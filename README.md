@@ -38,10 +38,11 @@ product site is **https://sgvue.github.io/**. Help › Check for updates… open
   for your user only, without administrator rights, and updates an existing install in place.
   It is not code-signed yet, so Windows may show *"Windows protected your PC"*: choose
   **More info → Run anyway**.
-- **macOS 13 or later (Apple silicon and Intel):** not published yet; it will appear on the same
-  page. The build is not notarised, so the first launch needs one extra step: open SGVue once,
-  then **System Settings → Privacy & Security → Open Anyway** (on macOS 13 and 14,
-  Control-click the app and choose **Open**).
+- **macOS 13 or later (Apple silicon and Intel):** published from 1.2.0 on. Download
+  `SGVue-<version>-arm64.dmg` for Apple silicon or `SGVue-<version>-x64.dmg` for an Intel Mac,
+  open it and drag SGVue onto Applications. The build is not notarised, so the first launch
+  needs one extra step: open SGVue once, then **System Settings → Privacy & Security → Open
+  Anyway** (on macOS 13 and 14, Control-click the app and choose **Open**).
 
 ## Privacy
 
@@ -68,7 +69,7 @@ product site is **https://sgvue.github.io/**. Help › Check for updates… open
 
 | | |
 |---|---|
-| **System** | Windows 10 or 11, 64-bit · macOS 13 or later, Apple silicon or Intel (builds not yet published) |
+| **System** | Windows 10 or 11, 64-bit · macOS 13 or later, Apple silicon or Intel |
 | **Memory** | 8 GB works for IFC files up to about 100 MB; 16 GB is recommended for 200 MB files or several models together |
 | **Graphics** | Any graphics card with WebGL2. On a Windows PC with an NVIDIA card, SGVue uses it |
 | **Files** | `.ifc` or `.ifczip`, built for typical files of 50–200 MB; a single file over 600 MB is not opened |

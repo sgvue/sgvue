@@ -157,9 +157,11 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > assisted NSIS wizard of 2026-09-28 — and its payload, extracted without running it, is 75 of 75
 > files SHA-256-identical to `dist/win-unpacked` (409 159 247 bytes: 390 MB installed), on which
 > `npm run test:packaged` passes. The installer is run by the owner, never by a build here. No
-> macOS build was made for 1.2.0 and none is published. The system requirements published with
-> it — the product site, the release notes (`docs/releases/1.2.0.md`) and the releases page —
-> are the table above, said for a user.
+> macOS build was made for 1.2.0 and none is published. *(2026-10-05: the two disk images —
+> ad-hoc signed, built by the release workflow from `sgvue/sgvue` (`docs/RELEASING.md`) — are
+> published with 1.2.0 on `sgvue/releases`, and `docs/releases/1.2.0.md` gives their
+> requirements.)* The system requirements published with it — the product site, the release
+> notes (`docs/releases/1.2.0.md`) and the releases page — are the table above, said for a user.
 
 ---
 
