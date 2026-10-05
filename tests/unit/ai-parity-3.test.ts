@@ -792,6 +792,8 @@ describe('request_user_action copy_link and copy_guids — nothing is copied unt
     expect(st().linkCopied).toBe(false)
     // Apply runs the Viewpoints card's own control — here the real one, on a clipboard that takes it.
     setOutsideActions({ openRecent: outside.openRecent, copyLink })
+    // Its 1 600 ms flash on a fake clock, which `afterEach` drops: nothing is left running.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     st().applyPending(at)
     await vi.waitFor(() => expect(st().linkCopied).toBe(true))
     expect(written).toHaveLength(1)
@@ -828,6 +830,8 @@ describe('request_user_action copy_link and copy_guids — nothing is copied unt
       action: { kind: 'copy_guids', text: guids.join('\n') }
     })
     expect(written).toEqual([])
+    // Its 1 400 ms flash on a fake clock, which `afterEach` drops: nothing is left running.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     st().applyPending(at)
     // The property card's own path: its flash is the store's, and stands once the text is there.
     await vi.waitFor(() => expect(st().copied).toBe(true))

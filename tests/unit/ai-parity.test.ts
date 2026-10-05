@@ -907,9 +907,10 @@ describe('set_interface — the app’s own settings', () => {
     expect(none.message).toBe('The Schedules window cannot be opened here.')
     expect(none.changed).toEqual([])
 
-    // The bridge opens it and the window joins.
+    // The bridge opens it and the window joins — once: main's own call only brings an open window
+    // forward, so a second call joins nothing (it used to, on a timer that fired in a later test).
     const port = { postMessage: () => undefined, close: () => undefined, onmessage: null } as unknown as MessagePort
-    const openSchedules = vi.fn(async () => {
+    const openSchedules = vi.fn(async (): Promise<void> => undefined).mockImplementationOnce(async () => {
       setTimeout(() => connect(port), 20)
     })
     vi.stubGlobal('window', { sgvue: { openSchedules } })

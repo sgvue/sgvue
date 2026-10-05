@@ -1,6 +1,6 @@
 # Dependabot version updates (2026-10-05): weekly, minor and patch updates grouped into one
-# pull request per ecosystem, majors one by one. Security updates are a separate repository
-# setting and stay on for every dependency.
+# pull request per ecosystem; no major version updates (each is measured by hand).
+# Security updates are a separate repository setting and still come for every dependency.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -11,6 +11,9 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
+      # No major version update for any dependency: a major upgrade is a measured change, not a bot PR.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
       # Pinned on purpose: an upgrade of any of these three is measured before it lands
       # (CLAUDE.md, docs/DECISIONS.md, docs/TRAPS.md) — Electron for the GPU memory the guards
       # watch, three.js for the renderer and its pixel parity with the design, web-ifc for the
@@ -34,3 +37,7 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # No major version update for any action: a major upgrade is a measured change, not a bot PR.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]

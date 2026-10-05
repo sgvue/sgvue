@@ -53,6 +53,8 @@ function fromChat(format: ExportFormat): { refused: ExportRefusal | null; runnin
 }
 
 beforeEach(() => {
+  // The toast's 2.6 s timer (`flash`) on a fake clock, which `afterEach` drops: nothing is left running.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   cell.clear();
   asked = [];
   opened = [];
@@ -78,6 +80,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   state.store = null;
 });
 

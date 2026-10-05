@@ -24,7 +24,7 @@ import {
 import { useShell } from '../../src/renderer/state/shell'
 import type { ModelIndex } from '../../src/shared/model-index.types'
 import { NO_SECTIONS } from '../../src/shared/sections'
-import { resetShell, stubViewer } from './stub-viewer'
+import { disposeFederation, resetShell, stubViewer } from './stub-viewer'
 
 const INITIAL = useShell.getState()
 
@@ -240,6 +240,8 @@ describe('FederationController — the replacement joins in the old one’s plac
     fed = new FederationController()
     fed.attach(viewer)
   })
+  // Each commit queues an SQL index build: it is stopped and settled here, never in a later test.
+  afterEach(() => disposeFederation(fed))
 
   it('one model under the key, the camera kept, never back to the landing page', async () => {
     await fed.addBatch([item('ARC', '/old/ARC.ifc')])
@@ -316,6 +318,7 @@ describe('FederationController — a batch whose join fails undoes itself', () =
     fed = new FederationController()
     fed.attach(viewer)
   })
+  afterEach(() => disposeFederation(fed))
 
   it('a replacement that fails to join leaves the model on screen as it was', async () => {
     await fed.addBatch([item('ARC', '/old/ARC.ifc'), item('STR', '/s')])

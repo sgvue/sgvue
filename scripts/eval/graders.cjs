@@ -22,7 +22,7 @@
  *
  *   · `pass`      every check the case declares, including `no_write`
  *   · `no_write`  the read-only guarantee, as a metric of its own so a refusal-zero and a
- *                 capability-zero are never summed (`eval-audit.md` §2)
+ *                 capability-zero are never summed
  *   · `facts`     the share of the required facts the reply actually carries, 0…1
  *   · `tools_ok`  tool discipline — what was called, in what order, how much of it
  *
@@ -809,8 +809,8 @@ function gradeCase(kase, obs, truth, kindOf) {
 const TRANSIENT_KINDS = new Set(['rate_limit', 'overloaded', 'connection'])
 
 /**
- * Why a zero is a zero. `eval-audit.md` §2: an infra error and a wrong answer must never share
- * a column. `harness` rows never reach `results.jsonl` at all — they go to `errors.jsonl`.
+ * Why a zero is a zero: an infra error and a wrong answer must never share a column. `harness`
+ * rows never reach `results.jsonl` at all — they go to `errors.jsonl`.
  */
 function failureClass(obs, grade) {
   const outcome = obs.outcome || {}

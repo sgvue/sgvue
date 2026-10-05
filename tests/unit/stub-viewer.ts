@@ -8,7 +8,10 @@
  *   Viewer's non-method members (`backend`, `bbox`, `dev`) unless a test passes them.
  * - `memoryStorage()` — an in-memory `localStorage`, so persistence can be asserted.
  * - `resetShell()` — the store back to its first state, and the undo stacks with it.
+ * - `disposeFederation(fed)` — a test's own `FederationController` disposed, with nothing of it
+ *   left running.
  */
+import type { FederationController } from '../../src/renderer/model/federation-store'
 import { resetHistory, useShell } from '../../src/renderer/state/shell'
 import type { Viewer } from '../../src/renderer/viewer/viewer-core'
 
@@ -47,4 +50,23 @@ const INITIAL = useShell.getState()
 export function resetShell(): void {
   useShell.setState(INITIAL, true)
   resetHistory()
+}
+
+/**
+ * Dispose a test's own `FederationController`, and wait until every SQL index build it had queued
+ * has run out — for an `afterEach`, so none is left to start after the test.
+ * Call it under real timers, since it drains through real `setTimeout(0)`s — or advance fake ones.
+ *
+ * Every commit or removal queues a build in the background (`rebuildSql`), which starts a timer
+ * later. Node has no `Worker`, so a build that starts fails and logs `SQL index unavailable`;
+ * started after a file's last test, that log reached vitest while it was closing the worker's
+ * RPC — `Closing rpc while "onUserConsoleLog" was pending`, the first public CI run's one error
+ * (2026-10-05). `query` waits for the newest build, so it is asked for first; `dispose` then
+ * stops each build still waiting before it starts, and the query is refused without a worker —
+ * the bridge has no database.
+ */
+export async function disposeFederation(fed: FederationController): Promise<void> {
+  const settled = fed.query('SELECT 1').catch(() => undefined)
+  fed.dispose()
+  await settled
 }

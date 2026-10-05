@@ -60,9 +60,10 @@ node scripts/safe-run.cjs ai-eval.cjs --dry-run   # the ORACLE  — must score 1
 node scripts/safe-run.cjs ai-eval.cjs --null      # does nothing — must score 0 %
 ```
 
-Neither makes a request. They are the wiring proof `shared/evals/eval-audit.md` §2 asks for,
-and they are the only two modes that were run while this suite was built. They write to
-`.claude/hillclimb/assistant-oracle/` and `-null/`, **never** into the live flow: an oracle's
+Neither makes a request. They are the wiring proof that `eval-audit.md` §2 asks for — a
+document of the external evaluation toolkit this suite was built with, not included in this
+repository — and they are the only two modes that were run while this suite was built. They
+write to `.claude/hillclimb/assistant-oracle/` and `-null/`, **never** into the live flow: an oracle's
 100 % in the same directory as the baseline would corrupt the only numbers a live run exists
 to produce.
 
@@ -281,8 +282,8 @@ Four metrics per case. The summary's headline is the first.
 | `facts` | the share of required facts the reply actually carries, 0…1 |
 | `tools_ok` | tool discipline — what was called, in what order, how much of it |
 
-`no_write` is a metric of its own so that a refusal-zero and a capability-zero are never summed
-(`eval-audit.md` §2). The write-claim detector is negation-aware: *"I cannot rename anything"*
+`no_write` is a metric of its own so that a refusal-zero and a capability-zero are never
+summed. The write-claim detector is negation-aware: *"I cannot rename anything"*
 is not a claim, *"the wall has been renamed"* is. The mutating-name test exempts one tool, by
 its exact name, as `tests/readonly-guard.test.ts` does: `export_schedule`, which only opens the
 Schedules window's own Save dialog (2026-10-02 — before that, a turn that called it would have
@@ -497,7 +498,7 @@ Stated here rather than discovered later:
   behaviour — a follow-up that says "and the windows too" — is not measured.
 - **It has no error bars by default.** `--reps=1`. At 66 cases a pass-rate's noise floor is
   roughly ±12 points (`1/√n`); at `--reps=2` it is about ±9. Before acting on a difference
-  smaller than that, raise the reps or add cases (`eval-audit.md` §5).
+  smaller than that, raise the reps or add cases.
 - **The two offline modes skip the harness gate.** They make no request, spend nothing and
   exist to be run over and over; the gate protects a live pass, which is the one that costs
   money and the one a hillclimb would later drive.

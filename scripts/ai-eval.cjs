@@ -36,7 +36,8 @@
  *   (neither)   LIVE. Needs ANTHROPIC_API_KEY already in the environment. Spends real money.
  *
  * Flags: --pilot, --only=<ids|groups|tags>, --fixture=<mock|mock-hostile>, --variant=v1,
- *        --flow=DIR, --reps=N, --timeout-s=N, --retries=N, --approve-harness.
+ *        --flow=DIR, --reps=N, --timeout-s=N, --retries=N, --approve-harness;
+ *        --no-report is accepted and does nothing (there has been no report since 2026-10-05).
  * Env:   SGVUE_APP_OUT=<dir> runs the suite against a saved build directory instead of `out/`.
  *        SGVUE_IFC=<path>    the optional, opt-in real-model fixture (see docs/AI_EVAL.md).
  *
@@ -172,7 +173,7 @@ const MODEL_PATH = process.env.SGVUE_IFC && process.env.SGVUE_IFC !== 'mock' ? p
 /**
  * **The real main process.** Requiring the built bundle is what puts the actual gateway, the
  * actual IPC table and the actual settings path behind the window — an eval that re-wired any
- * of them would be measuring the harness (`build-eval.md`, "Reimplementing the app").
+ * of them would be measuring the harness.
  *
  * electron-vite externalises main's `dependencies`, so the bundle does `require('zod')` and
  * `require('@anthropic-ai/sdk')` at load and Node resolves those by walking **up from the
@@ -902,8 +903,7 @@ app.whenReady().then(async () => {
       }
 
       // Token and cost columns exist only where a request was actually billed. The offline
-      // modes make none, and a row of zeros there would read as a measurement
-      // (`eval-audit.md` §3, and build-eval's "Trusting a zero").
+      // modes make none, and a row of zeros there would read as a measurement.
       const usage = out.obs.usage
       const billed = usage
         ? {

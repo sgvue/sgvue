@@ -33,7 +33,7 @@ first `npm test` does — or at once with `node node_modules/electron/install.js
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | `tsc` over the Node side and the web side |
-| `npm test` | The unit tests and the read-only guard (vitest). No Electron window, no GPU, no network |
+| `npm test` | The unit tests and the read-only guard (vitest). No Electron window and no GPU; the tests make no network call — only the first run may download Electron's binary, once (above) |
 | `npm run build` | Type-check, then build main, preload and renderer into `out/` |
 | `npm run test:e2e` | The Electron end-to-end suite (Playwright), through its guard. Needs a GPU with WebGL2 |
 | `npm run dist:win` · `npm run dist:mac` | The installers, into `dist/`. Before `dist:mac`, run `node node_modules/electron/install.js` — the disk images copy Electron's licence and Chromium's notices from the binary it installs ([docs/RELEASING.md](docs/RELEASING.md)) |

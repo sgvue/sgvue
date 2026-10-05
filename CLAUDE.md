@@ -1014,6 +1014,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-05 — **`sgvue/releases` is a permanent public channel** — never renamed, moved, made private or deleted, because every installed copy asks it for updates and treats a redirect as failure. CI builds the installers and publishes nothing; releases are made by hand (`docs/RELEASING.md`).
 - 2026-10-05 — **public commits are authored as `Yong Yen <releases@sgvue.invalid>`, the project's public commit identity**, and no file holds a personal account, address or link.
 - 2026-10-05 — **LF in every working copy** (`.gitattributes`, `* text=auto eol=lf`): a CRLF checkout — Git for Windows' default — fails the guard test's source patterns.
+- 2026-10-05 — **the public repository, `sgvue/sgvue`, is the source of truth**: every push is public at once; commits carry the project's public commit identity; the privacy search runs before every push; `sgvue/releases` stays the download channel. The private repository is an archive of the history before publication.
+- 2026-10-05 — **Dependabot proposes no major version update** for any dependency, npm or Actions (`'*'` with `update-types: [version-update:semver-major]`): a toolchain major is a measured change, not a bot PR. Security updates are unaffected — `update-types` applies to version updates only.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
@@ -1028,7 +1030,7 @@ A new decision is recorded as **one line here and a full row in `docs/DECISIONS.
 | `npm run typecheck` | `tsc --noEmit` for the node and web projects |
 | `npm test` | vitest (unit + read-only guard) |
 | `npm run test:e2e` | Electron smoke test through `scripts/safe-e2e.cjs` (the guarded wrapper — **never** a bare `npx playwright test`). Runs on Windows too: same limits, working set + the GPU dedicated-memory counter instead of `phys_footprint` |
-| `npm run dist:mac` / `dist:win` | Installers. `dist:mac` writes `dist/SGVue-<version>-arm64.dmg` and `dist/SGVue-<version>-x64.dmg`; `dist:win` writes `dist/SGVue-<version>-setup.exe` (`<version>` is `package.json`'s). The DMGs ad-hoc signed (since 2026-10-05), the installer unsigned |
+| `npm run dist:mac` / `dist:win` | Installers. `dist:mac` writes `dist/SGVue-<version>-arm64.dmg` and `dist/SGVue-<version>-x64.dmg`; `dist:win` writes `dist/SGVue-<version>-setup.exe` (`<version>` is `package.json`'s). The DMGs ad-hoc signed (since 2026-10-05), the installer unsigned. Before `dist:mac`, run `node node_modules/electron/install.js` — Electron 44.3.0 has no install script, and without its binary the Mac build lacks Electron's and Chromium's notice files |
 | **`npm run test:packaged`** | The **packaged** app — `dist/mac-arm64/SGVue.app` on macOS, `dist/win-unpacked` on Windows — through `scripts/safe-app.cjs`: a share link, the production CSP, the unpacked `.wasm`, Preferences from the real menu. Skips when there is no `dist/`; the `.icns` test is macOS-only |
 | **`node scripts/safe-app.cjs -- <executable> [args]`** | **The only sanctioned way to start a *packaged* SGVue.** Same limits as the other guards, matched on `/SGVue.app/Contents/` as well as `node_modules/electron/dist/`, and it kills every `SGVue Helper (…)` afterwards. On Windows it matches on the directory instead — `dist\win-unpacked\`, `node_modules\electron\dist\`, and the directory of a `-- <executable>.exe` so an installed copy is guarded too — reads working set plus the GPU dedicated-memory counter, and kills with `taskkill /T /F`. With no `--` it runs the packaged Playwright spec |
 | **`node scripts/safe-run.cjs <script.cjs> [args]`** | **The only sanctioned way to start Electron here.** Refuses to start a second dev Electron, runs the target in the foreground under the memory guard, kills any survivor afterwards and says whether it had to — on Windows too, through PowerShell and `taskkill` rather than `/bin/ps` and `kill -9`. On both platforms a listing that could not be made refuses the run outright rather than start blind, and one at the end prints `COULD NOT LIST` rather than `clean:`. Limits: `SGVUE_MAX_GPU_MB` (2 500), `SGVUE_MAX_RENDERER_MB` (6 000), `SGVUE_MAX_SECONDS` (25) |
@@ -1064,6 +1066,11 @@ is the history, and `docs/SYSTEM_SPEC.md` §11 is what is still owed before a pu
   ending in a Build Report.
 - **The reviewer commits**, after reviewing the report against the diff and against the design.
   The builder never commits.
+- **The public repository, `sgvue/sgvue`, is the source of truth, and every push is public at
+  once.** Commit only as the project's public commit identity, `Yong Yen
+  <releases@sgvue.invalid>`. Before every push, run the privacy search over what is pushed: no
+  personal account, e-mail address, home path or real project may appear, and the owner appears
+  only as Yong Yen. Installers are still published on `sgvue/releases`.
 - **`samples/` is git-ignored.** Real project models never enter the repository. So is
   **`tests/fixtures/*.expected.json`**: the IfcOpenShell ground truth is generated *from*
   those models and carries their metadata. Regenerate it with

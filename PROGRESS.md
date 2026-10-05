@@ -3,6 +3,80 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-05 — published as `sgvue/sgvue`; the first CI run's one error fixed, and the docs tidied
+
+**Published.** SGVue is open source at https://github.com/sgvue/sgvue (Apache-2.0): one commit,
+`27fb7ee` — this repository's first, and the one hash in these notes that resolves here — made
+from the tree the entry below prepared, after its review, and authored as Yong Yen. The private
+repository keeps the history before publication as an archive; it is not published. Switched on
+in the repository's settings: private vulnerability reporting, secret scanning with push
+protection, Dependabot alerts and security updates, CodeQL's default setup, a read-only default
+token for workflows, and a ruleset, "Protect main", that blocks deleting `main` and
+force-pushing to it. This PC's checkout now has the public repository as `origin`. The same day
+the redesigned download page went live on the product site (commit `2772199` of the site's own
+repository).
+
+**The first CI run.** Windows passed; macOS and Ubuntu failed at `npm test` although every test
+passed (142 files and 2 773 tests passed, 3 and 4 skipped): vitest reported one unhandled
+`EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`,
+from `tests/unit/federation-store.test.ts`. **The cause:** every commit and every removal in
+`FederationController` queues an SQL index build behind a timer (`rebuildSql`, behind
+`afterPaint`'s `setTimeout`); Node has no `Worker`, so each build fails and logs
+`[sgvue] SQL index unavailable`. The file's tests never wait on a timer, so its twelve builds
+started only once vitest yielded after the last test: the CI log shows eight of their logs
+arriving as the file finished and four after it, the last still on its way when the worker's
+RPC was closed. **The fix, in the tests only:** `disposeFederation(fed)`
+(`tests/unit/stub-viewer.ts`) asks the controller for a query — which waits for its newest
+build — disposes it, so every build still waiting returns before it starts, and resolves once
+that chain has run out. `federation-store.test.ts` calls it after each test, and so do the two
+`FederationController` blocks of `replace-pick.test.ts`, whose six builds used to fail and log
+inside a later test (P9). No app code changed.
+
+**The other files.** A temporary audit — a vitest setup file, not committed — recorded every
+real timer a test left behind, the handles still active at each file's end and any log after
+its last test. Before: twelve late logs and eight pending timers in `federation-store.test.ts`;
+four timers in `replace-pick.test.ts` whose builds logged in P9; flash timers still pending
+when the file ended in `ai-parity-3.test.ts` (`link copied`, 1 600 ms; `Copied`, 1 400 ms),
+`schedule/manage.test.ts` and `schedule/exporting.test.ts` (the Schedules window's 2.6 s
+toast); and in `ai-parity.test.ts` a stub `openSchedules` that joined the window again on its
+second call, on a 20 ms timer that fired in a later test — main's own call only brings an open
+window forward, and the stub now does the same. The flashes and toasts now run on a fake clock
+that their file's `afterEach` drops. None of those four logged, so none could have caused the
+CI error. After: no test leaves a timer behind, no file ends with one pending, and nothing logs
+after a file's last test. Four main-process test files still end with a file-system request
+completing (`FSReqCallback`, `CloseReq`); the modules they test log nothing.
+
+**Docs and settings.** `docs/COMMANDS.md` and `CLAUDE.md`: `npm run dist:mac` needs
+`node node_modules/electron/install.js` first. `scripts/ai-eval.cjs`'s flag list names
+`--no-report`. The citations of `eval-audit.md` and `build-eval.md`, documents of the external
+evaluation toolkit, are gone from the code and from two of three places in `docs/AI_EVAL.md`;
+the one kept, where the oracle and null modes are introduced, says it is external and not
+included here. `CONTRIBUTING.md`: the tests make no network call, and only the first `npm test`
+may download Electron's binary. `.github/dependabot.yml` proposes no major version update for
+any dependency, npm or Actions — four major-upgrade pull requests (TypeScript, Vite,
+`@types/node`, `@vitejs/plugin-react`) arrived within minutes of publishing; security updates
+are unaffected. Two rows in `docs/DECISIONS.md` and their index lines; one new rule in
+`CLAUDE.md`: the public repository is the source of truth.
+
+**Found doing it.** vitest 5 runs in its agent mode when it finds an AI agent's environment
+(`AI_AGENT`), and then prints no console output for passing tests — one reason the SQL warning
+was not seen locally. The runs below used `--reporter=default`, as CI does, unless said
+otherwise.
+
+**Verified:** `npm run typecheck` exit 0. `npx vitest run tests/unit/federation-store.test.ts`
+30 times: 30 clean — 10 passed, no unhandled error — and 30 more under the agent reporter.
+`npm test` 5 times with the default workers and 5 with `--maxWorkers=3`: every run 143 files
+passed / 2 skipped, 2 775 tests passed / 3 skipped, no unhandled error, no SQL log. **The race
+reproduced here, and gone:** with the full suite running beside an old copy of the test and an
+old-style test with a longer build chain, 3 of 6 runs ended in CI's error, each from the longer
+chain; beside the same two in the new style, 0 of 6. With one more log at a file's end, the old
+`federation-store.test.ts` failed 2 of 30 runs under the agent reporter and the longer chain 2
+of 30 under the default one; their new versions 0 of 30 each. The Dependabot file parses
+(js-yaml and PyYAML). **Not verified here:** GitHub's macOS and Ubuntu runners themselves.
+
+This is the 22nd entry; as with the 21st, the oldest is not compressed, because the public
+repository starts without the history that would hold its full text.
+
 ## 2026-10-05 — prepared for open source: Apache-2.0, notices generated and shipped, ad-hoc-signed macOS builds, the documents a stranger reads, CI
 
 **Why:** the owner: *"prepare our sg vue repo for open source on github. propose license for me

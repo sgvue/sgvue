@@ -2,12 +2,11 @@
  * The eval suite's own graders.
  *
  * `scripts/ai-eval.cjs` decides whether the assistant answered a question correctly, and a
- * grader that is wrong turns every number in `metrics.json` into fiction — `eval-audit.md` §4
- * is mostly about exactly this. So the scoring is a set of pure functions over three plain
- * objects (`scripts/eval/graders.cjs`) and this file is what holds them honest: no Electron,
- * no store, no window, no API.
+ * grader that is wrong turns every number in `metrics.json` into fiction. So the scoring is a
+ * set of pure functions over three plain objects (`scripts/eval/graders.cjs`) and this file is
+ * what holds them honest: no Electron, no store, no window, no API.
  *
- * The three things it has to prove, in `eval-audit.md`'s own terms:
+ * The three things it has to prove:
  *   · an **oracle** passes — a correct observation scores 1 on every metric;
  *   · a **null** fails — an agent that does nothing scores 0 on every case, including the
  *     refusals, which it would otherwise "pass" by saying nothing;

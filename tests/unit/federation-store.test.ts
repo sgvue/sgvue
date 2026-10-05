@@ -10,12 +10,12 @@
  * These tests drive `FederationController` against a recording stub, so the rule is checked
  * without a GPU — the thing a parity screenshot only catches after the fact.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mockGeometryChunks, mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { FederationController, type BatchItem } from '../../src/renderer/model/federation-store'
 import { useShell } from '../../src/renderer/state/shell'
 import type { ModelMeta, Viewer } from '../../src/renderer/viewer/viewer-core'
-import { resetShell, stubViewer } from './stub-viewer'
+import { disposeFederation, resetShell, stubViewer } from './stub-viewer'
 
 /** Every viewer call the controller and `commitModels` make, in order. */
 function recordingViewer(): { viewer: Viewer; calls: string[]; metas: Map<string, ModelMeta> } {
@@ -54,6 +54,8 @@ beforeEach(() => {
   stub = recordingViewer()
   fed.attach(stub.viewer)
 })
+// Each commit queues an SQL index build: it is stopped and settled here, never after the file.
+afterEach(() => disposeFederation(fed))
 
 describe('boot-batch framing', () => {
   it('frames once, after every model of the boot batch is in', async () => {
