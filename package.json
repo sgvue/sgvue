@@ -33,9 +33,9 @@
     "dist:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.125.0",
+    "@anthropic-ai/sdk": "0.131.0",
     "@electron-toolkit/utils": "4.0.0",
-    "zod": "4.6.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
@@ -61,7 +61,7 @@
     "three": "0.186.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
-    "vitest": "5.0.0",
+    "vitest": "5.0.3",
     "web-ifc": "0.0.77",
     "zustand": "5.0.15"
   }
