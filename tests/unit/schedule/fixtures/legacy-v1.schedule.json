@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "name": "Legacy Door Schedule",
+  "entity": ["IfcDoor"],
+  "columns": [
+    { "field": { "kind": "core", "key": "storey" } },
+    { "field": { "kind": "core", "key": "typeMark" }, "heading": "Type Tag" },
+    { "field": { "kind": "core", "key": "objectType" } },
+    { "field": { "kind": "core", "key": "expressId" }, "align": "right" },
+    { "field": { "kind": "prop", "pset": "*", "prop": "FireRating" }, "total": "count" },
+    { "field": { "kind": "combined", "id": "k1" } },
+    { "field": { "kind": "formula", "id": "c1" }, "format": { "decimals": 2 } }
+  ],
+  "calculated": [
+    { "id": "c1", "name": "Double", "kind": "formula", "formula": "FireRating * 2", "byLevel": 1 }
+  ],
+  "combined": [
+    { "id": "k1", "name": "Ref", "separator": " - ", "parts": [{ "field": { "kind": "core", "key": "typeName" } }] }
+  ],
+  "filters": [
+    { "field": { "kind": "prop", "pset": "*", "prop": "FireRating" }, "op": "hasValue" }
+  ],
+  "filterLogic": "and",
+  "sort": [{ "field": { "kind": "core", "key": "storey" }, "dir": "asc", "header": true }],
+  "itemize": true,
+  "grandTotal": true,
+  "appearance": { "headerItalic": true, "fontSize": 13 }
+}

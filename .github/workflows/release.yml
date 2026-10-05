@@ -1,0 +1,119 @@
+# Release builds (2026-10-05). Builds the installers on GitHub's runners and publishes nothing:
+# each file goes up as a workflow artifact, with its SHA-256 in the run's summary and a
+# build-provenance attestation. A release is made by hand on sgvue/releases once the builds
+# have been tested (docs/RELEASING.md). Every action is pinned to a full commit SHA, with its
+# version in a comment.
+name: Release builds
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Never sign with a certificate found by chance: the macOS build is ad-hoc signed by its own
+  # configuration (electron-builder.yml), and the Windows installer is not signed.
+  CSC_IDENTITY_AUTO_DISCOVERY: false
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write # the attestation's signing certificate
+      attestations: write # storing the attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:win
+      - name: SHA-256 into the summary
+        shell: bash
+        run: |
+          {
+            echo '### Windows installer — SHA-256'
+            echo
+            echo '```'
+            (cd dist && sha256sum SGVue-*-setup.exe)
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sgvue-windows
+          path: dist/SGVue-*-setup.exe
+          if-no-files-found: error
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/SGVue-*-setup.exe
+
+  macos:
+    name: macOS disk images
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write # the attestation's signing certificate
+      attestations: write # storing the attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Electron 44.3.0 has no install script, so `npm ci` leaves node_modules/electron/dist/
+      # without Electron — and electron-builder.yml copies Electron's LICENSE and
+      # LICENSES.chromium.html into each app from there. electron-builder packs its own download
+      # of Electron, so nothing else in the build changes.
+      - name: Install Electron's binary (its licence and Chromium's notices)
+        run: node node_modules/electron/install.js
+      # Both disk images, arm64 and x64, ad-hoc signed (electron-builder.yml).
+      - run: npm run dist:mac
+      # A missing `extraResources` source is only a warning to electron-builder ("file source
+      # doesn't exist"), and the build goes on without it. dist/mac-arm64 holds the arm64 app and
+      # dist/mac the x64 one (x64 is electron-builder's default arch, so its folder has no suffix).
+      - name: Both apps carry Electron's licence and Chromium's notices
+        run: |
+          missing=0
+          for app in dist/mac-arm64/SGVue.app dist/mac/SGVue.app; do
+            for file in LICENSE.electron.txt LICENSES.chromium.html; do
+              if [ -f "$app/Contents/Resources/$file" ]; then
+                echo "found $app/Contents/Resources/$file"
+              else
+                echo "::error::$app/Contents/Resources/$file is missing"
+                missing=1
+              fi
+            done
+          done
+          exit "$missing"
+      - name: SHA-256 into the summary
+        run: |
+          {
+            echo '### macOS disk images — SHA-256'
+            echo
+            echo '```'
+            (cd dist && shasum -a 256 SGVue-*.dmg)
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sgvue-macos
+          path: dist/SGVue-*.dmg
+          if-no-files-found: error
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/SGVue-*.dmg

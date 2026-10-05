@@ -1,0 +1,46 @@
+/*
+ * The assistant panel's rules that cannot be inline styles — 2026-10-01, the owner's "Ask Vee"
+ * handoff (`design-reference/ask-vee/`). None of them is in `SGVue.dc.html`; each says why it
+ * has to be a rule.
+ */
+
+/*
+ * The composer's placeholder returns as the typed line lifts out of it (`ask-thinking-hex.jsx:287`,
+ * `phIn`): a pseudo-element has no inline style, so the panel sets `--ph` on the input for the
+ * 0.9 s the lift takes and removes it again. With no `--ph` the placeholder is the design's.
+ */
+[data-role='chatinput']::placeholder {
+  opacity: var(--ph, 1);
+}
+
+/*
+ * The send button is a stop button while a turn runs: its arrow cross-fades to a square in
+ * `--accent-ink`. Under the pointer the button fills with `--accent` and its arrow turns
+ * `--ground` (the design's own hover, `.hv-accent-ground`); the square takes the same colour,
+ * or it would be teal on teal.
+ */
+.hv-accent-ground:hover [data-part='send-stop'] {
+  background: var(--ground) !important;
+}
+
+/*
+ * A tooltip inside the chat log is not generated until it shows.
+ *
+ * The design's tooltip (`[data-tip]::after`, `design.css`) is always laid out and only made
+ * visible on hover. Inside the log — the one scroll container that carries `data-tip`s — its
+ * invisible box counts as the log's content: a control near the right edge (the design's own
+ * right-aligned `reply`, a chip at the end of a line) put up to 20 px of tooltip outside the
+ * log, which then scrolled sideways: `scrollWidth` 348 against a `clientWidth` of 320. Not
+ * generated, it is no content at all; `@starting-style` gives it the state it fades in from,
+ * which the always-present one had for free.
+ */
+[data-role='chatlog'] [data-tip]:not(:hover):not(:focus-visible)::after {
+  content: none;
+}
+@starting-style {
+  [data-role='chatlog'] [data-tip]:hover::after,
+  [data-role='chatlog'] [data-tip]:focus-visible::after {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-3px);
+  }
+}

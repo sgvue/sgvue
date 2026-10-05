@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Schedules</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self' sgvue-file: blob:; object-src 'none'; base-uri 'none'" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header id="header" class="hdr" hidden></header>
+      <div id="layout" class="layout" hidden>
+        <aside id="rail-pane" class="rail" aria-label="Categories"></aside>
+        <main class="centre">
+          <div id="output-pane" class="centre-body"></div>
+          <footer id="status-bar" class="status"></footer>
+        </main>
+        <aside id="inspector-pane" class="inspector" aria-label="Schedule setup"></aside>
+      </div>
+      <div id="empty-pane" class="empty-note">Open a model in SGVue to see its schedules.</div>
+      <div id="overlay-root"></div>
+    </div>
+    <script type="module" src="./schedule-ui/main.ts"></script>
+  </body>
+</html>

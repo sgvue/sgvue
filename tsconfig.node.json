@@ -1,0 +1,23 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": [
+    "electron.vite.config.*",
+    "vitest.config.*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "src/schedule/**/*",
+    "src/worker/index-builder.ts",
+    "src/worker/ifc-source.ts",
+    "src/worker/geometry-streamer.ts",
+    "src/worker/sql-schema.ts",
+    "tests/**/*"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    // `vite/client` is what declares the `?url` asset imports. The two workers are left out of
+    // this project's `include` for exactly that reason, but a test that reaches a renderer
+    // module pulls their *types* in through the bridges, so the declarations have to be here.
+    "types": ["electron-vite/node", "vite/client"]
+  }
+}

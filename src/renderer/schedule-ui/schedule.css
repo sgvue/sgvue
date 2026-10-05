@@ -1,0 +1,610 @@
+/*
+ * The Schedules window (2026-09-25; phase 2 the same day). ifcTable's layout and controls
+ * (`shell.css`, `controls.css`, `overlays.css`, `table.css`), redrawn in SGVue's own tokens
+ * from `design.css` — no ifcTable palette survives. The mapping, once:
+ *
+ *   surfaces   panel → --card · shell / panel-2 → --ground · group / chip / hover → --step-bg
+ *   lines      line / line-2 / line-soft → --border · line-strong → --border-strong
+ *   text       ink / ink-2 → --ink · ink-3 / muted → --muted · muted-2 / faint → --faint
+ *   accent     accent-soft / accent-chip → --sel-bg + --sel-ink, edges --accent
+ *   ok / warn  --ok-* / --warn-*; ifcTable's danger has no SGVue colour, so a destructive
+ *              control takes warn, as the main window's delete buttons do (`hv-warn-both`)
+ *   type       the section label (600 11 px, uppercase, .09–.1em), the 13 px row, the 11 px
+ *              mono count and meta, IBM Plex Sans / Mono
+ *   radius     10 px on cards and overlays, 8 px on fields and buttons, 6 px on rows and
+ *              icon buttons, 999 px on pills
+ *   motion     the Preferences dialog's `fadein` .15 s on what is created once (the dialog,
+ *              the toast); nothing on what a repaint rebuilds (ifcTable's rule)
+ *   hover      hover.css's declarations — the markup carries `hv-step`, `hv-step-ink` and
+ *              `hv-warn-both` where the main window would; the button classes below restate
+ *              the same declarations as plain `:hover` rules
+ */
+
+:root { --col-tint: color-mix(in srgb, var(--accent) 7%, transparent); }
+
+[hidden] { display: none !important; }
+
+.app { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+.mono { font-family: var(--mono); }
+.spacer { flex: 1; }
+
+/* ── buttons ──────────────────────────────────────────────────────────── */
+/* The Preferences dialog's Save button: the secondary action everywhere in this window. */
+.btn {
+  flex: none; font: 600 12px/1 var(--sans); padding: 7px 12px; border-radius: 8px;
+  border: 1px solid var(--border-strong); color: var(--ink); background: var(--ground);
+  white-space: nowrap; text-align: center;
+}
+.btn:hover:not(:disabled) { background: var(--step-bg); color: var(--ink); }
+/* The chat panel's send button: sel-bg with the accent edge, accent under the pointer. */
+.btn.primary, button.tint { background: var(--sel-bg); color: var(--sel-ink); border: 1px solid var(--accent); }
+.btn.primary:hover:not(:disabled), button.tint:hover:not(:disabled) { background: var(--accent); color: var(--ground); }
+.btn.danger { color: var(--warn-ink); border-color: var(--warn-line); }
+button:disabled { opacity: .45; cursor: default; }
+button.tint { width: 100%; font: 600 12.5px/1 var(--sans); padding: 9px 12px; border-radius: 8px; text-align: center; }
+/* The filter card's "+ add filter step": an add is a link-coloured line, not a box. */
+button.dashed {
+  align-self: flex-start; display: block; font: 500 12px/1 var(--sans); color: var(--accent-ink);
+  padding: 6px 0;
+}
+button.dashed:disabled { color: var(--faint); opacity: 1; }
+button.dashed .dim { color: var(--faint); }
+button.link {
+  font: 500 11.5px/1 var(--sans); color: var(--accent-ink); padding: 0 0 0 6px;
+}
+button.link:hover:not(:disabled) { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+button.link:disabled { color: var(--faint); opacity: 1; }
+button.quiet { font: 500 12px/1 var(--sans); color: var(--muted); padding: 6px 8px; border-radius: 6px; }
+button.quiet:hover:not(:disabled) { background: var(--step-bg); color: var(--ink); }
+.icon-btn {
+  width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--muted);
+}
+.icon-btn.small { width: 24px; height: 24px; color: var(--faint); }
+.icon-btn > svg { display: block; }
+.icon-btn.on { background: var(--sel-bg); color: var(--sel-ink); }
+.icon-btn:disabled { opacity: .35; }
+/* The main window's remove-a-filter-step ×: 22 px, faint, warn under the pointer. */
+.x-btn {
+  width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--faint); margin-left: 4px;
+}
+.x-btn.flush { margin-left: 0; }
+.x-btn.near { margin-left: 2px; }
+/* A pill — the sidebar's "clear" chip and the landing page's sample pills. */
+button.chip {
+  font: 500 11px/1 var(--sans); color: var(--accent-ink); padding: 5px 9px;
+  border: 1px solid var(--border); border-radius: 999px;
+}
+button.chip:hover { border-color: var(--accent); }
+
+/* ── fields ───────────────────────────────────────────────────────────── */
+/* The Filter card's own field style (`FilterCard.tsx`), and hover.css's `fv-field` focus. */
+.app select, .app input[type="text"], .app input[type="number"], .app input[type="search"], .dlg-field {
+  font: 400 12.5px/1.3 var(--sans); color: var(--ink); background: var(--card);
+  border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 8px; min-width: 0;
+}
+.app select:focus, .app input[type="text"]:focus, .app input[type="number"]:focus,
+.app input[type="search"]:focus, .dlg-field:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--sel-bg); outline: none;
+}
+/* `input.` as well as the class: `.app input[type=…]` is (0,2,1) — an attribute counts as a
+   class — and a bare `.app .field` (0,2,0) would lose to it (ifcTable's own trap). */
+.app input.field { width: 100%; font-size: 13px; padding: 7px 10px; }
+.app input[type="checkbox"], .app input[type="range"] { accent-color: var(--accent); margin: 0; }
+.app input[type="range"] { width: 100%; }
+select.picker { font-weight: 500; color: var(--sel-ink); background: var(--sel-bg); border-color: var(--accent); }
+
+/* ── labels and text ──────────────────────────────────────────────────── */
+/* Preferences' LABEL. */
+label.lbl { display: block; font: 600 11px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+/* The Filter card's rule-builder title. */
+.eyebrow { font: 600 10.5px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sub { font: 400 11.5px/1.45 var(--sans); color: var(--muted); }
+.hint { font: 400 12px/1.45 var(--sans); color: var(--muted); text-wrap: pretty; }
+.opt-title { font: 500 13px/1.35 var(--sans); color: var(--ink); }
+.dim { color: var(--faint); font-weight: 400; }
+.panel-note { font: 400 11.5px/1.5 var(--sans); color: var(--faint); margin-top: 10px; text-align: center; text-wrap: pretty; }
+.tip-error { color: var(--warn-ink); }
+.empty-note { margin: auto; padding: 40px 10px; font: 400 13px/1.5 var(--sans); color: var(--muted); text-align: center; }
+
+/* ── layout helpers (ifcTable's, unchanged) ───────────────────────────── */
+.row { display: flex; gap: 6px; align-items: center; }
+.row > * { min-width: 0; }
+.row.wide { gap: 8px; }
+.row.ends { justify-content: space-between; }
+.row.top { align-items: flex-start; }
+.row.bottom { align-items: flex-end; }
+.row > .lbl { margin-bottom: 0; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.stack.tight { gap: 2px; }
+.block { margin-top: 12px; }
+.block.tight { margin-top: 10px; }
+.block.snug { margin-top: 8px; }
+.full { width: 100%; }
+.grow-1 { flex: 1; min-width: 0; }
+.slot-sm { flex: 0 0 84px; }
+.slot-md { flex: 0 0 92px; }
+.block-label { margin-bottom: 8px; }
+.head-row { margin-bottom: 8px; }
+.hint-under { margin-top: 5px; }
+.rule-sep { height: 1px; background: var(--border); margin: 14px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ── pills, badges, notices ───────────────────────────────────────────── */
+/* A checkbox dressed as a pill; the whole pill is the hit target. On: the sidebar's accent pill. */
+.toggle {
+  position: relative; display: inline-flex; align-items: center; gap: 5px;
+  font: 500 11px/1 var(--sans); color: var(--muted); padding: 5px 9px;
+  border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+}
+button.toggle:hover, label.toggle:hover { border-color: var(--accent); }
+.toggle > input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.toggle:has(> input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle.on { color: var(--sel-ink); background: var(--sel-bg); border-color: var(--accent); }
+/* An on pill says so in words as well as colour. */
+.toggle.on::before { content: '✓'; font-size: 10px; line-height: 1; }
+/* The Filter card's action tag. */
+.badge {
+  display: inline-block; font: 600 9.5px/1 var(--mono); letter-spacing: .02em; padding: 3px 5px;
+  border-radius: 4px; background: var(--warn-bg); color: var(--warn-ink); white-space: nowrap; vertical-align: 1px;
+}
+.badge.accent { background: var(--sel-bg); color: var(--sel-ink); }
+.notice {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  font: 400 12px/1.4 var(--sans); color: var(--warn-ink); background: var(--warn-bg);
+  border: 1px solid var(--warn-line); border-radius: 8px; padding: 7px 10px;
+}
+.notice > .grow { flex: 1; }
+.notice .btn { color: var(--warn-ink); border-color: var(--warn-line); background: var(--card); padding: 5px 10px; }
+
+/* ── the switch: a checkbox as an on/off track, in tokens ─────────────── */
+.switch { position: relative; width: 30px; height: 17px; flex: none; display: inline-block; }
+.switch > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.switch > i { position: absolute; inset: 0; border-radius: 999px; background: var(--border-strong); pointer-events: none; transition: background .15s; }
+.switch > i::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+  border-radius: 999px; background: var(--card); box-shadow: var(--shadow); transition: translate .15s;
+}
+.switch > input:checked + i { background: var(--accent); }
+.switch > input:checked + i::after { translate: 13px 0; }
+.switch > input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font: 400 13px/1.35 var(--sans); color: var(--ink); cursor: pointer; }
+.switch-row.top { align-items: flex-start; }
+.switch-row.top .switch { margin-top: 2px; }
+.switch-row .opt-title, .switch-row .hint { display: block; }
+.switch-row .hint { margin-top: 2px; }
+.switch-list > .switch-row { border-bottom: 1px solid var(--border); }
+.switch-list > .switch-row:last-child { border-bottom: none; }
+
+/* ── the segmented control: the sidebar's Entity / Type pair ──────────── */
+.seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
+.seg-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font: 500 11.5px/1 var(--mono); padding: 7px 8px; color: var(--muted); border-right: 1px solid var(--border);
+}
+.seg-btn:last-child { border-right: none; }
+.seg-btn:hover { background: var(--step-bg); }
+.seg-btn.on { background: var(--sel-bg); color: var(--sel-ink); }
+.seg.mini { flex: none; }
+.seg.mini .seg-btn { flex: none; padding: 6px 8px; }
+
+/* ── header ───────────────────────────────────────────────────────────── */
+.hdr {
+  flex: none; height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 12px;
+  background: var(--card); border-bottom: 1px solid var(--border); min-width: 0;
+}
+/* Reads as the sidebar's project title until it is clicked into. */
+.app .hdr input.schedule-name {
+  font: 600 15px/1 var(--sans); letter-spacing: -.01em; color: var(--ink);
+  background: transparent; border-color: transparent; padding: 7px 8px; width: 240px; min-width: 80px; flex: 0 1 240px;
+}
+.app .hdr input.schedule-name:hover { border-color: var(--border); }
+.app .hdr input.schedule-name:focus { border-color: var(--accent); }
+/* The sidebar's accent pill (`Sidebar.tsx`, the active-model chip). */
+.cat-chip, .tpl-chip {
+  flex: none; font: 500 10.5px/1 var(--mono); letter-spacing: .04em; white-space: nowrap;
+  color: var(--sel-ink); background: var(--sel-bg); border: 1px solid var(--accent); border-radius: 999px; padding: 4px 8px;
+}
+.tpl-chip { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-line); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.hdr-group { display: flex; align-items: center; gap: 2px; padding-left: 8px; margin-left: 2px; border-left: 1px solid var(--border); }
+/* The tooltips sit below; at the right edge of the window they hug it rather than spill out. */
+.hdr-group:last-child [data-tip]::after { left: auto; right: 0; transform: translateY(-3px); }
+.hdr-group:last-child [data-tip]:hover::after { transform: none; }
+
+/* ── three panes ──────────────────────────────────────────────────────── */
+.layout { flex: 1; display: flex; min-height: 0; min-width: 0; }
+
+.rail {
+  width: 248px; flex: none; display: flex; flex-direction: column; min-height: 0;
+  background: var(--card); border-right: 1px solid var(--border);
+}
+.rail.closed { width: 22px; }
+.strip-open { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; color: var(--faint); }
+.rail-search { flex: none; display: flex; gap: 4px; align-items: center; padding: 12px 8px 8px 12px; }
+.rail-label {
+  flex: none; padding: 6px 12px 4px; display: flex; align-items: center; justify-content: space-between;
+  font: 600 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.rail-label .n { font: 400 11px/1 var(--mono); letter-spacing: 0; color: var(--faint); }
+.rail-body {
+  flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column;
+  padding: 2px 12px 12px 10px;
+}
+.rail-item {
+  display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; align-items: center; gap: 9px;
+  padding: 6px 8px; border-left: 2px solid transparent; border-radius: 0 6px 6px 0;
+  font: 500 13px/1.3 var(--sans); color: var(--ink);
+}
+.rail-item .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-item .n { font: 400 11px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+.rail-item.on { border-left-color: var(--accent); background: var(--sel-bg); color: var(--sel-ink); }
+.rail-item .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--faint); }
+.rail-item .dot.arc { background: var(--accent); }
+.rail-item .dot.str { background: var(--muted); }
+.rail-item .dot.mep { background: var(--warn-ink); }
+.rail-item.on .dot { background: var(--accent); }
+/* Phase 3: a category holding a 3D selection the table does not show — an accent dot after
+   the count, the discipline dot's own size. */
+.rail-item.sel-here { grid-template-columns: 6px minmax(0, 1fr) auto 6px; }
+.rail-item.sel-here::after { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--accent); }
+.rail-empty { padding: 6px 8px; font: 400 12px/1.4 var(--sans); color: var(--muted); }
+.rail-sched { flex: none; border-top: 1px solid var(--border); padding-top: 8px; }
+.rail-sched .rail-group { max-height: 176px; overflow-y: auto; display: flex; flex-direction: column; padding: 2px 12px 12px 10px; }
+.rail-saved {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px;
+  padding: 2px 4px 2px 8px; border-left: 2px solid transparent; border-radius: 0 6px 6px 0;
+}
+.rail-saved > .grow {
+  padding: 4px 0; font: 500 12.5px/1.3 var(--sans); color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rail-saved .n { font: 400 10.5px/1 var(--mono); color: var(--sel-ink); }
+.rail-saved.on { border-left-color: var(--accent); background: var(--sel-bg); }
+.rail-saved.on > .grow { color: var(--sel-ink); }
+.rail-saved .x { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 5px; color: var(--faint); }
+
+.centre { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.centre-body { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+/* The status bar's own line: 11 px mono, tabular, `--border-strong` dots. */
+.status {
+  flex: none; height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 16px;
+  background: var(--card); border-top: 1px solid var(--border);
+  font: 400 11px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; overflow: hidden;
+}
+.status .dot { color: var(--border-strong); }
+/* Phase 3: "2 selected in 3D · not in this schedule". */
+.status .sel-note { display: inline-flex; gap: 10px; color: var(--sel-ink); }
+.status .sel-note:empty { display: none; }
+
+.inspector {
+  width: var(--inspector-w, 380px); flex: none; display: flex; flex-direction: column; min-height: 0;
+  background: var(--card); border-left: 1px solid var(--border); position: relative;
+}
+.inspector.closed { width: 44px; }
+.inspector-icons { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; }
+.icons-rule { width: 22px; height: 1px; background: var(--border); margin: 4px 0; flex: none; }
+.strip-tab { color: var(--muted); }
+.inspector-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 14px 10px 10px 16px; }
+.inspector-head .t { font: 600 11px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.inspector-head .s { font: 400 11px/1.3 var(--mono); color: var(--faint); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inspector-tabs { flex: none; display: flex; gap: 2px; padding: 0 10px 8px; border-bottom: 1px solid var(--border); }
+.tab {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 7px 2px 6px; border-radius: 6px; color: var(--muted);
+}
+.tab > svg { display: block; }
+.tab.on { background: var(--sel-bg); color: var(--sel-ink); }
+.tab .t { font: 600 10.5px/1 var(--sans); display: flex; align-items: center; gap: 4px; }
+.tab-badge { font: 500 9.5px/1 var(--mono); background: var(--step-bg); color: var(--step-ink); border-radius: 999px; padding: 2px 4px; }
+.tab.on .tab-badge { background: var(--card); color: var(--sel-ink); }
+.tab-alert { width: 6px; height: 6px; border-radius: 999px; background: var(--warn-ink); }
+.inspector-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 20px; }
+/* The sidebar sections' drag line (`hv-split`): transparent at rest, accent under the pointer. */
+.panel-resize {
+  position: absolute; left: -5px; top: 0; bottom: 0; width: 10px; z-index: 5;
+  cursor: col-resize; display: flex; align-items: center; justify-content: center;
+}
+.panel-resize > i { width: 1px; height: 100%; background: transparent; pointer-events: none; }
+.panel-resize:hover > i, .panel-resize.active > i { background: var(--accent); }
+
+/* ── inspector internals ──────────────────────────────────────────────── */
+.subcard { border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--card); }
+.subcard + .subcard { margin-top: 8px; }
+.subcard.bad { border-color: var(--warn-line); background: var(--warn-bg); }
+.drag-row {
+  display: flex; align-items: center; gap: 8px; padding: 5px 4px 5px 4px;
+  border-left: 2px solid transparent; border-radius: 0 6px 6px 0;
+}
+.drag-row:hover { background: var(--step-bg); }
+.drag-row.on { background: var(--sel-bg); border-left-color: var(--accent); }
+.drag-row.empty { background: var(--warn-bg); }
+.drag-row.empty .name { color: var(--warn-ink); }
+.drag-row.boxed { border: 1px solid var(--border); border-radius: 6px; background: var(--card); }
+.drag-row.lifting { opacity: .4; }
+.drag-row.over-up, .subcard.over-up { box-shadow: inset 0 2px 0 0 var(--accent); }
+.drag-row.over-down, .subcard.over-down { box-shadow: inset 0 -2px 0 0 var(--accent); }
+.subcard.lifting { opacity: .4; }
+.drag-row .name { flex: 1; font: 500 13px/1.3 var(--sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.drag-row.on .name { color: var(--sel-ink); }
+.drag-row .name.off { text-decoration: line-through; color: var(--faint); }
+.drag-row .name.small { font-size: 12.5px; cursor: default; }
+.handle { display: flex; align-items: center; color: var(--faint); cursor: grab; flex: none; padding: 2px; border-radius: 4px; }
+.pset { font: 400 10.5px/1 var(--mono); color: var(--faint); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; }
+.cover { font: 400 11px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ok-ink); flex: none; width: 34px; text-align: right; }
+.cover.mid, .cover.none { color: var(--warn-ink); }
+.remap { padding: 2px 6px 8px 26px; }
+.remap-pick { margin-top: 4px; }
+.none-yet { padding: 4px 2px 0; }
+.add-fields { margin-top: 10px; }
+.calc-note { margin-top: 10px; }
+.calc-note .sub { margin-bottom: 6px; }
+
+/* Filter */
+/* A rule's field and a level's field take the row's spare width. */
+.app .subcard .row > select[data-act="filter-field"], .app .subcard .row > select[data-act="sort-field"] { flex: 1; }
+.match-row { gap: 10px; margin-bottom: 12px; }
+.value-slot { flex: 1; display: flex; min-width: 0; }
+.value-slot > * { flex: 1; }
+.unit-hint { flex: none; }
+.rule-effect { margin-top: 6px; }
+.rule-effect .keeps { color: var(--ok-ink); font: 600 11.5px/1 var(--sans); }
+.rule-effect strong { color: var(--warn-ink); font-weight: 600; }
+.bar { flex: 1; height: 5px; border-radius: 999px; background: var(--step-bg); overflow: hidden; display: flex; }
+.bar > i { display: block; height: 100%; background: var(--ok-ink); }
+.bar > i.mid { background: var(--warn-ink); }
+.bar > i.none { background: var(--warn-line); }
+.bar.keep { height: 4px; background: var(--warn-line); margin-top: 10px; }
+
+/* Sort */
+.lvl-n {
+  width: 18px; height: 18px; border-radius: 999px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  font: 500 10.5px/1 var(--mono); background: var(--sel-bg); color: var(--sel-ink);
+}
+
+/* Format */
+.preview-box {
+  display: flex; align-items: baseline; gap: 10px;
+  background: var(--step-bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+}
+.preview-box .value { font: 500 14px/1.2 var(--mono); }
+.preview-box .tail { margin-left: auto; font: 400 11px/1 var(--sans); color: var(--faint); }
+/* A colour rule fires on the previewed value: the box wears the cell's colours, and its two
+   labels ride on the rule's own text colour (ifcTable's reasoning, kept). */
+.preview-box.lit { font-weight: 500; border-color: var(--border); }
+.preview-box.lit .sub, .preview-box.lit .tail { color: inherit; opacity: .72; font-weight: 400; }
+.preview-box.lit .value { font-weight: inherit; }
+.cond-head { margin: 14px 0 8px; }
+.cond-when { font: 400 12px/1 var(--sans); color: var(--muted); flex: none; }
+.cond-op { flex: 0 0 38%; }
+.cond-op.solo { flex: 1; }
+.cond-presets { display: flex; gap: 4px; flex: 1; }
+button.cond-preset {
+  width: 27px; height: 24px; flex: none; font: 600 11px/1 var(--sans); text-align: center;
+  border: 1px solid var(--border); border-radius: 6px;
+}
+button.cond-preset.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--sel-bg); }
+.cond-swatch { display: flex; flex-direction: column; gap: 3px; flex: none; }
+.cond-swatch > .lbl { font: 600 10px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cond-swatch > input[type="color"] {
+  width: 46px; height: 24px; padding: 1px; cursor: pointer;
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 6px;
+}
+.size-read { font: 500 12px/1 var(--mono); color: var(--ink); }
+
+/* ── the table ────────────────────────────────────────────────────────── */
+.schedule-title { flex: none; margin: 0; font: 600 15px/1 var(--sans); letter-spacing: -.01em; color: var(--ink); }
+/* The table hugs its content and the wrap hugs the table; the wrap is the one scrollport. */
+.table-wrap {
+  flex: 1; min-height: 0; overflow: auto; width: fit-content; max-width: 100%;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+}
+.table-wrap.no-outline { border: none; }
+
+table.schedule { border-collapse: separate; border-spacing: 0; width: max-content; font-size: 13px; }
+table.schedule th, table.schedule td {
+  padding: 7px 12px; text-align: left; vertical-align: top;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+table.schedule thead th {
+  position: sticky; top: 0; z-index: 2; user-select: none; cursor: pointer;
+  font: 600 11px/1.2 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+  background: var(--card); border-bottom: 1px solid var(--border-strong); padding: 9px 12px;
+}
+table.schedule thead th:hover { background: var(--step-bg); }
+/* A heading is focusable (phase 3: its menu from the keyboard). The design's own ring, drawn
+   inside: at the scroller's top edge an outer ring would be clipped. Mouse focus shows none. */
+table.schedule thead th:focus-visible { outline-offset: -2px; }
+/* Shift / Ctrl-clicked headings: the set a grip resizes together. */
+table.schedule thead th.sel { background: var(--sel-bg); color: var(--sel-ink); box-shadow: inset 0 -3px 0 var(--accent); }
+table.schedule.nobold thead th { font-weight: 400; }
+table.schedule.grid th, table.schedule.grid td { border-right: 1px solid var(--border); }
+table.schedule.grid tbody td { border-bottom: 1px solid var(--border); }
+table.schedule th:last-child, table.schedule td:last-child { border-right: none; }
+table.schedule thead th .badge { margin-left: 4px; letter-spacing: .02em; text-transform: none; }
+
+/* Zebra and the picked row sit on the <tr>, so `hv-step`'s hover (also on the <tr>) wins, and
+   a colour rule's inline fill on a <td> wins over both. */
+table.schedule.zebra tbody tr.data:nth-of-type(even) { background: var(--ground); }
+table.schedule tbody tr.data { cursor: pointer; }
+table.schedule tbody tr.data.on { background: var(--sel-bg); color: var(--sel-ink); }
+/* No `scroll-margin` on the rows: measured 2026-09-25 on the 4 082-row IfcMember table, one
+   such declaration on every <tr> doubled a full repaint (0.27–0.55 s → 0.83–1.13 s). main.ts
+   keeps a row it scrolls to clear of the sticky heading instead (`reveal`). */
+
+/* Phase 3 — the 3D colour-by: the legend's 3 px-radius square before each value of the source
+   column, and the first three colours as one bar before that column's heading. Fixed SCHEME
+   hexes, the same in both themes, as in the legend. */
+table.schedule td .sw {
+  display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px;
+}
+table.schedule thead th .hd-sw {
+  display: inline-block; width: 16px; height: 8px; border-radius: 3px; margin-right: 6px; vertical-align: 0;
+}
+
+/* ifcTable's "free windowing". Measured 2026-09-25: it does NOT skip layout here — a <tr> is an
+   internal table box and ignores the containment — so every drawn row is laid out on each
+   paint (4 082 rows: ~0.23–0.39 s of layout). Kept as ifcTable wrote it; any paint saving is unmeasured. */
+table.schedule tbody tr { content-visibility: auto; contain-intrinsic-size: auto 30px; }
+
+tr.group td {
+  background: var(--step-bg); font-weight: 600; font-size: 12.5px; color: var(--ink);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding-left: 12px;
+}
+tr.group td .count { color: var(--muted); font-weight: 400; }
+tr.group.level-1 td { background: var(--ground); font-weight: 500; font-size: 12px; padding-left: 30px; }
+tr.group.level-2 td { background: var(--ground); font-weight: 500; font-size: 11.5px; padding-left: 48px; }
+tr.group.level-3 td { background: var(--ground); font-weight: 500; font-size: 11.5px; padding-left: 66px; }
+tr.footer td { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+tr.grand td { background: var(--step-bg); border-top: 2px solid var(--ink); font-weight: 700; padding: 11px 12px; }
+tr.blank td { height: 1.7em; padding: 0; }
+
+/* Two classes and two types, to match the base rule's specificity — ifcTable's own trap. */
+table.schedule td.num, table.schedule th.num { text-align: right; }
+table.schedule td.num { font-variant-numeric: tabular-nums; }
+table.schedule td.ctr, table.schedule th.ctr { text-align: center; }
+th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; }
+
+/* The resize grip: the last few pixels of a heading, owned by colResize.ts. */
+table.schedule thead th[data-defcol]::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: col-resize;
+}
+table.schedule thead th[data-defcol]:hover::after { background: var(--accent); opacity: .5; }
+table.schedule thead th.vertical[data-defcol]::after { right: auto; left: 0; }
+
+/* ── overlays ─────────────────────────────────────────────────────────── */
+/* The Preferences scrim and card. No entrance animation: the card is rebuilt on every
+   keystroke in its search box, and a replayed fade flashes (ifcTable's rule). */
+.overlay {
+  position: fixed; inset: 0; z-index: 40; padding: 28px;
+  background: rgba(0, 0, 0, .34); display: flex; align-items: center; justify-content: center;
+}
+.overlay-card {
+  width: 1120px; max-width: 100%; height: 100%; max-height: 720px;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow);
+}
+.overlay-card.narrow { width: 780px; }
+.overlay-head { flex: none; padding: 16px 18px 0; }
+.overlay-head h3 { margin: 0; font: 600 15px/1.2 var(--sans); letter-spacing: -.01em; color: var(--ink); }
+.overlay-head p { margin: 5px 0 0; font: 400 12.5px/1.4 var(--sans); color: var(--muted); }
+.overlay-head .head-row { gap: 12px; }
+.overlay-close { width: 24px; height: 24px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--faint); }
+.overlay-foot { flex: none; border-top: 1px solid var(--border); padding: 10px 18px; display: flex; align-items: center; gap: 10px; }
+.filter-row { margin: 14px 0 12px; flex-wrap: wrap; }
+.overlay-head .search-row { margin-top: 14px; }
+.app .overlay-head .search-box { padding: 8px 12px; font-size: 13px; }
+.app .overlay-head .tpl-search, .app .overlay-head .saved-search { width: 280px; padding: 7px 10px; }
+.check-inline { gap: 7px; font: 400 12.5px/1 var(--sans); color: var(--muted); cursor: pointer; padding-left: 4px; }
+
+/* field browser */
+.browse-cols { flex: 1; min-height: 0; display: flex; margin-top: 14px; border-top: 1px solid var(--border); }
+.browse-groups { width: 236px; flex: none; border-right: 1px solid var(--border); padding: 12px 10px; overflow-y: auto; }
+.browse-groups .group-head { padding: 0 8px; margin-bottom: 8px; }
+.browse-groups .rail-group { display: flex; flex-direction: column; }
+.browse-groups .rail-item { grid-template-columns: minmax(0, 1fr) auto; }
+.browse-groups .rail-item:hover { background: var(--step-bg); }
+.browse-groups .pset-name { font: 400 12px/1.3 var(--mono); }
+.browse-list { flex: 1; min-width: 0; overflow-y: auto; padding: 12px 14px; }
+.browse-list .rows { gap: 4px; }
+.browse-chosen { width: 280px; flex: none; border-left: 1px solid var(--border); background: var(--ground); padding: 12px 14px; overflow-y: auto; }
+.browse-chosen .chosen-head { margin-bottom: 10px; }
+.browse-chosen .order-note { margin-top: 10px; }
+.browse-row { display: flex; align-items: center; gap: 11px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.browse-row.used { background: var(--step-bg); }
+.browse-row.empty { background: var(--warn-bg); border-color: var(--warn-line); }
+.browse-row .cover-slot { width: 132px; flex: none; gap: 8px; }
+.browse-row .cover.pct { width: 34px; }
+.browse-row .btn.pick { padding: 6px 10px; }
+.browse-row .btn.pick.add { color: var(--accent-ink); border-color: var(--accent); background: var(--card); }
+.value-hits { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-strong); display: flex; flex-direction: column; gap: 4px; }
+.value-hits > .eyebrow { margin-bottom: 5px; }
+.type-mark {
+  width: 18px; height: 18px; border-radius: 4px; flex: none; display: flex; align-items: center; justify-content: center;
+  font: 600 10px/1 var(--mono); background: var(--step-bg); color: var(--step-ink);
+}
+.type-mark.number { background: var(--sel-bg); color: var(--sel-ink); }
+.type-mark.bool { background: var(--ok-bg); color: var(--ok-ink); }
+.value-hits .type-mark { background: var(--warn-bg); color: var(--warn-ink); }
+
+/* calculated values, in the field browser */
+.calc-editor { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+.calc-editor .chosen-head { margin-bottom: 8px; }
+.calc-editor .subcard { margin-bottom: 8px; }
+.calc-editor .calc-body { margin-top: 7px; display: flex; flex-direction: column; gap: 6px; }
+.calc-editor .calc-unit { gap: 8px; flex-wrap: wrap; }
+.calc-editor .calc-unit .sub { flex: none; }
+.calc-editor .calc-unit select { width: auto; }
+.calc-body input[type="text"], .calc-body > select { width: 100%; }
+.app .calc-editor input.mono { font-family: var(--mono); font-size: 12px; }
+
+/* template gallery — a card is the landing page's sample pill, grown: accent edge on hover */
+.tpl-grid-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 18px; border-top: 1px solid var(--border); }
+.tpl-group { padding-top: 16px; }
+.tpl-group > .eyebrow { display: block; }
+.tpl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.tpl-card { display: block; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.tpl-card:hover { border-color: var(--accent); background: var(--step-bg); }
+.tpl-card.on { background: var(--sel-bg); border-color: var(--accent); }
+.tpl-card .card-head { gap: 10px; }
+.tpl-card .tpl-name { font: 600 13.5px/1.3 var(--sans); letter-spacing: -.01em; color: var(--ink); }
+.tpl-card .tpl-meta { margin-top: 3px; font: 400 11px/1.4 var(--mono); color: var(--faint); }
+.tpl-card .tpl-fit { margin-top: 12px; gap: 9px; }
+.tpl-card .tpl-score { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+/* my templates */
+.overlay-head .save-row { margin-top: 14px; }
+.app .overlay-head .saved-name { padding: 7px 10px; font-size: 13px; }
+.save-hint { margin-top: 7px; text-wrap: pretty; }
+.saved-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 18px; border-top: 1px solid var(--border); }
+.saved-group { margin-top: 14px; }
+.saved-group-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; margin-bottom: 7px; }
+.saved-row {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 6px; padding: 8px 10px 8px 12px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+}
+.saved-row:hover { border-color: var(--border-strong); }
+.saved-row.on { background: var(--sel-bg); border-color: var(--accent); }
+.saved-row .saved-title { display: flex; align-items: center; gap: 8px; }
+.saved-row .saved-title b { font: 600 13px/1.3 var(--sans); color: var(--ink); }
+.saved-row .saved-acts { flex: none; gap: 2px; }
+
+/* the formula syntax guide */
+.help-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 22px 22px; border-top: 1px solid var(--border); }
+.help-body section { padding-top: 14px; }
+.help-body h4 { margin: 4px 0 8px; font: 600 11px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.help-body h5 { margin: 14px 0 6px; font: 600 13px/1.3 var(--sans); color: var(--ink); }
+.help-body p, .help-body li { font: 400 13px/1.6 var(--sans); color: var(--ink); margin: 0 0 8px; text-wrap: pretty; }
+.help-body ul { margin: 0 0 8px; padding-left: 20px; }
+.help-body code { font: 400 12px/1.4 var(--mono); color: var(--code-ink); background: var(--code-bg); border-radius: 4px; padding: 1px 4px; }
+.help-body pre { margin: 0 0 10px; padding: 10px 12px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+.help-body pre code { padding: 0; background: none; }
+.help-table { border-collapse: collapse; width: 100%; }
+.help-table td { font: 400 12.5px/1.5 var(--sans); color: var(--ink); padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.help-table td:first-child { white-space: nowrap; }
+
+/* ── the dialog (dialog.ts): the Preferences card ─────────────────────── */
+.dlg-scrim {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .34);
+}
+.dlg {
+  width: 380px; max-width: calc(100% - 32px); display: flex; flex-direction: column; gap: 12px; padding: 14px;
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow);
+  animation: fadein .15s ease-out;
+}
+.dlg-label { font: 600 11px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.dlg-message { margin: 0; font: 400 13px/1.5 var(--sans); color: var(--ink); text-wrap: pretty; }
+.dlg-field { width: 100%; font-size: 13px; padding: 7px 10px; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── toast ────────────────────────────────────────────────────────────── */
+/* `pointer-events: none` is load-bearing: it sits above everything for 2.6 s. */
+.toast {
+  /* `translate`, not `transform`: `fadein` animates transform, and would un-centre it. */
+  position: fixed; left: 50%; bottom: 44px; translate: -50% 0; z-index: 90; pointer-events: none;
+  font: 400 12.5px/1.4 var(--sans); color: var(--ink); background: var(--card);
+  border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 14px; box-shadow: var(--shadow);
+  animation: fadein .15s ease-out;
+}
+.toast.bad { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-line); }

@@ -1,0 +1,131 @@
+/*
+ * The design's `style-hover` / `style-focus` pseudo-state attributes, as CSS.
+ *
+ * `SGVue.dc.html` writes hover and focus states as extra attributes on the element
+ * (`style-hover="background:var(--step-bg)"`), which its own template runtime applies. React
+ * has no such thing, so each distinct declaration set becomes one class here and the element
+ * carries its name. Same declarations, same visual result.
+ *
+ * `!important` is not decoration: the base styles are inline `style` attributes, which beat a
+ * class rule, so the hover state has to out-rank them — exactly as the design's runtime does
+ * by rewriting the inline style.
+ *
+ * Every rule below appears verbatim in the design; the comment names where.
+ */
+
+/* L72 project button · L94 model row · L142 library item · L163 storey row
+ * L179 group header · L191 tree row · L224–248 toolbar buttons · L420 colour-legend row
+ * L475 a chat result-table row */
+.hv-step:hover {
+  background: var(--step-bg) !important;
+}
+
+/* L77 collapse · L111 cancel · L211 rail open · L249 persp/ortho · L250 theme · L259 card close
+ * L416 the colour legend's × · L438 the chat panel's close */
+.hv-step-ink:hover {
+  background: var(--step-bg) !important;
+  color: var(--ink) !important;
+}
+
+/* L95 model eye · L164 storey eye · L183 group eye · L196 element eye */
+.hv-ink:hover {
+  color: var(--ink) !important;
+}
+
+/* L99 colour swatch · L536 the Ask pill */
+.hv-accent-line:hover {
+  border-color: var(--accent) !important;
+}
+
+/* L105 activate target */
+.hv-card-accent:hover {
+  background: var(--card) !important;
+  color: var(--accent-ink) !important;
+}
+
+/* L106 unload × · L518 cancel a reply */
+.hv-card-ink:hover {
+  background: var(--card) !important;
+  color: var(--ink) !important;
+}
+
+/* L112 delete */
+.hv-warn:hover {
+  background: var(--warn-bg) !important;
+}
+
+/* L308 the temporary-state frame's reset pill · L488 apply a pending change
+ * Since 2026-10-01 also a row under one of the assistant's replies (the "Ask Vee" handoff, not
+ * `SGVue.dc.html`): the row sits on a `--step-bg` bubble, where `.hv-step` would change nothing. */
+.hv-card:hover {
+  background: var(--card) !important;
+}
+
+/* L612 the filter card's "clear" */
+.hv-warn-ink:hover {
+  color: var(--warn-ink) !important;
+}
+
+/* L562 · L574 markup rows · L626 remove a filter step · L667 forget a saved set */
+.hv-warn-both:hover {
+  background: var(--warn-bg) !important;
+  color: var(--warn-ink) !important;
+}
+
+/* L637 the AND / OR join pill */
+.hv-accent-sel:hover {
+  border-color: var(--accent) !important;
+  background: var(--sel-bg) !important;
+}
+
+/* L362 Identifiers · L377 Related · L394 Geometry — the property card's section headers
+ * L447 reply to a message · L448 revert one turn */
+.hv-accent-ink:hover {
+  color: var(--accent-ink) !important;
+}
+
+/* L367 the GlobalId copy button */
+.hv-step-strong:hover {
+  background: var(--step-bg) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* L87 search field · L591 the section offset · L642 a filter value
+ * L692–695 the four Coordinate-system fields (style-focus) */
+.fv-field:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--sel-bg) !important;
+  outline: none !important;
+}
+
+/* L757 the Resume-last-session card · L804 a sample-federation pill */
+.hv-accent-step:hover {
+  border-color: var(--accent) !important;
+  background: var(--step-bg) !important;
+}
+
+/* L824 the landing page's theme toggle (the rest of the design's footer strip is not in the
+ * port — 2026-09-21) · L525 a chat suggestion */
+.hv-accent-both:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+
+/* L432 the chat panel's resize corner — the design's one custom-property hover: the stroke
+ * reads `var(--grab, var(--border-strong))`, so setting `--grab` on the 34 px hit area is what
+ * turns both of its borders accent. */
+.hv-grab:hover {
+  --grab: var(--accent) !important;
+}
+
+/* Not in the design — 2026-09-24, the owner's resizable sidebar sections: a drag handle's
+ * 1 px line is transparent at rest and accent under the pointer. */
+.hv-split:hover > span {
+  background: var(--accent) !important;
+}
+
+/* L530 the chat panel's send button */
+.hv-accent-ground:hover {
+  background: var(--accent) !important;
+  color: var(--ground) !important;
+}

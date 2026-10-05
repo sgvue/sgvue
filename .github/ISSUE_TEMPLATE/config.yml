@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: SGVue website and downloads
+    url: https://sgvue.github.io/
+    about: What SGVue is, and the latest version to download.
+  - name: Report a security vulnerability
+    url: https://github.com/sgvue/sgvue/security/policy
+    about: Security problems are reported privately, as the security policy describes — never in an issue.

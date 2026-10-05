@@ -1,0 +1,36 @@
+# Dependabot version updates (2026-10-05): weekly, minor and patch updates grouped into one
+# pull request per ecosystem, majors one by one. Security updates are a separate repository
+# setting and stay on for every dependency.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Pinned on purpose: an upgrade of any of these three is measured before it lands
+      # (CLAUDE.md, docs/DECISIONS.md, docs/TRAPS.md) — Electron for the GPU memory the guards
+      # watch, three.js for the renderer and its pixel parity with the design, web-ifc for the
+      # parser and the notices recorded for its WebAssembly (scripts/third-party-notices.json).
+      # The rules name update types rather than the whole dependency, because update types are
+      # a version-update notion: security updates for these three still come through.
+      - dependency-name: electron
+        update-types: [version-update:semver-major, version-update:semver-minor, version-update:semver-patch]
+      - dependency-name: three
+        update-types: [version-update:semver-major, version-update:semver-minor, version-update:semver-patch]
+      # three's type definitions move with three, never on their own.
+      - dependency-name: '@types/three'
+        update-types: [version-update:semver-major, version-update:semver-minor, version-update:semver-patch]
+      - dependency-name: web-ifc
+        update-types: [version-update:semver-major, version-update:semver-minor, version-update:semver-patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]

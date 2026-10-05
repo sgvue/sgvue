@@ -1,0 +1,68 @@
+{
+  "name": "sgvue",
+  "version": "1.2.0",
+  "description": "SGVue \u2014 read-only IFC model viewer for BIM coordination review",
+  "main": "./out/main/index.js",
+  "author": {
+    "name": "Yong Yen"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://sgvue.github.io/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sgvue/sgvue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sgvue/sgvue/issues"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run",
+    "test:e2e": "node scripts/safe-e2e.cjs",
+    "test:packaged": "node scripts/safe-app.cjs",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.125.0",
+    "@electron-toolkit/utils": "4.0.0",
+    "zod": "4.6.4"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "@fontsource/ibm-plex-serif": "5.3.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "1.4.11",
+    "@types/three": "0.186.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "exceljs": "4.4.0",
+    "fflate": "0.8.3",
+    "hash-wasm": "4.12.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sql.js": "1.14.2",
+    "three": "0.186.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "5.0.0",
+    "web-ifc": "0.0.77",
+    "zustand": "5.0.15"
+  }
+}

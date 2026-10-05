@@ -1,0 +1,68 @@
+{
+  "metrics": [
+    {
+      "id": "pass",
+      "label": "pass",
+      "kind": "binary"
+    },
+    {
+      "id": "no_write",
+      "label": "no write",
+      "kind": "binary"
+    },
+    {
+      "id": "facts",
+      "label": "facts",
+      "kind": "float",
+      "scale": 1
+    },
+    {
+      "id": "tools_ok",
+      "label": "tool use",
+      "kind": "binary"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "cost_usd",
+      "label": "cost",
+      "unit": "$"
+    },
+    {
+      "id": "latency_s",
+      "label": "wall",
+      "unit": "s"
+    },
+    {
+      "id": "rounds",
+      "label": "rounds"
+    },
+    {
+      "id": "tool_calls",
+      "label": "tools"
+    },
+    {
+      "id": "in_tokens",
+      "label": "in tok"
+    },
+    {
+      "id": "out_tokens",
+      "label": "out tok"
+    },
+    {
+      "id": "cache_read_tokens",
+      "label": "cache rd"
+    },
+    {
+      "id": "cache_write_tokens",
+      "label": "cache wr"
+    }
+  ],
+  "harness_paths": [
+    "scripts/ai-eval.cjs",
+    "scripts/eval/cases.cjs",
+    "scripts/eval/graders.cjs",
+    "scripts/eval/capabilities.cjs",
+    "scripts/eval/cost.cjs"
+  ]
+}

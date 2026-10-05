@@ -1,0 +1,125 @@
+appId: com.sgvue.viewer
+productName: SGVue
+# The Windows executable's file properties and the macOS Info.plist carry it. Stated, rather than
+# left to electron-builder's default (built from package.json's `author`), so it cannot drift.
+copyright: Copyright © 2026 Yong Yen
+# The share-link scheme. macOS reads it from `CFBundleURLTypes` in Info.plist, which this writes:
+# without it `app.setAsDefaultProtocolClient('sgvue')` (`src/main/index.ts`) has nothing to
+# claim there and a `sgvue://` link never reaches the app. Windows registers at run time, from
+# that same call; NSIS writes nothing for this.
+protocols:
+  - name: SGVue link
+    schemes:
+      - sgvue
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!tests/*'
+  - '!design-reference/*'
+  - '!samples/*'
+  - '!docs/*'
+  - '!scripts/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!vitest.config.{js,ts,mjs,cjs}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{CLAUDE.md,PROGRESS.md,README.md,CHANGELOG.md,CONTRIBUTING.md,CODE_OF_CONDUCT.md,SECURITY.md,SUPPORT.md}'
+  # The licence and the notices travel beside the archive, not in it (`extraResources`, below).
+  - '!{LICENSE,NOTICE,THIRD_PARTY_NOTICES.md}'
+  # Nothing this app runs is a dot-entry at the project root, and a dot-entry at the project
+  # root is exactly where tooling leaves its working files. `.claude/` (the assistant eval
+  # suite's flows, traces and results — a trace carries a turn's tool results, which on a real
+  # model is project data) and `.eval-builds/` (a saved developer build kept as an evaluation
+  # baseline) were both inside `app.asar` until 2026-09-20. One pattern rather than two names,
+  # so the next such directory is excluded before it exists. Single-segment, so it reaches only
+  # the root: `out/` and `node_modules/` are untouched.
+  - '!.*'
+  # Playwright's own output, and its config. `npm run test:e2e` writes `test-results/`; a run
+  # asked for a report writes `playwright-report/`. Neither is read at run time.
+  - '!test-results/*'
+  - '!playwright-report/*'
+  - '!playwright.config.{js,ts,mjs,cjs}'
+asarUnpack:
+  - '**/*.wasm'
+# 2026-10-05: the licence and the third-party notices go with every installer — beside app.asar,
+# in `resources/` on Windows and `SGVue.app/Contents/Resources/` on macOS. Never inside the
+# archive, whose top level tests/unit/asar-contents.test.ts holds to node_modules, out and
+# package.json. THIRD_PARTY_NOTICES.md is generated (scripts/third-party-notices.cjs).
+extraResources:
+  - LICENSE
+  - NOTICE
+  - THIRD_PARTY_NOTICES.md
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+  # It has to be explicit (Phase 10): with no `identity` electron-builder signs with whatever
+  # certificate it finds in the keychain — on the development Mac a personal *Apple
+  # Development* one, which no other Mac accepts.
+  #
+  # 2026-10-05: ad-hoc signed, where it was `null` (not signed at all). Apple-silicon code must
+  # carry at least an ad-hoc signature, and electron-builder rewrites the bundle after
+  # Electron's own one (Info.plist, the executable's name, the resources), so an unsigned arm64
+  # build that was downloaded is reported as "damaged and can't be opened". `'-'` makes
+  # electron-builder 26 sign ad hoc — app-builder-lib, `out/mac/MacTargetHelper.js:37–43`
+  # (`if (qualifier === "-")`), which also warns that ad-hoc signing with the hardened runtime
+  # needs the disable-library-validation entitlement or the app fails to launch; hence
+  # `hardenedRuntime: false`. Gatekeeper still asks once (System Settings → Privacy & Security
+  # → Open Anyway): signing and notarisation with a Developer ID are owed (docs/SYSTEM_SPEC.md
+  # §11).
+  identity: '-'
+  hardenedRuntime: false
+  # 2026-10-05: Electron's licence and Chromium's notices, which electron-builder deletes from a
+  # macOS build (app-builder-lib, `out/electron/electronMac.js:219–220`) and leaves beside
+  # SGVue.exe on Windows. Copied from the installed Electron, whose macOS distribution keeps both
+  # beside `Electron.app`, into `SGVue.app/Contents/Resources/` under the Windows build's names.
+  # `node_modules/electron/dist/` holds that distribution only once Electron's binary is installed
+  # (`node node_modules/electron/install.js` — `npm ci` alone does not). Mac-only, so the Windows
+  # output is unchanged; to be confirmed on the first `dist:mac` (docs/RELEASING.md).
+  extraResources:
+    - from: node_modules/electron/dist/LICENSES.chromium.html
+      to: LICENSES.chromium.html
+    - from: node_modules/electron/dist/LICENSE
+      to: LICENSE.electron.txt
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+win:
+  executableName: SGVue
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  artifactName: ${productName}-${version}-setup.${ext}
+  # A wizard - Welcome, progress, Finish - rather than a one-click box, because the same setup
+  # .exe is the updater: each page says whether it is installing, updating or repairing
+  # (build/installer.nsh). Still per-user with no elevation, and no install-mode, folder or
+  # licence page. Same appId, so it updates an install the one-click 1.0.x / 1.1.0-beta
+  # installers made, in place.
+  oneClick: false
+  # English only, like the app: the pages' own texts are English, and a 26-language build would
+  # put Windows-language buttons ("Weiter", "Abbrechen") beside an English "Update".
+  multiLanguageInstaller: false
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  # Not `always`: that recreates a desktop shortcut the user deleted on every update. The Finish
+  # page's "Create a desktop shortcut" box decides; a real uninstall removes the shortcut.
+  createDesktopShortcut: true
+  # 24-bit BMPs from `python scripts/make-installer-images.py` (the app icon and design tokens).
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/installerSidebar.bmp
+  installerHeader: build/installerHeader.bmp
+  # The wizard's page texts and Finish-page choices, and - for dual-GPU laptops, where Windows
+  # gives SGVue the weak integrated GPU - the per-app graphics setting (High performance +
+  # windowed-games optimizations) for SGVue.exe when the user has none; a real uninstall removes
+  # it only while it is still exactly ours.
+  include: build/installer.nsh
+npmRebuild: false
+# No auto-updater, so no update feed: without this the git remote's owner is written into app-update.yml.
+publish: null

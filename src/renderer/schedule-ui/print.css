@@ -1,0 +1,57 @@
+/*
+ * Print / Save as PDF: strip the window and leave a schedule that looks like a Revit sheet.
+ * Ported from ifcTable's `print.css` (2026-09-25, phase 2) and made neutral: paper is white
+ * and ink is black whichever theme the window is in, because every colour below is a literal
+ * and the theme tokens are set aside. What SGVue adds: `html, body` scroll again (design.css
+ * pins them for the screen), and the picked row and the zebra live on the <tr> here.
+ */
+@media print {
+  @page { margin: 12mm; size: landscape; }
+
+  html, body { height: auto; overflow: visible; background: #fff; color: #000; }
+
+  .hdr,
+  .rail,
+  .inspector,
+  .status,
+  .overlay,
+  .dlg-scrim,
+  .toast,
+  .notice { display: none !important; }
+
+  .app, .layout { display: block; height: auto; overflow: visible; min-width: 0; }
+  .centre, .centre-body { display: block; overflow: visible; padding: 0; }
+  /* On screen the wrap and the table hug their content and scroll; paper cannot scroll. */
+  .table-wrap { overflow: visible; border: none; width: auto; max-width: none; background: #fff; }
+
+  .schedule-title { font: 600 14pt/1.2 var(--sans); color: #000; margin: 0 0 3mm; }
+
+  table.schedule { font-size: 9pt; width: 100%; color: #000; }
+  table.schedule th, table.schedule td { padding: 1mm 1.5mm; white-space: normal; color: inherit; }
+  table.schedule.grid th, table.schedule.grid td { border-color: #bbb; }
+
+  /* Repeat the header on every page and never split a row across pages. */
+  table.schedule thead { display: table-header-group; }
+  table.schedule tbody tr { page-break-inside: avoid; break-inside: avoid; }
+  table.schedule tr.group { page-break-after: avoid; break-after: avoid; }
+
+  /* content-visibility would skip off-screen rows at print time. */
+  table.schedule tbody tr { content-visibility: visible; }
+
+  table.schedule thead th {
+    position: static; background: #fff; color: #000; box-shadow: none;
+    border-bottom: 1.5pt solid #000; text-transform: none; font-size: 9pt; letter-spacing: 0;
+  }
+  table.schedule thead th .badge { display: none; }
+  table.schedule tbody tr.data, table.schedule tbody tr.data.on { background: #fff; color: #000; }
+  table.schedule.zebra tbody tr.data:nth-of-type(even) { background: #f4f4f4; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tr.group td, tr.group.level-1 td, tr.group.level-2 td, tr.group.level-3 td {
+    background: #ececec; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  tr.group td .count { color: #444; }
+  tr.footer td { color: #333; border-color: #bbb; }
+  tr.grand td { border-top: 1.5pt solid #000; background: #fff; color: #000; }
+  /* A conditional rule's fill has to reach paper: `td[style]` is exactly the claimed cells,
+     since `cellStyle()` is the only writer of an inline style on a td. */
+  table.schedule tbody td[style] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

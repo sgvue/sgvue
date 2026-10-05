@@ -1,0 +1,18 @@
+# LF in the repository and in every working copy, on every platform, whatever `core.autocrlf`
+# says. Several tests read source files and match them with patterns written for LF (for example
+# `tests/readonly-guard.test.ts`), so a CRLF checkout — Git for Windows' default — fails them.
+* text=auto eol=lf
+
+# IFC-SPF (ISO 10303-21) is a text format. The two committed fixtures are generated text
+# (`scripts/make-tiny-ifc.py`), the tests read them as UTF-8, and the parser takes either line
+# ending; LF everywhere means a fixture is the same bytes, and the same SHA-256, on every OS.
+*.ifc text eol=lf
+
+# The binary types the repository holds: never converted, never diffed as text.
+*.png binary
+*.jpg binary
+*.webp binary
+*.bmp binary
+*.ico binary
+*.icns binary
+*.woff2 binary

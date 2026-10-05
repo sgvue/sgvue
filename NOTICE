@@ -1,0 +1,19 @@
+SGVue
+Copyright 2026 Yong Yen
+
+Licensed under the Apache License, Version 2.0 (see LICENSE). The licence grants no right to
+use the name "SGVue" or its logo (section 6).
+
+This product includes software developed by others:
+
+  - src/shared/corenet.ts adapts the CORENET X georeferencing bounds check from a copy of
+    ifcgref (https://github.com/tudelft3d/ifcgref), MIT License,
+    Copyright (c) 2023 3D geoinformation research group at TU Delft.
+
+  - src/renderer/viewer/section.ts writes out the instanced line-segment template of
+    three.js's LineSegmentsGeometry (examples/jsm/lines/LineSegmentsGeometry.js),
+    MIT License, Copyright © 2010-2026 three.js authors.
+
+The licences and notices of the third-party software SGVue's installers ship — Electron and
+Chromium, the bundled JavaScript libraries, web-ifc (MPL-2.0) and where its source is, and the
+IBM Plex fonts (OFL-1.1) — are in THIRD_PARTY_NOTICES.md.

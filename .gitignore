@@ -1,0 +1,45 @@
+node_modules/
+out/
+dist/
+samples/*
+!samples/README.md
+# The IfcOpenShell ground truth is generated from a real project model and carries its
+# metadata (file name, storey names, GUIDs, site latitude/longitude, element property
+# sets). Regenerate it locally with scripts/expected-from-ifcopenshell.py.
+tests/fixtures/*.expected.json
+# Parity captures are large (24 MB for Phase 2a alone) and are regenerated on demand by
+# scripts/screenshot.cjs and scripts/parity-prototype.cjs. tests/parity/<phase>/README.md
+# carries the commands and the measured differences, and that is what belongs in the repo.
+tests/parity/**/*.png
+tests/parity/**/*.jpg
+# The chrome rectangles each capture writes beside its PNG (Phase 3 onwards).
+tests/parity/**/*.json
+.DS_Store
+*.log
+.env*
+tmp/
+# Playwright's own output from `npm run test:e2e` (scripts/safe-e2e.cjs).
+test-results/
+playwright-report/
+# The assistant eval suite's output (scripts/ai-eval.cjs, docs/AI_EVAL.md). The cases, the
+# graders and the runner are the repository's; a run's transcripts and derived report are not.
+# A trace carries every tool result of a turn, which on a real model is project data.
+.claude/hillclimb/**/traces/
+.claude/hillclimb/**/report.html
+.claude/hillclimb/**/trajectory/
+# A build directory kept as an eval baseline (SGVUE_APP_OUT=out-baseline).
+out-baseline/
+# The AI coding assistant's own working folders: drafts, audits, worktrees and local settings.
+# `.claude/hillclimb/` stays tracked — the eval suite's baselines, which `scripts/ai-eval.cjs`
+# reads and extends.
+.claude/wip/
+.claude/worktrees/
+.claude/settings.local.json
+# Not redistributed, because their licence was never recorded (2026-10-05): the design tool's
+# runtime and starter files (design-reference/README.md) and the eval's HTML report builder
+# (docs/AI_EVAL.md). A maintainer who has them may keep them in place; they are never committed.
+design-reference/design/support.js
+design-reference/ask-vee/support.js
+design-reference/ask-vee/animations-v3.jsx
+design-reference/ask-vee/tweaks-panel.jsx
+scripts/eval/report/

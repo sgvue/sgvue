@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in SGVue does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting it.
+
+        **Issues are public. Never attach a confidential model, or a screenshot or log that shows project information.**
+        If a problem shows only on one of your models, describe it, or make a small synthetic IFC file that reproduces it.
+
+        A security problem is reported privately instead: see the [security policy](https://github.com/sgvue/sgvue/security/policy).
+  - type: input
+    id: version
+    attributes:
+      label: SGVue version
+      description: Help › About shows it.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS on Apple silicon
+        - macOS on Intel
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating system version
+      placeholder: "Windows 11 24H2, macOS 15.5…"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a model exported from …
+        2. Click …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: authoring-tool
+    attributes:
+      label: The tool that wrote the IFC file
+      description: With its version, and the IFC schema if you know it.
+      placeholder: "Revit 2025, IFC4 · Archicad 28, IFC2X3 · Tekla Structures 2024…"
+  - type: checkboxes
+    id: no-confidential-data
+    attributes:
+      label: Before you submit
+      options:
+        - label: This report holds no confidential model, file, screenshot or project information.
+          required: true

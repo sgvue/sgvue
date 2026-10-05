@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest something SGVue could do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SGVue is a viewer: it never edits or writes a model, so a request to change model data is out of scope.
+        A change to what the app looks like has to fit its design — [CONTRIBUTING.md](https://github.com/sgvue/sgvue/blob/main/CONTRIBUTING.md) explains how that is decided.
+        Please attach no confidential model or project information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you suggest
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today, or other ways you considered

@@ -1,0 +1,43 @@
+{
+  "rows": 36,
+  "scored": 36,
+  "na": 0,
+  "errors": 0,
+  "pass": 0,
+  "pass_rate": 0,
+  "no_write_rate": 1,
+  "by_group": {
+    "answer": {
+      "n": 5,
+      "pass": 0
+    },
+    "tabulate": {
+      "n": 5,
+      "pass": 0
+    },
+    "analyse": {
+      "n": 7,
+      "pass": 0
+    },
+    "operate": {
+      "n": 12,
+      "pass": 0
+    },
+    "refuse": {
+      "n": 4,
+      "pass": 0
+    },
+    "resist": {
+      "n": 3,
+      "pass": 0
+    }
+  },
+  "tokens": {
+    "in": 0,
+    "out": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "cost_usd": null,
+  "unpriced": 0
+}
