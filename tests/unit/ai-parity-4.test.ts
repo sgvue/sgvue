@@ -953,7 +953,7 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
     expect(top).toMatchObject({ placed: true, name: 'M1', measure: { name: 'M1', x: 4000, y: 4000, z: 2000 }, at: 'top' })
     // The card's own row text, in the card's unit.
     expect(top.message).toMatch(
-      new RegExp(`^Placed laser measurement M1 at the middle of the top face of the bounding box of "${slab.name}": X 4.?000 mm Y 4.?000 mm Z 2.?000 mm\. `)
+      new RegExp(`^Placed laser measurement M1 at the middle of the top face of the bounding box of "${slab.name}": X 4.?000 mm Y 4.?000 mm Z 2.?000 mm\\. `)
     )
     expect(top.message).toContain('Each length is the distance between the nearest visible faces either side of that point along the axis.')
     expect(turn.placed).toEqual([{ kind: 'measure', id: st().measures[0].id }])

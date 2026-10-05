@@ -70,6 +70,13 @@ code; do not run the same thing again.
 - **Changed a dependency?** Run `node scripts/third-party-notices.cjs` and commit the
   `THIRD_PARTY_NOTICES.md` it writes — every installer ships that file, and `npm test` fails
   until it matches the installed tree.
+- **A Dependabot pull request** that changes a package SGVue ships fails that same test, because
+  Dependabot does not write the notices. The maintainer checks out the pull request's branch
+  (`gh pr checkout <number>`), runs `npm ci` — the generator reads the installed tree, so it has
+  to be the branch's — then `node scripts/third-party-notices.cjs`, reads the diff, commits
+  `THIRD_PARTY_NOTICES.md`, pushes to the same branch, and merges once CI is green. Dependabot
+  stops rebasing a pull request once someone else has pushed to it, and `@dependabot recreate`
+  drops that commit: after a recreate, write the notices again.
 
 ## The rules the project cannot bend
 

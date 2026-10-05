@@ -502,7 +502,8 @@ function render() {
     .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
     .map(([l, n]) => `${l} ${n}`)
     .join(' · ')
-  const cell = (s) => String(s).replace(/\|/g, '\\|')
+  // A table cell's text: its backslashes escaped first, then the `|` that would end the cell.
+  const cell = (s) => String(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
 
   const out = []
   out.push(

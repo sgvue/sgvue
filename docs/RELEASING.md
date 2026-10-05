@@ -35,8 +35,9 @@ with `?v=<version>`.
 1. **Prepare on `main`.** Set the version. Write `docs/releases/X.Y.Z.md` — what changed, for
    users, and the system requirements — and the version's entry in `CHANGELOG.md`. If a
    dependency changed, run `node scripts/third-party-notices.cjs` (`npm test` fails until the
-   notices match). Run `npm run typecheck`, `npm test`, `npm run build` and, through its guard,
-   `npm run test:e2e`; CI must be green.
+   notices match); a Dependabot pull request has its notices written on its own branch before
+   it is merged, as [CONTRIBUTING.md](../CONTRIBUTING.md) describes. Run `npm run typecheck`,
+   `npm test`, `npm run build` and, through its guard, `npm run test:e2e`; CI must be green.
 2. **Commit and tag.** Public commits are authored and committed as
    **`Yong Yen <releases@sgvue.invalid>`** — set it in the clone with
    `git config user.name "Yong Yen"` and `git config user.email releases@sgvue.invalid` — and

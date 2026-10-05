@@ -124,11 +124,13 @@ app.whenReady().then(async () => {
   await js(`window.__sgvueDev.setView('iso')`)
   await wait(1500)
 
-  const pointer = (type, fx, fy, extra) => `(() => {
+  // Only this script's own literals go into the page's code: an event type and two fractions of
+  // the viewport. `executeJavaScript` takes code alone, so nothing else is encoded into it.
+  const pointer = (type, fx, fy) => `(() => {
     const c = document.querySelector('[data-role="viewport"]'); const r = c.getBoundingClientRect();
-    c.dispatchEvent(new PointerEvent('${type}', Object.assign(
+    c.dispatchEvent(new PointerEvent('${type}',
       { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', buttons: 0,
-        clientX: r.left + r.width * ${fx}, clientY: r.top + r.height * ${fy} }, ${JSON.stringify(extra || {})})))
+        clientX: r.left + r.width * ${fx}, clientY: r.top + r.height * ${fy} }))
   })()`
 
   await trigger('hover highlight (pointer over geometry)', pointer('pointermove', 0.5, 0.55))
