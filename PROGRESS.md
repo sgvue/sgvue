@@ -3,6 +3,60 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-08 — Vee's replies are laid out in paragraphs, lists and tables
+
+**Did:** the owner's *"the Ask VEE ai assistant answer are in one sentence, which is extremely
+difficult to read … Present answer in simple table or list if applicable."* Two causes, both
+fixed. **The prompt** carried the design's `Reply in one short sentence … no lists unless asked.`
+(`SGVue.dc.html:1257`); in its place are three formatting lines written for a small model — an
+opening sentence with its key number or name in bold (after a change, still what was done and to
+how many elements), then a `- ` list for three or more items, a table rather than a list for
+counts or values across groups (a separator cell per column, ≤ 4 columns, ≤ 12 rows, the largest
+and how many more past that)
+or short paragraphs, only where they help; no headings, emoji, HTML or code blocks; no table
+repeated after `summarize_elements` or `clash_check` (`main/ai/prompt.ts`, 37 → 39 lines; no
+example, since none could be measured). **The panel** split a reply at every run of white space
+and so lost its line breaks; it now reads the reply in blocks (`ai/blocks.ts`, pure, linear):
+paragraphs and their line breaks, `- ` / `* ` and `1. ` lists, pipe tables with a separator row;
+anything else prints as written, never HTML. `ReplyText` (`app/Trace.tsx`, replacing `Words`)
+draws one paragraph exactly as before and anything more as `<p>`, `<ul>` / `<ol>` and `<table>`,
+6 px apart; a table in the result table's strings (`SGVue.dc.html:466–477`), numbers
+right-aligned in mono, scrolling inside its own box and making its bubble full width. A list
+marker and a whole table are each one piece of the reveal (`wordCount`, moved to
+`ai/blocks.ts`). Every message of Vee's is drawn in the reply bubble — the boot audit too, with
+nothing to reveal; a user's is plain text. A reply is quoted as one plain line (`plainOf`): the
+reply strip, the quote above the question and `[replying to Vee: …]`. The eval's graders read a
+reply as the panel shows it — marks out, each list item and table cell a sentence of its own
+(`scripts/eval/graders.cjs`). Capture states `fmt-plain`, `fmt-mid`, `fmt-done` and `fmt-rows`
+in `scripts/screenshot.cjs`, which print what they measure. Docs: a deviation entry and the marks
+decision line amended in `CLAUDE.md`; a row in `docs/DECISIONS.md` and the 2026-10-01 marks row
+amended; `SYSTEM_SPEC.md`; `AI_EVAL.md`.
+
+**After the deep review** (one must-fix, four should-fixes, all done): the quote's flattening
+(`plainText`) re-tested everything joined so far at every block — 1.7 s for 66 667 one-word
+paragraphs, 0.75 s for 50 000 one-item lists, on a path the reply strip ran at every keystroke —
+and now collects its pieces and joins them once (27.3 ms); the three many-block shapes are in the
+linear tests; the reply strip's line is memoised on the transcript and its target; the prompt
+spells the table's separator row per column, with an example, since a single `|---|` under a
+three-column header is rightly no table; a numbered item breaks into a paragraph only at `1.`,
+as in CommonMark, so a wrapped line starting `2024. ` stays text.
+
+**Measured** (mock, 1280 × 820, DPR 1, both themes; the build before captured through the same
+guarded harness first): with a one-sentence reply the chat panel is **pixel-identical** to the
+build before — the trace's eight states and a reply with no tool, the boot audit in each. A
+sentence, three items and a five-row table, which the build before drew as one seven-line
+paragraph of dashes and pipes, is a bubble 296 × 291.83 px: a paragraph 38.75, the list 64.13,
+the table box 160.95, each 6 px under the one before; 41 pieces for the reveal, 8 of them in at
+0.9 s; the log's `scrollWidth` = `clientWidth` = 320. A third turn's rows stand under its
+blocks, their cells in them (`fmt-rows`). 200 kB of pathological shapes — tens of thousands of
+blocks among them — parse in at most 8.6 ms and are flattened for a quote in at most 27.3 ms.
+**Verified** (after the review): `npm run typecheck` exit 0; `npm test` **146 files passed / 2
+skipped, 2 876 tests passed / 3 skipped**; `npm run test:e2e` **64 passed, 6 skipped** (the new
+`vee-trace` case among them), peak working set 238 MB one process / 791 MB all, GPU dedicated
+276 MB, `clean:`; the eval's offline runner, into a scratch folder: oracle **65 / 65**, null
+**0 / 65**. **Not verified:** a live model run — none is possible here — so whether
+`claude-haiku-5-5` follows the three lines is for the owner's first turns to show. Not committed.
+
 ## 2026-10-08 — the laser meter reads each side of its point
 
 **Did:** the owner's *"Also update the measurement to show left and right dimension from the
@@ -1620,45 +1674,23 @@ exit 0; `npm run test:e2e` **40 passed, 6 skipped** — the smoke case clicks th
 gets `https://sgvue.github.io/?v=1.1.0` — peak working set 217 MB one process / 769 MB all, GPU
 dedicated 260 MB, `clean:`. Not committed; no version bump.
 
-## 2026-09-28 — 1.1.0 released: feature/ifc-table merged into main
-
-**Did:** `main` fast-forwarded to `d7e4527` (the Schedules branch at 1.1.0-beta.4) and the
-version set to **1.1.0** (`package.json`, both root entries of `package-lock.json`); no code
-changed. Against the last published release, 1.0.2, 1.1.0 carries: **1.0.3's NVIDIA-first
-graphics** — on Windows SGVue asks Chromium for the NVIDIA (else AMD) adapter at every launch,
-with Preferences' *Prefer NVIDIA graphics when available* and About's `Graphics:` line; **the
-Schedules window**, phases 1–4 — ifcTable's schedule engine in a second window drawn in SGVue's
-design, a row click shows its element in 3D and a 3D pick marks its rows, a right-click menu,
-colour 3D by a column, a `Model` column for federations, and export to Excel, CSV and
-`.schedule.json` through the native Save dialog; **the assisted installer wizard** — Welcome →
-progress → Finish, worded for install, update or repair, with open-now and desktop-shortcut
-choices; **the assistant** reading property names the file's way (nearest keys, yes/no values,
-`find_properties`) and working with schedules (`make_schedule`, `get_schedule`,
-`export_schedule`, `color_by_schedule_column`); **spot level tags and snapping** — a spot shows
-`▽ +level`, a click opens its full grid, and the snap takes the surface being looked at; and
-**section cut lines** — everything the plane cuts is outlined in the accent, 2.5 px.
-
-**Verified:** `npm run typecheck` exit 0; `npm test` **120 files passed / 2 skipped, 1 894 tests
-passed / 3 skipped**; `npm run dist:win` exit 0 → `dist/SGVue-1.1.0-setup.exe`, 115 380 802
-bytes, SHA-256 `019b0b56a869982bc6300a50c21f098e548242067b4658c41396d61c4a3590d4`;
-`npm run test:packaged` 1 passed, 2 skipped, peak working set 180 MB one process / 534 MB all,
-GPU dedicated 229 MB, `clean:`. The installer was not run (blocked on this PC): its payload,
-extracted with electron-builder's own 7-Zip, is **75 of 75 files SHA-256-identical** to
-`dist/win-unpacked`, and `app.asar`'s `package.json` reads `1.1.0`. A case-insensitive byte scan
-of the payload and of the setup `.exe`, as UTF-8 and as UTF-16LE, found **0** hits for the
-owner's private identifiers — among them the e-mail handle, the Windows account name and both
-spellings of the profile path; `Yong Yen`, the credited name and the scanner's control, was
-found (payload 4, setup 2). Nothing survived.
-
 ## Earlier work
 
-Compressed: the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-09-28 — 1.1.0 released: feature/ifc-table merged into main.** `main` fast-forwarded to the
+Schedules branch and the version set to 1.1.0; no code changed. Against 1.0.2 it carries
+NVIDIA-first graphics on Windows, the Schedules window (phases 1–4), the assisted installer
+wizard, the assistant reading property names the file's way and working with schedules, spot
+level tags with the surface snap, and section cut lines. 1 894 unit tests;
+`dist/SGVue-1.1.0-setup.exe` built and verified without being run — its payload 75 of 75 files
+identical to `dist/win-unpacked`, and none of the owner's private identifiers in it.
 
 **2026-09-28 — a section outlines everything it cuts, in the accent.** The owner: *"Also
 highlight and thicken the line of all geometry that are cut in cut section."* — the accent, about

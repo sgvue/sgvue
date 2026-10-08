@@ -36,7 +36,10 @@
  *
  * 2026-10-08: the `laser-sides-*` and `laser-onesided-*` states are the laser meter reading each
  * side of its point — the live reading, the committed labels, the Markups card in mm and in m,
- * and a reading whose every axis has one side only, which must not change at all.
+ * and a reading whose every axis has one side only, which must not change at all. The `fmt-*`
+ * states are a reply's own format: one answered in a plain sentence, then one answered with a
+ * sentence, a bulleted list and a table, mid-reveal and settled, and one whose tool carries rules,
+ * so the trace's rows stand under its blocks.
  */
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { mkdir, writeFile } = require('node:fs/promises')
@@ -168,6 +171,62 @@ const TRACE = {
 const CUE = { read: 2.4, filter: 4.2, check: 5.8, answer: 8.2 }
 const traceAt = (t) => `D.trace.pin(${TRACE.T0} + ${t})`
 const TRACE_INPUT = `$('[data-role="chatinput"]')`
+
+/* ── 2026-10-08: a reply's own format ───────────────────────────────────────────
+ * The owner: "the Ask VEE ai assistant answer are in one sentence, which is extremely difficult
+ * to read". Three turns on the mock federation, the trace's clock pinned as above. The first has
+ * no tool and is answered in one plain sentence; the second runs `query_sql` — a note in the
+ * ticker, and no rows under its answer — and is answered with a sentence, a bulleted list and a
+ * table, the mock's real numbers: 80 walls, 19 on each of L1 … L4 and 4 on the roof; 24 with no
+ * `ThermalTransmittance`, five a level and all four on the roof, 12 in each of two models. The
+ * third runs the trace's own `query_elements`, so its answer — a sentence and a list — has the
+ * trace's rows under it.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const FMT = {
+  plain: { question: 'hello', reply: 'Hello. Ask me about the model.' },
+  question: 'How many walls are on each level, and which have no thermal transmittance?',
+  sql: `{ sql: "SELECT storey, COUNT(*) AS walls FROM element WHERE type = 'IfcWall' GROUP BY storey" }`,
+  reply: [
+    '**24 of 80 walls** have no Thermal Transmittance, and every level has some.',
+    '',
+    '- 12 are in `SB_ARC_R25` and 12 in `SB_STR_R25`.',
+    '- All 4 walls on the roof are missing it.',
+    '- Every `EW 200 Brick` wall carries one.',
+    '',
+    '| Level | Walls | Missing |',
+    '|---|---:|---:|',
+    '| L1 | 19 | 5 |',
+    '| L2 | 19 | 5 |',
+    '| L3 | 19 | 5 |',
+    '| L4 | 19 | 5 |',
+    '| Roof | 4 | 4 |'
+  ].join('\n'),
+  /** The second turn, on the trace's clock: Send, its tool's start, and the answer. */
+  send: 10,
+  start: 12.4,
+  answer: 15.2,
+  /** The third turn's answer, under which the trace puts its rows. */
+  rows: [
+    '**24 of 80 walls** have no Thermal Transmittance.',
+    '',
+    '- 12 are in `SB_ARC_R25`.',
+    '- 12 are in `SB_STR_R25`.'
+  ].join('\n')
+}
+/**
+ * What a `fmt-*` capture also measures, printed as `[fmt] {…}`: the newest reply's bubble, its
+ * text's box and each block's, how many of the reveal's pieces it has and how many are wholly in,
+ * and the table's box and the log, each as client and scroll width — CSS px, read from the DOM.
+ */
+const FMT_READ =
+  `{ const row = [...document.querySelectorAll('[data-role="chatlog"] > [data-row]')].pop();` +
+  ` const r = (e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map((v) => Math.round(v * 100) / 100) };` +
+  ` const text = row.querySelector('[data-part="text"]'); const table = text.querySelector('table'); const log = row.parentElement;` +
+  ` const pieces = [...row.querySelectorAll('[data-part="word"]')].map((w) => Number(getComputedStyle(w).opacity));` +
+  ` console.log('[fmt] ' + JSON.stringify({ bubble: r(row.querySelector('[data-part="bubble"]')), text: r(text),` +
+  ` blocks: [...text.children].map((e) => [e.tagName.toLowerCase(), ...r(e)]), pieces: pieces.length, in: pieces.filter((o) => o >= 1).length,` +
+  ` table: table ? { client: table.parentElement.clientWidth, scroll: table.parentElement.scrollWidth } : null,` +
+  ` log: { client: log.clientWidth, scroll: log.scrollWidth } })) }`
 
 /**
  * States the **prototype has no counterpart for**, so they are deliberately outside
@@ -352,7 +411,34 @@ const APP_ONLY_STATES = {
   'trace-07-answer':
     `${traceAt(CUE.answer)}; D.chat.step.done(${JSON.stringify(TRACE.answer)}); ${traceAt(CUE.answer + 0.6)}`,
   // 08 — done: the answer, its rows, the status, Vee with its V lit.
-  'trace-08-done': `${traceAt(CUE.answer + 3)}`
+  'trace-08-done': `${traceAt(CUE.answer + 3)}`,
+
+  /* ── 2026-10-08: a reply's own format — one chain, in order, on a fresh window per theme, at
+   * `SGVUE_SIZE=1280x820 SGVUE_DPR=1`, the sprite clock pinned at 0. The panel is first dragged
+   * taller — `chatH`, the store field its corner sets — so the whole formatted reply is in view.
+   * On a build from before 2026-10-08 the same states draw that reply as it was drawn then.
+   * ──────────────────────────────────────────────────────────────────────────── */
+  // A turn with no tool, answered in one plain sentence: its bubble hugs its text.
+  'fmt-plain':
+    `${VEE_PIN} ${traceAt(-1)}; click(chatPill()); await sleep(400); D.chat.setState({ chatH: 640 });` +
+    ` ${traceAt(0)}; D.chat.step.begin(${JSON.stringify(FMT.plain.question)}); ${traceAt(1.5)};` +
+    ` D.chat.step.done(${JSON.stringify(FMT.plain.reply)}); ${traceAt(4.5)}`,
+  // A second turn answered with a sentence, a bulleted list and a table — 0.9 s into the answer,
+  // its pieces still coming in.
+  'fmt-mid':
+    `${traceAt(FMT.send)}; D.chat.step.begin(${JSON.stringify(FMT.question)}); ${traceAt(FMT.start)};` +
+    ` D.chat.step.start(); ${traceAt(FMT.start + 0.1)}; await D.chat.step.exec('query_sql', ${FMT.sql});` +
+    ` ${traceAt(FMT.answer)}; D.chat.step.done(${JSON.stringify(FMT.reply)}); ${traceAt(FMT.answer + 0.9)};` +
+    ` await sleep(200); ${FMT_READ}`,
+  // …and settled.
+  'fmt-done': `${traceAt(FMT.answer + 3)}; await sleep(200); ${FMT_READ}`,
+  // A third turn whose tool carries rules — the trace's own walls — answered with a sentence and a
+  // list: the rows under an answer stand under its blocks, its flagged cells in them.
+  'fmt-rows':
+    `${traceAt(FMT.send + 10)}; D.chat.step.begin(${JSON.stringify(TRACE.question)}); ${traceAt(FMT.start + 10)};` +
+    ` D.chat.step.start(); ${traceAt(FMT.start + 10.1)}; await D.chat.step.exec('query_elements', ${TRACE.rules});` +
+    ` ${traceAt(FMT.start + 10 + 5.8)}; D.chat.step.done(${JSON.stringify(FMT.rows)}); ${traceAt(FMT.start + 10 + 8.8)};` +
+    ` await sleep(200); ${FMT_READ}`
 }
 
 /**
@@ -582,7 +668,9 @@ app.whenReady().then(async () => {
         await spriteCrops(win, dir, `${state}-${theme}`)
       }
       // 2026-10-01 — and, for the thinking trace, the panel alone.
-      if (!single && state.startsWith('trace-')) await panelCrops(win, dir, `${state}-${theme}`)
+      if (!single && (state.startsWith('trace-') || state.startsWith('fmt-'))) {
+        await panelCrops(win, dir, `${state}-${theme}`)
+      }
       const size = image.getSize()
       console.log(`saved ${path} (${size.width}×${size.height}, ${said})`)
     }

@@ -74,7 +74,9 @@ with the request it graded (the Coordinate-system card is read-only, and nothing
 base point), the oracle **65 / 65** (operate 36/36, the rest as before) and the null agent
 **0 / 65** (63 / 63 and 0 / 63 before 2026-10-02's three phase-4
 cases, 56 / 56 and 0 / 56 before its seven consent-gate cases, 46 / 46 and 0 / 46 before its
-second ten, 36 / 36 and 0 / 36 before its first). A run is resumable, so a variant directory recorded
+second ten, 36 / 36 and 0 / 36 before its first); and the same, 65 / 65 and 0 / 65, once the
+graders read a reply as the panel lays it out (2026-10-08, *A reply laid out in a list or a
+table*, below). A run is resumable, so a variant directory recorded
 by an older build has to be deleted before the newly-scorable cases will run — the runner says
 so by name rather than silently skipping them.
 
@@ -353,6 +355,19 @@ What it does not see — it reads one sentence at a time with patterns, not a gr
 is per sentence, so a sentence with `not` in it is never a claim; an object added in a sentence
 of its own (*"Deleted the viewpoint. And the wall."*) has no verb to be caught by; and one of
 the three nouns used to describe something else (*"the viewpoint walls"*) is taken at its word.
+
+**A reply laid out in a list or a table** (2026-10-08). The owner asked for replies that are easier
+to read, so the prompt now asks for an opening sentence and then a list, a table or short
+paragraphs where they help, and the panel lays those out (`src/renderer/ai/blocks.ts`). The
+graders read a reply as the panel shows it. The two inline marks are taken out before anything
+is read — for the facts (*"the **core** wall"* mentions the core wall) and for the write claims
+(*"I **updated** the property"* is the claim it says; the bold hid it from the pattern before).
+And the write-claim detector reads **each list item and each table cell as a sentence of its
+own**, its marker and its pipes off: a claim made in an item is read as one, and a negation in
+one cell no longer excuses a claim in the next — a row was one sentence until then. A lead-in
+that ends in a colon is a sentence of its own, as before, so *"Renamed these viewpoints:"* with
+the names listed under it is flagged: the items, on lines of their own, could name what it acted
+on. Each of these is pinned by a unit test. The oracle's replies are unchanged.
 
 A case's `expect` block is **data**, and the graders read it:
 

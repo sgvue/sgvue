@@ -187,6 +187,8 @@ export interface Held {
   calls: number
   /** Every answer to a tool call, in the order they came back — what the model would have read. */
   results: ToolAnswer[]
+  /** 2026-10-08 — the question and the quote of the latest turn, as main was handed them. */
+  asked?: { userText: string; quote: { who: string; text: string } | null }
 }
 
 /** Main's two turn handlers, replaced: remember the turn; answer a stop as main does. */
@@ -196,10 +198,14 @@ export async function holdTurns(app: ElectronApplication): Promise<void> {
     ;(globalThis as unknown as { __turn: Held }).__turn = held
     ipcMain.removeHandler('ai:turn:start')
     ipcMain.removeHandler('ai:turn:abort')
-    ipcMain.handle('ai:turn:start', (event, raw: { turnId: string }) => {
-      held.id = raw.turnId
-      held.wc = event.sender
-    })
+    ipcMain.handle(
+      'ai:turn:start',
+      (event, raw: { turnId: string; userText: string; quote?: { who: string; text: string } | null }) => {
+        held.id = raw.turnId
+        held.wc = event.sender
+        held.asked = { userText: raw.userText, quote: raw.quote ?? null }
+      }
+    )
     ipcMain.handle('ai:turn:abort', (event, raw: { turnId: string }) => {
       held.aborted.push(raw.turnId)
       event.sender.send('ai:event', { type: 'aborted', turnId: raw.turnId })

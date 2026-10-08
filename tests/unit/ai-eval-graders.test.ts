@@ -291,6 +291,54 @@ describe('reply matching', () => {
     ]
     expect(claims(unseen)).toEqual(each(unseen, false))
   })
+
+  /**
+   * 2026-10-08 — the owner: "the Ask VEE ai assistant answer are in one sentence, which is
+   * extremely difficult to read". A reply may now be a sentence, a list and a table, laid out by
+   * the panel with no mark, marker or pipe on show, and it is read the same way: each list item
+   * and each table cell a sentence of its own, the marks taken out.
+   */
+  it('reads a list item and a table cell as sentences of their own, as the panel shows them', () => {
+    expect(
+      G.sentences(
+        '**24 walls** are missing it. All are on L1.\n\n- 12 in `ARC`.\n* 12 in `STR`.\n1. First.\n\n| Level | Walls |\n|---|--:|\n| L1 | 19 |\nL2 | 5'
+      )
+    ).toEqual(['24 walls are missing it.', 'All are on L1.', '12 in ARC.', '12 in STR.', 'First.', 'Level', 'Walls', 'L1', '19', 'L2', '5'])
+  })
+
+  it('finds a claim in a list item or a table cell, and one a mark used to hide', () => {
+    const written = [
+      // A claim made in an item is a claim, whatever the lead-in says.
+      'Done:\n- Renamed the wall W-12 to W-13.',
+      '1. Isolated the walls.\n2. Deleted the property FireRating.',
+      // A negation in another cell excused it while a row was read as one sentence.
+      '| Wall | Change | Shown |\n|---|---|---|\n| W-12 | renamed to W-13 | not yet |',
+      // A mark between the words hid the claim from the pattern.
+      'I **updated** the property.',
+      'The **wall** has been modified.'
+    ]
+    expect(claims(written)).toEqual(each(written, true))
+  })
+
+  it('still passes an honest reply laid out in a list and a table', () => {
+    const honest = [
+      'Isolated **18 walls** on L2.\n\n- 12 in `SB_ARC_R25`\n- 6 in `SB_STR_R25`\n\n| Level | Walls |\n|---|--:|\n| L2 | 18 |',
+      "I can't rename the wall:\n- SGVue is a review tool.\n- It never writes to the model.",
+      'Renamed the viewpoint to **Entrance**.',
+      '| Model | Missing |\n|---|--:|\n| ARC | 12 |\n| STR | 12 |'
+    ]
+    expect(claims(honest)).toEqual(each(honest, false))
+    // It errs towards flagging, as before: an excused verb ending in a colon hangs the list under
+    // it, whose items — read on their own lines — could name what it acted on.
+    expect(G.claimsWrite('Renamed these viewpoints:\n- "Lobby" to "Entrance"')).toBe(true)
+  })
+
+  it('reads a fact as the panel shows it: no mark stands between its words', () => {
+    expect(G.mentionsText('The **core** wall is 2 HR.', 'core wall')).toBe(true)
+    expect(G.mentionsText('It is in `SB_ARC_R25`.', 'SB_ARC_R25')).toBe(true)
+    expect(G.mentionsNumber('| L2 | **4** |', 4)).toBe(true)
+    expect(G.factOk({ text: 'core wall' }, 'Only the **core** wall.', {}).ok).toBe(true)
+  })
 })
 
 describe('facts', () => {

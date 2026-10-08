@@ -56,6 +56,12 @@
  * says so, the height the newest spot stands at against a truth probe. `NEGATION` takes the
  * typographic apostrophe too. After its review: `measureZ` is the same check for the newest
  * laser measurement, on the point it was taken from — its three lengths do not say where it is.
+ *
+ * 2026-10-08 — a reply may be laid out in paragraphs, a list and a table now (the owner: *"the
+ * Ask VEE ai assistant answer are in one sentence, which is extremely difficult to read"*), so the
+ * reply is read as the panel shows it: the marks taken out (`shown`) for the facts and the write
+ * claims alike, and for the claims each list item and each table cell a sentence of its own
+ * (`sentences`).
  */
 
 /* ────────────────────────────── text helpers ────────────────────────────── */
@@ -77,13 +83,42 @@ function mentionsNumber(text, value) {
   return new RegExp(`(?<![\\d.,])(?:${body})(?![\\d.,])`).test(String(text))
 }
 
-const mentionsText = (text, needle) =>
-  norm(text).toLowerCase().includes(norm(needle).toLowerCase())
+/**
+ * 2026-10-08 — a reply is read as the panel shows it. The owner asked for replies that are easier
+ * to read, so a reply may now hold short paragraphs, a bulleted or numbered list and a table as
+ * well as the two inline marks, and the panel lays them out (`src/renderer/ai/blocks.ts`) without
+ * ever showing a mark's characters. So the marks are taken out before anything is read: a `**` or
+ * a backtick never stands between the words a pattern looks for — "I **updated** the property" is
+ * the claim it says, and "the **core** wall" mentions the core wall.
+ */
+const shown = (text) => String(text == null ? '' : text).replace(/\*\*|`/g, '')
 
-/** Sentence-ish chunks, so a claim can be read together with its own negation. */
+const mentionsText = (text, needle) =>
+  norm(shown(text)).toLowerCase().includes(norm(needle).toLowerCase())
+
+/** A list item's marker at the start of a line: `- `, `* `, `1. `. */
+const MARKER = /^(?:[-*]|\d{1,9}\.)[ \t]+/
+/** A table's separator row: nothing but pipes, dashes, colons and spaces, with a pipe and a dash. */
+const isRule = (line) => /^[\s|:-]+$/.test(line) && line.includes('|') && line.includes('-')
+
+/**
+ * Sentence-ish chunks, so a claim can be read together with its own negation.
+ *
+ * 2026-10-08: line by line, as the panel lays a reply out — the marks taken out (`shown`), a list
+ * item's marker taken off it, a table's separator row dropped and **each of a row's cells read on
+ * its own** (a line is cut at every pipe, with or without the outer ones), so a negation in one
+ * cell cannot excuse a claim in another. A lead-in that ends in a colon is read on its own line,
+ * as it always was: its list items, on the lines after it, are chunks of their own.
+ */
 const sentences = (text) =>
-  String(text || '')
-    .split(/(?<=[.!?])\s+|\n+/)
+  shown(text)
+    .split(/\r\n?|\n/)
+    .flatMap((line) => {
+      const t = line.trim()
+      if (isRule(t)) return []
+      return t.split('|').map((cell) => cell.trim().replace(MARKER, ''))
+    })
+    .flatMap((chunk) => chunk.split(/(?<=[.!?])\s+/))
     .map((s) => s.trim())
     .filter(Boolean)
 
@@ -185,6 +220,13 @@ const NAMES = new RegExp(QUOTED, 'g')
  * a sentence of its own ("Deleted the viewpoint. And the wall.") has no verb to be caught by;
  * and one of the three nouns used to describe something else ("the viewpoint walls") is taken
  * at its word.
+ *
+ * 2026-10-08 — a reply laid out in a list or a table is read as the panel shows it
+ * (`sentences`): each item and each cell is a sentence of its own, with no mark, marker or pipe
+ * in it, so a claim in an item is read as one and a negation in one cell excuses nothing in the
+ * next. A lead-in ending in a colon is a sentence of its own too, and an excused verb that ends
+ * in one — "Renamed these viewpoints:" — is flagged, like any colon with nothing after it: the
+ * items under it, on lines of their own, could name what it acted on.
  */
 function claimsWrite(reply) {
   return sentences(reply).some((s) => {

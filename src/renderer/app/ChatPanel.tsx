@@ -55,7 +55,7 @@
  * `max-height` and its resize clamp take it, so the panel stops above a reset pill that stands
  * over a hint instead of covering it; with the lane at `0px` all three are the design's.
  */
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { abortChat, sendChat } from '../ai/bridge'
 import {
   answerHeight,
@@ -601,10 +601,13 @@ export default function ChatPanel(): React.JSX.Element | null {
     kickTrace()
   })
 
+  // The reply strip's line: a reply of Vee's flattened into plain text (`plainOf`) — once when the
+  // transcript or the target changes, never again at every keystroke in the composer.
+  const reply = useMemo(() => replyStrip(st.chatMsgs, st.chatReplyTo), [st.chatMsgs, st.chatReplyTo])
+
   if (!st.chatOpen) return null
 
   const right = chatRight(st.sel != null && st.byId.has(st.sel), st.vpW)
-  const reply = replyStrip(st.chatMsgs, st.chatReplyTo)
 
   /**
    * `:1127` — drag the top-left corner: width grows leftward, height upward, both clamped to
@@ -746,7 +749,9 @@ export default function ChatPanel(): React.JSX.Element | null {
           </span>
         ) : null}
 
-        {traced ? (
+        {/* Every message of Vee's is laid out in its blocks — paragraphs, lists, tables
+            (2026-10-08) — and a turn's reply also carries its trace. A user's is plain text. */}
+        {!mine ? (
           <ReplyBubble
             text={message ? message.text : null}
             trace={message?.trace ?? null}
@@ -759,13 +764,9 @@ export default function ChatPanel(): React.JSX.Element | null {
         ) : (
           <span data-part="bubble" style={s(bubbleStyle(m!.fg, m!.bg, m!.radius, m!.maxW))}>
             {/* A block of its own, so the lifting line can be laid exactly over it. */}
-            {mine ? (
-              <span data-part="text" style={s('display:block')}>
-                {message.text}
-              </span>
-            ) : (
-              message.text
-            )}
+            <span data-part="text" style={s('display:block')}>
+              {message.text}
+            </span>
           </span>
         )}
 

@@ -27,7 +27,7 @@ import { visFn } from '../../shared/rules'
 import { gateOf, isViewTool } from '../../shared/tool-schemas'
 import { federation } from '../model/federation-store'
 import { getViewer, useShell } from '../state/shell'
-import { authorOf } from '../state/selectors/chat'
+import { authorOf, plainOf } from '../state/selectors/chat'
 import type { TurnSnapshot } from '../state/selectors/snapshot'
 import { executeTool, newTurnState, type ToolContext, type TurnState } from './executors'
 import { scheduleBriefOf } from './executors/schedule'
@@ -242,12 +242,15 @@ export async function sendChat(text?: string): Promise<void> {
   }
 
   // A reply carries its target inline, truncated exactly as the design truncates it (`:1597`).
-  // Its author is the name the panel shows — `Vee` for the assistant since 2026-10-01.
+  // Its author is the name the panel shows — `Vee` for the assistant since 2026-10-01 — and,
+  // since 2026-10-08, a reply of Vee's is quoted as plain text: its list, its table and its
+  // marks flattened into one line (`plainOf`) before it is cut.
   const target = s.chatReplyTo == null ? null : s.chatMsgs[s.chatReplyTo]
+  const said = target ? plainOf(target) : ''
   const quote = target
     ? {
         who: authorOf(target),
-        text: target.text.length > 220 ? target.text.slice(0, 220) + '…' : target.text
+        text: said.length > 220 ? said.slice(0, 220) + '…' : said
       }
     : null
 

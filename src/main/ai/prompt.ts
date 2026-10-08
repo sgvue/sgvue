@@ -37,7 +37,8 @@ type BetaTextBlockParam = Anthropic.Beta.BetaTextBlockParam
  * `get_view_state` is full), phase 2 (the camera's direction and when to move it; viewpoints
  * and markups are the user's own), phase 3, the consent gate (what only asks, and that a
  * request is never reported as done) and phase 4 (the Schedules window's own controls and a
- * schedule's rows as a set; placing a markup) — each marked where it sits. 37 lines.
+ * schedule's rows as a set; placing a markup) — each marked where it sits. 37 lines — 39 since
+ * 2026-10-08, when one design line became three (below).
  *
  * Phase 3 also brought two of the *added* lines up to date, because each said something that
  * stopped being true: `delete_set` forgets nothing by itself any more, and a viewpoint or a
@@ -46,6 +47,16 @@ type BetaTextBlockParam = Anthropic.Beta.BetaTextBlockParam
  * Its follow-up, to phase 4's own placing line: a reply's revert takes away a markup that reply
  * placed. No design line was touched.
  *
+ * **2026-10-08 — one design line is replaced, the owner's request.** *"the Ask VEE ai assistant
+ * answer are in one sentence, which is extremely difficult to read … Present answer in simple
+ * table or list if applicable."* The design's `Reply in one short sentence saying what you did
+ * and how many elements it affected. No preamble, no lists unless asked.` (`SGVue.dc.html:1257`)
+ * is, in its place, three lines of formatting rules a small model follows: an opening sentence
+ * with its key number or name in bold — which, after a change to the view, still says what was
+ * done and how many elements it affected, the design's line's own intent — then a list, a table
+ * or short paragraphs only where they make the answer easier to read, and the Markdown the panel
+ * does not render ruled out. The panel lays those blocks out (`renderer/ai/blocks.ts`).
+ *
  * One correction, and it is the plan's (§3.5 defect 3): the design writes `combine:"add"` in
  * the "also / add / plus / include" line while `set_filter_stack` already spells the same
  * value `append`. One enum, one word — `append`.
@@ -53,9 +64,9 @@ type BetaTextBlockParam = Anthropic.Beta.BetaTextBlockParam
  * The six additions are the user's decision on `docs/AI_REVIEW.md` §5 and §9 ("yes to all
  * five"): text from the file is data, quantities are as authored, the `absent` operator, the
  * id and selection targets, named filter sets, and the turn budget. **No design line is
- * removed or reworded**, and the additions are written in plain sentence case rather than the
- * design's capitals for emphasis — current guidance for this model is calm, specific
- * instruction, not shouting.
+ * removed or reworded** — but the reply line of 2026-10-08, above — and the additions are
+ * written in plain sentence case rather than the design's capitals for emphasis — current
+ * guidance for this model is calm, specific instruction, not shouting.
  *
  * The design's own last two lines are data, not instruction: `'Current view state: …'` and
  * `'Model schema: …'`. They are not here because they are cached differently — see the file
@@ -139,7 +150,14 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   'manage_markups also places a spot coordinate or a laser measurement at a point you name — the top, centre or base of an element’s bounding box, or a project-frame point — exactly as the user’s click with that tool would. The point is taken on the box, not on a picked surface, so say so when you report it; place one only when asked — a placed markup stays until the user deletes it or reverts your reply, which takes away the markups that reply placed.',
   // 2026-09-20 — gap 10. It has twelve rounds and 120 seconds and was told neither.
   'You have twelve tool rounds and about 120 seconds for a turn, so plan for one good call rather than a chain of small ones: a question that needs several joins is one query_sql statement, and a view with several conditions is one set_filter_stack call.',
-  'Reply in one short sentence saying what you did and how many elements it affected. No preamble, no lists unless asked.',
+  // 2026-10-08 — owner: "the Ask VEE ai assistant answer are in one sentence, which is extremely
+  // difficult to read … Present answer in simple table or list if applicable." These three
+  // replace the design's `Reply in one short sentence saying what you did and how many elements
+  // it affected. No preamble, no lists unless asked.` — keeping its opening sentence, its count
+  // after a change, and its no preamble — and the panel renders what they ask for.
+  'Write every reply for a narrow chat panel that renders bold, inline code, lists and tables and no other Markdown. Open with one sentence that answers the question, with its key number or name in **bold** and nothing else in bold; after you change the view, that sentence says what you did and how many elements it affected. No preamble, and never repeat the question. Often that sentence is the whole reply.',
+  'Add more only when it makes the answer easier to read. Three or more items: a bulleted list, one "- " item per line, never nested, numbered ("1. ") only when their order matters. Counts or values across groups, such as levels, types, models or a comparison: a Markdown table rather than a list, with a header row, then a separator row of one --- cell per column (| Level | Walls | then |---|---|), at most 4 columns and 12 rows; past that, show the largest and say how many more there are. Anything else: short paragraphs of at most two sentences, with a blank line between them.',
+  'summarize_elements and clash_check already show their own table under your reply, so do not repeat it in a table or a list of yours. Never use headings, emoji, HTML or code blocks, and put backticks only around an exact name as the file spells it: an IFC class, a property, a model or an element.',
   'A user message that opens with [replying to …] is a direct reply to that quoted turn: resolve "those", "that", "them" and "it" against the quoted message, not against the most recent one.',
   'Visibility is an ORDERED STACK of filter steps, each with its own action and rules, applied in sequence: step 1 narrows the model, step 2 acts on what step 1 left. "isolate L2 then hide windows" is two steps, not one rule list.',
   'When the user says "also", "add", "plus", "include" or "as well", they are EXTENDING what is already shown — pass combine:"append", which APPENDS a step and keeps the current action. Only use combine:"replace" (the default) when they describe a fresh view, which starts a new stack.',

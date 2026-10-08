@@ -15,7 +15,7 @@
  * any instant — and step it through one — with the same result on every run.
  */
 import type { Federation } from '../../shared/federate'
-import { wordCount } from './marks'
+import { wordCount } from './blocks'
 import { traceReduce, traceSummary, type Timeline, type TraceEvent } from './trace'
 import { readFacts, toolFacts, type ChatTrace } from './trace-facts'
 

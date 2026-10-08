@@ -21,10 +21,15 @@
  * (`ai/marks.ts`) — the rows under it, each a button that selects its elements, and the canvas.
  * Once nothing moves the bubble is ordinary flow again: it re-wraps and grows with the panel,
  * and its rows' cells are redrawn where the rows are.
+ *
+ * **Since 2026-10-08 the answer is laid out in blocks** (`ai/blocks.ts`, `ReplyText`): paragraphs,
+ * their line breaks, bulleted and numbered lists, and tables. A reply of one paragraph is drawn
+ * exactly as before; a list marker and a whole table each come in as one of the reveal's pieces.
  */
-import { Fragment, memo, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { s } from './css'
-import { markWords, type Mark } from '../ai/marks'
+import { markWords, splitMarks, type Mark } from '../ai/marks'
+import { hasTable, parseBlocks, type Block } from '../ai/blocks'
 import {
   H_THINK,
   J,
@@ -321,34 +326,175 @@ const MARK_STYLE: Record<Mark, string> = {
   m: 'font:400 11px/1 var(--mono)'
 }
 
+/** A run of pieces, each mark as an element and plain text as text. */
+const marked = (pieces: readonly { text: string; mark: Mark }[]): React.ReactNode[] =>
+  pieces.map((piece, k) =>
+    piece.mark ? (
+      <span key={k} style={s(MARK_STYLE[piece.mark])}>
+        {piece.text}
+      </span>
+    ) : (
+      piece.text
+    )
+  )
+
 /**
- * The reply's text as words. Each word is a span the reveal can fade and lift — `position:
+ * One line of a reply as words. Each word is a span the reveal can fade and lift — `position:
  * relative`, so it is still inline and the line breaks exactly where plain text would break —
  * and each piece of a word carries its mark as an element.
- *
- * Memoised on the text: the panel renders again at every keystroke in the composer, and a reply
- * that has not changed is neither split nor laid out again. (What the reveal writes on the
- * spans is the painter's own, and no render of this touches it.)
  */
-const Words = memo(function Words({ text }: { text: string }): React.JSX.Element {
+function Words({ text }: { text: string }): React.JSX.Element {
   const words = markWords(text)
   return (
     <>
       {words.map((word, j) => (
         <Fragment key={j}>
           <span data-part="word" style={s('position:relative')}>
-            {word.map((piece, k) =>
-              piece.mark ? (
-                <span key={k} style={s(MARK_STYLE[piece.mark])}>
-                  {piece.text}
-                </span>
-              ) : (
-                piece.text
-              )
-            )}
+            {marked(word)}
           </span>
           {j < words.length - 1 ? ' ' : ''}
         </Fragment>
+      ))}
+    </>
+  )
+}
+
+/** A block's lines, a line break between each two: as the reveal's words, or as plain pieces. */
+function Lines({ lines, reveal }: { lines: readonly string[]; reveal: boolean }): React.JSX.Element {
+  return (
+    <>
+      {lines.map((line, i) => (
+        <Fragment key={i}>
+          {i ? <br /> : null}
+          {reveal ? <Words text={line} /> : marked(splitMarks(line))}
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
+/** Between two blocks of a reply, between two items of a list, and from a marker to its text: px. */
+const BLOCK_GAP = 6
+const ITEM_GAP = 3
+const MARKER_GAP = 6
+
+/** A bullet: the text's own size, in `--faint`, at the text's left edge. */
+const BULLET = 'position:relative;flex:none;width:8px;color:var(--faint)'
+/** A list's number: the mono face every numeral takes — the result table's quantity (`SGVue.dc.html:474`). */
+const NUMBER_MARK =
+  'position:relative;flex:none;text-align:right;font:400 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)'
+
+/*
+ * A table is the chat's result table (`SGVue.dc.html:466–477`, `ChatPanel`) drawn from the
+ * reply's own rows: the same 1 px `--border` box with an 8 px radius, here on `--card` as that
+ * table is, the header in its title's mono capitals on `--step-bg`, each row under a 1 px rule,
+ * 9 px at either side and 10 px between two columns; text in the row label's sans, numbers in
+ * the count's mono. Its box scrolls sideways when the table is wider than the bubble — the log
+ * never does.
+ */
+const TABLE_BOX = 'position:relative;overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--card)'
+const TABLE_HEAD =
+  'background:var(--step-bg);font:500 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);vertical-align:bottom'
+const TABLE_TEXT = 'border-top:1px solid var(--border);vertical-align:baseline;font:400 11.5px/1.4 var(--sans);color:var(--ink)'
+const TABLE_NUMBER =
+  'border-top:1px solid var(--border);vertical-align:baseline;font:400 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap'
+
+/** One block of a reply, `top` px under the one before it. Nothing in it is ever HTML. */
+function ReplyBlock({ block, top, reveal }: { block: Block; top: number; reveal: boolean }): React.JSX.Element {
+  /** A list marker and a whole table are each one of the reveal's pieces, like a word. */
+  const piece = reveal ? 'word' : undefined
+  if (block.kind === 'p') {
+    return (
+      <p style={s(`margin:${top}px 0 0`)}>
+        <Lines lines={block.lines} reveal={reveal} />
+      </p>
+    )
+  }
+  if (block.kind === 'table') {
+    const last = block.head.length - 1
+    const pad = (c: number, y: number): string => `padding:${y}px ${c === last ? 9 : 5}px ${y}px ${c === 0 ? 9 : 5}px`
+    return (
+      <div data-part={piece} style={s(`${TABLE_BOX};margin-top:${top}px`)}>
+        <table style={s('border-collapse:collapse;width:100%')}>
+          <thead>
+            <tr>
+              {block.head.map((cell, c) => (
+                <th key={c} scope="col" style={s(`${pad(c, 6)};${TABLE_HEAD};text-align:${block.cols[c].align}`)}>
+                  {marked(splitMarks(cell))}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, c) => (
+                  <td
+                    key={c}
+                    style={s(`${pad(c, 5)};${block.cols[c].num ? TABLE_NUMBER : TABLE_TEXT};text-align:${block.cols[c].align}`)}
+                  >
+                    {marked(splitMarks(cell))}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  const ordered = block.kind === 'ol'
+  const List = ordered ? 'ol' : 'ul'
+  /** Every number of a list as wide as its widest, so their full stops stand in a column. */
+  const digits = ordered ? String(block.start + block.items.length - 1).length + 1 : 0
+  return (
+    <List
+      style={s(`margin:${top}px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:${ITEM_GAP}px`)}
+    >
+      {block.items.map((item, k) => (
+        <li key={k} style={s(`display:flex;align-items:baseline;gap:${MARKER_GAP}px`)}>
+          {ordered ? (
+            <span data-part={piece} style={s(`${NUMBER_MARK};min-width:${digits}ch`)}>
+              {block.start + k}.
+            </span>
+          ) : (
+            <span data-part={piece} aria-hidden="true" style={s(BULLET)}>
+              •
+            </span>
+          )}
+          <span style={s('flex:1;min-width:0')}>
+            <Lines lines={item} reveal={reveal} />
+          </span>
+        </li>
+      ))}
+    </List>
+  )
+}
+
+/**
+ * A reply's text, laid out in its blocks (`ai/blocks.ts`). **A reply of one paragraph is drawn as
+ * every reply was** — its words straight into the text's box, with nothing around them — and
+ * anything more is a paragraph, a list or a table each, `BLOCK_GAP` apart. With `reveal` every
+ * word, list marker and table is a `[data-part="word"]` the reveal fades in, in reading order and
+ * as many as `wordCount` counts; without it the reply is the same layout with nothing to reveal.
+ *
+ * Memoised on the text: the panel renders again at every keystroke in the composer, and a reply
+ * that has not changed is neither split nor laid out again. (What the reveal writes on the
+ * spans is the painter's own, and no render of this touches it.)
+ */
+export const ReplyText = memo(function ReplyText({
+  text,
+  reveal = true
+}: {
+  text: string
+  reveal?: boolean
+}): React.JSX.Element {
+  const blocks = parseBlocks(text)
+  if (blocks.length === 1 && blocks[0].kind === 'p') return <Lines lines={blocks[0].lines} reveal={reveal} />
+  return (
+    <>
+      {blocks.map((block, i) => (
+        <ReplyBlock key={i} block={block} top={i ? BLOCK_GAP : 0} reveal={reveal} />
       ))}
     </>
   )
@@ -409,6 +555,11 @@ export const bubbleStyle = (fg: string, bg: string, radius: string, maxW: string
  * `owned` is the reply the trace is drawing: it carries the ticker, and its canvas is painted by
  * the panel's frame loop. Any other reply paints its own canvas — the rows' cells at rest — and
  * again whenever its box, the theme or the display's ratio changes.
+ *
+ * 2026-10-08: every message of Vee's is drawn in this bubble — the boot audit too, which no turn
+ * produced (it has no trace, so no canvas and nothing to reveal) — so that every reply is laid out
+ * in its blocks. A reply that holds a table is full width as well: a table never decides how wide
+ * its bubble is, so a wide one scrolls inside its own box.
  */
 export function ReplyBubble({
   text,
@@ -461,6 +612,7 @@ export function ReplyBubble({
 
   const lay = rowLayout(rows, noun, { width: inner, dpr: window.devicePixelRatio || 1 })
   const hasCanvas = owned || rows.length > 0
+  const table = useMemo(() => text !== null && hasTable(text), [text])
 
   return (
     <span
@@ -468,7 +620,7 @@ export function ReplyBubble({
       data-part="bubble"
       style={s(
         `${base};padding:0;position:relative;overflow:hidden` +
-          (wide ? ';align-self:stretch' : '') +
+          (wide || table ? ';align-self:stretch' : '') +
           // Nothing of the bubble shows until the trace opens it.
           (text === null ? ';height:0;opacity:0' : '')
       )}
@@ -501,7 +653,8 @@ export function ReplyBubble({
           style={s(`padding:8px ${PAD_X}px ${rows.length ? ROWS_BOTTOM : 8}px`)}
         >
           <div ref={words} data-part="text">
-            <Words text={text} />
+            {/* Only a turn's reply has words to reveal; a message no turn produced is plain. */}
+            <ReplyText text={text} reveal={trace !== null} />
           </div>
           {rows.length ? (
             <div data-part="rows" style={s(`position:relative;margin-top:${ROWS_GAP}px`)}>

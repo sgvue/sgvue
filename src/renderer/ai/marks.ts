@@ -13,6 +13,10 @@
  *
  * `markWords` is the same text as the words the reveal fades in one by one: a word is what stands
  * between two runs of white space, and may be made of pieces (a bold word and its full stop).
+ *
+ * 2026-10-08: the marks are read inside each line of a block — a paragraph's, a list item's, a
+ * table's cell (`ai/blocks.ts`) — and the reveal's count of pieces moved there with the blocks
+ * (`wordCount`).
  */
 
 /** How a piece is set: plain, bold (weight 600) or the mono face. */
@@ -97,6 +101,3 @@ export function markWords(text: string): MarkPiece[][] {
   }
   return words
 }
-
-/** How many words the reveal has to bring in. */
-export const wordCount = (text: string): number => markWords(text).length

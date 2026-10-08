@@ -15,6 +15,9 @@
  * lines brought up to date, because each said something that had stopped being true. Phase 4:
  * two more (the Schedules window's own controls and a schedule's rows as a set; placing a
  * markup) — 37 — and three added lines brought up to date in the same way.
+ *
+ * 2026-10-08 — the owner's "the Ask VEE ai assistant answer are in one sentence": the design's
+ * one-sentence reply line is replaced, in its place, by three formatting lines — 39.
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -57,8 +60,9 @@ describe('the system contract', () => {
 
   it('carries the design’s instruction lines, in the design’s order', () => {
     // 18 of the design's, 6 of 2026-09-20, 4 of 2026-09-28, 1 of 2026-10-01, and 8 of
-    // 2026-10-02: two for each of the parity work's four phases.
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(37)
+    // 2026-10-02: two for each of the parity work's four phases. 2026-10-08: the design's reply
+    // line became three (the case below), so 17 of the design's are left.
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(39)
     expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
     expect(DESIGN_SYSTEM_LINES[1]).toContain('strictly read-only with respect to model data')
     // Still the last line, as the design ends.
@@ -71,7 +75,6 @@ describe('the system contract', () => {
       'Distinguish the three colour tools:',
       'psetKeys in the schema are real, queryable properties',
       'Always call query_elements first',
-      'Reply in one short sentence',
       'A user message that opens with [replying to …]',
       'Visibility is an ORDERED STACK',
       'For ANY view needing more than one condition',
@@ -413,6 +416,63 @@ describe('the system contract', () => {
     expect(DESIGN_SYSTEM_LINES.filter((l) => /schedule:true/.test(l))).toEqual([schedules])
     expect(DESIGN_SYSTEM_LINES.filter((l) => /places a spot coordinate/.test(l))).toEqual([placing])
     // And no design line was touched to make room.
+    expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
+    expect(DESIGN_SYSTEM_LINES[DESIGN_SYSTEM_LINES.length - 1]).toBe(DESIGN_LAST)
+  })
+
+  /**
+   * 2026-10-08 — the owner: "the Ask VEE ai assistant answer are in one sentence, which is
+   * extremely difficult to read … Present answer in simple table or list if applicable." The one
+   * design line that asked for exactly that one sentence is replaced — in its own place, between
+   * the turn budget and the `[replying to …]` line — by three lines a small model can follow: an
+   * opening sentence with its key fact in bold, which keeps the design line's count after a
+   * change; a list, a table or short paragraphs only where they help; and what not to write.
+   */
+  it('replaces the design’s one-sentence reply line with three formatting lines, in its place', () => {
+    const joined = DESIGN_SYSTEM_LINES.join('\n')
+    // The design's line is gone, and nothing still asks for one sentence and no lists.
+    expect(joined).not.toContain('Reply in one short sentence')
+    expect(joined).not.toContain('no lists unless asked')
+    const at = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('Write every reply for a narrow chat panel'))
+    expect(DESIGN_SYSTEM_LINES[at - 1]).toMatch(/^You have twelve tool rounds/)
+    expect(DESIGN_SYSTEM_LINES[at + 3]).toMatch(/^A user message that opens with \[replying to …\]/)
+    const [open, shape, never] = DESIGN_SYSTEM_LINES.slice(at, at + 3)
+    for (const said of [
+      'renders bold, inline code, lists and tables and no other Markdown',
+      'Open with one sentence that answers the question',
+      'its key number or name in **bold** and nothing else in bold',
+      // The design line's own intent, kept: a change to the view is reported with its count.
+      'after you change the view, that sentence says what you did and how many elements it affected',
+      'No preamble, and never repeat the question',
+      'Often that sentence is the whole reply'
+    ]) {
+      expect([said, open.includes(said)]).toEqual([said, true])
+    }
+    for (const said of [
+      'Add more only when it makes the answer easier to read',
+      'Three or more items: a bulleted list, one "- " item per line, never nested',
+      'numbered ("1. ") only when their order matters',
+      'Counts or values across groups, such as levels, types, models or a comparison',
+      'a Markdown table rather than a list, with a header row, then a separator row of one --- cell per column (| Level | Walls | then |---|---|), at most 4 columns and 12 rows',
+      'past that, show the largest and say how many more there are',
+      'short paragraphs of at most two sentences, with a blank line between them'
+    ]) {
+      expect([said, shape.includes(said)]).toEqual([said, true])
+    }
+    for (const said of [
+      'summarize_elements and clash_check already show their own table under your reply, so do not repeat it',
+      'Never use headings, emoji, HTML or code blocks',
+      'put backticks only around an exact name as the file spells it'
+    ]) {
+      expect([said, never.includes(said)]).toEqual([said, true])
+    }
+    // Sentence case, as every added line: no capitals for emphasis but the names that are capitals.
+    for (const line of [open, shape, never]) {
+      const shouted = line.replace(/\b(?:HTML|IFC)\b/g, '').match(/\b[A-Z]{3,}\b/g)
+      expect([line.slice(0, 24), shouted]).toEqual([line.slice(0, 24), null])
+    }
+    // Still in the cached contract, and no other design line moved.
+    expect(contractText()).toContain(open)
     expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
     expect(DESIGN_SYSTEM_LINES[DESIGN_SYSTEM_LINES.length - 1]).toBe(DESIGN_LAST)
   })

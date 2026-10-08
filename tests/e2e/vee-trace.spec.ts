@@ -427,6 +427,111 @@ test('a turn with no tool has no trace: the reply opens word by word, and says h
   }
 })
 
+/**
+ * 2026-10-08 — the owner: "the Ask VEE ai assistant answer are in one sentence, which is extremely
+ * difficult to read … Present answer in simple table or list if applicable." A reply written as a
+ * sentence, a list and a table is laid out as one (`ai/blocks.ts`, `ReplyText`): its pieces come
+ * in one after another, its bubble ends exactly at its content, a table too wide for the panel
+ * scrolls inside its own box — never the log — and a reply to it quotes it as one plain line.
+ */
+test('a reply written as a sentence, a list and a table is laid out as one, and quoted as one line', async () => {
+  const FORMATTED = [
+    '**24 of 80 walls** have no Thermal Transmittance.',
+    '',
+    '- 12 are in `SB_ARC_R25` and 12 in `SB_STR_R25`.',
+    '- All 4 walls on the roof are missing it.',
+    '- Every `EW 200 Brick` wall carries one.',
+    '',
+    '| Level | Walls | Missing | Type |',
+    '|---|---:|---:|---|',
+    '| L1 | 19 | 5 | `SB_ARC_R25_EXTERNAL_WALL_TYPE_WITHOUT_THERMAL_TRANSMITTANCE` |',
+    '| Roof | 4 | 4 | all |'
+  ].join('\n')
+  /** What the quote reads: no mark, no marker, no pipe — the list and the rows one line. */
+  const FLAT =
+    '24 of 80 walls have no Thermal Transmittance. 12 are in SB_ARC_R25 and 12 in SB_STR_R25; All 4 walls on the roof are ' +
+    'missing it; Every EW 200 Brick wall carries one. Level, Walls, Missing, Type; ' +
+    'L1, 19, 5, SB_ARC_R25_EXTERNAL_WALL_TYPE_WITHOUT_THERMAL_TRANSMITTANCE; Roof, 4, 4, all'
+  const { app, page } = await ready()
+  try {
+    const log = page.locator('[data-role="chatlog"]')
+    await watch(page)
+    // A turn with no tool: its bubble would hug its text — but a table makes it full width.
+    await ask(page, 'Which walls are missing it, by level?')
+    await expect.poll(async () => (await now(page)).status.join()).toBe('Thinking')
+    await emit(app, { type: 'done', text: FORMATTED, rounds: 1 })
+    const reply = log.locator(':scope > [data-row]').last()
+    await expect(reply.locator('[data-part="status-final"]')).toHaveText(/^\ds$/)
+    await expect(log).not.toHaveAttribute('data-moving', '', { timeout: 10_000 })
+
+    // The blocks: a paragraph, three items, a table — and none of the characters that wrote them.
+    const text = reply.locator('[data-part="text"]')
+    await expect(text.locator(':scope > p')).toHaveText('24 of 80 walls have no Thermal Transmittance.')
+    await expect(text.locator(':scope > ul > li')).toHaveText([
+      '•12 are in SB_ARC_R25 and 12 in SB_STR_R25.',
+      '•All 4 walls on the roof are missing it.',
+      '•Every EW 200 Brick wall carries one.'
+    ])
+    await expect(text.locator('table th')).toHaveText(['Level', 'Walls', 'Missing', 'Type'])
+    await expect(text.locator('table tbody tr')).toHaveCount(2)
+    expect(await text.textContent()).not.toMatch(/\*\*|`|\||---/)
+    // The header is the result table's capitals; a column of numbers is right-aligned, in mono.
+    expect(await text.locator('table th').first().evaluate((e) => getComputedStyle(e).textTransform)).toBe('uppercase')
+    const walls = text.locator('table tbody tr').first().locator('td').nth(1)
+    expect(await walls.evaluate((e) => [getComputedStyle(e).textAlign, getComputedStyle(e).fontFamily.includes('Mono')])).toEqual([
+      'right',
+      true
+    ])
+
+    // The pieces came in one after another — the sentence's words, each marker and its item's
+    // words, the table whole — and are all in now: 8 + (1 + 8) + (1 + 9) + (1 + 7) + 1.
+    const all = await seen(page)
+    const last = all.filter((s) => s.index === 2 && s.words.length)
+    expect(last[last.length - 1].words).toHaveLength(36)
+    expect(last.some((s) => s.words.some((w) => w < 0.5) && s.words.some((w) => w > 0.5))).toBe(true)
+    expect((await now(page)).words.every((w) => w === 1)).toBe(true)
+
+    // Its bubble is the log's width, as the boot audit's is, and ends exactly at its content.
+    const box = await reply.evaluate((row) => {
+      const bubble = row.querySelector<HTMLElement>('[data-part="bubble"]')!
+      const body = bubble.querySelector<HTMLElement>('[data-part="body"]')!
+      const table = bubble.querySelector<HTMLElement>('table')!.parentElement!
+      const log = row.parentElement!
+      return {
+        bubble: bubble.getBoundingClientRect().width,
+        height: bubble.getBoundingClientRect().height,
+        natural: body.getBoundingClientRect().height,
+        inline: bubble.style.height,
+        table: { client: table.clientWidth, scroll: table.scrollWidth, x: getComputedStyle(table).overflowX },
+        log: { client: log.clientWidth, scroll: log.scrollWidth, x: getComputedStyle(log).overflowX }
+      }
+    })
+    const seed = (await log.locator(':scope > [data-row]').first().locator('[data-part="bubble"]').boundingBox())!
+    expect(box.bubble).toBeCloseTo(seed.width, 1)
+    expect(box.inline).toBe('')
+    expect(box.height).toBeCloseTo(box.natural, 1)
+    // The table is wider than the bubble: it scrolls inside its own box, and the log does not.
+    expect(box.table.x).toBe('auto')
+    expect(box.table.scroll).toBeGreaterThan(box.table.client)
+    expect(box.log.scroll).toBe(box.log.client)
+    expect(box.log.x).toBe('hidden')
+
+    // A reply to it quotes it as one plain line: in the strip, above the question, and to main.
+    await reply.locator('button[data-tip="Reply to this message"]').click()
+    const strip = page.locator('span', { hasText: /^Replying to Vee$/ }).locator('xpath=following-sibling::span[1]')
+    await expect(strip).toHaveText(FLAT)
+    await ask(page, 'and the doors?')
+    const quote = FLAT.slice(0, 220) + '…'
+    await expect.poll(() => app.evaluate(() => (globalThis as unknown as { __turn: Held }).__turn.asked)).toEqual({
+      userText: 'and the doors?',
+      quote: { who: 'Vee', text: quote }
+    })
+    await expect(log.locator(':scope > [data-row][data-mine]').last()).toContainText(quote)
+  } finally {
+    await app.close()
+  }
+})
+
 test('with reduced motion every state shows at its end, and nothing in between', async () => {
   const { app, page } = await ready({ reducedMotion: 'reduce' })
   try {

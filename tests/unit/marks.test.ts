@@ -8,7 +8,10 @@
  * so it also has to be linear in the reply's length, whatever the reply holds.
  */
 import { describe, expect, it } from 'vitest'
-import { markWords, splitMarks, wordCount } from '../../src/renderer/ai/marks'
+import { markWords, splitMarks } from '../../src/renderer/ai/marks'
+// 2026-10-08: the reveal's count moved to the blocks (`ai/blocks.ts`); for a reply of one line
+// it is still that line's words, which is what these cases count.
+import { wordCount } from '../../src/renderer/ai/blocks'
 
 const flat = (text: string): string => splitMarks(text).map((p) => (p.mark ? `<${p.mark}:${p.text}>` : p.text)).join('')
 

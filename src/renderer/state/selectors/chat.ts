@@ -20,6 +20,7 @@
 import type { ChatTable } from '../../ai/executors/context'
 import type { ChatMessage, ShellState } from '../shell'
 import { chatSuggest, type SuggestInput } from '../../ai/analysis'
+import { plainText } from '../../ai/blocks'
 import type { VeeState } from '../../app/vee-grid'
 
 /**
@@ -165,6 +166,15 @@ export const STOP_GUARD_MS = 300
 export const sendClick = (busy: boolean, now: number, stoppedAt: number | null): 'stop' | 'send' | 'ignore' =>
   stoppedAt !== null && now - stoppedAt < STOP_GUARD_MS ? 'ignore' : busy ? 'stop' : 'send'
 
+/**
+ * 2026-10-08 — a message as one line of plain text: a reply of Vee's with its blocks and marks
+ * flattened (`ai/blocks.ts`, `plainText` — a reply of one plain sentence is itself), a user's as
+ * it was typed. What a reply's quote carries to the model and above the question, and what the
+ * reply strip shows.
+ */
+export const plainOf = (m: Pick<ChatMessage, 'role' | 'text'>): string =>
+  m.role === 'user' ? m.text : plainText(m.text)
+
 /** `:2037–2039`. Who the composer is replying to, and the line it shows. */
 export function replyStrip(
   msgs: readonly ChatMessage[],
@@ -174,7 +184,7 @@ export function replyStrip(
   return {
     replying: replyTo != null,
     who: target ? authorOf(target) : '',
-    text: target ? target.text : ''
+    text: target ? plainOf(target) : ''
   }
 }
 
