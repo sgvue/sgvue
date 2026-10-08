@@ -47,7 +47,8 @@ export const SECTION_MARGIN = 1.5
 /**
  * The cut outline's place in the **opaque** list: after the batches (0), so it depth-tests
  * against every solid, and before the ground veil (`scene.ts`, 10), so below grade it is dimmed
- * with the parts it outlines.
+ * with the parts it outlines — while the canvas grid is on (2026-10-08); with it off the veil is
+ * not drawn, and neither is dimmed.
  */
 export const RENDER_ORDER_CUT = 5
 

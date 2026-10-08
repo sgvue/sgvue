@@ -176,8 +176,9 @@ export interface SceneRig {
   scale: number
   setTheme(name: ThemeName): void
   /**
-   * Show or hide the fine ground grid (2026-09-24, owner-requested). The helper is rebuilt on
-   * every theme change and the rig on every rescale; both keep the flag, so it survives either.
+   * Show or hide the fine ground grid (2026-09-24, owner-requested) and, with it, the ground veil
+   * (2026-10-08, owner-requested). The helper is rebuilt on every theme change and the rig on
+   * every rescale; both keep the flag, so it survives either.
    */
   setGroundGrid(on: boolean): void
   /** Re-render the shadow map on the next frame. See `sun.shadow.autoUpdate` below. */
@@ -262,6 +263,11 @@ export function buildScene(
   veil.position.z = ground.position.z
   veil.receiveShadow = true
   veil.renderOrder = GROUND_VEIL_ORDER
+  // 2026-10-08 (owner-requested): the veil is drawn only while the canvas grid is on. Off, the
+  // opaque layer is the whole ground — it still takes the shadow — and, the veil's depth gone
+  // with it, nothing below grade is dimmed or hidden. `setGroundGrid` below moves it with the
+  // helper.
+  veil.visible = groundGrid
   scene.add(ground, veil)
 
   let gridHelper: GridHelper | null = null
@@ -296,6 +302,7 @@ export function buildScene(
     setGroundGrid: (on) => {
       gridOn = on
       if (gridHelper) gridHelper.visible = on
+      veil.visible = on
     },
     invalidateShadows: () => {
       sun.shadow.needsUpdate = true

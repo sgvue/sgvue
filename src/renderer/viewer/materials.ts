@@ -509,17 +509,19 @@ export function createMaterials(themeName: ThemeName, parts: PartState): Materia
   /*
    * The ground, in two layers (2026-09-24). The reference's opaque ground writes depth, so
    * anything below grade is hidden from above. Here the opaque layer is drawn **first** and
-   * writes no depth, so an opaque part below grade draws over it; then `groundVeil` — the same
-   * plane, the same lit and shadowed colour — is blended over it at `GROUND_VEIL_ALPHA`
-   * **after** every batch and before any transparent object, and writes the depth
-   * the reference's ground wrote. Over plain ground that blends ground over ground, so the
-   * pixel does not change; over a part below grade it dims the part toward the ground colour;
-   * and because the veil leaves the reference's ground depth behind, every transparent pass
-   * after it (edges, see-through parts, glass, gridlines, the section sheet) meets exactly the
-   * depth it met before. `CustomBlending` rather than `transparent` is what keeps it in the
-   * opaque list — a transparent veil would be drawn after glass's back-face pass
-   * (`Renderer._renderTransparents`) and dim it. The alpha factors keep the canvas opaque.
-   * Both are `FrontSide`, as the reference's ground is, so from below neither is drawn.
+   * writes no depth, so an opaque part below grade draws over it; then, while the canvas grid
+   * is on (2026-10-08, `scene.ts`), `groundVeil` — the same plane, the same lit and shadowed
+   * colour — is blended over it at `GROUND_VEIL_ALPHA` **after** every batch and before any
+   * transparent object, and writes the depth the reference's ground wrote. Over plain ground
+   * that blends ground over ground, so the pixel does not change; over a part below grade it
+   * dims the part toward the ground colour; and because the veil leaves the reference's ground
+   * depth behind, every transparent pass after it (edges, see-through parts, glass, gridlines,
+   * the section sheet) meets exactly the depth it met before. With the grid off the veil is not
+   * drawn, so nothing below grade is dimmed or hidden. `CustomBlending` rather than
+   * `transparent` is what keeps it in the opaque list — a transparent veil would be drawn after
+   * glass's back-face pass (`Renderer._renderTransparents`) and dim it. The alpha factors keep
+   * the canvas opaque. Both are `FrontSide`, as the reference's ground is, so from below neither
+   * is drawn.
    */
   const ground = new MeshStandardMaterial({
     color: T.ground,

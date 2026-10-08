@@ -276,7 +276,10 @@ export interface Viewer {
   /** Escape: abandon whatever the current tool was building. */
   cancel(): void
   setShadows(b: boolean): void
-  /** The fine ground grid under the model (2026-09-24). Not the IFC grids — `setGrids`. */
+  /**
+   * The fine ground grid under the model (2026-09-24) and, with it, the ground veil
+   * (2026-10-08). Not the IFC grids — `setGrids`.
+   */
   setGroundGrid(b: boolean): void
   /**
    * Both section planes in one call (2026-10-01): the gridline cut and the level cut, each a
@@ -1125,7 +1128,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
   const drawCalls = (): number => {
     let n = store.drawObjects() + edges.drawObjects() + annotations.drawObjects()
     n += section.drawn
-    n += 2 + (groundGridOn ? 1 : 0) // the ground plane and its veil, and the grid helper when on
+    n += 1 + (groundGridOn ? 2 : 0) // the ground plane, and its veil and grid helper when on
     // The larger of the two is right in both cases: on WebGPU the renderer's own count is
     // per instance and far higher; on WebGL2 it can be zero, and ours is what was submitted.
     return Math.max(renderer.info.render.drawCalls, n)
@@ -1458,6 +1461,8 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     },
     setGroundGrid: (b) => {
       groundGridOn = b
+      // The grid helper and the ground veil (2026-10-08). Neither casts, so the shadow map —
+      // casters only — is unchanged and a frame is all this needs.
       rig.setGroundGrid(b)
       invalidate()
     },

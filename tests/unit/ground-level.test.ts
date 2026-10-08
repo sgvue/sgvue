@@ -10,6 +10,8 @@
  * Three levels: the rule itself; `buildScene`, which is what places the ground, the veil and
  * the grid helper; and the real geometry streamer on a committed fixture whose first streamed
  * product is its highest (`tests/fixtures/high-first.ifc`, `scripts/make-tiny-ifc.py`).
+ *
+ * 2026-10-08: and the veil is drawn only while the canvas grid is on.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -82,6 +84,9 @@ const helperOf = (children: readonly Object3D[]): Object3D => children.find((c) 
 /** The ground and its veil: the two meshes on the one plane geometry. */
 const planesOf = (children: readonly Object3D[]): Object3D[] =>
   children.filter((c) => (c as { geometry?: { type?: string } }).geometry?.type === 'PlaneGeometry')
+/** The veil alone: the mesh drawn in the veil's own material. */
+const veilOf = (children: readonly Object3D[]): Object3D =>
+  children.find((c) => (c as { material?: unknown }).material === materials.groundVeil)!
 
 describe('buildScene — the ground, its veil and the grid helper stand at the datum', () => {
   it('puts all three at the file’s zero when the offset’s Z is not 0', () => {
@@ -129,6 +134,56 @@ describe('buildScene — the ground, its veil and the grid helper stand at the d
       expect(helperOf(rig.scene.children).position.z).toBe(-0.005 * rig.scale)
       rig.dispose()
     }
+  })
+})
+
+describe('buildScene — the ground veil is drawn only while the canvas grid is on (2026-10-08)', () => {
+  // The owner: "When off the canvas grid, please dont show the semi-opacity plane filter." The
+  // veil is what dims a part below grade; the opaque ground under it stays, and takes the shadow.
+  const mock = new Box3(new Vector3(-8, -8, -1), new Vector3(32, 26, 15.5))
+  const shown = (rig: ReturnType<typeof buildScene>): boolean[] => [
+    veilOf(rig.scene.children).visible,
+    helperOf(rig.scene.children).visible,
+    rig.ground.visible
+  ]
+
+  it('builds with the veil hidden when the canvas grid is off, and drawn when it is on', () => {
+    const off = buildScene(mock, materials, 'dark', false)
+    expect(shown(off)).toEqual([false, false, true])
+    expect(off.ground.receiveShadow).toBe(true)
+    off.dispose()
+    for (const on of [buildScene(mock, materials, 'dark', true), buildScene(mock, materials, 'dark')]) {
+      expect(shown(on)).toEqual([true, true, true])
+      on.dispose()
+    }
+  })
+
+  it('setGroundGrid hides and shows the veil with the grid helper, both ways', () => {
+    const rig = buildScene(mock, materials, 'dark', true)
+    const veil = veilOf(rig.scene.children)
+    rig.setGroundGrid(false)
+    expect(shown(rig)).toEqual([false, false, true])
+    rig.setGroundGrid(true)
+    expect(shown(rig)).toEqual([true, true, true])
+    rig.setGroundGrid(false)
+    expect(shown(rig)).toEqual([false, false, true])
+    // The same veil throughout, still in the scene on the ground's plane.
+    expect(veilOf(rig.scene.children)).toBe(veil)
+    expect(veil.position.z).toBe(rig.ground.position.z)
+    rig.dispose()
+  })
+
+  it('keeps the veil as the grid has it through a theme change, which rebuilds the helper', () => {
+    const rig = buildScene(mock, materials, 'dark', false)
+    rig.setTheme('light')
+    expect(shown(rig)).toEqual([false, false, true])
+    rig.setGroundGrid(true)
+    rig.setTheme('dark')
+    expect(shown(rig)).toEqual([true, true, true])
+    rig.setGroundGrid(false)
+    rig.setTheme('light')
+    expect(shown(rig)).toEqual([false, false, true])
+    rig.dispose()
   })
 })
 

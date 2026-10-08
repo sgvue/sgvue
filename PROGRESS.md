@@ -3,6 +3,44 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-08 — with the canvas grid off, the ground veil is not drawn
+
+**Did:** the owner: *"When off the canvas grid, please dont show the semi-opacity plane filter."*
+— 2026-09-24's ground veil, which draws an opaque part below grade at 40 % of its contrast.
+`buildScene` builds the veil with `visible = groundGrid`, and the rig's `setGroundGrid` sets it
+beside the grid helper (`viewer/scene.ts`): a theme change keeps it, and every rig rebuild takes
+the flag from `buildRig`. The opaque ground under it stays and takes the building's shadow. The
+toggle needs nothing more: `invalidate()` was already there, and the veil casts nothing, so the
+shadow map is untouched; the dev draw count is one less with the grid off (`viewer-core.ts`). The
+assistant's `toggle_display` `groundGrid` goes through the same button action. The reading
+taken — only the veil goes — is recorded as one the owner may still correct. Because the veil
+also carried the ground's depth, with the grid off what is below grade is drawn as it is, edges,
+glass and annotations included. One allowed-deviation entry, one decision line and row; the two
+2026-09-24 entries and the "two layers" decision line amended.
+
+**Measured** (a scratchpad harness under `safe-run.cjs`, built from `electron-guard.cjs` and the
+parity DOM helpers: the mock, 1280 × 820, ratio 1, the 3D view, the canvas alone, the build
+before against this one, each theme its own run, 60 fps throughout): grid on, eight states
+byte-identical; grid off, 1 586 px with the whole federation and 6 954 / 6 958 (dark / light)
+with only ARC and STR shown — every pixel's ray cast with the app's own picker: the turf's rim
+astride the ground plane, the eight footings (−1.0 … −0.5 m), the ground slab's rim and eight
+column stubs below grade, or within 1–4 px of such a hit, but one pixel on a far IFC gridline.
+On the bare ground, 258 px: the far IFC gridlines no longer lose samples to the veil's depth.
+With the level rings on and only ARC and STR shown, the `Foundation` ring at −1 m now shows
+through (2 112 px). With the grid off, unloading the site model rescaled the scene and rebuilt
+the rig, and the new veil came up hidden. The building's shadow on the ground in the ARC + STR
+view, 28 146 / 28 156 px, is the build before's, pixel for pixel. The tool's frame and the
+button's are identical.
+
+**Verified:** `npm run typecheck` exit 0; `npm test` **143 files passed / 2 skipped, 2 778 tests
+passed / 3 skipped** (3 new in `ground-level.test.ts`, each failing against the old
+`scene.ts`); `npm run build` exit 0; `npm run test:e2e` **62 passed, 6 skipped** in 8.0 m, the two
+canvas-grid cases in `smoke.spec.ts` unchanged among them — peak one process 240 MB, all
+786 MB, GPU dedicated 253 MB, `clean:`; nothing survived.
+
+**Not verified:** a real model (none in `samples/`), macOS, and the owner's reading of the
+request.
+
 ## 2026-10-05 — published as `sgvue/sgvue`; the first CI run's one error fixed, and the docs tidied
 
 **Published.** SGVue is open source at https://github.com/sgvue/sgvue (Apache-2.0): one commit,
@@ -1542,112 +1580,48 @@ checked the window but not its `webContents`, which a closing window loses first
 both, and the schedules spec (9 passed) and the full run passed after. Not run: the paid AI eval
 suite.
 
-## 2026-09-28 — the assistant makes and reads schedules: `make_schedule`, `get_schedule`
-
-**Did:** the owner: *"wire the schedules with the AI. Improve AI abilities."* — the first two of
-the four abilities they chose (export and colour-from-chat come next, separately). **`make_schedule`**
-(view) takes a simplified schedule — `category` (IFC classes), `columns` `[{field, heading?,
-total?}]`, `filters` in the engine's thirteen operators, `sortBy`, `groupBy`, `grandTotals`,
-`title` — builds a `ScheduleDef` through `parseScheduleDef`, opens the Schedules window when it is
-closed (waiting up to 8 s for it to join) and shows it there as the current, unsaved schedule on
-the window's own undo history, with the existing toast (`Schedule from Ask SGVue`). With
-**`base:"open"`** it changes the open schedule instead — columns added or re-headed / re-totalled,
-`removeColumns` by heading or field, filters / sort / group replaced — and keeps everything the
-simple shape cannot say (calculated columns, formats, colour rules, widths, the template note);
-toast `Schedule changed by Ask SGVue`. **`get_schedule`** (read) reads the open one. Both run the
-ported engine **in the main renderer** (`schedule/assistant.ts`) over `scheduleStore()` — the
-adapter's own snapshot, built the first time either tool runs (never by a chat turn), one slot,
-released when the federation changes or Schedules closes — and return the definition in the
-input's shape, each measured column carrying its display `unit` and the SI `filterUnit` its
-filters compare in, a page of rows as displayed text (≤ 50), each group's count
-and subtotals, the grand totals, `filled` per column and `filterKeeps` per filter, bounded and
-`truncated` when cut; chips per top-level group. Field names: core by label, key or SGVue's name;
-property names through the same `resolveKey` as rules; unknown or ambiguous refuses the whole call
-with the nearest names. The Schedules window now reports its schedule and the rows its table
-shows (`current`, ≤ one per 250 ms) and accepts one (`define`), both bounded by `DefShape` and
-read by `parseScheduleDef` on receipt; the main window keeps it in `schedule-link.ts`, and the
-view state gains a small `schedule` line built from that report alone — a chat turn builds no
-store and runs no engine. Two prompt lines. Review follow-ups: an ambiguous property name now says
-`"fire rating" matches two names, FireRating and Fire_Rating — say which.`, and `booleanSpelling`
-counts `true` / `True` as one spelling. `docs/SYSTEM_SPEC.md` lists both tools and messages.
-
-**Measured** (mock): a grouped door schedule's result 1 775 characters; the view-state line
-115 B; tools block 23 523 → 28 870 B (27 → 29 tools); `contractText()` 15 204 → 15 906 B.
-
-**Verified:** `npm run typecheck` exit 0; `npm test` **118 files passed / 2 skipped, 1 849 tests
-passed / 3 skipped** (58 new: 28 in `schedule/assistant.test.ts`, 10 in `ai-schedule.test.ts` —
-one spies `scheduleStore` and `StoreBuilder.finish` to prove a turn's view state touches
-neither — 8 link, 4 message, 5 catalogue, 1 prompt, 2 resolver); `npm run build` exit 0;
-`npm run test:e2e` **37 passed, 6 skipped** in 3.4 m — the new case drives both tools over the
-real `ai:tool:exec` IPC: the window opens on the schedule, the view state names it, a template the
-user applies keeps every column when the assistant adds one, and one undo takes only that column
-away — peak one process 219 MB, all 773 MB, GPU dedicated 289 MB, `clean:`; nothing survived. One
-earlier full run failed that case's last poll: the test's own window lookup read a window closed a
-moment before (`getURL` on a destroyed window throws); the helper now skips destroyed windows, and
-the case passed alone, in its spec and in the full run after. Not run: the paid AI eval suite, and
-a real model (none in `samples/`), so the store's one-time build cost is unmeasured — the
-`SGVUE_IFC` e2e now logs it.
-
-## 2026-09-28 — the Windows installer is a wizard that says install, update or repair
-
-**Did:** the owner asked for a proper professional install and update — a progress banner,
-"update" wording when updating, open-now / shortcut / pin choices and a Finish button.
-`nsis.oneClick: false` gives Welcome → progress → Finish, per-user, with no install-mode,
-folder or licence page (`customInstallMode`). `build/installer.nsh`'s `customInit` detects new /
-update / repair from the uninstall entry's `DisplayVersion` and words every page for it
-(Install / Update / Repair button). Finish has "Open SGVue now" and "Create a desktop
-shortcut"; the second is ticked on a new install and on an update only if the shortcut existed,
-and it decides that shortcut (`createDesktopShortcut: true`, no longer `always`). A
-taskbar-pin tip is shown, since Windows has no supported way for an installer to pin. The
-uninstaller is a wizard with an Uninstall button. Sidebar and header bitmaps come from the app
-icon and the design tokens (`scripts/make-installer-images.py`). English only. GPU-preference
-macros unchanged.
-**Verified:** makensis `-WX` clean; payload 75 files SHA-256-identical to `dist/win-unpacked`;
-`tests/unit/installer.test.ts` 7 passed; the old one-click installs update in place (same
-uninstall key and folder; the old uninstaller runs with `--keep-shortcuts --updated`).
-**Not verified:** running the installer — the owner click-tests it.
-
-## 2026-09-28 — the assistant reads property names the file's way: nearest keys, yes/no values, `find_properties`
-
-**Did:** the owner: *"Sometimes when i ask it check area with includesGFA, it never check the
-shared parameters Includes As GFA. Similar for others."* Three causes, each confirmed in code:
-the schema listed 150 names in file order (a real export has more, shared parameters last);
-every miss answered with the first 40 of `propKeys` in that order; and a Revit Yes/No arrives as
-`IfcBoolean` → `true` / `false`, which "Yes" never matches. **One pass in `executeTool`**
-(`executors/names.ts`, on the pure `shared/prop-names.ts`) now reads every property name a tool
-input carries — rule `prop` in `rules` and `steps[].rules`, `groupBy`, `property`, `attr` —
-before any executor runs: the exact key, else the one key equal but for case, spaces and
-punctuation, `Pset.Key` / `Pset:Key` read as the key; two alike are never chosen between, and a
-merely similar key (`includesGFA`) is never chosen. A rewrite reaches the store, so the Filter
-card shows the file's key; the result gains `resolvedKeys`. A yes/no on `=` / `!=` becomes the
-key's one stored spelling (`resolvedValues`) when every stored value is a yes/no. A name still not
-a key — on any tool, because `!=` and `absent` over it match everything — answers with its 8
-nearest names (`includesGFA` → `Includes As GFA` first); a value that matched nothing, with its
-key's 15 commonest values. New read tool **`find_properties`** (`text`, `rules?`, `limit?` ≤ 50):
-per name its sets, how many carry it, kind, measure type and commonest values, bounded and
-`truncated` when cut. Property names got their own schema cap, **1 000**; one prompt line beside
-the design's psetKeys line; `EXTRA_TOOLS_PARAGRAPH` names the tool. `attr()`, `matchFn` and every
-designed surface are unchanged, so no allowed-deviation entry.
-
-**Measured** (bytes / 4 ≈ tokens): mock schema block 1 982 B before and after (43 names, never
-cut); mock + 200 names 4 429 B (151 listed) → 6 299 B (all 243); 1 000 names 22 653 B. Tools
-block 21 977 → 23 523 B (26 → 27 tools); `contractText()` 14 522 → 15 204 B.
-
-**Verified:** `npm run typecheck` exit 0; `npm test` **115 files passed / 2 skipped, 1 784 tests
-passed / 3 skipped** (1 743 before: 17 in the new `prop-names.test.ts`, 20 executor cases, 1
-catalogue, 3 prompt and schema); `npm run build` exit 0; `npm run test:e2e` **36 passed, 6
-skipped** in 4.1 m, peak one process 431 MB, all 815 MB, GPU dedicated 263 MB, `clean:`; nothing
-survived. The paid AI eval suite was not run (it needs the owner's key).
-
 ## Earlier work
 
-Compressed: the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-09-28 — the assistant makes and reads schedules: `make_schedule`, `get_schedule`.** The
+owner: *"wire the schedules with the AI. Improve AI abilities."* `make_schedule` (view) takes a
+simplified schedule — classes, columns, filters in the engine's thirteen operators, sort, group,
+grand totals, title — builds it through `parseScheduleDef`, opens the Schedules window when it
+is closed and shows it there as the current, unsaved schedule on that window's own undo history;
+`base:"open"` changes the open schedule and keeps what the simple shape cannot say (calculated
+columns, formats, colour rules, widths). `get_schedule` (read) reads it back, bounded. Both run
+the ported engine in the main renderer over a store built the first time either runs — never by
+a chat turn — and released when the federation changes or Schedules closes; field names resolve
+as rule names do, and an unknown or ambiguous one refuses the call with the nearest names. The
+Schedules window reports its schedule (`current`, at most one per 250 ms) and accepts one
+(`define`). Tools block 23 523 → 28 870 B (27 → 29 tools). 1 849 unit tests; e2e 37 passed,
+6 skipped.
+
+**2026-09-28 — the Windows installer is a wizard that says install, update or repair.** The
+owner asked for a proper install and update. `nsis.oneClick: false` gives Welcome → progress →
+Finish, per-user, with no install-mode, folder or licence page; `customInit` reads the uninstall
+entry's `DisplayVersion` and words every page Install, Update or Repair; Finish offers "Open
+SGVue now" and "Create a desktop shortcut", which decides that shortcut. Bitmaps from
+`scripts/make-installer-images.py`; English only. makensis `-WX` clean, the payload's 75 files
+SHA-256-identical to `dist/win-unpacked`, and the old one-click installs update in place; running
+it was left to the owner.
+
+**2026-09-28 — the assistant reads property names the file's way.** The owner: *"Sometimes when
+i ask it check area with includesGFA, it never check the shared parameters Includes As GFA."*
+One pass in `executeTool` (`executors/names.ts` on `shared/prop-names.ts`) reads every property
+name a tool input carries: the exact key, else the one key equal but for case, spaces and
+punctuation — never a merely similar one, never one of two alike — and a yes/no on `=` / `!=`
+becomes the key's stored spelling; a name still not a key answers with its 8 nearest names, a
+value that matched nothing with its key's 15 commonest values. New read tool `find_properties`;
+property names got their own schema cap, 1 000 (22 653 B at 1 000 names). 1 784 unit tests;
+e2e 36 passed, 6 skipped.
 
 **2026-09-25 — main's 1.0.3 merged into `feature/ifc-table`; version 1.1.0-beta.2.** `main`
 (`1403365`: the NVIDIA-first GPU choice, 1.0.3) merged into the Schedules branch with both

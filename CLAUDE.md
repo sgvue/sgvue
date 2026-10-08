@@ -182,6 +182,8 @@ Anything not on this list is a defect.
   plain ground, shadows included, is byte-identical to the previous build** in both themes; the
   mock's only other changed pixels (531, 0.06 %) are on its at-grade site slab, where the grid
   helper 5 mm under it now meets the slab in a different draw order. From below nothing changed.
+  *(Amended 2026-10-08: only while the canvas grid is on — with it off the veil is not drawn,
+  below.)*
 - **2026-09-24 — the camera frames the building, not the site.** Asked for by the user in these
   words: *"frame the camera on the building, not the site."* Boot, zoom extents, the six view
   presets, the cube, a section's re-aim and a double-click on empty space frame the **building
@@ -205,7 +207,8 @@ Anything not on this list is a defect.
   these words: *"Add an option to toggle off canvas gridline."* One new control, the only one:
   a button right after Levels, the neighbours' markup, class and on/off colours,
   `data-tip="canvas grid"`, a framed 3 × 3 grid glyph in the toolbar's stroke. It shows or hides
-  the fine ground `GridHelper` — not the IFC grids. On by default; not saved in a session.
+  the fine ground `GridHelper` — not the IFC grids. *(Amended 2026-10-08: and the ground veil
+  with it — below.)* On by default; not saved in a session.
   **Amended 2026-10-02:** it was recorded here as "not reachable by the assistant", and now it
   is — `toggle_display`'s `groundGrid`, through the button's own `setGroundGrid` — because the
   owner's direction of 2026-10-01 (*"assistant should possess everything user can do on the
@@ -788,10 +791,26 @@ Anything not on this list is a defect.
   same copy and style string, and **no flash, as designed**; a copy that did not reach the
   clipboard is said in the panel's status line. The base point joins what a reply's `revert`
   puts back.
+- **2026-10-08 — with the canvas grid off, the ground veil is not drawn.** Asked for by the
+  owner in these words: *"When off the canvas grid, please dont show the semi-opacity plane
+  filter."* The filter is 2026-09-24's ground veil, the layer that dims an opaque part below
+  grade to 40 % of its contrast; it now goes on and off with the canvas grid. **Grid on, nothing
+  changes.** Grid off, the opaque ground under the veil is the whole ground — its colour and the
+  building's shadow, unchanged — so what is below grade is seen from above as it is: an opaque
+  part at full contrast and, because the veil also carried the ground's depth, its edges,
+  see-through parts, glass and annotations below grade as well. Our reading, which the owner may
+  still correct: only the veil goes; the opaque layer stays and keeps the shadow. The same
+  toolbar button, and the assistant's `toggle_display` `groundGrid` through it; **no new element
+  and no new control.** **Measured** (mock, 1280 × 820, the 3D view, the canvas alone, both
+  themes): grid on, every frame is byte-identical to the build before; grid off, the pixels
+  that change are on below-grade parts and their edges — the footings, the slab's and the turf's
+  rims, the `Foundation` level ring — plus 258 px of far IFC gridlines that no longer lose
+  samples to the veil's depth. The building's shadow on the ground is the build before's, pixel
+  for pixel; the numbers are in `docs/DECISIONS.md`.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
-2026-09-25's (all three), 2026-09-28's, 2026-10-01's and 2026-10-02's.
+2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's and 2026-10-08's.
 
 ### No visible additions
 
@@ -892,7 +911,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-09-24 — **the assistant's suggestions are one scrolling line, folded behind a `suggestions` chip after the first user message**; same source, same cap.
 - 2026-09-24 — **a gridline is drawn on to its bubbles' centres**; `p0` / `p1` stay the clipped ends every rule reads.
 - 2026-09-24 — **dimensions between adjacent parallel gridlines, at each family's start end, a fixed screen distance inward of the bubbles**: pure geometry in `shared/annotate.ts` (`gridDimRuns`, `gridDimStandoffPx`), placed per drawn frame *before* `renderer.render`; labels decided after every bubble in the same sweep and occlusion-tested; a run is drawn only while its label is (`gridDimsStale` asks for the frame that catches up).
-- 2026-09-24 — **the ground is two layers in the opaque list**: helper −2, opaque ground −1 (no depth write), batches 0, a veil at 10 (`CustomBlending`, 0.6, writes depth). Never a transparent veil — glass's back-face pass draws before every transparent.
+- 2026-09-24 — **the ground is two layers in the opaque list**: helper −2, opaque ground −1 (no depth write), batches 0, a veil at 10 (`CustomBlending`, 0.6, writes depth). Never a transparent veil — glass's back-face pass draws before every transparent. *(Amended 2026-10-08: the veil is drawn only while the canvas grid is on — below.)*
 - 2026-09-24 — **the viewer keeps two boxes: `store.bbox` covers what is drawn, `frameBox` is the building** (`shared/site.ts` leaves out site classes and ground proxies, falling back to the whole box). Framing, view presets, the orbit target, the near zoom limits, the level rings and the bubble gap read `frameBox`; clip planes, far zoom limit, shadow frustum, ground, section sheet, occlusion and laser read `store.bbox`.
 - 2026-09-24 — **the grid rectangle is the grids' own authored extent** (`gridExtentRect` + `padRect`, a segment under 2.5 m ignored), else the building's footprint; never the whole model's.
 - 2026-09-24 — **site elements never hide an annotation**: the picker's `occludes` mask leaves them out of `anyHit` only; `pick` and `ray` (hover, select, laser, snap) still hit them.
@@ -1016,6 +1035,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-05 — **LF in every working copy** (`.gitattributes`, `* text=auto eol=lf`): a CRLF checkout — Git for Windows' default — fails the guard test's source patterns.
 - 2026-10-05 — **the public repository, `sgvue/sgvue`, is the source of truth**: every push is public at once; commits carry the project's public commit identity; the privacy search runs before every push; `sgvue/releases` stays the download channel. The private repository is an archive of the history before publication.
 - 2026-10-05 — **Dependabot proposes no major version update** for any dependency, npm or Actions (`'*'` with `update-types: [version-update:semver-major]`): a toolchain major is a measured change, not a bot PR. Security updates are unaffected — `update-types` applies to version updates only.
+- 2026-10-08 — **with the canvas grid off, the ground veil is not drawn** (owner-requested): `buildScene` builds it with `visible = groundGrid` and the rig's `setGroundGrid` moves it with the helper, so a theme change keeps it and every rig rebuild (`buildRig`) takes the flag; the opaque ground stays, and takes the shadow. The veil casts nothing, so the shadow map is untouched and `invalidate()` is all the toggle needs. The veil also carried the ground's depth, so with the grid off what is below grade — edges, glass, annotations — is drawn too.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

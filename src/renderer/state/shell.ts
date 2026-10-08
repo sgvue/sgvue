@@ -321,7 +321,8 @@ export interface ShellState {
   shadows: boolean
   /**
    * The fine ground grid under the model (2026-09-24, owner-requested: *"Add an option to
-   * toggle off canvas gridline."*). Not the IFC grids — that is `grids`. Not saved in a
+   * toggle off canvas gridline."*). Not the IFC grids — that is `grids`. Off, the ground veil
+   * goes with it (2026-10-08, owner-requested), so nothing below grade is dimmed. Not saved in a
    * session. It was recorded then as not reachable by the assistant; since 2026-10-02 it is
    * (`toggle_display`'s `groundGrid`, through `setGroundGrid` below) — the owner's direction
    * of 2026-10-01, *"assistant should possess everything user can do on the app"*.
