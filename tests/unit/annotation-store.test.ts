@@ -253,7 +253,7 @@ describe('the base point is read-only', () => {
 })
 
 describe('the two markup lists', () => {
-  const M: MeasureRecord[] = [{ id: 1, p: [1, 2, 3], x: 1.66 }]
+  const M: MeasureRecord[] = [{ id: 1, p: [1, 2, 3], x: 1.66, sides: { x: { minus: 0.5, plus: 1.16 } } }]
   const S: SpotRecord[] = [
     { id: 2, p: [4, 5, 6], E: 1, N: 2, Z: 3, x: 4, y: 5, z: 6 }
   ]

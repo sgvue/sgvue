@@ -884,7 +884,10 @@ them labelled.
 >
 > **The laser meter** fires ±X ±Y ±Z from a snapped surface point to the nearest visible faces,
 > skipping any ray that points into the surface it sits on (`d · n < −0.5`) and stepping past a
-> self-hit within 5 cm; an axis with no reading on either side is dropped. **Spot coordinates**
+> self-hit within 5 cm; an axis with no reading on either side is dropped. Since 2026-10-08 each
+> axis reads its two sides of the point, along the axis — one label at the middle of each half
+> that reached a face, where the design had one for the whole ray; the live reading and the
+> Markups card read `X 1 200 + 2 300` — and the whole ray is their sum. **Spot coordinates**
 > pin a point and print its map coordinates and its coordinates in the file's own frame.
 > **Selection dimensions** (`D`) draw the selection's bounding box and three dimension runs
 > with ticks and millimetre labels, placed by a screen-space search: each anchor position along
@@ -1389,10 +1392,11 @@ compared first, idempotent, bounded — and nothing that deletes, clears or plac
   words. There is no delete. *(Phase 3: such a restore is held behind Apply instead of refused,
   and `delete` exists as a request — below.)*
 - `manage_markups` — the Markups card, read: `list` returns the laser measurements (`M1 {x, y,
-  z}`, the lengths its rays read, in the card's unit) and the spot coordinates (`C1 {E, N, Z}`,
-  or `{level}` where the model has no base point), at most fifty of each with the totals and
-  `truncated`; `focus` zooms to one (`focusPoint`). Nothing is placed, changed or removed.
-  *(Phase 3: `delete` and `clear` ask for a removal — below.)*
+  z}`, the lengths its rays read, in the card's unit — since 2026-10-08 with `sides {minus,
+  plus}` per axis, each length split at the point, a side that reached no face left out) and
+  the spot coordinates (`C1 {E, N, Z}`, or `{level}` where the model has no base point), at most
+  fifty of each with the totals and `truncated`; `focus` zooms to one (`focusPoint`). Nothing is
+  placed, changed or removed. *(Phase 3: `delete` and `clear` ask for a removal — below.)*
 - `manage_filters` — `update`, above; it runs the scope guard, and an update that takes nothing
   out of view is exempt. `set_filter_stack` — a `color` per step, one of the card's six
   swatches; a step with none still takes the next unused one.

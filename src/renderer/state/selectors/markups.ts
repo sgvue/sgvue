@@ -10,7 +10,8 @@
  * typed into the Coordinate-system card to stand for one — and an absent value is the design's
  * own em dash.
  */
-import { DASH, fixed3, mmv } from '../../../shared/fmt'
+import { laserSideLengths, type LaserSides } from '../../../shared/annotate'
+import { DASH, fixed3, mmPlain } from '../../../shared/fmt'
 import type { MeasureRecord, SpotRecord } from '../../viewer/annotations'
 import type { Units } from '../shell'
 
@@ -19,6 +20,12 @@ export interface MarkupRow {
   n: string
   /** The reading, formatted for the current unit. */
   v: string
+  /**
+   * 2026-10-08 — a laser row's readings, one an axis, when one of them reads two sides: `v` is
+   * them joined as the design joins them, and the card breaks the row between them, never inside
+   * one, when they do not fit. Absent on any other row, which the card draws as the design does.
+   */
+  axes?: readonly string[]
   /** The record's own id, for `dropMeasure` / `dropSpot`. */
   id: number
   /** The scene point, for `focusPoint`. */
@@ -27,22 +34,31 @@ export interface MarkupRow {
 
 const AXES = ['x', 'y', 'z'] as const
 
+/**
+ * One axis of a row. Since 2026-10-08 (owner-requested) its two sides of the point, − side
+ * first, joined by ` + ` — `1 200 + 2 300 mm` — or the one side that reached a face, which reads
+ * exactly as the design's whole-ray number did (`2 300 mm`). The unit once, after the numbers.
+ */
+const axisReading = (s: LaserSides, units: Units): string =>
+  units === 'm'
+    ? laserSideLengths(s).map(fixed3).join(' + ') + ' m'
+    : laserSideLengths(s).map(mmPlain).join(' + ') + ' mm'
+
 /** `SGVue.dc.html:2061–2065`. Three spaces between the axis readings, as the design joins them. */
 export function measureRows(
   measures: readonly MeasureRecord[],
   units: Units
 ): MarkupRow[] {
-  return measures.map((m, i) => ({
-    n: 'M' + (i + 1),
-    id: m.id,
-    p: m.p,
-    v: AXES.filter((a) => m[a] != null)
-      .map((a) => {
-        const v = m[a] as number
-        return a.toUpperCase() + ' ' + (units === 'm' ? fixed3(v) + ' m' : mmv(v))
-      })
-      .join('   ')
-  }))
+  return measures.map((m, i) => {
+    const axes = AXES.flatMap((a) => {
+      const s = m.sides[a]
+      return s ? [a.toUpperCase() + ' ' + axisReading(s, units)] : []
+    })
+    // Only a row that reads two sides somewhere needs to wrap; any other is the design's text in
+    // the design's own span, byte for byte.
+    const split = AXES.some((a) => m.sides[a]?.minus != null && m.sides[a]?.plus != null)
+    return { n: 'M' + (i + 1), id: m.id, p: m.p, v: axes.join('   '), ...(split ? { axes } : {}) }
+  })
 }
 
 /** `SGVue.dc.html:2066–2069`. */

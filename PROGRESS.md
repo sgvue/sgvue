@@ -3,6 +3,60 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-08 — the laser meter reads each side of its point
+
+**Did:** the owner's *"Also update the measurement to show left and right dimension from the
+spot, rather than overall."* Per axis the laser now reads the distance along the axis from the
+clicked point to the face on its − side and on its + side (`LaserRay.minus` / `plus`,
+`MeasureRecord.sides`; `null` where a side hit nothing); the whole ray (`x` / `y` / `z`) is kept
+for the assistant's result, the eval's observation and the fixtures, and is now exactly the sum
+of the two. The 3D view: one label a side at the middle of its half, in the design's markup and
+offsets (`laserLabelHtml`, moved with the live reading's `laserLiveHtml` into
+`shared/annotate.ts`), where the design had one at the middle of the ray; lines, dots and the
+origin mark unchanged. The live reading `X 1 200 + 2 300 · Y … mm`, the `+` in `--faint`. The
+Markups row `X 1 200 + 2 300 mm` / `X 1.200 + 2.300 m`; a row that reads two sides somewhere wraps
+between two axes' readings (`white-space:normal`, one `nowrap` span per axis inside the design's
+span, `MarkupRow.axes`) — the one style string changed, because such rows measured up to 311 px
+against the 220 px column and were cut off — and every other row is the design's span and text.
+`manage_markups` adds `sides` in the card's unit; its description and `place_measure`'s sentence
+say what the numbers are. Capture states `laser-sides-*` and `laser-onesided-*` in
+`scripts/screenshot.cjs`. Docs: an allowed-deviation entry, a decision line and row, two
+sentences in `SYSTEM_SPEC.md`, a dated note in `tests/parity/phase6/README.md`.
+
+**After the deep review** (approved; six follow-ups, all done): the sides are measured along the
+axis, not as straight lines from the point — the ray starts 3 mm off the surface, so a side
+across a face had read that lift's hypotenuse — and `len` is their sum, so `minus + plus === len`
+for every axis, pinned (a one-sided axis across a face included, where the design's
+`a.distanceTo(b)` had measured from the point, off the ray); a row with no two-sided axis has no
+`axes`, so the card draws the design's own span; the phase-6 chain run again; `SYSTEM_SPEC.md`;
+the `CLAUDE.md` entry's wording, with the known limit named; `L382`, not `L381`.
+
+**Measured** (mock, 1280 × 820, DPR 1, both themes; the build before, saved and captured through
+the same guarded harness and the same pointer events; a second run of this build for the
+harness's noise): `Ext Wall E 1-2 L4` at (906, 440) — `Y 2 673 + 2 927 · Z 2 400 + 300 mm`,
+before `Y 5 600 · Z 2 700 mm` — differs only in its own labels (3 289–9 666 px), the Markups
+card (6 072–6 144 px; 112 → 122 px tall, the row on two lines) and what also differs between
+two runs of one build (the grid bubbles' and grid dimensions' antialiasing, 950–4 141 px); with
+3 s for the camera to arrive, the zoomed 3D frame is the build before's. `Floor Slab L2` at
+(682, 560), one side on every axis, is byte-identical: dark 0 px in the whole window in all three
+states, light only the grid-label band. The phase-6 chain (1440 × 860): the nine states before
+`measure-M1` differ only in that band; from `measure-M1` to `coords-card` the two measurements
+read two sides — M1 `X 60 + 2 280 · Z 1 380 + 60 mm` — so their labels differ (1 804–7 966 px)
+and `markups-card`'s card is 225 px tall (was 205); in `coords-card` the Coordinate-system
+card, status bar, sidebar and toolbar are 0 px apart. Label overlap in the default view: the
+design's labels overlapped at 4 of 8 wall points, the new ones at 8 of 8 (1–6 pairs, up to
+51.8 × 16.3 px, there always two axes' labels); and M1's 60 mm halves overprint their own axis's
+other label (X 50 × 10 px, Z 60 × 6 px) — the known limit, not decluttered, as the brief asked.
+Zoomed to the measurement, none. Tools block (strict) 54 494 → 54 684 B.
+
+**Verified:** `npm run typecheck` exit 0; `npm test` **145 files passed / 2 skipped, 2 843 tests
+passed / 3 skipped** (new: `laser-sides.test.ts`, the annotation layer itself on a stub host —
+the record, `minus + plus === len` on every axis, every reading's text, anchor and offset, the
+live reading, a deleted measurement's labels gone — and the label, live-reading and row formats
+in `annotate.test.ts` and `markups.test.ts`, `manage_markups`' output in the parity tests);
+`npm run build` exit 0; `npm run test:e2e` **63 passed, 6 skipped** in 7.9 m — peak one process
+239 MB, all 785 MB, GPU dedicated 253 MB, `clean:`. Every guarded run ended `clean:`.
+
 ## 2026-10-08 — coordinates, part 2: the WorldCoordinateSystem, a note for a model that cannot be lined up, and a read-only Coordinate-system card
 
 **Did:** rule 4 of the owner's five (*"Yes, all five"*), and the two things they chose for the
@@ -1596,48 +1650,24 @@ owner's private identifiers — among them the e-mail handle, the Windows accoun
 spellings of the profile path; `Yong Yen`, the credited name and the scanner's control, was
 found (payload 4, setup 2). Nothing survived.
 
-## 2026-09-28 — a section outlines everything it cuts, in the accent
-
-**Did:** the owner's *"Also highlight and thicken the line of all geometry that are cut in cut
-section."*, with their choice: *"Accent colour, thick — SGVue's teal accent, about 2.5 px"*.
-While a section cuts, where the plane meets every element whose edges are drawn (visible, not
-inert, ghosted or fading, not a space; glass included) is one instanced fat-line mesh in the
-theme's accent, 2.5 CSS px, depth-tested with a small polygon offset, not clip-gated, drawn
-after the batches and before the ground veil (`section.ts`, `Line2NodeMaterial` with three's
-`LineSegmentsGeometry` layout written out). The segments come from the batch store's own slot
-triangles (`viewer/section-cut.ts`, pure): box culling, the on-plane rules (a coplanar triangle
-gives nothing; an edge in the plane is drawn by the triangle whose third vertex is kept),
-collinear pieces joined. `viewer-core.ts` marks it dirty from the section's `setClip` /
-`clearClip` and from every edge rebuild, and recomputes once a frame before drawing; a preview
-or a cleared section draws none. No new element, control or toggle.
-
-**Measured:** in the built app, a synthetic 5.58 M-triangle model (17 600 elements) — level cut
-5.6 ms, grid cut 7.0 ms, a grid on 540 walls' end faces 8.9 ms, 13 ms cold; 2.23 M triangles
-5.6 / 3.9 / 4.8 ms. So it stays on the main thread. The join's `Map` (48 ns a triangle) became a
-typed-array hash (21 ns). Frame cost with the outline drawn vs hidden: within noise (2.4–2.5 vs
-2.4 ms). WebGL2 and WebGPU draw it alike (16 243 vs 16 168 accent pixels on the mock).
-**Parity** (phase-6 chain, both themes): the outline is 37 653 / 37 648 px in `section-grid-C`,
-1 129 in the flipped state, 32 294 / 32 277 in `section-level-L2`; hidden, those frames are
-HEAD's (byte-identical in `section-grid-C`, within HEAD's own label noise in the other two);
-every other state computes no segment.
-
-**Verified:** `npm run typecheck` exit 0; `npm test` **120 files passed / 2 skipped, 1 894 tests
-passed / 3 skipped** (10 new in `section-cut.test.ts`, one of them the mock's `Core Wall W L1` →
-its 250 × 3 500 mm rectangle, 4 segments); `npm run build` exit 0; `npm run test:e2e` **40
-passed, 6 skipped** (3.8 min; one new case on the demo: grid C outlines in the exact accent —
-7 374 px — hiding `Floor Slab L3` drops it, a preview and a clear show none, the light theme
-recolours it), peak working set 220 MB one process / 777 MB all, GPU dedicated 265 MB, `clean:`;
-`frame-triggers.cjs` 24 / 24 and 0 renders at rest. No Electron of this run survived.
-
 ## Earlier work
 
-Compressed: the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-09-28 — a section outlines everything it cuts, in the accent.** The owner: *"Also
+highlight and thicken the line of all geometry that are cut in cut section."* — the accent, about
+2.5 px. While a section cuts, where the plane meets every element whose edges are drawn (glass
+included, no space) is one instanced fat-line mesh in `--accent`, depth-tested, computed from the
+batch store's own triangles (`viewer/section-cut.ts`, pure) at most once a frame — 5.6–8.9 ms on
+a 5.58 M-triangle model, so on the main thread; a preview or a cleared section draws none. On the
+phase-6 chain the outline is 37 653 px in `section-grid-C`; hidden, the frames are HEAD's.
+1 894 unit tests; e2e 40 passed, 6 skipped.
 
 **2026-09-28 — a spot shows its level only, and the snap takes the surface being looked at.** The
 owner: *"I need the spot coordinate to show level only most of the time and prioritize on the

@@ -836,6 +836,25 @@ Anything not on this list is a defect.
   builds). The base point is the boot file's — P read off `bootGeoref`, the declaration that
   defined the frame, kept in the store with it — so it, the chips and the caption stay right after
   any unload. The status bar's chip no longer shows the design's `SVY21` for a typed base point.
+- **2026-10-08 — a laser measurement reads each side of its point.** Asked for by the owner in
+  these words: *"Also update the measurement to show left and right dimension from the spot,
+  rather than overall."* Per axis, the distance along it from the point to the face on each
+  side: in the 3D view one label at the middle of each half of the ray — the design's label
+  markup, style and offsets — where the design has one for the whole ray; under the pointer
+  `X 1 200 + 2 300 · … mm`; in the Markups card `X 1 200 + 2 300 mm` in its unit; in
+  `manage_markups`, `sides` beside each axis's whole length, which is their sum. A side that
+  reached no face has no reading, so an axis read one way is the design's 3D label and live
+  reading, and a row with no two-sided axis the design's Markups row, byte for byte — but for
+  the 3 mm the ray starts off the surface, which the design counted into a one-sided axis
+  across a face: that number can now be a millimetre less (about one reading in 220 at a metre).
+  Lines, dots, origin mark and copy unchanged; **no new control.** **One style string changed:**
+  a two-sided row's value — one span per axis inside the design's span — wraps between two axes'
+  readings (`white-space:normal`, each `nowrap`) instead of being cut: such rows measured up to
+  311 px against the 220 px column. **Known limit, by choice — no declutter:** both halves of one
+  axis share the design's screen offset, so a short two-sided axis seen from far off can
+  overprint its own two labels (phase 6's `measure-M1`, 60 mm halves: 50 × 10 px). On the
+  phase-6 chain `measure-M1` to `coords-card` differ for that reason
+  (`tests/parity/phase6/README.md`); the numbers are in `docs/DECISIONS.md`.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1074,6 +1093,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-08 — **rule 4: with no map conversion, a `WorldCoordinateSystem` that is not the identity is the map position** (coordinates part 2, owner-approved): the 3D `Model` context's (`readWcs`, `Georeference.wcs`), M = the WCS — origin through the length unit, its own turn — then `TrueNorth`'s turn, atan2(x, y), **only** when nothing else turns (no conversion, no site turn, no WCS turn). `placedBy` and the caption's method gain `WorldCoordinateSystem` (`… + IfcSite placement` with a site that moves). **Beside a conversion** the WCS is undone first, M = C ∘ WCS⁻¹ (IfcOpenShell's reading), and `get_model_info` says `ambiguous`. **web-ifc 0.0.77 applies the WCS to no placement — neither its move nor its turn** (pinned by a test), so nothing is added twice. Fixtures (i) Project Base Point with no EPSG, (j) its IFC2X3 twin, (k) WCS + conversion: all eleven federate within 1 mm in all 110 ordered pairs; IfcOpenShell agrees product by product — `auto_xyz2enh` for (k), and its own `get_wcs` and `get_true_north`, composed as Revit writes them, for (i) and (j).
 - 2026-10-08 — **the Coordinate-system card's one-line note** (owner-chosen, *"One-line note on screen"*): `notLinedUp` / `lineUpNote` (`selectors/status.ts`, pure) — a model with no map position while another has one, or one the stream flagged `farPlacement` (`ModelIndexMeta.farPlacementMetres`, recorded only for a model that did not set the offset); a boot model with no map position is named and no distance is. Read off the store's `bootGeoref`; names are the sidebar's file line through `labelText` (moved to `shared/fmt.ts`). `get_model_info` / `get_view_state` report `notLinedUp`.
 - 2026-10-08 — **the Coordinate-system card is read-only** (the owner: *"dont let user change anything"*): no `setCoord`, no `onChange`, no `set_base_point` (13 gated calls), no `basePoint` revert part; the store writes `coords` in `setOffset` alone, from `bootGeoref` — the boot model's georeferencing, kept beside `frame` after any unload, and cleared with it — and the guard pins that. A session's, link's or viewpoint's `coords` is **ignored on restore and still written**, for older builds (`sessionPatch`, `RESTORE_ORDER` without `coords`). `basePointSource` is `file` | `none`; the status bar's chip is the boot file's CRS or the em dash.
+- 2026-10-08 — **a laser measurement reads each side of its point** (owner-requested): `LaserRay` and `MeasureRecord.sides` carry, per axis, `{ minus, plus }` — the distance **along the axis** from the point to the face its − / + ray hit, `null` for none — beside the whole ray, `x` / `y` / `z`, which is kept (the assistant's result and the eval's observation read it) and is now exactly their sum; one label a side at the middle of its half, the live reading and the Markups row from `shared/annotate.ts` (`laserLabelHtml`, `laserLiveHtml`, `laserSideLengths`); a row with a two-sided axis wraps between axes (`MarkupRow.axes`, absent otherwise, so any other row is the design's span); `manage_markups` adds `sides` in the card's unit. No declutter: label overlaps are measured, not moved.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

@@ -326,12 +326,18 @@ function restore(view: Viewpoint, number: number, ctx: ToolContext): ToolOutcome
 
 /* ────────────────────────────── markups ────────────────────────────── */
 
-/** One laser measurement as the card's row reads: its name and the lengths its rays read. */
+/**
+ * One laser measurement as the card's row reads: its name, the lengths its rays read and —
+ * since 2026-10-08, when the card started listing them — each length split at the point:
+ * `minus` to the face on that axis's − side, `plus` to the one on its + side, a side that
+ * reached no face left out. The whole ray stays beside them, as it always read.
+ */
 interface MeasureBrief {
   name: string
   x?: number
   y?: number
   z?: number
+  sides: Partial<Record<'x' | 'y' | 'z', { minus?: number; plus?: number }>>
 }
 
 /** One spot coordinate: its map coordinates, or — with no base point — its level in the file. */
@@ -352,13 +358,27 @@ export function markupsState(s: ShellState): {
 } {
   const len = (metres: number): number => (s.units === 'm' ? +metres.toFixed(3) : Math.round(metres * 1000))
   const m3 = (v: number): number => +v.toFixed(3)
+  /** Each axis split at the point, in the card's unit — what its row lists. */
+  const sidesOf = (m: ShellState['measures'][number]): MeasureBrief['sides'] => {
+    const out: MeasureBrief['sides'] = {}
+    for (const a of ['x', 'y', 'z'] as const) {
+      const r = m.sides[a]
+      if (!r) continue
+      out[a] = {
+        ...(r.minus != null ? { minus: len(r.minus) } : {}),
+        ...(r.plus != null ? { plus: len(r.plus) } : {})
+      }
+    }
+    return out
+  }
   return {
     units: s.units,
     measures: s.measures.slice(0, MARKUPS_CAP).map((m, i) => ({
       name: `M${i + 1}`,
       ...(m.x != null ? { x: len(m.x) } : {}),
       ...(m.y != null ? { y: len(m.y) } : {}),
-      ...(m.z != null ? { z: len(m.z) } : {})
+      ...(m.z != null ? { z: len(m.z) } : {}),
+      sides: sidesOf(m)
     })),
     spots: s.spots.slice(0, MARKUPS_CAP).map((p, i) =>
       p.E != null && p.N != null && p.Z != null
@@ -540,7 +560,7 @@ function placeMarkup(input: Record<string, unknown>, ctx: ToolContext, laser: bo
       message:
         `Placed ${noun} ${name} at ${place.where}: ${reads}. ` +
         (laser
-          ? 'Each length is the distance between the nearest visible faces either side of that point along the axis. '
+          ? 'Each axis reads from that point to the nearest visible face on its − side and on its + side, in that order; a lone number is the one side that reached a face. '
           : full
             ? 'Its tag shows the full E, N and Z. '
             : 'Its tag shows the level alone; show:"full" gives E, N and Z. ') +

@@ -8,7 +8,11 @@
  *
  * Its `max-height` stops above the status bar (`calc(100% - 110px)`), and since 2026-10-01
  * above the action bar too: `--abar` (`selectors/lanes.ts`) is that bar's lane, `0px` without it.
+ *
+ * Since 2026-10-08 a laser row reads each side of its point (`selectors/markups.ts`); a row that
+ * reads two sides somewhere may wrap between two axes' readings when they do not fit on a line.
  */
+import { Fragment } from 'react'
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
 import { measureRows, noMarks, spotRows, type MarkupRow } from '../state/selectors/markups'
@@ -18,6 +22,14 @@ import { Cross } from './icons'
 
 const ROW =
   'display:grid;grid-template-columns:26px minmax(0,1fr) 22px;align-items:center;gap:8px;padding:5px 4px;border-radius:6px'
+const VALUE =
+  'font:400 11.5px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+/**
+ * 2026-10-08: a laser row that reads two sides of its point is wider than the column (up to
+ * 311 px of 220, measured), so its value may wrap — between two axes' readings, never inside
+ * one; one that fits is one line. A row with no two-sided axis has no `axes` and is `VALUE`.
+ */
+const VALUE_AXES = VALUE.replace('white-space:nowrap', 'white-space:normal')
 const HEAD = 'display:flex;align-items:center;gap:8px'
 const HEAD_LABEL = 'font:500 11px/1 var(--mono);color:var(--faint)'
 const RULE = 'flex:1;height:1px;background:var(--border)'
@@ -61,13 +73,18 @@ export default function MarkupsCard(): React.JSX.Element | null {
           >
             {r.n}
           </button>
-          <span
-            style={s(
-              'font:400 11.5px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
-            )}
-          >
-            {r.v}
-          </span>
+          {r.axes ? (
+            <span style={s(VALUE_AXES)}>
+              {r.axes.map((a, i) => (
+                <Fragment key={i}>
+                  {i > 0 && '   '}
+                  <span style={s('white-space:nowrap')}>{a}</span>
+                </Fragment>
+              ))}
+            </span>
+          ) : (
+            <span style={s(VALUE)}>{r.v}</span>
+          )}
           <button
             onClick={() => remove(r.id)}
             title="Delete"

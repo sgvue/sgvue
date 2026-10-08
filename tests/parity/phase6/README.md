@@ -93,6 +93,22 @@ the Markups list's E / N / Z and the four Coordinate-system fields are blank, an
 bar's CRS chip stays the em dash, where the prototype keeps its own literal base point. The
 numbers below are the phase-6 measurement and are not re-baselined.
 
+**2026-10-08 — the laser reads each side of its point** (owner-requested; `CLAUDE.md`, allowed
+deviations). The chain was run again, the build before against this one and this one twice
+(`SGVUE_SETTLE=3000`, into `tests/parity/2026-10-08-laser-sides/phase6-*`). The nine states
+before `measure-M1` place no measurement and are unchanged: what differs is only the grid
+bubbles' and grid dimensions' antialiasing, which differs between two runs of one build as much.
+**`measure-M1`, `spot-C1`, `dims-wall`, `markups-card` and `coords-card` differ**, because each
+shows the measurements `measure-M1` and `markups-card` place, and both read two sides: M1
+`X 60 + 2 280 · Z 1 380 + 60 mm` (was `X 2 340 · Z 1 440 mm`) and M2 `X 1 600 + 4 000 ·
+Y 40 + 8 825 · Z 1 800 mm` (was `X 5 600 · Y 8 865 · Z 1 800 mm`) — four and five labels where
+there were two and three (1 804–7 966 px). In `markups-card` both rows wrap in metres, so the
+Markups card is 330 × 225 (was 330 × 205). Everything else is unchanged: in `coords-card` the
+Coordinate-system card, the status bar, the sidebar and the toolbar are 0 px apart. At this
+zoom M1's 60 mm halves overprint their own axis's other label (X 50 × 10 px, Z 60 × 6 px) —
+not decluttered, by choice. The prototype keeps the design's one label a ray, so from
+`measure-M1` on the label readback no longer matches it.
+
 ## The mask, and what the sidecars answer
 
 Each capture writes its surfaces' `getBoundingClientRect()`s beside the PNG. Phase 6 adds

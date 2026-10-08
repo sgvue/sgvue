@@ -27,7 +27,7 @@
  * pointing into the positive half-plane. That is `(1, 0)` and `(0, 1)` for those two cases,
  * which is the design exactly, and it is well defined at 43°.
  */
-import { DASH, f3, signedF3, signedMm } from './fmt'
+import { DASH, f3, fmtMM, mmPlain, signedF3, signedMm } from './fmt'
 
 /** A plan point or direction: `[x, y]`, metres. */
 export type XY = readonly [number, number]
@@ -542,9 +542,54 @@ export function laserDirections(
   return out
 }
 
-/** L403. The measure label's offset from the middle of its ray, in pixels. */
+/**
+ * L403. The measure label's offset from its anchor, in pixels — since 2026-10-08 the middle of
+ * each half of the ray, the same offset for both.
+ */
 export const laserLabelOffset = (axis: LaserAxis): { dx: number; dy: number } =>
   axis === 'Z' ? { dx: 46, dy: 0 } : { dx: 0, dy: -16 }
+
+/**
+ * 2026-10-08, owner-requested (*"show left and right dimension from the spot, rather than
+ * overall"*): one axis of a reading split at the point it was taken from. `minus` is the
+ * distance along the axis from that point to the face the axis's − ray hit, `plus` to the face
+ * its + ray hit, in metres; `null` for a side that hit nothing, whose end is the point itself
+ * (L382). Their sum is the whole ray, the design's one number per axis.
+ */
+export interface LaserSides {
+  minus: number | null
+  plus: number | null
+}
+
+/** The sides that reached a face, − side first: what is drawn, listed and read for an axis. */
+export const laserSideLengths = (s: LaserSides): number[] =>
+  [s.minus, s.plus].filter((v): v is number => v != null)
+
+/**
+ * L395. One reading in the 3D view — the axis in `--faint`, the length in `--ink`, as the
+ * design's label for the whole ray. Since 2026-10-08 one such label stands at the middle of
+ * each half of the ray that reached a face.
+ */
+export const laserLabelHtml = (axis: LaserAxis, metres: number): string =>
+  `<span style="color:var(--faint)">${axis}</span>&nbsp;` +
+  `<b style="font-weight:500;color:var(--ink)">${fmtMM(metres)}</b>`
+
+/**
+ * L617. The reading that follows the pointer: per axis, since 2026-10-08, its two sides joined
+ * by a `+` in `--faint` (the axis letter's and the unit's colour) — or the one side that reached
+ * a face — with the design's `·` between axes and its ` mm` once at the end.
+ */
+export const laserLiveHtml = (rays: readonly ({ axis: LaserAxis } & LaserSides)[]): string =>
+  rays
+    .map(
+      (r) =>
+        `<span style="color:var(--faint)">${r.axis}</span> ` +
+        laserSideLengths(r)
+          .map((v) => `<b style="font-weight:500">${mmPlain(v)}</b>`)
+          .join('<span style="color:var(--faint)"> + </span>')
+    )
+    .join('<span style="color:var(--border-strong)"> · </span>') +
+  '<span style="color:var(--faint)"> mm</span>'
 
 /* ────────────────────────────── spot coordinates ────────────────────────────── */
 

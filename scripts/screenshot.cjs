@@ -33,6 +33,10 @@
  * The `trace-*` states are the assistant's thinking trace: one turn stepped through with the
  * trace's clock pinned (`D.trace.pin`, `D.chat.step`), held at the eight instants the handoff's
  * stills show, each with a crop of the panel at 1× and at 3×.
+ *
+ * 2026-10-08: the `laser-sides-*` and `laser-onesided-*` states are the laser meter reading each
+ * side of its point — the live reading, the committed labels, the Markups card in mm and in m,
+ * and a reading whose every axis has one side only, which must not change at all.
  */
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { mkdir, writeFile } = require('node:fs/promises')
@@ -219,6 +223,47 @@ const APP_ONLY_STATES = {
   'ui-laser':
     `click($('button[data-tip="Open the markups list"]')); await sleep(300);` +
     ` click($('button[data-tip^="Laser meter"]'))`,
+
+  /* ── 2026-10-08: the laser meter reads each side of its point ─────────────────
+   * Captured at `SGVUE_SIZE=1280x820 SGVUE_DPR=1`, so the canvas points are that window's CSS
+   * pixels. Two chains, each on a fresh window per theme, every step a designed control or a
+   * real pointer event:
+   *
+   *   laser-sides-hover, laser-sides, laser-sides-markups, laser-sides-markups-m, laser-sides-zoom
+   *       `Ext Wall E 1-2 L4` at (906, 440): Y and Z each read both sides of the point
+   *   laser-onesided-hover, laser-onesided, laser-onesided-markups
+   *       `Floor Slab L2` at (682, 560): every axis reads one side only, so nothing differs
+   * ──────────────────────────────────────────────────────────────────────────── */
+  // The laser tool over the wall: the live preview, its reading and the snap marker.
+  'laser-sides-hover': {
+    js: `click($('button[data-tip^="Laser meter"]'))`,
+    input: [MOVE(906, 440)]
+  },
+  // The click commits it; the pointer leaves for open sky and the select tool takes over, so
+  // what is left is the measurement alone.
+  'laser-sides': {
+    js: '',
+    input: [CLICK(906, 440), MOVE(800, 150)],
+    after: `click($('button[data-tip^="Select (Esc)"]'))`
+  },
+  // The Markups card, from the action bar, in millimetres…
+  'laser-sides-markups': `click($('button[data-tip="Open the markups list"]'))`,
+  // …and in metres.
+  'laser-sides-markups-m': `click(byText('button', 'm'))`,
+  // Back to mm, and the row's tag zooms to the measurement: the labels at a readable size.
+  'laser-sides-zoom':
+    `click(byText('button', 'mm')); await sleep(300);` +
+    ` click($('button[data-tip="Zoom to this measurement"]'))`,
+  'laser-onesided-hover': {
+    js: `click($('button[data-tip^="Laser meter"]'))`,
+    input: [MOVE(682, 560)]
+  },
+  'laser-onesided': {
+    js: '',
+    input: [CLICK(682, 560), MOVE(800, 150)],
+    after: `click($('button[data-tip^="Select (Esc)"]'))`
+  },
+  'laser-onesided-markups': `click($('button[data-tip="Open the markups list"]'))`,
 
   /* ── 2026-10-01: two section planes — the gridline cut and the level cut together ──
    * `tests/parity/2026-10-01-two-sections/README.md` has the commands and the measurements.

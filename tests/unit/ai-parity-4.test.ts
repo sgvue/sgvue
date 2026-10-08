@@ -140,15 +140,21 @@ function markupViewer(): ReturnType<typeof stubViewer> {
       st().setSpots([...st().spots, rec])
     },
     // `annotations.ts` `laserFrom`, with a ray that reads `reach` in every direction it is fired:
-    // which directions are fired is the laser's own rule, from the normal it is handed.
+    // which directions are fired is the laser's own rule, from the normal it is handed. Each
+    // axis is recorded whole and, since 2026-10-08, split at the point: a side not fired is null.
     placeMeasure: (p: number[], normal: number[] | null, selfId: number) => {
       placedLasers.push({ p, normal, selfId })
       if (reach === null) return false
       const fired = laserDirections(normal as [number, number, number] | null)
-      const rec: MeasureRecord = { id: ++nextId, p: p as [number, number, number] }
+      const rec: MeasureRecord = { id: ++nextId, p: p as [number, number, number], sides: {} }
       for (const axis of LASER_AXES) {
+        const at = (sign: 1 | -1): number | null => (fired.some((d) => d.axis === axis && d.sign === sign) ? reach : null)
+        const k = axis.toLowerCase() as 'x' | 'y' | 'z'
         const n = fired.filter((d) => d.axis === axis).length
-        if (n) rec[axis.toLowerCase() as 'x' | 'y' | 'z'] = n * reach
+        if (n) {
+          rec[k] = n * reach
+          rec.sides[k] = { minus: at(-1), plus: at(1) }
+        }
       }
       st().setMeasures([...st().measures, rec])
       return true
@@ -959,11 +965,17 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
     // The laser's own rule (`laserDirections`): from a top face no ray goes down, so Z reads one
     // way and X and Y both — with every ray reading 2 m, that is 4 000 · 4 000 · 2 000 mm.
     expect(top).toMatchObject({ placed: true, name: 'M1', measure: { name: 'M1', x: 4000, y: 4000, z: 2000 }, at: 'top' })
+    // Each axis split at the point (2026-10-08): from a top face Z reads its + side alone.
+    expect((top.measure as { sides: unknown }).sides).toEqual({ x: { minus: 2000, plus: 2000 }, y: { minus: 2000, plus: 2000 }, z: { plus: 2000 } })
     // The card's own row text, in the card's unit.
     expect(top.message).toMatch(
-      new RegExp(`^Placed laser measurement M1 at the middle of the top face of the bounding box of "${slab.name}": X 4.?000 mm Y 4.?000 mm Z 2.?000 mm\\. `)
+      new RegExp(
+        `^Placed laser measurement M1 at the middle of the top face of the bounding box of "${slab.name}": X 2.?000 \\+ 2.?000 mm Y 2.?000 \\+ 2.?000 mm Z 2.?000 mm\\. `
+      )
     )
-    expect(top.message).toContain('Each length is the distance between the nearest visible faces either side of that point along the axis.')
+    expect(top.message).toContain(
+      'Each axis reads from that point to the nearest visible face on its − side and on its + side, in that order; a lone number is the one side that reached a face.'
+    )
     expect(turn.placed).toEqual([{ kind: 'measure', id: st().measures[0].id }])
 
     await run('manage_markups', { op: 'place_measure', id: slab.id, at: 'base' })
@@ -971,7 +983,13 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
     // The middle of the box is on no surface: every ray is fired, and nothing is stepped past.
     const centre = await run('manage_markups', { op: 'place_measure', id: slab.id, at: 'centre' })
     expect(placedLasers.at(-1)).toEqual({ p: [mid.x, mid.y, (box[2] + box[5]) / 2], normal: null, selfId: -1 })
-    expect(centre.measure).toEqual({ name: 'M3', x: 4000, y: 4000, z: 4000 })
+    expect(centre.measure).toEqual({
+      name: 'M3',
+      x: 4000,
+      y: 4000,
+      z: 4000,
+      sides: { x: { minus: 2000, plus: 2000 }, y: { minus: 2000, plus: 2000 }, z: { minus: 2000, plus: 2000 } }
+    })
     const point = await run('manage_markups', { op: 'place_measure', point: { x: 1, y: 2, z: 3 } })
     expect(placedLasers.at(-1)).toEqual({ p: [1, 2, 3], normal: null, selfId: -1 })
     expect(point.name).toBe('M4')

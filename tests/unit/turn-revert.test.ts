@@ -465,7 +465,7 @@ const KINDS: Kind[] = [
   },
   {
     name: 'the camera, by a markup zoomed to',
-    setup: () => st().setMeasures([{ id: 1, p: [3, 4, 5], x: 1 }]),
+    setup: () => st().setMeasures([{ id: 1, p: [3, 4, 5], x: 1, sides: { x: { minus: 0.4, plus: 0.6 } } }]),
     calls: () => [['manage_markups', { op: 'focus', name: 'M1' }]],
     parts: ['camera'],
     read: () => rv.rig.getCamera()

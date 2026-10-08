@@ -31,7 +31,10 @@ import {
   isElevation,
   keepFamily,
   laserDirections,
+  laserLabelHtml,
   laserLabelOffset,
+  laserLiveHtml,
+  laserSideLengths,
   declutterBubbles,
   levelTagAnchor,
   levelTagHtml,
@@ -47,7 +50,7 @@ import {
   type DimRect,
   type XY
 } from '../../src/shared/annotate'
-import { DASH, f3 } from '../../src/shared/fmt'
+import { DASH, THIN_SPACE, f3 } from '../../src/shared/fmt'
 
 /** The design's own mock federation box, which every parity capture is taken over. */
 const MOCK = { minX: -8, minY: -8, maxX: 32, maxY: 26 }
@@ -387,6 +390,61 @@ describe('laserDirections', () => {
     expect(laserLabelOffset('X')).toEqual({ dx: 0, dy: -16 })
     expect(laserLabelOffset('Y')).toEqual({ dx: 0, dy: -16 })
     expect(LASER_AXES).toEqual(['X', 'Y', 'Z'])
+  })
+})
+
+/**
+ * 2026-10-08, owner-requested — the reading split at its point: one label per side in the 3D
+ * view, both sides in the live reading. The markup is the design's own (L395, L617); only what
+ * stands between the numbers is new.
+ */
+describe('the laser reading, each side of its point', () => {
+  const T = THIN_SPACE
+  const FAINT = '<span style="color:var(--faint)">'
+  const NUM = '<b style="font-weight:500">'
+  const PLUS = `${FAINT} + </span>`
+  const DOT = '<span style="color:var(--border-strong)"> · </span>'
+
+  it('lists the sides that reached a face, − side first', () => {
+    expect(laserSideLengths({ minus: 1.2, plus: 2.3 })).toEqual([1.2, 2.3])
+    expect(laserSideLengths({ minus: null, plus: 2.3 })).toEqual([2.3])
+    expect(laserSideLengths({ minus: 1.2, plus: null })).toEqual([1.2])
+    expect(laserSideLengths({ minus: null, plus: null })).toEqual([])
+  })
+
+  it('labels one side in the design’s own markup: the axis in --faint, the length in --ink', () => {
+    expect(laserLabelHtml('X', 1.2)).toBe(
+      `${FAINT}X</span>&nbsp;<b style="font-weight:500;color:var(--ink)">1${T}200 mm</b>`
+    )
+    expect(laserLabelHtml('Z', 0.9)).toBe(
+      `${FAINT}Z</span>&nbsp;<b style="font-weight:500;color:var(--ink)">900 mm</b>`
+    )
+  })
+
+  it('reads both sides of each axis under the pointer, joined by a faint +', () => {
+    expect(
+      laserLiveHtml([
+        { axis: 'X', minus: 1.2, plus: 2.3 },
+        { axis: 'Y', minus: null, plus: 9.025 },
+        { axis: 'Z', minus: 0.9, plus: 1.8 }
+      ])
+    ).toBe(
+      `${FAINT}X</span> ${NUM}1${T}200</b>${PLUS}${NUM}2${T}300</b>${DOT}` +
+        `${FAINT}Y</span> ${NUM}9${T}025</b>${DOT}` +
+        `${FAINT}Z</span> ${NUM}900</b>${PLUS}${NUM}1${T}800</b>` +
+        `${FAINT} mm</span>`
+    )
+  })
+
+  it('reads a one-sided axis exactly as the design read its whole ray', () => {
+    // L617, verbatim, for rays whose other end is the point itself.
+    const design = (axis: string, mm: string): string => `${FAINT}${axis}</span> ${NUM}${mm}</b>`
+    expect(
+      laserLiveHtml([
+        { axis: 'X', minus: 2.4, plus: null },
+        { axis: 'Z', minus: null, plus: 3.5 }
+      ])
+    ).toBe(`${design('X', `2${T}400`)}${DOT}${design('Z', `3${T}500`)}${FAINT} mm</span>`)
   })
 })
 

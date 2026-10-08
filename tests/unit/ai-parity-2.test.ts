@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HL } from '../../src/shared/colors'
 import { federate } from '../../src/shared/federate'
 import * as fstack from '../../src/shared/filter-stack'
-import { mmv, fixed3 } from '../../src/shared/fmt'
+import { mmPlain, mmv, fixed3 } from '../../src/shared/fmt'
 import { visFn, type Rule } from '../../src/shared/rules'
 import {
   MARKUPS_CAP,
@@ -746,9 +746,17 @@ describe('manage_views — the Viewpoints card', () => {
 
 describe('manage_markups — the Markups card, read', () => {
   const MEASURES: MeasureRecord[] = [
-    { id: 11, p: [1, 2, 3], x: 4.5, y: 9.025, z: 2.7 },
-    // A ray that hit nothing has no reading: only X here.
-    { id: 12, p: [4, 5, 6], x: 1.234 }
+    {
+      id: 11,
+      p: [1, 2, 3],
+      x: 4.5,
+      y: 9.025,
+      z: 2.7,
+      // 2026-10-08: each axis split at the point, as the viewer records it — Y read one side only.
+      sides: { x: { minus: 1.2, plus: 3.3 }, y: { minus: null, plus: 9.025 }, z: { minus: 0.9, plus: 1.8 } }
+    },
+    // A ray that hit nothing has no reading: only X here, and only its − side.
+    { id: 12, p: [4, 5, 6], x: 1.234, sides: { x: { minus: 1.234, plus: null } } }
   ]
   const SPOTS: SpotRecord[] = [
     // The repository's synthetic coordinates, never a real site's.
@@ -775,15 +783,23 @@ describe('manage_markups — the Markups card, read', () => {
     })
   })
 
-  it('lists what the card shows: each measurement’s X, Y and Z in the card’s unit, each spot’s E, N, Z or its level', async () => {
+  it('lists what the card shows: each measurement’s X, Y and Z, whole and split at its point, in the card’s unit, each spot’s E, N, Z or its level', async () => {
     place()
     const mm = await run('manage_markups', { op: 'list' })
     expect(mm).toEqual({
       message: '2 laser measurements (M1–M2, lengths in mm) and 2 spot coordinates (C1–C2, in metres).',
       units: 'mm',
+      // Each axis whole, and split at the point as the card lists it (2026-10-08): a side that
+      // reached no face is left out.
       measures: [
-        { name: 'M1', x: 4500, y: 9025, z: 2700 },
-        { name: 'M2', x: 1234 }
+        {
+          name: 'M1',
+          x: 4500,
+          y: 9025,
+          z: 2700,
+          sides: { x: { minus: 1200, plus: 3300 }, y: { plus: 9025 }, z: { minus: 900, plus: 1800 } }
+        },
+        { name: 'M2', x: 1234, sides: { x: { minus: 1234 } } }
       ],
       spots: [
         { name: 'C1', E: 12345.457, N: 23456.766, Z: 5.05 },
@@ -796,8 +812,12 @@ describe('manage_markups — the Markups card, read', () => {
     // The numbers are the card's own: its rows, read back.
     const rows = measureRows(st().measures, 'mm')
     expect(rows.map((r) => r.n)).toEqual(['M1', 'M2'])
-    expect(rows[0].v).toBe(`X ${mmv(4.5)}   Y ${mmv(9.025)}   Z ${mmv(2.7)}`)
-    expect(rows[0].v.replace(/[^\d ]/g, '').trim().split(/\s{2,}/).map((x) => Number(x.replace(/\D/g, '')))).toEqual([4500, 9025, 2700])
+    expect(rows[0].v).toBe(
+      `X ${mmPlain(1.2)} + ${mmPlain(3.3)} mm   Y ${mmv(9.025)}   Z ${mmPlain(0.9)} + ${mmPlain(1.8)} mm`
+    )
+    // The row read back axis by axis is the result’s sides.
+    const read = rows[0].v.split('   ').map((axis) => (axis.match(/\d[\d\u2009]*/g) ?? []).map((n) => Number(n.replace(/\D/g, ''))))
+    expect(read).toEqual([[1200, 3300], [9025], [900, 1800]])
     expect(spotRows(st().spots)[0].v).toBe(`${fixed3(12345.457)} E · ${fixed3(23456.766)} N · ${fixed3(5.05)} Z`)
 
     // The card's m toggle: metres, to three decimals.
@@ -805,8 +825,14 @@ describe('manage_markups — the Markups card, read', () => {
     const m = await run('manage_markups', { op: 'list' })
     expect(m.units).toBe('m')
     expect(m.measures).toEqual([
-      { name: 'M1', x: 4.5, y: 9.025, z: 2.7 },
-      { name: 'M2', x: 1.234 }
+      {
+        name: 'M1',
+        x: 4.5,
+        y: 9.025,
+        z: 2.7,
+        sides: { x: { minus: 1.2, plus: 3.3 }, y: { plus: 9.025 }, z: { minus: 0.9, plus: 1.8 } }
+      },
+      { name: 'M2', x: 1.234, sides: { x: { minus: 1.234 } } }
     ])
     expect(m.message).toContain('lengths in m)')
     // A read: nothing changed, nothing to revert.
@@ -815,14 +841,23 @@ describe('manage_markups — the Markups card, read', () => {
   })
 
   it('is bounded: fifty of each, and it says it cut', async () => {
-    st().setMeasures(Array.from({ length: MARKUPS_CAP + 10 }, (_, i) => ({ id: i, p: [i, 0, 0] as [number, number, number], x: 1 })))
+    st().setMeasures(
+      Array.from({ length: MARKUPS_CAP + 10 }, (_, i) => ({
+        id: i,
+        p: [i, 0, 0] as [number, number, number],
+        x: 1,
+        sides: { x: { minus: null, plus: 1 } }
+      }))
+    )
     const body = await run('manage_markups', { op: 'list' })
     expect(body.measures).toHaveLength(MARKUPS_CAP)
     expect(body).toMatchObject({ measuresTotal: MARKUPS_CAP + 10, spotsTotal: 0, truncated: true })
     expect(body.message).toBe(
       `${MARKUPS_CAP + 10} laser measurements (M1–M${MARKUPS_CAP + 10}, lengths in mm). The first ${MARKUPS_CAP} of each are listed.`
     )
-    expect(JSON.stringify(body).length).toBeLessThan(2500)
+    // 2 772 B since 2026-10-08, when each measurement gained its split (`sides`); all sixty would
+    // be about 3 300.
+    expect(JSON.stringify(body).length).toBeLessThan(3000)
   })
 
   it('zooms to one through the card’s own tag, named as the card names it', async () => {
@@ -1133,7 +1168,7 @@ describe('the ticker words the new calls as what they do', () => {
 
 describe('nothing in this phase hides without the guard, or takes more than it is given', () => {
   it('leaves the undo stack and the visible set alone for every camera, viewpoint-list and markup call', async () => {
-    st().setMeasures([{ id: 1, p: [1, 2, 3], x: 1 }])
+    st().setMeasures([{ id: 1, p: [1, 2, 3], x: 1, sides: { x: { minus: 0.4, plus: 0.6 } } }])
     const calls: [string, unknown][] = [
       ['set_view', { azimuth: 120, elevation: 20 }],
       ['set_view', { fit: 'extents', zoom: 2 }],

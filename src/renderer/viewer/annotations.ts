@@ -28,6 +28,10 @@
  *   nobody authored.
  * · A spot tag shows its **level only** (`▽ +10.500`) until it is clicked, and a click toggles
  *   it to the design's full grid and back (2026-09-28, owner-requested).
+ * · A laser measurement reads **each side of its point** (2026-10-08, owner-requested): per
+ *   axis, one label at the middle of each half of the ray, where the design has one for the
+ *   whole ray at its middle; the live reading under the pointer reads both sides too. The lines,
+ *   the end dots and the origin mark are the design's.
  * · Scene-scale constants (the bubble gap, the stem drop, the laser's reach, the section
  *   margin) are the reference's value × `radius / 27.5`, as everything in `scene.ts` is. The
  *   footprint padding and the dimension stand-off are **not**: both are already
@@ -60,7 +64,9 @@ import {
   isElevation,
   keepFamily,
   laserDirections,
+  laserLabelHtml,
   laserLabelOffset,
+  laserLiveHtml,
   levelTagAnchor,
   levelTagHtml,
   nearEndSign,
@@ -71,10 +77,11 @@ import {
   type DimRect,
   type GridDimRun,
   type LaserAxis,
+  type LaserSides,
   type Rect,
   type XY
 } from '../../shared/annotate'
-import { fmtMM, mmPlain, mmTxt } from '../../shared/fmt'
+import { mmTxt } from '../../shared/fmt'
 import { toMap, type BasePoint } from '../../shared/georef'
 import type { Materials } from './materials'
 import type { Label, LabelOverlay, ViewerCamera } from './overlay'
@@ -88,6 +95,11 @@ import type { GridSegment } from './section'
  * `x` / `y` / `z` are the **lengths** the three rays read, in metres, and absent for an axis
  * that had no reading at all. `p` is the origin in **scene** coordinates, which is what
  * `focusPoint` takes back.
+ *
+ * `sides` (2026-10-08, owner-requested) is the same reading split at `p`, along the axis, for
+ * exactly the axes `x` / `y` / `z` carry: what the 3D labels, the Markups card and the assistant
+ * show. The whole ray is kept beside it — the assistant's result and the evaluation's
+ * observation still read it — and is the sum of the two sides, exactly.
  */
 export interface MeasureRecord {
   id: number
@@ -95,6 +107,7 @@ export interface MeasureRecord {
   x?: number
   y?: number
   z?: number
+  sides: Partial<Record<'x' | 'y' | 'z', LaserSides>>
 }
 
 /**
@@ -116,8 +129,12 @@ export interface SpotRecord {
 /** What became of a request to set a spot tag's state (`showSpot`). */
 export type SpotShown = 'changed' | 'already' | 'missing'
 
-/** One ray of a measurement: the two ends it hit and the distance between them. */
-export interface LaserRay {
+/**
+ * One ray of a measurement: the two ends it hit and the distance between them — and, since
+ * 2026-10-08, the distance along the axis from the point to each end that is a hit (`minus` to
+ * `a`, `plus` to `b`; `null` where that end is the point itself). `len` is their sum.
+ */
+export interface LaserRay extends LaserSides {
   axis: LaserAxis
   a: Vector3
   b: Vector3
@@ -275,22 +292,6 @@ const SPOT_GRID_OFFSET = { dx: 70, dy: -34 }
  */
 const SPOT_LEVEL_OFFSET = { dx: 33, dy: -7 }
 
-/** L395. */
-const rayHtml = (r: LaserRay): string =>
-  `<span style="color:var(--faint)">${r.axis}</span>&nbsp;` +
-  `<b style="font-weight:500;color:var(--ink)">${fmtMM(r.len)}</b>`
-
-/** L617. */
-const liveHtml = (rays: readonly LaserRay[]): string =>
-  rays
-    .map(
-      (r) =>
-        `<span style="color:var(--faint)">${r.axis}</span> ` +
-        `<b style="font-weight:500">${mmPlain(r.len)}</b>`
-    )
-    .join('<span style="color:var(--border-strong)"> · </span>') +
-  '<span style="color:var(--faint)"> mm</span>'
-
 /* ────────────────────────────── internals ────────────────────────────── */
 
 interface GridEnd {
@@ -393,7 +394,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
   let dimLabels: Label[] = []
 
   /** What the live preview last read, for `debug()` — nothing visible depends on it. */
-  let preview: { axis: LaserAxis; len: number }[] = []
+  let preview: ({ axis: LaserAxis; len: number } & LaserSides)[] = []
 
   const toPx = (p: Vector3): Vector2 => {
     const { w, h } = host.size()
@@ -732,13 +733,21 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       slot[sign > 0 ? 0 : 1] = hit ? hit.point.clone() : null
     }
     const out: LaserRay[] = []
-    for (const axis of LASER_AXES) {
+    LASER_AXES.forEach((axis, i) => {
       const slot = ends.get(axis)
-      if (!slot || (!slot[0] && !slot[1])) continue
+      if (!slot || (!slot[0] && !slot[1])) return
       const a = slot[1] ?? p.clone()
       const b = slot[0] ?? p.clone()
-      out.push({ axis, a, b, len: a.distanceTo(b) })
-    }
+      // 2026-10-08: each side is the distance from the point **along the axis**. The ray starts
+      // 3 mm off the surface (L372), and across the axis that lift is no part of a length — the
+      // design's `a.distanceTo(b)` (L383) read a one-sided axis across a face as the hypotenuse
+      // of it. The whole ray is the sum of the two sides, exactly.
+      const along = (hit: Vector3 | null): number | null =>
+        hit ? Math.abs(hit.getComponent(i) - p.getComponent(i)) : null
+      const minus = along(slot[1])
+      const plus = along(slot[0])
+      out.push({ axis, a, b, len: (minus ?? 0) + (plus ?? 0), minus, plus })
+    })
     return out
   }
 
@@ -758,8 +767,16 @@ export function createAnnotations(host: AnnotationHost): Annotations {
 
   const measureList = (): MeasureRecord[] =>
     measures.map((m) => {
-      const out: MeasureRecord = { id: m.id, p: m.p.toArray() as [number, number, number] }
-      for (const r of m.rays) out[r.axis.toLowerCase() as 'x' | 'y' | 'z'] = r.len
+      const out: MeasureRecord = {
+        id: m.id,
+        p: m.p.toArray() as [number, number, number],
+        sides: {}
+      }
+      for (const r of m.rays) {
+        const k = r.axis.toLowerCase() as 'x' | 'y' | 'z'
+        out[k] = r.len
+        out.sides[k] = { minus: r.minus, plus: r.plus }
+      }
       return out
     })
 
@@ -974,17 +991,25 @@ export function createAnnotations(host: AnnotationHost): Annotations {
         measGroup.add(line)
         m.lines.push(line)
         const off = laserLabelOffset(r.axis)
-        m.labels.push(
-          overlay.mkLabel(
-            r.a.clone().lerp(r.b, 0.5),
-            rayHtml(r),
-            { ...overlay.labelBase(), borderColor: 'var(--accent)' },
-            off.dx,
-            off.dy
-          ),
-          overlay.mkLabel(r.a, '', DOT_STYLE),
-          overlay.mkLabel(r.b, '', DOT_STYLE)
-        )
+        // 2026-10-08 (owner-requested): a reading for each side of the point, at the middle of
+        // that half of the ray, where L403 put one for the whole ray at its middle. A side that
+        // hit nothing ends at the point itself and has no reading.
+        for (const [end, len] of [
+          [r.a, r.minus],
+          [r.b, r.plus]
+        ] as const) {
+          if (len == null) continue
+          m.labels.push(
+            overlay.mkLabel(
+              p.clone().lerp(end, 0.5),
+              laserLabelHtml(r.axis, len),
+              { ...overlay.labelBase(), borderColor: 'var(--accent)' },
+              off.dx,
+              off.dy
+            )
+          )
+        }
+        m.labels.push(overlay.mkLabel(r.a, '', DOT_STYLE), overlay.mkLabel(r.b, '', DOT_STYLE))
       }
       measures.push(m)
       publishMeasures()
@@ -1011,11 +1036,17 @@ export function createAnnotations(host: AnnotationHost): Annotations {
 
     previewLaser: (p, normal, selfId) => {
       const rays = laserFrom(p, normal, selfId)
-      preview = rays.map((r) => ({ axis: r.axis, len: +r.len.toFixed(4) }))
+      const r4 = (v: number | null): number | null => (v == null ? null : +v.toFixed(4))
+      preview = rays.map((r) => ({
+        axis: r.axis,
+        len: +r.len.toFixed(4),
+        minus: r4(r.minus),
+        plus: r4(r.plus)
+      }))
       fillLaser(rays, p)
       liveLabel.on = rays.length > 0
       liveLabel.pos.copy(p)
-      liveLabel.el.innerHTML = liveHtml(rays)
+      liveLabel.el.innerHTML = laserLiveHtml(rays)
     },
 
     clearPreview: () => {

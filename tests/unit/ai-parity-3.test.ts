@@ -112,10 +112,18 @@ let told: [string, ...unknown[]][] = []
 type Opened = 'opening' | 'gone' | 'moved'
 let outside: { openRecent: Mock<(path: string) => Promise<Opened>>; copyLink: Mock<() => Promise<boolean>> }
 
+/** Each split at its point as the viewer records it (2026-10-08); M2 and M3 read one side only. */
 const MEASURES: MeasureRecord[] = [
-  { id: 11, p: [1, 2, 3], x: 4.5, y: 9.025, z: 2.7 },
-  { id: 12, p: [4, 5, 6], x: 1.234 },
-  { id: 13, p: [7, 7, 7], z: 0.5 }
+  {
+    id: 11,
+    p: [1, 2, 3],
+    x: 4.5,
+    y: 9.025,
+    z: 2.7,
+    sides: { x: { minus: 1.2, plus: 3.3 }, y: { minus: null, plus: 9.025 }, z: { minus: 0.9, plus: 1.8 } }
+  },
+  { id: 12, p: [4, 5, 6], x: 1.234, sides: { x: { minus: null, plus: 1.234 } } },
+  { id: 13, p: [7, 7, 7], z: 0.5, sides: { z: { minus: 0.5, plus: null } } }
 ]
 const SPOTS: SpotRecord[] = [
   // The repository's synthetic coordinates, never a real site's.
@@ -929,6 +937,13 @@ describe('manage_markups delete and clear — by the record’s own id, as the c
     st().applyPending(at)
     expect(told).toEqual([['dropMeasure', 12]])
     expect(st().measures.map((m) => m.id)).toEqual([13])
+  })
+
+  it('quotes a two-sided measurement as its row reads now — each side of its point (2026-10-08)', async () => {
+    const { at } = await ask('manage_markups', { op: 'delete', name: 'M1' })
+    expect(pendingOf(at)!.label).toBe(
+      'delete laser measurement M1 (X 1 200 + 3 300 mm Y 9 025 mm Z 900 + 1 800 mm), as the Markups card lists it now — it cannot be brought back'
+    )
   })
 
   it('asks to delete a spot the same way, by its E, N and Z', async () => {

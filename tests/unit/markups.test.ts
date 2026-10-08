@@ -4,9 +4,11 @@
  *
  * 2026-10-01: the Section card's chips are per plane — the gridline chips grouped by grid
  * family, each plane with its own summary and its own chip rule.
+ *
+ * 2026-10-08: a laser measurement's row reads each side of its point, not the whole ray.
  */
 import { describe, expect, it } from 'vitest'
-import { DASH } from '../../src/shared/fmt'
+import { DASH, THIN_SPACE } from '../../src/shared/fmt'
 import { federate } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import {
@@ -28,26 +30,85 @@ import type { MeasureRecord, SpotRecord } from '../../src/renderer/viewer/annota
 import type { SecPlane } from '../../src/renderer/state/shell'
 import type { GridAxisRecord } from '../../src/shared/model-index.types'
 
+/**
+ * 2026-10-08: a record carries each axis split at its point (`sides`) beside the whole ray. M1
+ * reads both sides of X and Z and only the + side of Y; M2 only the − side of X and both of Z.
+ */
 const M: MeasureRecord[] = [
-  { id: 1, p: [1, 2, 3], x: 1.66, y: 0.12, z: 1.44 },
-  { id: 2, p: [4, 5, 6], x: 6, z: 2.04 }
+  {
+    id: 1,
+    p: [1, 2, 3],
+    x: 1.66,
+    y: 0.12,
+    z: 1.44,
+    sides: {
+      x: { minus: 0.5, plus: 1.16 },
+      y: { minus: null, plus: 0.12 },
+      z: { minus: 0.9, plus: 0.54 }
+    }
+  },
+  {
+    id: 2,
+    p: [4, 5, 6],
+    x: 6,
+    z: 2.04,
+    sides: { x: { minus: 6, plus: null }, z: { minus: 1.2, plus: 0.84 } }
+  }
 ]
 const S: SpotRecord[] = [
   { id: 3, p: [1, 2, 3], E: 28513.539, N: 30200.195, Z: 109.88, x: 13.26, y: -2.74, z: 7.38 }
 ]
 
 describe('measureRows', () => {
-  it('numbers by position and prints millimetres by default', () => {
+  /** The design’s thousands separator, U+2009. */
+  const T = THIN_SPACE
+
+  it('numbers by position and prints each side of the point in millimetres by default', () => {
     const rows = measureRows(M, 'mm')
     expect(rows.map((r) => r.n)).toEqual(['M1', 'M2'])
-    expect(rows[0].v).toBe('X 1 660 mm   Y 120 mm   Z 1 440 mm')
-    // An axis with no reading is dropped, not printed as zero (the design's `filter`).
-    expect(rows[1].v).toBe('X 6 000 mm   Z 2 040 mm')
+    // 2026-10-08: per axis the − side, ' + ', the + side and the unit once — three spaces between
+    // axes, as the design joins them.
+    expect(rows[0].v).toBe(`X 500 + 1${T}160 mm   Y 120 mm   Z 900 + 540 mm`)
+    // An axis with no reading is dropped, not printed as zero (the design’s `filter`); so is a
+    // side that reached no face, and the side that did reads alone.
+    expect(rows[1].v).toBe(`X 6${T}000 mm   Z 1${T}200 + 840 mm`)
+    // One reading an axis — what the card wraps between, never inside — joined as `v`.
+    expect(rows[0].axes).toEqual([`X 500 + 1${T}160 mm`, 'Y 120 mm', 'Z 900 + 540 mm'])
+    expect(rows.every((r) => r.v === r.axes!.join('   '))).toBe(true)
+    expect(spotRows(S)[0].axes).toBeUndefined()
   })
 
   it('prints three decimals of a metre under the m toggle', () => {
-    expect(measureRows(M, 'm')[0].v).toBe('X 1.660 m   Y 0.120 m   Z 1.440 m')
-    expect(measureRows(M, 'm')[1].v).toBe('X 6.000 m   Z 2.040 m')
+    expect(measureRows(M, 'm')[0].v).toBe('X 0.500 + 1.160 m   Y 0.120 m   Z 0.900 + 0.540 m')
+    expect(measureRows(M, 'm')[1].v).toBe('X 6.000 m   Z 1.200 + 0.840 m')
+  })
+
+  it('reads a one-sided axis exactly as the design read its whole ray', () => {
+    // With the other side the point itself, the side alone is the whole ray — so the row is the
+    // design’s own text, whichever side reached the face.
+    const one = (minus: number | null, plus: number | null): MeasureRecord => ({
+      id: 9,
+      p: [0, 0, 0],
+      y: 2.4,
+      sides: { y: { minus, plus } }
+    })
+    for (const r of [one(2.4, null), one(null, 2.4)]) {
+      expect(measureRows([r], 'mm')[0].v).toBe(`Y 2${T}400 mm`)
+      expect(measureRows([r], 'm')[0].v).toBe('Y 2.400 m')
+      // No axis reads two sides, so the row has no `axes`: the card draws the design's own span
+      // around the design's own text, byte for byte.
+      expect(measureRows([r], 'mm')[0].axes).toBeUndefined()
+    }
+    const allOneSided: MeasureRecord = {
+      id: 10,
+      p: [0, 0, 0],
+      x: 15.215,
+      y: 0.7,
+      z: 4,
+      sides: { x: { minus: 15.215, plus: null }, y: { minus: 0.7, plus: null }, z: { minus: 4, plus: null } }
+    }
+    expect(measureRows([allOneSided], 'mm')[0]).toMatchObject({ v: `X 15${T}215 mm   Y 700 mm   Z 4${T}000 mm` })
+    expect(measureRows([allOneSided], 'mm')[0].axes).toBeUndefined()
   })
 
   it('renumbers when one is deleted, because the label is the row’s position', () => {
