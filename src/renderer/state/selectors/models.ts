@@ -81,6 +81,20 @@ export function modelLabel(
   return library.find((f) => f.key === key)?.name ?? stem(fileName) ?? key
 }
 
+/**
+ * The file line under a model row's name — `SGVue.dc.html:1802`'s `file`: the upload's own file
+ * name, else the library entry's, else the loaded file's. (2026-10-08: the Coordinate-system
+ * card's note names a model by it too.)
+ */
+export function modelFile(
+  key: string,
+  fileName: string,
+  library: readonly LibraryFile[],
+  uploadName?: string
+): string {
+  return uploadName || (library.find((f) => f.key === key)?.file ?? fileName)
+}
+
 export function modelRows(input: ModelInput): ModelRow[] {
   const { federation, files, library, modelVis, modelColors, nativeMats, uploadNames } = input
   const counts = new Map<string, number>()
@@ -89,7 +103,6 @@ export function modelRows(input: ModelInput): ModelRow[] {
 
   return federation.models.map((m) => {
     const key = m.meta.modelKey
-    const lib = library.find((f) => f.key === key)
     const ov = modelColors[key] || null
     const live = !!ov && !nativeMats
     const act = input.active === key
@@ -97,7 +110,7 @@ export function modelRows(input: ModelInput): ModelRow[] {
     return {
       key,
       name: modelLabel(key, m.meta.fileName, library, up),
-      file: up || (lib?.file ?? m.meta.fileName),
+      file: modelFile(key, m.meta.fileName, library, up),
       path: files.find((f) => f.key === key)?.path ?? '',
       count: counts.get(key) ?? 0,
       vis: modelVis[key] !== false,

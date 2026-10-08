@@ -221,12 +221,6 @@ const APPLY_GATED: { tool: string; value: string; setup?: () => void | Promise<v
     value: 'copy_guids',
     input: () => ({ action: 'copy_guids', ids: STAIRS }),
     kind: 'copy_guids'
-  },
-  {
-    tool: 'request_user_action',
-    value: 'set_base_point',
-    input: () => ({ action: 'set_base_point', E: 28500, N: 30200, angle: 12.5 }),
-    kind: 'set_base_point'
   }
 ]
 
@@ -234,7 +228,8 @@ describe('a gated call asks, and changes nothing by itself', () => {
   it('covers every call the catalogue marks as waiting behind Apply', () => {
     const marked = GATED_CALLS.filter((g) => g.surface === 'apply').map((g) => `${g.tool}.${g.value}`)
     expect(APPLY_GATED.map((g) => `${g.tool}.${g.value}`).sort()).toEqual([...marked].sort())
-    expect(marked).toHaveLength(8)
+    // Seven since 2026-10-08: `set_base_point` went with the read-only Coordinate-system card.
+    expect(marked).toHaveLength(7)
   })
 
   for (const gated of APPLY_GATED) {
@@ -282,7 +277,8 @@ describe('a gated call asks, and changes nothing by itself', () => {
       ['request_user_action', { action: 'unload_model' }, 'asking to unload a model'],
       ['request_user_action', { action: 'copy_link' }, 'asking to copy the link'],
       ['request_user_action', { action: 'copy_guids' }, 'asking to copy GlobalIds'],
-      ['request_user_action', { action: 'set_base_point' }, 'asking to change the base point'],
+      // 2026-10-08: no longer an action, so no phrase of its own.
+      ['request_user_action', { action: 'set_base_point' }, 'asking you to decide'],
       ['request_user_action', {}, 'asking you to decide'],
       ['request_user_action', { action: 'constructor' }, 'asking you to decide'],
       ['manage_views', { op: 'delete' }, 'asking to delete a viewpoint'],
@@ -424,7 +420,7 @@ describe('a turn makes one request, of any kind', () => {
     for (const [name, input] of [
       ['manage_views', { op: 'delete', number: 1 }],
       ['manage_markups', { op: 'clear', kind: 'measures' }],
-      ['request_user_action', { action: 'set_base_point', E: 1 }],
+      ['request_user_action', { action: 'copy_guids', ids: STAIRS }],
       ['request_user_action', { action: 'unload_model', model: 'MEP' }],
       ['request_user_action', { action: 'open_files' }]
     ] as const) {
@@ -516,7 +512,7 @@ describe('a turn makes one request, of any kind', () => {
   it('asks again in the next turn', async () => {
     await run('request_user_action', { action: 'copy_link' })
     fresh()
-    expect((await run('request_user_action', { action: 'set_base_point', Z: 5.05 })).pending).toBe(true)
+    expect((await run('request_user_action', { action: 'copy_guids', ids: STAIRS })).pending).toBe(true)
   })
 })
 
@@ -885,106 +881,28 @@ describe('request_user_action copy_link and copy_guids — nothing is copied unt
   })
 })
 
-/* ────────────────────────────── 8. the base point ────────────────────────────── */
+/* ────────────────────────────── 8. the base point — never asked for since 2026-10-08 ────────────────────────────── */
 
-describe('request_user_action set_base_point — the numbers in the row, the user’s click types them in', () => {
-  it('shows each number beside the one it replaces, and changes nothing', async () => {
-    st().setCoord('E', '12345.457')
-    st().setCoord('N', '23456.766')
-    const coords = st().coords
-    told = []
-    const { body, at } = await ask('request_user_action', { action: 'set_base_point', E: 28500, N: 30200, Z: 102.5, angle: 12.5 })
-    expect(pendingOf(at)).toEqual({
-      label:
-        'set the base point — Easting 28500 m (now 12345.457 m), Northing 30200 m (now 23456.766 m), Elevation 102.5 m (now —), True north 12.5° (now —) — every coordinate read-out follows it',
-      action: {
-        kind: 'set_base_point',
-        coords: { E: 28500, N: 30200, Z: 102.5, angle: 12.5 },
-        // What the four fields held when it was asked: the label was written against these.
-        was: { E: 12345.457, N: 23456.766, Z: null, angle: null }
-      }
-    })
-    expect(body).toMatchObject({
-      pending: true,
-      basePoint: { E: 12345.457, N: 23456.766, Z: null, angle: null, source: 'user' },
-      proposed: { E: 28500, N: 30200, Z: 102.5, angle: 12.5 }
-    })
-    expect(st().coords).toBe(coords)
-    expect(told).toEqual([])
-
-    // Apply is the Coordinate-system card's own action, field by field.
-    st().applyPending(at)
-    expect(st().coords).toEqual({ E: 28500, N: 30200, Z: 102.5, angle: 12.5 })
-    expect(told.filter((c) => c[0] === 'setCoords')).toHaveLength(4)
-    expect(told[told.length - 1]).toEqual(['setCoords', { E: 28500, N: 30200, Z: 102.5, angle: 12.5 }])
-    expect((await run('get_view_state')).basePoint).toEqual({ E: 28500, N: 30200, Z: 102.5, angle: 12.5, source: 'user' })
-    // …and it joins the reply's undo: the card has no reset, the reply's `revert` is one.
-    expect(st().chatMsgs[at].undoSnap?.changed).toEqual(['basePoint'])
-    st().revertTurn(at)
-    expect(st().coords).toEqual(coords)
-  })
-
-  it('asks only for the fields that would change, and for nothing when none would', async () => {
-    st().setCoord('E', '28500')
-    const { at } = await ask('request_user_action', { action: 'set_base_point', E: 28500, Z: 5.05 })
-    expect(actionOf(at)).toEqual({
-      kind: 'set_base_point',
-      coords: { Z: 5.05 },
-      was: { E: 28500, N: null, Z: null, angle: null }
-    })
-    expect(pendingOf(at)!.label).toBe(
-      'set the base point — Elevation 5.05 m (now —) — every coordinate read-out follows it'
+/**
+ * The owner made the Coordinate-system card read-only (2026-10-08): *"dont let user change
+ * anything."* What nobody can change, the assistant cannot ask to change, so `set_base_point` is
+ * gone from `request_user_action` — from the schema, the gate, the pending row and the store.
+ */
+describe('the base point cannot be asked for: the Coordinate-system card is read-only', () => {
+  it('is refused by the schema before anything runs, and nothing waits behind Apply', async () => {
+    const before = st()
+    await expect(run('request_user_action', { action: 'set_base_point', E: 28500 })).rejects.toThrow(
+      /request_user_action: action/
     )
-    const same = await ask('request_user_action', { action: 'set_base_point', E: 28500 })
-    expect(same.body.message).toBe('The base point already has those values — nothing to change, and nothing was asked.')
-    expect(pendingOf(same.at)).toBeNull()
-    const none = await ask('request_user_action', { action: 'set_base_point' })
-    expect(none.body.message).toBe('Pass at least one of E, N, Z or angle. Nothing was asked.')
-    expect(none.body.basePoint).toMatchObject({ E: 28500, source: 'user' })
-    expect(pendingOf(none.at)).toBeNull()
+    expect(turn.pending).toBeNull()
+    expect(st()).toBe(before)
+    expect(GATED_CALLS.some((g) => g.value === 'set_base_point')).toBe(false)
   })
 
-  /**
-   * After review: the rule every other request keeps. The label says "Easting 28500 m (now
-   * 12345.457 m)", so the click sets the numbers only while "now" is still now.
-   */
-  it('sets nothing when the base point has changed since it was asked', async () => {
-    const STALE = 'The base point has changed since that was asked, so nothing was set.'
-    st().setCoord('E', '12345.457')
-    const { at } = await ask('request_user_action', { action: 'set_base_point', E: 28500, N: 30200 })
-    // The user types an elevation into the card: a field the request does not even name.
-    st().setCoord('Z', '5.05')
-    const typed = st().coords
-    told = []
-    st().applyPending(at)
-    expect(st().coords).toBe(typed)
-    expect(told).toEqual([])
-    expect(st().chatErr).toBe(STALE)
-    // Spent, like any request: it is not left to be applied against yet another state.
-    expect(pendingOf(at)).toBeNull()
-    expect(st().chatMsgs[at].undoSnap).toBeNull()
-
-    // A field the request does name, changed and changed back, is the same base point again.
-    const again = await ask('request_user_action', { action: 'set_base_point', E: 28500, N: 30200 })
-    expect(actionOf(again.at)).toMatchObject({ was: { E: 12345.457, N: null, Z: 5.05, angle: null } })
-    st().setCoord('E', '1')
-    st().setCoord('E', '12345.457')
-    st().applyPending(again.at)
-    expect(st().coords).toEqual({ E: 28500, N: 30200, Z: 5.05, angle: null })
-  })
-
-  it('…and one asked on a blank card sets nothing once the card is no longer blank', async () => {
-    const blank = await ask('request_user_action', { action: 'set_base_point', angle: 12.5 })
-    expect(actionOf(blank.at)).toEqual({
-      kind: 'set_base_point',
-      coords: { angle: 12.5 },
-      was: { E: null, N: null, Z: null, angle: null }
-    })
-    // The user types the very field the request names — to another value.
-    st().setCoord('angle', '3')
-    st().applyPending(blank.at)
-    expect(st().coords).toEqual({ E: null, N: null, Z: null, angle: 3 })
-    expect(st().chatErr).toBe('The base point has changed since that was asked, so nothing was set.')
+  it('leaves the store no action that sets one, and no pending kind that would', () => {
+    expect('setCoord' in st()).toBe(false)
+    // The read-back is still there, and says whose the numbers are: here, nobody's.
+    expect(st().coords).toEqual({ E: null, N: null, Z: null, angle: null })
   })
 })
 
@@ -1275,7 +1193,14 @@ describe('a held patch is visibility and nothing else', () => {
     st().addStep('hide', [is('IfcEntity', 'IfcWindow')])
     st().saveFilterSet('No windows')
     st().clearStack()
-    st().setCoord('E', '12345.457')
+    // A base point the file states (2026-10-08: the only way there is one).
+    st().setOffset([0, 0, 0], null, {
+      source: 'IfcMapConversion',
+      sources: ['IfcMapConversion'],
+      method: 'IfcMapConversion',
+      eastings: 12345.457,
+      northings: 23456.766
+    })
     const kept = st()
     const before = st().chatBegin('q', null)
     const smuggled = {
@@ -1399,7 +1324,7 @@ describe('a call that only asks, for a turn that is no longer live', () => {
       ['request_user_action', { action: 'open_files' }],
       ['request_user_action', { action: 'unload_model', model: 'MEP' }],
       ['request_user_action', { action: 'copy_link' }],
-      ['request_user_action', { action: 'set_base_point', E: 28500 }],
+      ['request_user_action', { action: 'copy_guids', ids: STAIRS }],
       ['manage_views', { op: 'delete', number: 1 }],
       ['manage_filters', { op: 'delete_set', name: 'x' }],
       ['export_schedule', { format: 'csv' }]
@@ -1483,8 +1408,9 @@ describe('a name in a pending label, or in the result of a request', () => {
 
   it('writes the class it strips as escapes: the helper’s own source holds none of those characters', () => {
     // The characters are invisible, and some reorder the text around them in an editor — so
-    // the one place that names them must name them by number.
-    const source = readFileSync(join(process.cwd(), 'src/renderer/ai/executors/context.ts'), 'utf8')
+    // the one place that names them must name them by number. (The helper lives in
+    // `shared/fmt.ts` since 2026-10-08, beside the Coordinate-system card's note that uses it too.)
+    const source = readFileSync(join(process.cwd(), 'src/shared/fmt.ts'), 'utf8')
     expect(source).toContain(String.raw`[\p{Cc}\u200B-\u200F\u202A-\u202E\u2066-\u2069]`)
     expect(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/.test(source)).toBe(false)
   })

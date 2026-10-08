@@ -921,7 +921,7 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
   })
 
   it('the scene stands whole metres off the project frame: the point handed to the viewer is project − offset', async () => {
-    st().setOffset([28000, 30000, 100], null)
+    st().setOffset([28000, 30000, 100], null, null)
     const body = await run('manage_markups', { op: 'place_spot', point: { x: 28010.5, y: 30020.25, z: 103.2 } })
     expect(placedSpots).toEqual([[10.5, 20.25, 3.2000000000000028]])
     // What comes back is the point that was asked for, in the frame it was asked in.
@@ -932,11 +932,19 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
   })
 
   it('with a base point the spot reads E, N and Z — the map coordinates the card’s row shows', async () => {
-    // The repository's synthetic set, never a real site's.
-    st().setCoord('E', '12345.457')
-    st().setCoord('N', '23456.766')
-    st().setCoord('Z', '5.05')
-    st().setCoord('angle', '0')
+    // The repository's synthetic set, never a real site's — stated by the file, which is the only
+    // place a base point comes from since the card became read-only (2026-10-08).
+    st().setOffset([0, 0, 0], null, {
+      source: 'IfcMapConversion',
+      sources: ['IfcMapConversion'],
+      method: 'IfcMapConversion',
+      eastings: 12345.457,
+      northings: 23456.766,
+      orthogonalHeight: 5.05,
+      xAxisAbscissa: 1,
+      xAxisOrdinate: 0
+    })
+    expect(st().coords).toEqual({ E: 12345.457, N: 23456.766, Z: 5.05, angle: 0 })
     const body = await run('manage_markups', { op: 'place_spot', point: { x: 1, y: 2, z: 3 }, show: 'full' })
     const m = toMap(st().coords, 1, 2, 3)!
     expect(body.spot).toEqual({ name: 'C1', E: +m.E.toFixed(3), N: +m.N.toFixed(3), Z: +m.Z.toFixed(3) })

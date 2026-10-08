@@ -131,6 +131,8 @@ export interface GeometryWarning {
   kind: 'farPlacement' | 'precision'
   /** A real number, not a percentage — the distance that triggered it. */
   detail: string
+  /** That distance, in metres (2026-10-08: the Coordinate-system card's note reads it). */
+  metres: number
 }
 
 /** What the worker reports once a model's geometry has finished streaming. */

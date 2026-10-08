@@ -23,7 +23,7 @@ import {
   sectionGridFamilies,
   sectionLevelChips
 } from '../../src/renderer/state/selectors/section'
-import { hasManualCoords, statusValues } from '../../src/renderer/state/selectors/status'
+import { statusValues } from '../../src/renderer/state/selectors/status'
 import type { MeasureRecord, SpotRecord } from '../../src/renderer/viewer/annotations'
 import type { SecPlane } from '../../src/renderer/state/shell'
 import type { GridAxisRecord } from '../../src/shared/model-index.types'
@@ -220,43 +220,34 @@ describe('the status bar’s CRS chip', () => {
     units: 'mm' as const
   }
 
-  it('is the em dash on a federation with no georeferencing and nothing typed', () => {
+  it('is the em dash on a federation with no georeferencing', () => {
     // The design's mock has no CRS at all, which is why this is the parity difference.
-    expect(statusValues({ ...base, coords: { E: null, N: null, Z: null, angle: null } }).crs).toBe(
-      DASH
-    )
+    expect(statusValues({ ...base, bootGeoref: null }).crs).toBe(DASH)
+    expect(statusValues({ ...base, bootGeoref: federation.models[0].meta.georef }).crs).toBe(DASH)
   })
 
-  it('keeps the design’s chip once the user has typed a base point', () => {
-    const coords = { E: 28500, N: 30200, Z: 102.5, angle: 12.5 }
-    expect(hasManualCoords(coords, federation)).toBe(true)
-    expect(statusValues({ ...base, coords }).crs).toBe('SVY21')
-  })
-
-  it('does not call a file-supplied base point manual', () => {
-    const georeferenced = federate([
-      {
-        ...mockModelIndex('ARC'),
-        georef: {
-          source: 'IfcMapConversion' as const,
-          sources: ['IfcMapConversion' as const],
-          method: 'IfcMapConversion' as const,
-          eastings: 0,
-          northings: 0,
-          orthogonalHeight: 0,
-          crs: {
-            name: 'EPSG:3414',
-            description: 'SVY21 / Singapore TM',
-            geodeticDatum: 'SVY21',
-            verticalDatum: '',
-            mapProjection: '',
-            mapZone: ''
-          }
-        }
+  it('names the CRS the boot file declares — the declaration that defined the federation’s frame', () => {
+    const svy21 = {
+      source: 'IfcMapConversion' as const,
+      sources: ['IfcMapConversion' as const],
+      method: 'IfcMapConversion' as const,
+      eastings: 0,
+      northings: 0,
+      orthogonalHeight: 0,
+      crs: {
+        name: 'EPSG:3414',
+        description: 'SVY21 / Singapore TM',
+        geodeticDatum: 'SVY21',
+        verticalDatum: '',
+        mapProjection: '',
+        mapZone: ''
       }
-    ])
-    const coords = { E: 0, N: 0, Z: 0, angle: 0 }
-    expect(hasManualCoords(coords, georeferenced)).toBe(false)
-    expect(statusValues({ ...base, federation: georeferenced, coords }).crs).toBe('SVY21')
+    }
+    expect(statusValues({ ...base, bootGeoref: svy21 }).crs).toBe('SVY21')
+    // Read off the boot file, not off whichever loaded model states one: the frame in use is the
+    // boot model's, and stays so after it is unloaded (2026-10-08).
+    const later = federate([mockModelIndex('ARC'), { ...mockModelIndex('STR'), georef: svy21 }])
+    expect(statusValues({ ...base, federation: later, bootGeoref: null }).crs).toBe(DASH)
+    // Until 2026-10-08 a base point typed into the card kept the design's chip; there is none to type.
   })
 })

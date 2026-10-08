@@ -1093,8 +1093,17 @@ export function placementMatrix(
   if (!placementId || depth > 24) return [...IDENTITY_M4]
   const p = src.line(modelID, placementId)
   if (!p) return [...IDENTITY_M4]
+  const local = axisMatrix(src, modelID, ref(p.RelativePlacement), scale)
+  return multiply(placementMatrix(src, modelID, ref(p.PlacementRelTo), scale, depth + 1), local)
+}
 
-  const axis = src.line(modelID, ref(p.RelativePlacement))
+/**
+ * One `IfcAxis2Placement3D` (or 2D) as a column-major 4×4, its `Location` in metres — a
+ * placement's own step, and (2026-10-08) the `Model` context's `WorldCoordinateSystem`. The
+ * identity for a missing axis.
+ */
+function axisMatrix(src: ReadOnlyIfcSource, modelID: number, axisId: number, scale: number): number[] {
+  const axis = axisId ? src.line(modelID, axisId) : null
   let local = [...IDENTITY_M4]
   if (axis) {
     const location = src.line(modelID, ref(axis.Location))
@@ -1123,8 +1132,7 @@ export function placementMatrix(
       n(c[0]) * scale, n(c[1]) * scale, n(c[2]) * scale, 1
     ]
   }
-
-  return multiply(placementMatrix(src, modelID, ref(p.PlacementRelTo), scale, depth + 1), local)
+  return local
 }
 
 const applyXY = (m: readonly number[], x: number, y: number): XY => [
@@ -1303,6 +1311,43 @@ function isModelContext(
 }
 
 /**
+ * The 3D `Model` context's `WorldCoordinateSystem` (2026-10-08), or `undefined` when it is the
+ * identity — which IFC says it normally is. A Revit export from the Survey Point, Project Base
+ * Point or Internal Origin with no EPSG code, and every Revit IFC2X3 one, writes the chosen
+ * point's Easting, Northing and Elevation as its `Location`, in project length units, and no
+ * `IfcMapConversion`. web-ifc 0.0.77 applies it to no placement and neither does
+ * `placementMatrix` (`docs/TRAPS.md`), so it is read here and applied in `shared/georef.ts`'s
+ * `mapPlacement`. The context itself, never a sub-context, whose own is derived from it.
+ */
+function readWcs(src: ReadOnlyIfcSource, modelID: number, scale: number): Georeference['wcs'] {
+  const code = src.typeCode('IFCGEOMETRICREPRESENTATIONCONTEXT')
+  if (!code) return undefined
+  for (const id of src.idsWithType(modelID, code, true)) {
+    if (src.typeName(src.lineType(modelID, id)) !== 'IfcGeometricRepresentationContext') continue
+    if (!isModelContext(src, modelID, id)) continue
+    const axisId = ref(src.line(modelID, id)?.WorldCoordinateSystem)
+    if (!axisId) return undefined
+    const m = axisMatrix(src, modelID, axisId, scale)
+    const rotationDeg = (Math.atan2(m[1], m[0]) * 180) / Math.PI
+    const pureZ =
+      Math.abs(m[2]) < 1e-9 &&
+      Math.abs(m[6]) < 1e-9 &&
+      Math.abs(m[8]) < 1e-9 &&
+      Math.abs(m[9]) < 1e-9 &&
+      Math.abs(m[10] - 1) < 1e-9
+    const moved = Math.abs(m[12]) >= 1e-9 || Math.abs(m[13]) >= 1e-9 || Math.abs(m[14]) >= 1e-9
+    const turned = Math.abs(rotationDeg) >= ROTATION_EPSILON_DEG
+    if (!moved && !turned && pureZ) return undefined
+    return {
+      origin: [m[12], m[13], m[14]],
+      ...(turned ? { rotationDeg } : {}),
+      ...(pureZ ? {} : { pureZRotation: false })
+    }
+  }
+  return undefined
+}
+
+/**
  * `IfcProjectedCRS.MapUnit`: the name the file gives it and metres per one of it — only for a
  * length, which is all IFC allows there (`IsLengthUnit`). `undefined` when the CRS names none.
  */
@@ -1432,6 +1477,17 @@ function readGeoreference(
         break
       }
     }
+  }
+
+  /*
+   * The `Model` context's `WorldCoordinateSystem` (2026-10-08, rule 4) — where Revit writes the
+   * map position when it writes no `IfcMapConversion`. Recorded only when it is not the identity.
+   * Beside a conversion it is still recorded: `shared/georef.ts` reads that pair as ambiguous.
+   */
+  const wcs = readWcs(src, modelID, units.length)
+  if (wcs) {
+    sources.push('WorldCoordinateSystem')
+    out = { ...out, wcs, ...(out.source === 'none' ? { source: 'WorldCoordinateSystem' } : {}) }
   }
 
   /* IfcSite — RefLatitude/RefLongitude/RefElevation and the placement CORENET X uses. */

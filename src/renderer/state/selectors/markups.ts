@@ -6,8 +6,9 @@
  *
  * The one place the port cannot be literal is a spot with no base point behind it: the
  * prototype always has one (its own literal origin), so it always prints three numbers. Here a
- * file that states no georeferencing and a session with nothing typed into the Coordinate-system
- * card leaves E / N / Z absent, and an absent value is the design's own em dash.
+ * file that states no georeferencing leaves E / N / Z absent — and since 2026-10-08 nothing can be
+ * typed into the Coordinate-system card to stand for one — and an absent value is the design's
+ * own em dash.
  */
 import { DASH, fixed3, mmv } from '../../../shared/fmt'
 import type { MeasureRecord, SpotRecord } from '../../viewer/annotations'

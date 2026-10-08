@@ -4,7 +4,8 @@
  * `design-reference/design/viewer-core.js` L408–409 keeps a `coords` object and a `toMap`
  * that turns a model point into an E/N/Z map coordinate. Its default is a literal base point
  * (`{ E: 28500, N: 30200, Z: 102.5, angle: 12.5 }`), which the fidelity contract's "never a
- * placeholder" forbids: a value is read from the file, or typed by the user, or absent.
+ * placeholder" forbids: a value is read from the file, or absent. (It could be typed by the user
+ * too until 2026-10-08, when the owner made the Coordinate-system card read-only.)
  *
  * So this module is the design's `toMap` plus the readings the prototype had no data for.
  *
@@ -33,6 +34,12 @@
  * so the streamer, `worldToProjectMatrix` and `toProject` are unchanged. `coordsFromGeoref` is
  * P read as a base point, so every map readout and the geometry come from the same numbers.
  *
+ * And the same day, rule 4: a model with no map conversion whose 3D `Model` context has a
+ * `WorldCoordinateSystem` that is not the identity is placed by it — that is where Revit writes
+ * the map position when it writes no EPSG code, and in every IFC2X3 export — with the rotation
+ * the context's `TrueNorth` implies when nothing else states one. web-ifc 0.0.77 applies the
+ * `WorldCoordinateSystem` to nothing (`docs/TRAPS.md`), so `mapPlacement` is where it is applied.
+ *
  * Everything here is arithmetic on plain objects, so `tests/unit/georef.test.ts` can check it
  * against hand-computed literals with no file, no worker and no GPU.
  */
@@ -54,10 +61,6 @@ export interface BasePoint {
 
 /** A base point can be mapped only when all three coordinates are there. */
 export const isLocated = (c: BasePoint): boolean => c.E != null && c.N != null && c.Z != null
-
-/** Two base points, field for field — "is the card still showing what the file said?". */
-export const sameBasePoint = (a: BasePoint, b: BasePoint): boolean =>
-  a.E === b.E && a.N === b.N && a.Z === b.Z && a.angle === b.angle
 
 /**
  * `viewer-core.js` L409. A point in the **project** frame → map coordinates.
@@ -151,6 +154,59 @@ export function isIdentitySitePlacement(g: Georeference | null | undefined): boo
 }
 
 /**
+ * True when the `Model` context's `WorldCoordinateSystem` moves nothing (2026-10-08) — absent,
+ * at the origin and not turned about `+Z`, which IFC says it normally is. The same rule as the
+ * site placement's (`isIdentitySitePlacement`): a tilt one angle cannot say is not a move, so a
+ * WCS tilted at the origin is the identity here, places nothing and gives no base point. A tilt is
+ * still a stated turn where it matters — `mapPlacement` never adds `TrueNorth` beside one.
+ */
+export function isIdentityWcs(g: Georeference | null | undefined): boolean {
+  const w = g?.wcs
+  if (!w) return true
+  const moved = w.origin.some((v) => Math.abs(v) >= LENGTH_EPSILON_M)
+  return !moved && Math.abs(num(w.rotationDeg) ?? 0) < ANGLE_EPSILON_DEG
+}
+
+/**
+ * The `WorldCoordinateSystem` as a frame — `T(origin) · Rz(rotation)` — or `null` when it is the
+ * identity. A placement that is not a pure turn about `+Z` keeps its translation and is read as
+ * no turn, exactly as the site placement is (`projectFrame`).
+ */
+function wcsFrame(g: Georeference | null | undefined): ProjectFrame | null {
+  const w = g?.wcs
+  if (!w || isIdentityWcs(g)) return null
+  return {
+    origin: [w.origin[0], w.origin[1], w.origin[2]],
+    rotationDeg: w.pureZRotation === false ? 0 : normaliseDeg(num(w.rotationDeg) ?? 0)
+  }
+}
+
+/**
+ * The turn the context's `TrueNorth` implies, project → map, degrees counter-clockwise — or `null`
+ * when the file states none, or states `(0, 1)`, which is "true north is project north".
+ *
+ * `TrueNorth` is the direction of north **in the project's own axes**. Turning the project by θ
+ * takes that direction onto the map's `+Y` when θ = atan2(x, y): for the repository's synthetic
+ * −43.4103°, `TrueNorth` = (sin θ, cos θ) = (−0.6871, 0.7266). It is the same number Revit's
+ * map conversion carries in its X axis — `(cos θ, sin θ)` — because Revit writes both from one
+ * angle; IfcOpenShell's `get_true_north` reads the same direction as +43.4103°, "how far project
+ * north turns anticlockwise to reach true north", which is this turn's negative.
+ */
+export function trueNorthDeg(g: Georeference | null | undefined): number | null {
+  const tn = g?.trueNorth
+  if (!tn) return null
+  const [x, y] = tn
+  if (!(Math.hypot(x, y) > 0)) return null
+  const deg = (Math.atan2(x, y) * 180) / Math.PI
+  return Math.abs(deg) < 1e-6 ? null : normaliseDeg(deg)
+}
+
+/** True when the site placement states a turn — about `+Z`, or a tilt one angle cannot say. */
+const siteTurns = (g: Georeference): boolean =>
+  !!g.site &&
+  (g.site.pureZRotation === false || Math.abs(num(g.site.rotationDeg) ?? 0) >= ANGLE_EPSILON_DEG)
+
+/**
  * Which declaration actually carries the model's position — the thing the Coordinate-system
  * card names beside the CRS chip, and the thing `get_model_info` reports.
  *
@@ -161,15 +217,24 @@ export function isIdentitySitePlacement(g: Georeference | null | undefined): boo
  * IFC2X3 has no `IfcMapConversion`, so its `ePset_MapConversion` is reported under its own
  * name; a 2X3 file that also places its site reports the pset, because that is the declaration
  * and the design's caption has no fifth label to spell the pair with.
+ *
+ * 2026-10-08, rule 4 — with no map conversion, a `WorldCoordinateSystem` that is not the identity
+ * is the map position (`mapPlacement`), so it is named, after the pattern the conversion set:
+ * `WorldCoordinateSystem`, or `WorldCoordinateSystem + IfcSite placement` when the site placement
+ * moves the project too (a Revit Project Base Point export whose internal origin is not on it).
+ * Beside a map conversion it is not the map position, and the conversion keeps the name.
  */
 export function detectMethod(g: Georeference | null | undefined): GeorefMethod {
   if (!g) return 'none'
   const conversion = !isIdentityMapConversion(g)
   const site = !isIdentitySitePlacement(g)
+  const wcs = !isIdentityWcs(g)
   const epset = g.sources.includes('ePset')
   if (conversion && epset) return 'ePset_MapConversion'
   if (conversion && site) return 'IfcMapConversion + IfcSite placement'
   if (conversion) return 'IfcMapConversion'
+  if (wcs && site) return 'WorldCoordinateSystem + IfcSite placement'
+  if (wcs) return 'WorldCoordinateSystem'
   if (site) return 'IfcSite placement'
   return 'none'
 }
@@ -199,11 +264,32 @@ export function projectFrame(g: Georeference | null | undefined): ProjectFrame |
  *
  *  · `IfcMapConversion` / `ePset_MapConversion` — its map conversion moves it (IFC4's entity,
  *    or IFC2X3's property set), composed over its site placement;
+ *  · `WorldCoordinateSystem` — no conversion moves it, and its 3D `Model` context's
+ *    `WorldCoordinateSystem` is not the identity: that is its map position (rule 4, 2026-10-08 —
+ *    Revit's Survey Point, Project Base Point and Internal Origin exports with no EPSG code, and
+ *    its IFC2X3 ones);
  *  · `site placement` — no conversion moves it and its site placement does, so its world
  *    coordinates are its map coordinates (Revit's "Shared Coordinates");
  *  · `none` — nothing moves it, and its world coordinates are taken as map coordinates too.
  */
-export type PlacedBy = 'IfcMapConversion' | 'ePset_MapConversion' | 'site placement' | 'none'
+export type PlacedBy =
+  | 'IfcMapConversion'
+  | 'ePset_MapConversion'
+  | 'WorldCoordinateSystem'
+  | 'site placement'
+  | 'none'
+
+/**
+ * The `WorldCoordinateSystem` as `mapPlacement` used it (2026-10-08), for `get_model_info`:
+ * `map position` — it is the map position, there being no conversion (rule 4); `undone before the
+ * conversion` — it stands beside a map conversion, which IFC leaves ambiguous, and was read as
+ * IfcOpenShell reads it.
+ */
+export interface WcsUse {
+  origin: readonly [number, number, number]
+  rotationDeg: number
+  readAs: 'map position' | 'undone before the conversion'
+}
 
 /** One model's world → map operation, and how it was read off the file. */
 export interface MapPlacement {
@@ -225,6 +311,20 @@ export interface MapPlacement {
   mapUnitKnown: boolean
   /** `Scale` as written, or `null`. Reported, **never applied**: see `mapPlacement`. */
   scale: number | null
+  /** The `WorldCoordinateSystem`, when it is not the identity, and how it was used. */
+  wcs: WcsUse | null
+  /**
+   * The turn `TrueNorth` put into the operation, degrees — only ever beside a
+   * `WorldCoordinateSystem` that is the map position, and only when nothing else states a turn.
+   * `null` otherwise: `TrueNorth` never stacks on a conversion (rule 5).
+   */
+  trueNorthDeg: number | null
+  /**
+   * True when the file states a map conversion **and** a `WorldCoordinateSystem` that is not the
+   * identity. IFC calls the pair ambiguous and current Revit never writes it; the
+   * `WorldCoordinateSystem` was undone before the conversion, as IfcOpenShell does.
+   */
+  ambiguous: boolean
 }
 
 /**
@@ -232,7 +332,7 @@ export interface MapPlacement {
  * (`modelFrame`), the grids and storeys (`federation-store.ts`'s `metaOf`, through the same
  * frame), the base point (`coordsFromGeoref`) and `get_model_info` all read it.
  *
- * Four rules, each the owner's:
+ * Five rules, each the owner's:
  *
  *  1. Each model's operation comes from its **own** declaration: the `IfcMapConversion` on its
  *     3D `Model` context (`worker/index-builder.ts` picks it), or IFC2X3's
@@ -243,9 +343,18 @@ export interface MapPlacement {
  *  3. **u comes from the map unit**: `IfcProjectedCRS.MapUnit` (IFC2X3: `ePset_ProjectedCRS`),
  *     an SI unit by its prefix, a conversion-based one through its factor. When the file names
  *     none, the metre — which is what Revit writes, and the IFC4.3 Annex E examples.
- *  5. **TrueNorth is never stacked on a conversion**; in this part it places nothing at all.
- *
- * (Rule 4, the context's `WorldCoordinateSystem`, is a later part.)
+ *  4. **With no conversion, a `WorldCoordinateSystem` that is not the identity is the map
+ *     position** (2026-10-08): M = the WCS — its `Location` in metres, through the project length
+ *     unit, and its own turn if it has one — then, only when nothing else states a turn (no
+ *     conversion, no site turn, no WCS turn), the turn `TrueNorth` implies (`trueNorthDeg`). That
+ *     is where Revit writes the map position when it writes no EPSG code, and in IFC2X3; for its
+ *     Project Base Point and Internal Origin exports `TrueNorth` is the only place the turn is.
+ *     web-ifc applies the WCS to nothing, so nothing here is added twice. **Beside a conversion**
+ *     a WCS that is not the identity — current Revit never writes one, and IFC calls the pair
+ *     ambiguous — is read as IfcOpenShell reads it, undone before the conversion: M = C ∘ WCS⁻¹.
+ *     `ambiguous` says so.
+ *  5. **TrueNorth is never stacked on a conversion**, and never turns a model whose own site
+ *     placement or WCS already turns it.
  */
 export function mapPlacement(g: Georeference | null | undefined): MapPlacement {
   const unit = g?.mapUnit
@@ -256,21 +365,41 @@ export function mapPlacement(g: Georeference | null | undefined): MapPlacement {
     mapUnitKnown: !unit || unit.metres != null,
     scale: num(g?.scale)
   }
+  const wcs = wcsFrame(g)
+  const used = (readAs: WcsUse['readAs']): WcsUse | null =>
+    wcs ? { origin: wcs.origin, rotationDeg: wcs.rotationDeg, readAs } : null
   if (!g || isIdentityMapConversion(g)) {
-    const placedBy = isIdentitySitePlacement(g) ? 'none' : 'site placement'
-    return { ...read, operation: null, placedBy }
+    if (!g || !wcs) {
+      const placedBy = isIdentitySitePlacement(g) ? 'none' : 'site placement'
+      return { ...read, operation: null, placedBy, wcs: null, trueNorthDeg: null, ambiguous: false }
+    }
+    // Rule 4. `TrueNorth` is the turn only when nothing else turns the project.
+    const turned = siteTurns(g) || g.wcs?.pureZRotation === false || wcs.rotationDeg !== 0
+    const north = turned ? null : trueNorthDeg(g)
+    return {
+      ...read,
+      operation: north === null ? wcs : composeFrames(wcs, { origin: [0, 0, 0], rotationDeg: north }),
+      placedBy: 'WorldCoordinateSystem',
+      wcs: used('map position'),
+      trueNorthDeg: north,
+      ambiguous: false
+    }
+  }
+  const conversion: ProjectFrame = {
+    origin: [
+      (num(g.eastings) ?? 0) * u,
+      (num(g.northings) ?? 0) * u,
+      (num(g.orthogonalHeight) ?? 0) * u
+    ],
+    rotationDeg: mapRotationDeg(g) ?? 0
   }
   return {
     ...read,
-    operation: {
-      origin: [
-        (num(g.eastings) ?? 0) * u,
-        (num(g.northings) ?? 0) * u,
-        (num(g.orthogonalHeight) ?? 0) * u
-      ],
-      rotationDeg: mapRotationDeg(g) ?? 0
-    },
-    placedBy: g.sources.includes('ePset') ? 'ePset_MapConversion' : 'IfcMapConversion'
+    operation: wcs ? composeFrames(conversion, invertFrame(wcs)) : conversion,
+    placedBy: g.sources.includes('ePset') ? 'ePset_MapConversion' : 'IfcMapConversion',
+    wcs: used('undone before the conversion'),
+    trueNorthDeg: null,
+    ambiguous: !!wcs
   }
 }
 
@@ -437,12 +566,17 @@ const deg4 = (v: number): number => Math.round(v * 1e4) / 1e4
  * and a `TrueNorth` that disagree are resolved in the map conversion's favour, because it is
  * what the E / N readouts and the geometry are computed with.
  *
- * `null` means "leave every field blank" — the card renders empty inputs, never a default.
+ * Rule 4 (2026-10-08): a `WorldCoordinateSystem` that is the map position states E, N and Z, and
+ * — through its own turn, or the `TrueNorth` turn `mapPlacement` put into P — the angle; both are
+ * P's, so a file placed that way reads exactly as the geometry stands.
+ *
+ * `null` means "leave every field blank" — the card renders empty fields, never a default.
  */
 export function coordsFromGeoref(g: Georeference | null | undefined): BasePoint | null {
   if (!g) return null
 
   const frame = projectFrame(g)
+  const placed = mapPlacement(g)
   const p = federationFrame(g)
   const [pE, pN, pZ] = p ? p.origin : [0, 0, 0]
   const mapRot = mapRotationDeg(g)
@@ -450,17 +584,20 @@ export function coordsFromGeoref(g: Georeference | null | undefined): BasePoint 
   // question is whether the file *states* a rotation, so the record is read directly. A site
   // that only translates leaves `angle` absent rather than claiming north.
   const siteRot = g.site?.pureZRotation === false ? null : num(g.site?.rotationDeg)
+  // Rule 4: the WCS as the map position states all three coordinates, and a turn when it has one.
+  const byWcs = placed.placedBy === 'WorldCoordinateSystem'
+  const wcsRot = placed.wcs && placed.wcs.rotationDeg !== 0 ? placed.wcs.rotationDeg : null
 
   // The project origin on the map: P's own origin.
-  const hasPlan = num(g.eastings) != null || num(g.northings) != null || frame != null
+  const hasPlan = num(g.eastings) != null || num(g.northings) != null || frame != null || byWcs
   const E = hasPlan ? mm(pE) : null
   const N = hasPlan ? mm(pN) : null
-  let Z = num(g.orthogonalHeight) != null || frame != null ? mm(pZ) : null
+  let Z = num(g.orthogonalHeight) != null || frame != null || byWcs ? mm(pZ) : null
   // `IfcSite.RefElevation` is the last thing that states a height, and it is a height alone.
   if (Z == null && g.site?.elevation != null) Z = mm(g.site.elevation)
 
   let angle: number | null = null
-  if (mapRot != null || siteRot != null) {
+  if (mapRot != null || siteRot != null || wcsRot != null || placed.trueNorthDeg != null) {
     angle = deg4(p ? p.rotationDeg : 0)
   } else if (g.trueNorth) {
     const [tx, ty] = g.trueNorth
@@ -499,18 +636,15 @@ export const isSvy21 = (g: Georeference | null | undefined): boolean =>
  * · the file's projected CRS is SVY21 / EPSG:3414 → the design's own two chips, verbatim;
  * · it names something else → that name (the card shows the same name; nothing is invented to
  *   fill the card's second half);
- * · no projected CRS, but the user has typed a base point this session → the design's chip in
- *   the status bar, because a session with coordinates in it is the state the design drew;
- *   the card still names no CRS, because typing a base point does not name one;
  * · nothing at all → the design's em dash, as everywhere else a value is absent.
+ *
+ * Until 2026-10-08 a base point typed into the card put the design's `SVY21` in the status bar;
+ * the card is read-only since then, so a base point is the file's or there is none, and the chip
+ * says only what the file declares.
  */
-export function crsChip(
-  g: Georeference | null | undefined,
-  manualCoords: boolean
-): { short: string; long: string } {
+export function crsChip(g: Georeference | null | undefined): { short: string; long: string } {
   if (isSvy21(g)) return { short: 'SVY21', long: 'SVY21 · EPSG:3414' }
   const named = crsNames(g)[0]
   if (named) return { short: named, long: named }
-  if (manualCoords) return { short: 'SVY21', long: DASH }
   return { short: DASH, long: DASH }
 }

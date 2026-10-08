@@ -8,7 +8,13 @@ import { federate } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { group } from '../../src/shared/fmt'
 import type { FilterStep } from '../../src/shared/rules'
-import { basePointSource, cardGeoref, coordsCaption } from '../../src/renderer/state/selectors/status'
+import {
+  basePointSource,
+  coordsCaption,
+  LINE_UP_NAME_CHARS,
+  lineUpNote,
+  notLinedUp
+} from '../../src/renderer/state/selectors/status'
 import { groupTree, treeGroups, withSelection } from '../../src/renderer/state/selectors/tree'
 import { ruleRows, valueOptions } from '../../src/renderer/state/selectors/filter'
 import {
@@ -19,8 +25,7 @@ import {
 } from '../../src/renderer/state/selectors/visibility'
 
 describe('coordsCaption — the 2026-09-20 caption rule', () => {
-  const FILE = { E: 28500, N: 30200, Z: 102.5, angle: 12.5 }
-  const conversion = (method: Georeference['method']): Georeference => ({
+  const declared = (method: Georeference['method']): Georeference => ({
     source: 'IfcMapConversion',
     sources: ['IfcMapConversion'],
     method,
@@ -34,64 +39,146 @@ describe('coordsCaption — the 2026-09-20 caption rule', () => {
     'IfcSite placement',
     'IfcMapConversion',
     'IfcMapConversion + IfcSite placement',
-    'ePset_MapConversion'
-  ] as const)('names %s while the fields show what the file said', (method) => {
-    expect(coordsCaption(conversion(method), FILE)).toBe(` · ${method}`)
+    'ePset_MapConversion',
+    // 2026-10-08, rule 4 — Revit's exports with no EPSG code, and its IFC2X3 ones.
+    'WorldCoordinateSystem',
+    'WorldCoordinateSystem + IfcSite placement'
+  ] as const)('names %s', (method) => {
+    expect(coordsCaption(declared(method))).toBe(` · ${method}`)
   })
 
   it('appends nothing when the file carries no georeferencing', () => {
-    expect(coordsCaption(null, { E: null, N: null, Z: null, angle: null })).toBe('')
-    expect(coordsCaption(conversion('none'), FILE)).toBe('')
-  })
-
-  it('appends nothing once the fields are the user’s own', () => {
-    expect(coordsCaption(conversion('IfcMapConversion'), { ...FILE, E: 28501 })).toBe('')
-    expect(coordsCaption(conversion('IfcMapConversion'), { ...FILE, angle: null })).toBe('')
+    expect(coordsCaption(null)).toBe('')
+    expect(coordsCaption(declared('none'))).toBe('')
   })
 })
 
 /**
- * 2026-10-08 — the card, the CRS chips and `basePointSource` speak for the model whose own
- * declaration the four fields are: the boot model, since only it fills them. Before, they read the
- * first model that stated any georeferencing, which after a session reorder or a removal need
- * not be the one the numbers came from.
+ * 2026-10-08 — the card, the CRS chips and `basePointSource` are read off the store's
+ * `bootGeoref`, the declaration that defined the federation's frame; and the card is read-only, so
+ * the four fields are always that declaration's base point. Whose they are is `file` or `none`.
  */
-describe('cardGeoref — the declaration the base point came from', () => {
-  const placed = (key: string, georef: Georeference): ReturnType<typeof mockModelIndex> => ({
-    ...mockModelIndex(key),
-    georef
+describe('basePointSource — the file’s, or none', () => {
+  it('is the file’s when the declaration that defined the frame states one, else none', () => {
+    const site: Georeference = {
+      source: 'IfcSite',
+      sources: ['IfcSite'],
+      method: 'IfcSite placement',
+      site: { placement: [12345.457, 23456.766, 5.05], rotationDeg: -43.4103 }
+    }
+    expect(basePointSource(site)).toBe('file')
+    expect(basePointSource(mockModelIndex('ARC').georef)).toBe('none')
+    expect(basePointSource(null)).toBe('none')
   })
+})
+
+/**
+ * 2026-10-08 — the Coordinate-system card's one-line note, the owner's choice of the ways offered
+ * to say that a model could not be lined up: *"One-line note on screen"*.
+ */
+describe('notLinedUp and lineUpNote — which model could not be lined up, in one line', () => {
   const site: Georeference = {
     source: 'IfcSite',
     sources: ['IfcSite'],
     method: 'IfcSite placement',
     site: { placement: [12345.457, 23456.766, 5.05], rotationDeg: -43.4103 }
   }
-  const other: Georeference = {
+  const conversion: Georeference = {
     source: 'IfcMapConversion',
     sources: ['IfcMapConversion'],
     method: 'IfcMapConversion',
-    eastings: 1000,
-    northings: 2000,
-    orthogonalHeight: 0
+    eastings: 12345.457,
+    northings: 23456.766,
+    orthogonalHeight: 5.05
   }
-  const blank = { E: null, N: null, Z: null, angle: null }
-  const P = { E: 12345.457, N: 23456.766, Z: 5.05, angle: -43.4103 }
+  const none: Georeference = { source: 'none', sources: [], method: 'none' }
+  const model = (
+    key: string,
+    fileName: string,
+    georef: Georeference,
+    farPlacementMetres?: number
+  ): ReturnType<typeof mockModelIndex> => ({
+    ...mockModelIndex(key),
+    fileName,
+    georef,
+    ...(farPlacementMetres !== undefined ? { farPlacementMetres } : {})
+  })
+  const say = (models: ReturnType<typeof mockModelIndex>[], boot: Georeference | null): string =>
+    lineUpNote(notLinedUp({ federation: federate(models), bootGeoref: boot, library: [], uploadNames: {} }))
 
-  it('names the model whose base point the fields are, wherever it stands in the list', () => {
-    const fed = federate([placed('ARC', other), placed('STR', site)])
-    expect(cardGeoref(fed, P)).toBe(fed.models[1].meta.georef)
-    expect(coordsCaption(cardGeoref(fed, P), P)).toBe(' · IfcSite placement')
-    expect(basePointSource(P, fed)).toBe('file')
+  it('has nothing to say with one model loaded, or when every model lines up', () => {
+    expect(say([model('ARC', 'Tower A.ifc', none, 9000)], none)).toBe('')
+    expect(say([model('ARC', 'Tower A.ifc', site), model('STR', 'STR.ifc', conversion)], site)).toBe('')
+    // Two local files: neither has a map position, so neither is the odd one out.
+    expect(say([model('ARC', 'Tower A.ifc', none), model('STR', 'STR.ifc', none)], none)).toBe('')
+    expect(notLinedUp({ federation: federate([]), bootGeoref: null, library: [], uploadNames: {} })).toEqual([])
   })
 
-  it('falls back to the first model that states any, for the chips, while the fields are blank or typed', () => {
-    const fed = federate([placed('ARC', mockModelIndex('ARC').georef), placed('STR', other), placed('MEP', site)])
-    expect(cardGeoref(fed, blank)).toBe(fed.models[1].meta.georef)
-    expect(cardGeoref(fed, { ...P, E: 1 })).toBe(fed.models[1].meta.georef)
-    expect(basePointSource({ ...P, E: 1 }, fed)).toBe('user')
-    expect(basePointSource(blank, fed)).toBe('none')
-    expect(cardGeoref(federate([mockModelIndex('ARC')]), blank)).toBeNull()
+  it('names a model with no map position when another model has one', () => {
+    expect(say([model('ARC', 'Tower A.ifc', site), model('STR', 'Tower B.ifc', none, 25_524)], site)).toBe(
+      'Tower B.ifc could not be lined up — it has no map position.'
+    )
+  })
+
+  it('counts a WorldCoordinateSystem tilted at the origin as no map position, as a tilted site is', () => {
+    const tilted: Georeference = { ...none, wcs: { origin: [0, 0, 0], pureZRotation: false } }
+    expect(say([model('ARC', 'Tower A.ifc', site), model('STR', 'Tilted.ifc', tilted)], site)).toBe(
+      'Tilted.ifc could not be lined up — it has no map position.'
+    )
+  })
+
+  it('names a model that landed far from the others, to a tenth of a kilometre', () => {
+    expect(say([model('ARC', 'Tower A.ifc', site), model('STR', 'STR.ifc', conversion, 12_345.6)], site)).toBe(
+      'STR.ifc could not be lined up — it sits 12.3 km from the others.'
+    )
+  })
+
+  it('names them all in one line when there are several', () => {
+    expect(
+      say(
+        [model('ARC', 'Tower A.ifc', site), model('STR', 'Tower B.ifc', none), model('SIT', 'STR.ifc', conversion, 12_345.6)],
+        site
+      )
+    ).toBe('2 models could not be lined up: Tower B.ifc (no map position), STR.ifc (12.3 km away).')
+  })
+
+  it('names the boot model when it is the one with no map position — and no distance from it', () => {
+    // The scene's origin is the boot model's own, so the model that has a map position lands
+    // kilometres from it: that one stands where its file puts it, and is not named.
+    const models = [model('ARC', 'Local.ifc', none), model('STR', 'STR.ifc', conversion, 25_524)]
+    expect(say(models, none)).toBe('Local.ifc could not be lined up — it has no map position.')
+    // The frame stays the boot model's after it is unloaded: what is left is not "far" either.
+    expect(say([model('STR', 'STR.ifc', conversion, 25_524), model('MEP', 'MEP.ifc', site, 25_520)], none)).toBe('')
+  })
+
+  it('still says it after the boot model that has a map position is unloaded', () => {
+    const models = [model('STR', 'STR.ifc', conversion), model('SIT', 'Local.ifc', none, 25_524)]
+    expect(say(models, site)).toBe('Local.ifc could not be lined up — it has no map position.')
+  })
+
+  it('names a model by the file line its sidebar row shows: the picked file’s name, else the library’s', () => {
+    // A file opened from disk is indexed under its key; the row shows the name it was picked by.
+    const federation = federate([model('ARC', 'Tower A.ifc', site), model('STR', 'STR', none)])
+    expect(lineUpNote(notLinedUp({ federation, bootGeoref: site, library: [], uploadNames: { STR: 'Tower B.ifc' } }))).toBe(
+      'Tower B.ifc could not be lined up — it has no map position.'
+    )
+    const library = [{ key: 'STR', name: 'Structure', file: 'SB_STR_R25.ifc', swatch: '#9AA5A3' }]
+    expect(lineUpNote(notLinedUp({ federation, bootGeoref: site, library, uploadNames: {} }))).toBe(
+      'SB_STR_R25.ifc could not be lined up — it has no map position.'
+    )
+  })
+
+  it('takes the file’s name through labelText: no control or direction characters, and clipped', () => {
+    const hostile = 'Tower\u202E B\n.ifc'
+    const long = 'N'.repeat(LINE_UP_NAME_CHARS + 30) + '.ifc'
+    const issues = notLinedUp({
+      federation: federate([model('ARC', 'Tower A.ifc', site), model('STR', hostile, none), model('SIT', long, none)]),
+      bootGeoref: site,
+      library: [],
+      uploadNames: {}
+    })
+    expect(issues.map((x) => x.name)).toEqual(['Tower B.ifc', 'N'.repeat(LINE_UP_NAME_CHARS) + '…'])
+    expect(lineUpNote(issues)).toBe(`2 models could not be lined up: Tower B.ifc (no map position), ${'N'.repeat(LINE_UP_NAME_CHARS)}… (no map position).`)
   })
 })
 

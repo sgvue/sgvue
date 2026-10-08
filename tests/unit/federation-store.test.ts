@@ -23,6 +23,12 @@ import {
 import type { FederationOffset, GeometryChunk } from '../../src/shared/geometry-contract.types'
 import type { Georeference } from '../../src/shared/model-index.types'
 import { FederationController, type BatchItem } from '../../src/renderer/model/federation-store'
+import {
+  basePointSource,
+  coordsCaption,
+  lineUpNote,
+  notLinedUp
+} from '../../src/renderer/state/selectors/status'
 import { useShell } from '../../src/renderer/state/shell'
 import type { ModelMeta, Viewer } from '../../src/renderer/viewer/viewer-core'
 import { disposeFederation, resetShell, stubViewer } from './stub-viewer'
@@ -210,7 +216,8 @@ describe('map-space federation: the boot model fixes P, each model streams throu
    */
   function fakeParse(
     georefs: Record<string, Georeference>,
-    gates: Record<string, Promise<unknown>> = {}
+    gates: Record<string, Promise<unknown>> = {},
+    far: Record<string, number> = {}
   ): { asked: Record<string, ProjectFrame | null>; askedOffset: Record<string, FederationOffset | null> } {
     const asked: Record<string, ProjectFrame | null> = {}
     const askedOffset: Record<string, FederationOffset | null> = {}
@@ -221,7 +228,9 @@ describe('map-space federation: the boot model fixes P, each model streams throu
         askedOffset[key] = offset
         await gates[key]
         for (const chunk of mockGeometryChunks('ARC')) onChunk({ ...chunk, header: { ...chunk.header, modelKey: key } })
-        return { offset: offset ?? [10, 20, 0], offsetFromThisModel: offset === null, frame, chunks: 0 }
+        // `far[key]`: the stream's own `farPlacement` warning, in metres.
+        const warnings = far[key] ? [{ kind: 'farPlacement', detail: '', metres: far[key] }] : []
+        return { offset: offset ?? [10, 20, 0], offsetFromThisModel: offset === null, frame, chunks: 0, warnings }
       },
       close: () => {},
       cancel: () => {}
@@ -282,6 +291,66 @@ describe('map-space federation: the boot model fixes P, each model streams throu
     expect(stub.calls).toContain('setCoords')
     await fed.addBatch([await fed.prepare(pick('FAR'), () => {})])
     expect(useShell.getState().coords).toEqual(coordsFromGeoref(byConversion))
+  })
+
+  /**
+   * 2026-10-08 — the part-1 review's deferred item. The store keeps the declaration that defined
+   * P beside it (`bootGeoref`), and the base point, the chips, the caption and `basePointSource`
+   * are read off that — so they stay right after the boot model is unloaded, and describe the
+   * frame in use.
+   */
+  it('keeps the base point, the chip, the caption and whose it is after the boot model is unloaded', async () => {
+    fakeParse({ CONV: byConversion, SITE: bySite })
+    await fed.addBatch([await fed.prepare(pick('CONV'), () => {}), await fed.prepare(pick('SITE'), () => {})])
+    const coords = useShell.getState().coords
+    expect(useShell.getState().bootGeoref).toBe(byConversion)
+    await fed.removeModel('CONV')
+    expect(useShell.getState().loaded).toEqual(['SITE'])
+    // The frame stays — SITE stands in it — and so does what describes it.
+    expect(useShell.getState().frame).toEqual(federationFrame(byConversion))
+    expect(useShell.getState().bootGeoref).toBe(byConversion)
+    expect(useShell.getState().coords).toBe(coords)
+    expect(coordsCaption(useShell.getState().bootGeoref)).toBe(' · IfcMapConversion')
+    expect(basePointSource(useShell.getState().bootGeoref)).toBe('file')
+  })
+
+  it('describes the frame in use when the boot model failed after another stood in it', async () => {
+    let fail = (_e: Error): void => {}
+    const held = new Promise((_ok, no) => (fail = no))
+    fakeParse({ BAD: elsewhere, B: bySite }, { BAD: held })
+    const bad = fed.prepare(pick('BAD'), () => {})
+    const b = await fed.prepare(pick('B'), () => {})
+    fail(new Error('out of memory'))
+    await expect(bad).rejects.toThrow('out of memory')
+    await fed.addBatch([b])
+    // BAD's declaration defined the frame B was placed in: the base point is that frame's.
+    expect(useShell.getState().bootGeoref).toBe(elsewhere)
+    expect(useShell.getState().coords).toEqual(coordsFromGeoref(elsewhere))
+  })
+
+  it('clears the base point with the frame when nothing is loaded, and the next boot sets its own', async () => {
+    fakeParse({ CONV: byConversion, SITE: bySite })
+    await fed.addBatch([await fed.prepare(pick('CONV'), () => {})])
+    await fed.removeModel('CONV')
+    // It used to stay standing here, and the next boot — finding it set — kept it.
+    expect(useShell.getState()).toMatchObject({ bootGeoref: null, coords: { E: null, N: null, Z: null, angle: null } })
+    await fed.addBatch([await fed.prepare(pick('SITE'), () => {})])
+    expect(useShell.getState().bootGeoref).toBe(bySite)
+    expect(useShell.getState().coords).toEqual(coordsFromGeoref(bySite))
+  })
+
+  it('records how far a model landed from the offset another model set — never the one that set it', async () => {
+    fakeParse({ A: bySite, B: elsewhere }, {}, { A: 7_000, B: 25_524 })
+    const a = await fed.prepare(pick('A'), () => {})
+    const b = await fed.prepare(pick('B'), () => {})
+    // A set the offset: its distance is from its own first part, which says nothing about others.
+    expect(a.index.farPlacementMetres).toBeUndefined()
+    expect(b.index.farPlacementMetres).toBe(25_524)
+    await fed.addBatch([a, b])
+    expect(lineUpNote(notLinedUp({ ...useShell.getState(), federation: fed.current }))).toBe(
+      // The fake parse hands back the mock's own file name for every key.
+      'SB_ARC_R25.ifc could not be lined up — it sits 25.5 km from the others.'
+    )
   })
   it('hands the frame back when the boot model fails before anything stands in it', async () => {
     // The first file parsed chooses the frame, and its stream then fails: nothing is loaded and

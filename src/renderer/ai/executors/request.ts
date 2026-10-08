@@ -3,12 +3,12 @@
  * user, phase 3 of 4 — the consent gate).
  *
  * The owner's direction is that the assistant should be able to do whatever the user can do in
- * the app. Six of those things reach outside the view or cannot be undone, and the rule for
+ * the app. Five of those things reach outside the view or cannot be undone, and the rule for
  * them is the owner's too — asked how the assistant should handle them, the recommendation,
  * *the assistant proposes, and you click Apply in the chat or pick in the Windows dialog*, was
  * confirmed: *"correct."* The reason is prompt injection: text authored inside an IFC file
- * reaches the model through every tool result, and must never be able to open, unload, copy or
- * re-georeference anything by itself. So this tool **never does any of them**:
+ * reaches the model through every tool result, and must never be able to open, unload or copy
+ * anything by itself. So this tool **never does any of them**:
  *
  *   open_files      the designed `upload` control's own call — the native Open dialog. The
  *                   user's pick loads, through main's `admit()`; the tool is not told what it was.
@@ -17,7 +17,10 @@
  *                   click on `delete` unloads
  *   copy_link       "copy link to this state"                 → the pending row
  *   copy_guids      the property card's Copy                  → the pending row
- *   set_base_point  the Coordinate-system card's four fields  → the pending row
+ *
+ * (A sixth, `set_base_point` — the Coordinate-system card's four fields — was asked for here from
+ * 2026-10-02 until 2026-10-08, when the owner made the card read-only: *"dont let user change
+ * anything."* What nobody can change, the assistant cannot ask to change.)
  *
  * "The pending row" is the design's own (`SGVue.dc.html:1632`): the label says exactly what
  * Apply will do, Apply does it — in the store's `applyPending`, the one place any of these is
@@ -34,14 +37,12 @@
  *
  * One request a turn, of any kind (`executors/index.ts`).
  */
-import { BASE_POINT_KEYS, RECENT_NAME_CHARS, RECENT_NAME_MAX } from '../../../shared/tool-schemas'
-import { DASH } from '../../../shared/fmt'
+import { RECENT_NAME_CHARS, RECENT_NAME_MAX } from '../../../shared/tool-schemas'
 import { api } from '../../api'
 import { openDialog, openDialogUp } from '../../model/upload-pipeline'
 import { modelLabel } from '../../state/selectors/models'
 import type { LibraryFile, ShellState } from '../../state/shell'
 import { askApply, labelText, notLoaded, type Executor, type ToolContext, type ToolOutcome } from './context'
-import { basePointState } from './read'
 import { emptyTargetMessage, resolveTargets, unknownFields, unknownText } from './targets'
 
 /* ────────────────────────────── open files ────────────────────────────── */
@@ -254,59 +255,6 @@ function askCopyGuids(input: Record<string, unknown>, ctx: ToolContext): ToolOut
   return out
 }
 
-/* ────────────────────────────── the base point ────────────────────────────── */
-
-/** The Coordinate-system card's own labels (`app/CoordsCard.tsx`), and what each is counted in. */
-const BASE_POINT_LABEL = {
-  E: ['Easting', ' m'],
-  N: ['Northing', ' m'],
-  Z: ['Elevation', ' m'],
-  angle: ['True north', '°']
-} as const
-
-/**
- * New values for the Coordinate-system card's fields. It changes every E / N / Z read-out in
- * the app — the spot labels, the property card's centroid, what the assistant's own tools
- * report — and the card has no reset, so the label shows each number beside the one it replaces
- * and the user's Apply is what types them in, field by field. A field already at
- * the value asked for is left out; with none left there is nothing to ask. The request carries
- * what all four fields held, and Apply sets nothing if any of them has changed since — the
- * "(now …)" in the label has to be true at the click.
- */
-function askBasePoint(input: Record<string, unknown>, ctx: ToolContext): ToolOutcome {
-  const s = ctx.state()
-  const now = basePointState(s)
-  const given = BASE_POINT_KEYS.filter((k) => typeof input[k] === 'number')
-  if (!given.length) {
-    return {
-      forModel: {
-        message: 'Pass at least one of E, N, Z or angle. Nothing was asked.',
-        basePoint: now
-      }
-    }
-  }
-  const coords: Partial<Record<(typeof BASE_POINT_KEYS)[number], number>> = {}
-  for (const k of given) if (input[k] !== s.coords[k]) coords[k] = input[k] as number
-  const changing = BASE_POINT_KEYS.filter((k) => coords[k] !== undefined)
-  if (!changing.length) {
-    return {
-      forModel: {
-        message: 'The base point already has those values — nothing to change, and nothing was asked.',
-        basePoint: now
-      }
-    }
-  }
-  const show = (k: (typeof BASE_POINT_KEYS)[number], v: number | null): string =>
-    v == null ? DASH : `${v}${BASE_POINT_LABEL[k][1]}`
-  const parts = changing.map((k) => `${BASE_POINT_LABEL[k][0]} ${show(k, coords[k]!)} (now ${show(k, s.coords[k])})`)
-  return askApply(
-    `set the base point — ${parts.join(', ')} — every coordinate read-out follows it`,
-    // `was`: the four fields as the label was written against them (`performGated` checks).
-    { kind: 'set_base_point', coords, was: { E: now.E, N: now.N, Z: now.Z, angle: now.angle } },
-    { basePoint: now, proposed: coords }
-  )
-}
-
 /* ────────────────────────────── the tool ────────────────────────────── */
 
 export const request_user_action: Executor = (input, ctx) => {
@@ -326,7 +274,8 @@ export const request_user_action: Executor = (input, ctx) => {
     case 'copy_guids':
       return askCopyGuids(input, ctx)
     default:
-      return askBasePoint(input, ctx)
+      // `inputs.ts` has already refused an action that is not one of these five.
+      return { forModel: { message: `There is no action "${labelText(String(input.action ?? ''), 40)}". Nothing was asked.` } }
   }
 }
 

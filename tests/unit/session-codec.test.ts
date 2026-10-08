@@ -134,7 +134,16 @@ describe('sessionPatch', () => {
     expect(p.sections).toEqual(live.sections)
     expect(p.hlColor).toBe(live.hlColor)
     expect(p.view).toBe(live.view)
-    expect(p.coords).toEqual(live.coords)
+  })
+
+  it('never reads a base point back — the card is read-only, and the base point is the boot file’s (2026-10-08)', () => {
+    // A payload's own, typed into a build from before then or written by this one, is ignored:
+    // the restore carries no `coords` at all, so the live one stands.
+    const p = sessionPatch({ coords: { E: 1, N: 2, Z: 3, angle: 4 } }, live)
+    expect('coords' in p).toBe(false)
+    expect(RESTORE_ORDER).not.toContain('coords')
+    // It is still written, for an older build — which restores it over its own reading.
+    expect(payload().coords).toEqual(live.coords)
   })
 
   it('keeps a false the payload actually carries — `pick` tests for undefined, not falsiness', () => {
@@ -166,7 +175,6 @@ describe('applyRestore', () => {
       target: {
         grids: note('grids'),
         levels: note('levels'),
-        coords: note('coords'),
         snap: note('snap'),
         modelColors: note('modelColors'),
         highlightColor: note('highlightColor'),
@@ -224,7 +232,7 @@ describe('applyRestore', () => {
       expect(calls).not.toContain('camera')
       expect(calls).toContain('frameExtents')
       // Everything else still restores.
-      expect(calls).toContain('coords')
+      expect(calls).toContain('section')
       expect(calls[calls.length - 1]).toBe('visibility')
     }
   })
@@ -241,7 +249,6 @@ describe('applyRestore', () => {
     const target = {
       grids: vi.fn(),
       levels: vi.fn(),
-      coords: vi.fn(),
       snap: vi.fn(),
       modelColors: vi.fn(),
       highlightColor: vi.fn(),

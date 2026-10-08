@@ -75,8 +75,9 @@
  * the app already has, and the user's own click is what does it (`ToolGate`, below):
  *
  *   · one new view tool, `request_user_action`: open model files (the native Open dialog), open
- *     a recent file, unload a model (the sidebar's own "Unload …?" confirmation), copy the share
- *     link or GlobalIds, and change the base point;
+ *     a recent file, unload a model (the sidebar's own "Unload …?" confirmation), and copy the
+ *     share link or GlobalIds — and, until 2026-10-08, when the owner made the Coordinate-system
+ *     card read-only, change the base point;
  *   · `manage_views` gains `delete`, `manage_markups` `delete` and `clear`, and `manage_filters`'
  *     `delete_set` — immediate until now — is asked for like the rest; so is a `save_set` that
  *     would forget a saved set, by replacing one of the same name or pushing the oldest out;
@@ -356,19 +357,13 @@ export const REQUEST_ACTIONS = [
   'open_recent',
   'unload_model',
   'copy_link',
-  'copy_guids',
-  'set_base_point'
+  'copy_guids'
 ] as const
 
 /** A recent file is **named**, never located: the longest name a file system gives a file. */
 export const RECENT_NAME_MAX = 255
 /** Recent files' names as one result lists them. The app keeps six (`RECENTS_MAX`). */
 export const RECENT_NAME_CHARS = 120
-
-/** The base point's four fields, as `request_user_action` names them and `get_view_state` reads them back. */
-export const BASE_POINT_KEYS = ['E', 'N', 'Z', 'angle'] as const
-/** A base point further out than this is not one: metres, a hundred thousand kilometres. */
-export const BASE_POINT_MAX = 1e8
 
 /* ────────────────────── phase 4's enums and bounds (2026-10-02) ────────────────────── */
 
@@ -823,7 +818,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'get_model_info',
     kind: 'read',
     description:
-      'Per loaded file: the ISO-10303-21 header including the MVD, the IFC schema, the unit assignment, georeferencing with the source it was read from and a CORENET X / IFC-SG readout for Singapore models, entity and element counts, and the SHA-256 of the bytes. Read-only.',
+      'Per loaded file: the ISO-10303-21 header including the MVD, the IFC schema, the unit assignment, georeferencing with the source it was read from — which declaration placed the model in the federation’s map space (placedBy), in which map unit, and whether it lines up with the others (notLinedUp) — and a CORENET X / IFC-SG readout for Singapore models, entity and element counts, and the SHA-256 of the bytes. Read-only.',
     input_schema: obj({
       model: { type: 'string', description: 'Model key; omit for every loaded model' }
     }),
@@ -833,7 +828,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'get_view_state',
     kind: 'read',
     description:
-      'What is currently shown: the filter stack step by step with live counts, visible and total elements, hidden elements, storey and model visibility, the active model, camera view, projection, section, colour scheme and selection. It also reads back, in full, what the per-turn view state mentions only when it is not at its default: every display switch (display), both section planes with their offset in millimetres, side and whether they cut (sectionPlanes), whether anything can be undone or redone (history), each model’s visibility, colour override and active state (models), and the interface — theme, units, tree mode, sidebar, open card, armed tool, tree search and whether the Schedules window is open. And where the camera stands (camera): the named view it is on, or null once it has been turned or orbited off one, its projection, and its direction as azimuth and elevation in set_view’s own terms; each highlight step’s colour in the filter stack; and the user’s saved viewpoints by name (viewpoints, the first 20). And the project base point every E / N / Z read-out is computed with (basePoint): E, N and Z in metres, angle the true-north rotation in degrees, and source — file when the four are what the file states, user when someone has changed them, none when there is no base point. Read-only.',
+      'What is currently shown: the filter stack step by step with live counts, visible and total elements, hidden elements, storey and model visibility, the active model, camera view, projection, section, colour scheme and selection. It also reads back, in full, what the per-turn view state mentions only when it is not at its default: every display switch (display), both section planes with their offset in millimetres, side and whether they cut (sectionPlanes), whether anything can be undone or redone (history), each model’s visibility, colour override and active state (models), and the interface — theme, units, tree mode, sidebar, open card, armed tool, tree search and whether the Schedules window is open. And where the camera stands (camera): the named view it is on, or null once it has been turned or orbited off one, its projection, and its direction as azimuth and elevation in set_view’s own terms; each highlight step’s colour in the filter stack; and the user’s saved viewpoints by name (viewpoints, the first 20). And the project base point every E / N / Z read-out is computed with (basePoint): E, N and Z in metres, angle the true-north rotation in degrees, and source — file when the four are what the file states, none when there is no base point; it comes from the file the federation was opened with, and nothing in the app can change it. And which loaded models could not be lined up with the others (notLinedUp): each one’s model key, why — it has no map position, or it sits far from the others — and how far, in kilometres. Read-only.',
     input_schema: obj({}),
     strict: true
   },
@@ -1069,9 +1064,10 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
     /**
      * 2026-10-02, phase 3 — the consent gate. What reaches outside the view, or cannot be
      * undone, and has no tool of its own to hang on: the designed `upload` control, a Recent
-     * pill, a model's ×, "copy link to this state", the property card's Copy, and the
-     * Coordinate-system card's four fields. **It only asks** — every action is in `gate` — and
-     * the description's first job is to make that plain to the model.
+     * pill, a model's ×, "copy link to this state" and the property card's Copy. **It only asks**
+     * — every action is in `gate` — and the description's first job is to make that plain to the
+     * model. (The Coordinate-system card's four fields were a sixth until 2026-10-08, when the
+     * owner made the card read-only.)
      */
     name: 'request_user_action',
     kind: 'view',
@@ -1081,8 +1077,7 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
       '"open_recent" asks to open one file of the app’s recent list, named by recent — the file’s name as that list has it, never a path; with no name, or one that is not on the list, it returns the names. ' +
       '"unload_model" raises the sidebar’s own "Unload …?" confirmation beside the loaded model with key model, where the user clicks delete or cancel; it is refused while only one model is loaded. ' +
       '"copy_link" asks to copy a share link to the view as it stands when the user clicks, and "copy_guids" the GlobalIds of ids, of what is selected (selection:true) or of what the open schedule lists (schedule:true), one per line; the result never contains what would be copied. ' +
-      '"set_base_point" asks to change the Coordinate-system card’s fields — E, N and Z in metres, angle the true-north rotation in degrees clockwise from project north, any subset — which changes every coordinate read-out; get_view_state reports the base point as it is. ' +
-      'open_recent, copy_link, copy_guids and set_base_point wait behind an Apply button under your reply.',
+      'open_recent, copy_link and copy_guids wait behind an Apply button under your reply.',
     gate: {
       by: 'action',
       asks: {
@@ -1090,8 +1085,7 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
         open_recent: 'apply',
         unload_model: 'confirm',
         copy_link: 'apply',
-        copy_guids: 'apply',
-        set_base_point: 'apply'
+        copy_guids: 'apply'
       }
     },
     input_schema: obj(
@@ -1116,13 +1110,6 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
         schedule: {
           type: 'boolean',
           description: 'For copy_guids: true takes the elements the open schedule lists instead of ids, however many.'
-        },
-        E: { type: 'number', description: 'For set_base_point: easting of the project origin, metres.' },
-        N: { type: 'number', description: 'For set_base_point: northing of the project origin, metres.' },
-        Z: { type: 'number', description: 'For set_base_point: elevation of the project origin, metres.' },
-        angle: {
-          type: 'number',
-          description: 'For set_base_point: true north, degrees clockwise from project north, −360 to 360.'
         }
       },
       ['action']

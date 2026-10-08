@@ -21,6 +21,11 @@
  * Phase 3, the consent gate: the base point (`basePoint`: E, N, Z, angle and whose they are) is
  * reported, because the assistant may now ask to change it — which takes `coords`, the last
  * exclusion, off the list. Every key the session saves is read back.
+ *
+ * 2026-10-08: the Coordinate-system card is read-only — the base point is the boot file's, and
+ * nothing in the app changes it — so `source` is `file` or `none`. It is still reported, and still
+ * written into a session for older builds, so it stays on the list; and `notLinedUp` says which
+ * loaded models could not be lined up, as the card's note does.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { federate } from '../../src/shared/federate'
@@ -48,7 +53,7 @@ import { visFn } from '../../src/shared/rules'
 import { LEVEL_DEFAULT_OFFSET_MM, NO_PLANE } from '../../src/shared/sections'
 import { coordsFromGeoref } from '../../src/shared/georef'
 import type { Georeference } from '../../src/shared/model-index.types'
-import { sessionPatch, type SessionSource } from '../../src/shared/session-codec'
+import { sessionPayload, type SessionSource } from '../../src/shared/session-codec'
 import {
   INTERFACE_SEARCH_MAX,
   VIEWPOINTS_CAP,
@@ -59,6 +64,7 @@ import { VIEWS } from '../../src/shared/view-angles'
 import { planePatch } from '../../src/renderer/state/selectors/section'
 import { modelRows } from '../../src/renderer/state/selectors/models'
 import { basePointSource } from '../../src/renderer/state/selectors/status'
+import { sessionSource } from '../../src/renderer/state/selectors/snapshot'
 import { SAMPLE_FILES } from '../../src/renderer/dev/mock-adapter'
 import { viewStateText } from '../../src/main/ai/prompt'
 import { rigViewer } from './rig-viewer'
@@ -66,6 +72,16 @@ import { memoryStorage, resetShell } from './stub-viewer'
 
 const KEYS = ['ARC', 'STR', 'SIT', 'MEP'] as const
 const full = federate(KEYS.map((k) => mockModelIndex(k)))
+
+/** A file that states a base point — the repository's synthetic set, never a real site's. */
+const STATES_ONE: Georeference = {
+  source: 'IfcMapConversion',
+  sources: ['IfcMapConversion'],
+  method: 'IfcMapConversion',
+  eastings: 12345.457,
+  northings: 23456.766,
+  orthogonalHeight: 5.05
+}
 
 const turn = newTurnState()
 const ctx = (): ToolContext => ({
@@ -462,18 +478,22 @@ describe('get_view_state covers the session’s own list of review state', () =>
       change: () => st().setStepColor(st().stack[0].id, '#E05A6B')
     },
     /**
-     * Phase 3 (2026-10-02) — excluded until then, the last one. The assistant can ask to change
-     * the base point, and every coordinate read-out follows it, so it has to see what it is.
+     * Phase 3 (2026-10-02) — excluded until then, the last one. Every coordinate read-out follows
+     * the base point, so the assistant has to see what it is. Since 2026-10-08 the one thing that
+     * moves it is the boot file's own georeferencing, fixed with the federation's frame.
      */
-    coords: { change: () => st().setCoord('E', '28500') }
+    coords: { change: () => st().setOffset([0, 0, 0], null, STATES_ONE) }
   }
 
   it('decides every key the session saves, and no key it does not', () => {
     resetShell()
-    // `sessionPatch` builds a `SessionSource`: its keys are the type's, at run time.
-    const saved = Object.keys(sessionPatch({}, st())).sort()
+    // `sessionSource` builds a `SessionSource`: its keys are the type's, at run time — and they
+    // are what a session writes (`coords` included, for older builds, though it is never read back).
+    const saved = Object.keys(sessionSource(st())).sort()
     expect(Object.keys(COVERAGE).sort()).toEqual(saved)
     expect(saved).toHaveLength(19)
+    const payload = sessionPayload(sessionSource(st()), [], [], null, 'identity')
+    for (const key of saved) expect([key, key in payload]).toEqual([key, true])
   })
 
   it('excludes nothing any more: every key the session saves is read back', () => {
@@ -500,43 +520,46 @@ describe('get_view_state covers the session’s own list of review state', () =>
     }
   })
 
-  it('reads the base point back: the four fields, and whose they are', async () => {
+  it('reads the base point back: the four fields, and that they are the file’s', async () => {
     // The mock states no georeferencing: every field blank, and it says so rather than zero.
     expect((await run('get_view_state')).basePoint).toEqual({ E: null, N: null, Z: null, angle: null, source: 'none' })
-    // Typed into the Coordinate-system card (the repository's synthetic set, never a real site's).
-    st().setCoord('E', '12345.457')
-    st().setCoord('N', '23456.766')
-    expect((await run('get_view_state')).basePoint).toEqual({
-      E: 12345.457,
-      N: 23456.766,
-      Z: null,
-      angle: null,
-      source: 'user'
-    })
-    // A file that states one: `file` while the fields are the file's own, `user` once they are not.
-    const georef: Georeference = {
-      source: 'IfcMapConversion',
-      sources: ['IfcMapConversion'],
-      method: 'IfcMapConversion',
-      eastings: 12345.457,
-      northings: 23456.766,
-      orthogonalHeight: 5.05
-    }
-    const withGeoref = {
-      ...full,
-      models: full.models.map((m, i) => (i === 0 ? { ...m, meta: { ...m.meta, georef } } : m))
-    }
-    useShell.setState({ federation: withGeoref })
-    const fromFile = coordsFromGeoref(georef)!
-    useShell.setState({ coords: fromFile })
+    // A boot file that states one (the repository's synthetic set, never a real site's): the four
+    // fields are the file's, and since 2026-10-08 nothing else can make them anything else.
+    st().setOffset([0, 0, 0], null, STATES_ONE)
+    const fromFile = coordsFromGeoref(STATES_ONE)!
     expect((await run('get_view_state')).basePoint).toEqual({ ...fromFile, source: 'file' })
-    expect(basePointSource(fromFile, withGeoref)).toBe('file')
-    st().setCoord('Z', '9')
-    expect((await run('get_view_state')).basePoint).toMatchObject({ Z: 9, source: 'user' })
-    // Numbers and one of three words: nothing a file authored reaches the model through it.
+    expect(basePointSource(STATES_ONE)).toBe('file')
+    expect(basePointSource(null)).toBe('none')
+    // Numbers and one of two words: nothing a file authored reaches the model through it.
     expect(Object.keys((await run('get_view_state')).basePoint as object)).toEqual(['E', 'N', 'Z', 'angle', 'source'])
     // On demand only: the per-turn state does not carry it.
     expect(Object.keys(perTurn())).toEqual(CORE_KEYS)
+  })
+
+  it('reads back which loaded models could not be lined up, as the Coordinate-system card’s note says', async () => {
+    // The mock's four models state no map position, and none landed far: nothing to say.
+    expect((await run('get_view_state')).notLinedUp).toEqual([])
+    // One of them is placed by a map conversion, and the others are not: they have no map position.
+    const placed = {
+      ...full,
+      models: full.models.map((m, i) =>
+        i === 0 ? { ...m, meta: { ...m.meta, georef: STATES_ONE } } : i === 1 ? { ...m, meta: { ...m.meta, farPlacementMetres: 12_345 } } : m
+      )
+    }
+    useShell.setState({ federation: placed })
+    st().setOffset([0, 0, 0], null, STATES_ONE)
+    expect((await run('get_view_state')).notLinedUp).toEqual([
+      { model: 'STR', reason: 'it has no map position', km: null },
+      { model: 'SIT', reason: 'it has no map position', km: null },
+      { model: 'MEP', reason: 'it has no map position', km: null }
+    ])
+    const info = (await run('get_model_info')).models as { model: string; georeferencing: { notLinedUp: unknown } }[]
+    expect(info.map((m) => [m.model, m.georeferencing.notLinedUp])).toEqual([
+      ['ARC', null],
+      ['STR', { reason: 'it has no map position', km: null }],
+      ['SIT', { reason: 'it has no map position', km: null }],
+      ['MEP', { reason: 'it has no map position', km: null }]
+    ])
   })
 })
 

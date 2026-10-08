@@ -11,7 +11,10 @@
  * `Scale`, (d) with `Scale` 1000, (e) with the map unit the foot, (f) IFC2X3's property sets,
  * (g) a local site offset that carries the turn, the survey point in the conversion, and a decoy
  * conversion on a 2D `Plan` context written first, (h) as (g) with the survey point's conversion
- * on the `Model` context's `Body` sub-context.
+ * on the `Model` context's `Body` sub-context — and, since rule 4 (coordinates part 2, the same
+ * day), (i) Revit "Project Base Point" with no EPSG code: no conversion, the base point's E / N / H
+ * on the `Model` context's `WorldCoordinateSystem` and the turn only in `TrueNorth`, (j) the same
+ * in IFC2X3, (k) a `WorldCoordinateSystem` beside a conversion, read as IfcOpenShell reads it.
  *
  * Federated by world coordinates, as the app did before, (a) and (b) land 26 km apart. Every
  * ordered pair here must land within a millimetre: vertices, element boxes, grid segments and
@@ -45,7 +48,10 @@ const FILES = [
   'e-map-unit-foot.ifc',
   'f-ifc2x3-epset.ifc',
   'g-survey-point.ifc',
-  'h-sub-context.ifc'
+  'h-sub-context.ifc',
+  'i-wcs-base-point.ifc',
+  'j-ifc2x3-wcs.ifc',
+  'k-wcs-and-conversion.ifc'
 ] as const
 
 /** The repository's synthetic map position — what every fixture states, one way or another. */
@@ -177,6 +183,108 @@ describe('map-space federation — the synthetic fixtures through the real index
       expect(read[f].northings, f).toBeCloseTo(SITE[1] - 3, 9)
       expect(read[f].mapUnit, f).toEqual({ name: 'METRE', metres: 1 })
     }
+
+    // Rule 4 — (i) and (j) carry no conversion: the WorldCoordinateSystem is the map position, in
+    // metres through the millimetre unit, and `TrueNorth` is the turn, since nothing else turns.
+    for (const f of ['i-wcs-base-point.ifc', 'j-ifc2x3-wcs.ifc'] as const) {
+      const p = mapPlacement(read[f])
+      expect([f, p.placedBy, p.ambiguous]).toEqual([f, 'WorldCoordinateSystem', false])
+      expect(read[f].method, f).toBe('WorldCoordinateSystem + IfcSite placement')
+      expect(read[f].sources, f).toEqual(['WorldCoordinateSystem', 'IfcSite'])
+      expect(p.wcs!.readAs, f).toBe('map position')
+      // The base point's E / N / H, in metres — a turned site offset short of the synthetic position.
+      expect(Math.abs(read[f].wcs!.origin[0] - 12344.2692407191), f).toBeLessThan(1e-9)
+      expect(Math.abs(read[f].wcs!.origin[1] - 23461.3310003166), f).toBeLessThan(1e-9)
+      expect(read[f].wcs!.origin[2], f).toBeCloseTo(5.05, 12)
+      expect(p.trueNorthDeg!, f).toBeCloseTo(-43.4103, 9)
+      expect(p.operation!.rotationDeg, f).toBeCloseTo(-43.4103, 9)
+    }
+    // (k) — a conversion beside a WorldCoordinateSystem: the conversion places it, the WCS is undone
+    // before it, the pair is marked ambiguous, and `TrueNorth` turns nothing (rule 5).
+    const k = mapPlacement(read['k-wcs-and-conversion.ifc'])
+    expect([k.placedBy, k.ambiguous, k.wcs!.readAs, k.trueNorthDeg]).toEqual([
+      'IfcMapConversion',
+      true,
+      'undone before the conversion',
+      null
+    ])
+    expect(read['k-wcs-and-conversion.ifc'].method).toBe('IfcMapConversion')
+    // Every file from before rule 4 keeps an identity WorldCoordinateSystem, and so its old reading.
+    for (const f of FILES.slice(0, 8)) {
+      expect([f, read[f].wcs, mapPlacement(read[f]).wcs]).toEqual([f, undefined, null])
+    }
+  })
+
+  it('pins that web-ifc 0.0.77 applies neither the WorldCoordinateSystem’s move nor its turn', async () => {
+    // One slab, in metres, its site at the origin; the context's WorldCoordinateSystem first the
+    // identity, then moved 1 km / 2 km / 300 m and turned 30° about +Z. web-ifc streams the very
+    // same placement both times — which is why `mapPlacement` applies it, once. If an upgrade
+    // starts to apply it, this fails before the map position is added twice.
+    const { src } = await ready
+    const file = (location: string, ref: string): Uint8Array =>
+      new TextEncoder().encode(
+        [
+          'ISO-10303-21;',
+          'HEADER;',
+          "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
+          "FILE_NAME('wcs-probe.ifc','2026-10-08T00:00:00',('SGVue test'),('SGVue'),'','','');",
+          "FILE_SCHEMA(('IFC4'));",
+          'ENDSEC;',
+          'DATA;',
+          '#1=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);',
+          '#2=IFCUNITASSIGNMENT((#1));',
+          `#3=IFCCARTESIANPOINT((${location}));`,
+          '#4=IFCDIRECTION((0.,0.,1.));',
+          `#5=IFCDIRECTION((${ref}));`,
+          '#6=IFCAXIS2PLACEMENT3D(#3,#4,#5);',
+          "#7=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#6,$);",
+          "#8=IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Body','Model',*,*,*,*,#7,$,.MODEL_VIEW.,$);",
+          "#9=IFCPROJECT('0000000000000000000001',$,'Probe',$,$,$,$,(#7),#2);",
+          '#10=IFCCARTESIANPOINT((0.,0.,0.));',
+          '#11=IFCAXIS2PLACEMENT3D(#10,$,$);',
+          '#12=IFCLOCALPLACEMENT($,#11);',
+          "#13=IFCSITE('0000000000000000000002',$,'Site',$,$,#12,$,$,.ELEMENT.,$,$,$,$,$);",
+          "#14=IFCRELAGGREGATES('0000000000000000000003',$,$,$,#9,(#13));",
+          '#15=IFCCARTESIANPOINT((2.,1.,0.));',
+          '#16=IFCAXIS2PLACEMENT3D(#15,$,$);',
+          '#17=IFCLOCALPLACEMENT(#12,#16);',
+          '#18=IFCRECTANGLEPROFILEDEF(.AREA.,$,$,6.,4.);',
+          '#19=IFCCARTESIANPOINT((3.,2.,0.));',
+          '#20=IFCAXIS2PLACEMENT3D(#19,$,$);',
+          '#21=IFCEXTRUDEDAREASOLID(#18,#20,#4,0.2);',
+          "#22=IFCSHAPEREPRESENTATION(#8,'Body','SweptSolid',(#21));",
+          '#23=IFCPRODUCTDEFINITIONSHAPE($,$,(#22));',
+          "#24=IFCSLAB('0000000000000000000004',$,'Slab',$,$,#17,#23,$,.FLOOR.);",
+          "#25=IFCRELCONTAINEDINSPATIALSTRUCTURE('0000000000000000000005',$,$,$,(#24),#13);",
+          'ENDSEC;',
+          'END-ISO-10303-21;'
+        ].join('\n')
+      )
+    // Each probe model is closed again, so none outlives the test in the shared source.
+    const placed = (bytes: Uint8Array): number[][] => {
+      const id = src.openFromBuffer(bytes)
+      try {
+        const out: number[][] = []
+        src.streamAllMeshes(id, (mesh) => mesh.placements.forEach((p) => out.push([...p.flatTransformation])))
+        return out
+      } finally {
+        src.close(id)
+      }
+    }
+    const plain = placed(file('0.,0.,0.', '1.,0.,0.'))
+    const moved = placed(file('1000.,2000.,300.', '0.866025403784439,0.5,0.'))
+    expect(plain).toHaveLength(1)
+    expect(moved).toEqual(plain)
+    // …while the index builder does read it, and `mapPlacement` is what applies it.
+    const id = src.openFromBuffer(file('1000.,2000.,300.', '0.866025403784439,0.5,0.'))
+    try {
+      const index = buildModelIndex(src, id, { modelKey: 'probe', fileName: 'probe.ifc', sha256: '' })
+      expect(index.georef.wcs!.origin).toEqual([1000, 2000, 300])
+      expect(index.georef.wcs!.rotationDeg).toBeCloseTo(30, 9)
+      expect(mapPlacement(index.georef).placedBy).toBe('WorldCoordinateSystem')
+    } finally {
+      src.close(id)
+    }
   })
 
   it('gives every one of them the same federation frame P — the synthetic map position', async () => {
@@ -236,19 +344,33 @@ describe('map-space federation — the synthetic fixtures through the real index
     expect(pairs).toBe(FILES.length * (FILES.length - 1))
   })
 
-  it('agrees with IfcOpenShell’s own reading of (a), (b) and (f), product by product', async () => {
+  it('agrees with IfcOpenShell product by product: auto_xyz2enh on (a), (b), (f) and (k), its WCS and TrueNorth readings on (i) and (j)', async () => {
     // `scripts/make-tiny-ifc.py` wrote these with `ifcopenshell.util.geolocation.auto_xyz2enh`:
     // each product's placement origin, in map metres. IfcOpenShell trusts `Scale`, which is right
-    // for these three; ours never reads it, and must land on the same points.
+    // for (a), (b), (f) and (k); ours never reads it, and must land on the same points. For (k) it
+    // undoes the WorldCoordinateSystem before the conversion — the reading `mapPlacement` takes.
+    // (i) and (j) carry no conversion, which `auto_xyz2enh` returns unmoved, so the script read
+    // them with IfcOpenShell's own `get_wcs` and `get_true_north`, composed as Revit writes them.
     const { src } = await ready
     const expected = JSON.parse(readFileSync(join(DIR, 'ifcopenshell-map.json'), 'utf8')) as {
       files: Record<string, Record<string, [number, number, number]>>
+      wcsFiles: Record<string, Record<string, [number, number, number]>>
     }
+    const sections = { ...expected.files, ...expected.wcsFiles }
+    expect(Object.keys(sections).sort()).toEqual([
+      'a-site-placement.ifc',
+      'b-map-conversion.ifc',
+      'f-ifc2x3-epset.ifc',
+      'i-wcs-base-point.ifc',
+      'j-ifc2x3-wcs.ifc',
+      'k-wcs-and-conversion.ifc'
+    ])
     let checked = 0
-    for (const [file, points] of Object.entries(expected.files)) {
+    for (const [file, points] of Object.entries(sections)) {
       const m = await byFile(file as (typeof FILES)[number])
       const operation = mapPlacement(m.index.georef).operation
       const product = src.typeCode('IFCPRODUCT')
+      const before = checked
       for (const id of src.idsWithType(m.modelID, product, true)) {
         const line = src.line(m.modelID, id)
         const guid = (line?.GlobalId as { value?: string } | undefined)?.value
@@ -258,8 +380,8 @@ describe('map-space federation — the synthetic fixtures through the real index
         within(toWorld(operation, w[12], w[13], w[14]), points[guid], `${file} ${guid}`)
         checked++
       }
-      expect(checked).toBeGreaterThan(0)
+      expect([file, checked - before]).toEqual([file, Object.keys(points).length])
     }
-    expect(checked).toBe(Object.values(expected.files).reduce((n, p) => n + Object.keys(p).length, 0))
+    expect(checked).toBe(Object.values(sections).reduce((n, p) => n + Object.keys(p).length, 0))
   })
 })

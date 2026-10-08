@@ -15,6 +15,7 @@ import { setViewer, useShell, type Sections } from '../../src/renderer/state/she
 import type { SectionsConfig, Viewer } from '../../src/renderer/viewer/viewer-core'
 import type { MeasureRecord, SpotRecord } from '../../src/renderer/viewer/annotations'
 import type { BasePoint } from '../../src/shared/georef'
+import type { Georeference } from '../../src/shared/model-index.types'
 import { NO_PLANE, NO_SECTIONS } from '../../src/shared/sections'
 import { resetShell, stubViewer } from './stub-viewer'
 
@@ -207,19 +208,47 @@ describe('gridClick', () => {
   })
 })
 
-describe('setCoord', () => {
-  it('writes one field and pushes the whole base point to the viewer (`:1039`)', () => {
-    useShell.getState().setCoord('E', '28500')
-    expect(useShell.getState().coords).toEqual({ E: 28500, N: null, Z: null, angle: null })
-    expect(rec.coords.at(-1)).toEqual({ E: 28500, N: null, Z: null, angle: null })
-    useShell.getState().setCoord('angle', '12.5')
-    expect(useShell.getState().coords.angle).toBe(12.5)
+/**
+ * 2026-10-08 — the owner: *"Maybe just make the coordinates system toggle a read only, dont let
+ * user change anything."* The design's `setCoord` (`:1039`) is gone; the base point is the boot
+ * file's, written with the federation's frame (`setOffset`) and nowhere else.
+ */
+describe('the base point is read-only', () => {
+  const FILE: Georeference = {
+    source: 'IfcMapConversion',
+    sources: ['IfcMapConversion'],
+    method: 'IfcMapConversion',
+    eastings: 12345.457,
+    northings: 23456.766,
+    orthogonalHeight: 5.05,
+    xAxisAbscissa: 1,
+    xAxisOrdinate: 0
+  }
+
+  it('has no action that sets a field, as the design’s setCoord did', () => {
+    expect('setCoord' in useShell.getState()).toBe(false)
   })
 
-  it('ignores a value that does not parse, as the design ignores it', () => {
-    useShell.getState().setCoord('E', 'abc')
-    expect(useShell.getState().coords.E).toBeNull()
-    expect(rec.coords).toHaveLength(0)
+  it('is written with the frame, from the declaration that defined it, and pushed to the viewer', () => {
+    useShell.getState().setOffset([10, 20, 0], null, FILE)
+    expect(useShell.getState()).toMatchObject({
+      bootGeoref: FILE,
+      coords: { E: 12345.457, N: 23456.766, Z: 5.05, angle: 0 }
+    })
+    expect(rec.coords.at(-1)).toEqual({ E: 12345.457, N: 23456.766, Z: 5.05, angle: 0 })
+    // Cleared with the frame when nothing is loaded — never left standing for the next boot.
+    useShell.getState().setOffset([0, 0, 0], null, null)
+    expect(useShell.getState()).toMatchObject({ bootGeoref: null, coords: { E: null, N: null, Z: null, angle: null } })
+    expect(rec.coords.at(-1)).toEqual({ E: null, N: null, Z: null, angle: null })
+  })
+
+  it('is not moved by a session, a link or a reply’s revert carrying a base point of its own', () => {
+    useShell.getState().setOffset([0, 0, 0], null, FILE)
+    const coords = useShell.getState().coords
+    rec.coords.length = 0
+    useShell.getState().applySession({ coords: { E: 28500, N: 30200, Z: 102.5, angle: 12.5 } })
+    expect(useShell.getState().coords).toBe(coords)
+    expect(rec.coords).toEqual([])
   })
 })
 
@@ -282,7 +311,7 @@ describe('placing a markup at a named point (2026-10-02)', () => {
     const st = useShell.getState()
     expect(st.placeSpot([4, 14, 3.3])).toBe(true)
     // The repository's synthetic offset: the scene stands tens of kilometres off the frame.
-    st.setOffset([12345, 23456, 5], null)
+    st.setOffset([12345, 23456, 5], null, null)
     expect(useShell.getState().placeSpot([12347.5, 23458.25, 8.5])).toBe(true)
     expect(useShell.getState().placeMeasure([12347.5, 23458.25, 8.5], [0, 0, 1], 42)).toBe(true)
     // The face and the element are the caller's to say, and go through as given.

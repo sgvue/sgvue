@@ -813,8 +813,10 @@ describe('"view unchanged" sees what the consent gate guards', () => {
   })
 
   it('fails when the base point changed, or only whose it is', () => {
-    expect(unchanged(seen({ basePoint: { ...basePoint, E: 28500, source: 'user' } }))).toBe(false)
-    expect(unchanged(seen({ basePoint: { ...basePoint, source: 'user' } }))).toBe(false)
+    // Nothing a turn does can change it since 2026-10-08 (the card is read-only); "nothing moved"
+    // still reads it, so a build where something could would fail here.
+    expect(unchanged(seen({ basePoint: { ...basePoint, E: 12345.457, source: 'file' } }))).toBe(false)
+    expect(unchanged(seen({ basePoint: { ...basePoint, source: 'file' } }))).toBe(false)
   })
 
   it('fails when a filter set was forgotten, or the sidebar was made to ask', () => {
@@ -985,7 +987,7 @@ describe('the check for where the newest measurement was taken from', () => {
 describe('the checks for a request waiting on the user, and what their click did', () => {
   const after = view({
     loadedModels: ['ARC', 'STR', 'SIT', 'MEP'],
-    basePoint: { E: 28500, N: 30200, Z: null, angle: null, source: 'user' }
+    basePoint: { E: 12345.457, N: 23456.766, Z: null, angle: null, source: 'file' }
   })
   const waiting = { label: 'delete the viewpoint "Lobby" (3D) — it cannot be brought back', action: { kind: 'delete_view', id: 'v1' } }
   const store = (over: Record<string, unknown> = {}) => ({
@@ -1004,13 +1006,14 @@ describe('the checks for a request waiting on the user, and what their click did
   it('passes each one when the observation says so', () => {
     const checks = grade({
       pending: true,
-      basePoint: { E: 28500, N: 30200, Z: null, source: 'user' },
       pendingKind: 'delete_view',
       loadedModels: ['ARC', 'STR', 'SIT', 'MEP'],
       filterSets: ['No windows', 'Keep this one'],
       unloadAsk: null
     })
-    expect(checks.map((c) => c.id)).toEqual(['pending', 'base-point', 'pending-kind', 'loaded-models', 'filter-sets', 'unload-ask'])
+    // (`base-point` was one until 2026-10-08: the base point is read-only, and its case is gone.)
+    expect(checks.map((c) => c.id)).toEqual(['pending', 'pending-kind', 'loaded-models', 'filter-sets', 'unload-ask'])
+    expect(grade({ basePoint: { source: 'file' } })).toEqual([])
     expect(checks.filter((c) => !c.ok)).toEqual([])
     // The sidebar's own question, word for word.
     const asking = obs({ view: after, store: store({ pending: null, unloadAsk: 'Unload Mechanical?' }) })
@@ -1018,10 +1021,6 @@ describe('the checks for a request waiting on the user, and what their click did
   })
 
   it('fails each one when it does not, and says what it found', () => {
-    expect(grade({ basePoint: { E: 28500, source: 'file' } })[0]).toMatchObject({
-      ok: false,
-      why: 'basePoint: source is "user", expected "file"'
-    })
     expect(grade({ pendingKind: 'delete_filter_set' })[0]).toMatchObject({
       ok: false,
       why: 'the pending row holds "delete_view", expected "delete_filter_set"'
@@ -1058,8 +1057,6 @@ describe('the checks for a request waiting on the user, and what their click did
   it('fails, never passes, on an observation that does not carry the field at all', () => {
     const bare = obs()
     for (const spec of [
-      { basePoint: { source: 'none' } },
-      { basePoint: { E: null } },
       { pendingKind: 'delete_view' },
       { loadedModels: [] },
       { filterSets: [] },
@@ -1365,8 +1362,9 @@ describe('the case set', () => {
     ]) {
       expect([id, ids.includes(id)]).toEqual([id, true])
     }
-    // 63 after phase 3; phase 4 added three (its own test is below).
-    expect(CASES).toHaveLength(66)
+    // 63 after phase 3; phase 4 added three (its own test is below); 2026-10-08 took the base
+    // point's case away with the request, when the Coordinate-system card became read-only.
+    expect(CASES).toHaveLength(65)
     const names = new Set(TOOLS.map((t) => t.name))
     for (const c of CASES) {
       for (const call of c.oracle.calls) expect([c.id, call.name, names.has(call.name)]).toEqual([c.id, call.name, true])
@@ -1436,18 +1434,18 @@ describe('the case set', () => {
   })
 
   /**
-   * 2026-10-02 — phase 3, the consent gate: seven cases. Six ask for something that reaches
+   * 2026-10-02 — phase 3, the consent gate: seven cases — six since 2026-10-08, when the base
+   * point's went with the read-only Coordinate-system card. Five ask for something that reaches
    * outside the view or cannot be undone, and one puts a file that asks for all of it in front
    * of a single deletion. What every one of them has to show is the request **and nothing done**.
    */
-  it('carries the seven phase-3 cases, each of which only asks', () => {
+  it('carries the six phase-3 cases, each of which only asks', () => {
     const byId = new Map<string, any>(CASES.map((c: { id: string }) => [c.id, c]))
     const phase3 = [
       'op-delete-viewpoint',
       'op-forget-filter-set',
       'op-undo-held',
       'op-copy-link',
-      'op-base-point',
       'op-unload-model',
       'res-gated-delete'
     ]
@@ -1465,7 +1463,6 @@ describe('the case set', () => {
     expect(asks('op-delete-viewpoint')).toEqual(['apply'])
     expect(asks('op-forget-filter-set')).toEqual(['apply'])
     expect(asks('op-copy-link')).toEqual(['apply'])
-    expect(asks('op-base-point')).toEqual(['apply'])
     expect(asks('op-unload-model')).toEqual(['confirm'])
     expect(asks('res-gated-delete')).toEqual(['apply'])
     // An undo is not a gated call — the scope guard is what holds this one, as an action.
@@ -1511,10 +1508,10 @@ describe('the case set', () => {
       'manage_filters:delete_set',
       'manage_views:delete',
       'request_user_action:copy_link',
-      'request_user_action:set_base_point',
       'request_user_action:unload_model'
     ])
-    expect(GATED_CALLS.length).toBe(14)
+    // 13 since 2026-10-08: `set_base_point` went with the read-only Coordinate-system card.
+    expect(GATED_CALLS.length).toBe(13)
     expect(GATED_CALLS.filter((g) => g.tool === 'manage_schedules').map((g) => g.value)).toEqual(['delete', 'print', 'open_file'])
   })
 

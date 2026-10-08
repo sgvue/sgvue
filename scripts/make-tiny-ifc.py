@@ -27,12 +27,19 @@ anybody — and the only site coordinates anywhere are the repository's syntheti
    `IfcProject`; (g) the site placement carries a local offset and the rotation and the
    conversion only the survey point's E / N / H (Revit "Survey Point"), with a decoy
    conversion on a 2D `Plan` context written first; (h) as (g) with the survey point's
-   conversion on the `Model` context's `Body` sub-context — legal, and the same frame. Every one
+   conversion on the `Model` context's `Body` sub-context — legal, and the same frame; and
+   (2026-10-08, rule 4) `georef/i-…` to `georef/k-…`: (i) Revit "Project Base Point" with no EPSG
+   code — no conversion, a local site offset with no turn, the base point's E / N / H on the
+   `Model` context's WorldCoordinateSystem in mm and the turn only in `TrueNorth`; (j) the same in
+   IFC2X3; (k) a WorldCoordinateSystem beside an `IfcMapConversion`, which IFC leaves ambiguous,
+   written for IfcOpenShell's reading (the WCS undone before the conversion). Every one
    of them puts every point of the building at the same map coordinates. `georef/ifcopenshell-map.json` is IfcOpenShell's own
-   reading of where (a), (b) and (f) put each product's placement origin
+   reading of where (a), (b), (f) and (k) put each product's placement origin
    (`ifcopenshell.util.geolocation.auto_xyz2enh`) — the files whose `Scale` it reads the
-   IFC4.3 way, which is the way they are written. `tests/unit/georef-federation.fixture.test.ts`
-   federates every pair of them, in either boot order.
+   IFC4.3 way, which is the way they are written — and of (i) and (j) through its own `get_wcs`
+   and `get_true_north`, since `auto_xyz2enh` leaves a file with no conversion where it is.
+   `tests/unit/georef-federation.fixture.test.ts` federates every pair of them, in either boot
+   order.
 
 They are built with IfcOpenShell, the same reference implementation `expected-from-ifcopenshell.py`
 uses as ground truth, so the fixtures the app is measured against were not written by the app's
@@ -56,6 +63,7 @@ try:
     import ifcopenshell.guid
     import ifcopenshell.util.geolocation
     import ifcopenshell.util.placement
+    import ifcopenshell.util.unit
 except ImportError:  # pragma: no cover - dev utility
     sys.exit("IfcOpenShell is not installed:  pip3 install ifcopenshell")
 
@@ -98,6 +106,7 @@ class Fixture:
         site_deg: float | None = None,
         true_north: tuple[float, float] | None = None,
         plan_context: bool = False,
+        wcs_at: tuple[float, float, float] | None = None,
     ) -> None:
         global _counter
         _counter = 0  # every file numbers its own GlobalIds from 1
@@ -135,12 +144,14 @@ class Fixture:
             if true_north
             else {}
         )
+        # The context's WorldCoordinateSystem: the origin, unless a fixture moves it — where Revit
+        # writes the map position when it writes no EPSG code (2026-10-08, fixtures i to k).
         model = self.model = f.create_entity(
             "IfcGeometricRepresentationContext",
             ContextType="Model",
             CoordinateSpaceDimension=3,
             Precision=1e-5,
-            WorldCoordinateSystem=self.axis(),
+            WorldCoordinateSystem=self.axis(*wcs_at) if wcs_at else self.axis(),
             **north,
         )
         self.body = f.create_entity(
@@ -561,28 +572,101 @@ def georef_survey_point(name: str, on_body: bool = False) -> None:
     fx.write(2)
 
 
-def ifcopenshell_map(names: list[str]) -> None:
+# 2026-10-08, rule 4 — where Revit writes the map position when it writes no EPSG code.
+# The internal origin of (i) and (j), a local offset from the project base point, not turned.
+PBP_SITE_MM = (4000.0, -2500.0, 0.0)
+# The WorldCoordinateSystem of (k), beside its map conversion: a local point, a few metres out.
+K_WCS_MM = (5000.0, 2000.0, 1000.0)
+
+
+def turned(x: float, y: float) -> tuple[float, float]:
+    """(x, y) turned by the synthetic rotation, −43.4103°, about the origin."""
+    return COS * x - SIN * y, SIN * x + COS * y
+
+
+def georef_wcs(name: str, schema: str = "IFC4") -> None:
+    """(i) Revit "Project Base Point" with no EPSG code: no `IfcMapConversion`; the site carries
+    the internal origin's local offset from the base point and no turn; the `Model` context's
+    WorldCoordinateSystem carries the base point's E / N / H in project units (mm); and the turn to
+    true north is only in the context's `TrueNorth`. (j) the same in IFC2X3, which has no
+    `IfcMapConversion` at all. The base point is where it has to be for the project origin to land
+    on the synthetic map position: SITE − turned(site offset)."""
+    sx, sy, sz = PBP_SITE_MM
+    tx, ty = turned(sx, sy)
+    wcs = (SITE_MM[0] - tx, SITE_MM[1] - ty, SITE_MM[2] - sz)
+    fx = Fixture(
+        name, "Georef", out_dir=GEOREF, schema=schema, millimetres=True,
+        site_at=PBP_SITE_MM, true_north=(SIN, COS), wcs_at=wcs,
+    )
+    georef_building(fx)
+    fx.write(2)
+
+
+def georef_wcs_and_conversion() -> None:
+    """(k) a WorldCoordinateSystem that is not the identity AND an `IfcMapConversion` on the same
+    context — which current Revit never writes, and IFC leaves ambiguous. It is written for
+    IfcOpenShell's reading, the one SGVue takes: the WorldCoordinateSystem undone before the
+    conversion, so the conversion's E / N / H are the synthetic position plus the WCS's own
+    origin, turned. `TrueNorth` repeats the conversion's angle, as Revit's does, and must not
+    turn the building twice."""
+    fx = Fixture(
+        "k-wcs-and-conversion.ifc", "Georef", out_dir=GEOREF, millimetres=True,
+        true_north=(SIN, COS), wcs_at=K_WCS_MM,
+    )
+    georef_building(fx)
+    wx, wy, wz = (v / 1000.0 for v in K_WCS_MM)
+    tx, ty = turned(wx, wy)
+    map_conversion(fx, fx.model, projected_crs(fx), SITE_E + tx, SITE_N + ty, SITE_H + wz, COS, SIN, 0.001)
+    fx.write(2)
+
+
+def ifcopenshell_map(names: list[str], wcs_names: list[str]) -> None:
     """IfcOpenShell's own reading: each product's placement origin, through
     `ifcopenshell.util.geolocation.auto_xyz2enh`, in map units (metres here). Only for files
     whose `Scale` it reads correctly — it trusts `Scale`, so (c), (d) and (e) would disagree with
-    it by design, and it takes the first conversion, so (g) and (h) would read the decoy. The
-    file names no IfcOpenShell version, so a run under another one does not churn it."""
+    it by design, and it takes the first conversion, so (g) and (h) would read the decoy. For (k)
+    it undoes the WorldCoordinateSystem before the conversion, which is the reading SGVue takes.
+
+    `auto_xyz2enh` returns a file with no map conversion unchanged — the WorldCoordinateSystem is
+    not a map position to it — so (i) and (j) are read with IfcOpenShell's own `get_wcs` and
+    `get_true_north` and composed the way Revit writes them: map = WCS · Rz(−true north) ·
+    placement, in project units, then into metres. The file names no IfcOpenShell version, so a
+    run under another one does not churn it."""
+    def products(f):
+        for product in f.by_type("IfcProduct"):
+            if product.ObjectPlacement:
+                m = ifcopenshell.util.placement.get_local_placement(product.ObjectPlacement)
+                yield product.GlobalId, [float(v) for v in m[:3, 3]]
+
     out: dict[str, dict[str, list[float]]] = {}
     for name in names:
         f = ifcopenshell.open(str(GEOREF / name))
-        points: dict[str, list[float]] = {}
-        for product in f.by_type("IfcProduct"):
-            if not product.ObjectPlacement:
-                continue
-            m = ifcopenshell.util.placement.get_local_placement(product.ObjectPlacement)
-            enh = ifcopenshell.util.geolocation.auto_xyz2enh(f, *[float(v) for v in m[:3, 3]])
-            points[product.GlobalId] = [round(float(v), 6) for v in enh]
+        points = {
+            guid: [round(float(v), 6) for v in ifcopenshell.util.geolocation.auto_xyz2enh(f, *xyz)]
+            for guid, xyz in products(f)
+        }
         out[name] = dict(sorted(points.items()))
+
+    wcs_out: dict[str, dict[str, list[float]]] = {}
+    for name in wcs_names:
+        f = ifcopenshell.open(str(GEOREF / name))
+        wcs = ifcopenshell.util.geolocation.get_wcs(f)
+        north = math.radians(-ifcopenshell.util.geolocation.get_true_north(f))
+        unit = ifcopenshell.util.unit.calculate_unit_scale(f)
+        c, s = math.cos(north), math.sin(north)
+        points = {}
+        for guid, (x, y, z) in products(f):
+            q = wcs @ [c * x - s * y, s * x + c * y, z, 1.0]
+            points[guid] = [round(float(v) * unit, 6) for v in q[:3]]
+        wcs_out[name] = dict(sorted(points.items()))
+
     path = GEOREF / "ifcopenshell-map.json"
     doc = {
         "generatedBy": "IfcOpenShell · util.geolocation.auto_xyz2enh",
         "what": "Each product's ObjectPlacement origin in map coordinates (E, N, H, metres), by GlobalId.",
         "files": out,
+        "wcsGeneratedBy": "IfcOpenShell · util.geolocation.get_wcs and get_true_north, composed as Revit writes them with no EPSG code: map = WCS · Rz(−true north) · placement",
+        "wcsFiles": wcs_out,
     }
     path.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
     print(f"wrote {path}")
@@ -597,7 +681,13 @@ def georef() -> None:
     georef_epset()
     georef_survey_point("g-survey-point.ifc")
     georef_survey_point("h-sub-context.ifc", on_body=True)
-    ifcopenshell_map(["a-site-placement.ifc", "b-map-conversion.ifc", "f-ifc2x3-epset.ifc"])
+    georef_wcs("i-wcs-base-point.ifc")
+    georef_wcs("j-ifc2x3-wcs.ifc", schema="IFC2X3")
+    georef_wcs_and_conversion()
+    ifcopenshell_map(
+        ["a-site-placement.ifc", "b-map-conversion.ifc", "f-ifc2x3-epset.ifc", "k-wcs-and-conversion.ifc"],
+        ["i-wcs-base-point.ifc", "j-ifc2x3-wcs.ifc"],
+    )
 
 
 def main() -> None:

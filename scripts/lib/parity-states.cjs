@@ -105,7 +105,6 @@ const UI = `
   const cardNamed = (re) => { const c = laneCards().find((e) => re.test(txt(e)));
     if (!c) throw new Error('parity: no card matching ' + re); return c; };
   const sectionCard = () => cardNamed(/^Section/);
-  const coordsCard = () => cardNamed(/^Coordinate system/);
   const secBtn = (t) => [...sectionCard().querySelectorAll('button')].find((b) => txt(b) === t);
   const secOffset = () => sectionCard().querySelector('input');
   // 2026-10-01: the app's card has two planes, each with its own \`cut\`, \`flip side\`, \`Clear\`
@@ -114,7 +113,6 @@ const UI = `
   // is cut. "Clear the section" is the app's \`Clear all\` (the gridline plane's own \`Clear\` would
   // leave a level cut standing); the prototype has no such button, so there it is its \`Clear\`.
   const secClear = () => secBtn('Clear all') || secBtn('Clear');
-  const coordFields = () => [...coordsCard().querySelectorAll('input')];
   const bubble = (name) => $$('div').find((e) => e.title === 'Show plane of grid ' + name);
   // Phase 7. Colour by property has **no designed manual control** — only the assistant's
   // \`color_by_property\` tool sets it (SGVue.dc.html:1547), and that is Phase 9 — so each side
@@ -356,10 +354,13 @@ const FILTER_STATES = {
  * dimensions on with the property card in the way; `markups-card` adds a second measure and
  * toggles the card to metres; `coords-card` is the four fields.
  *
- * `spot-C1` types the **prototype's own default base point** into both sides first
- * (28 500 E · 30 200 N · 102.5 Z · 12.5°). The app reads that base point from the file and the
- * design's mock federation has no georeferencing at all, so without it one side would print
- * coordinates and the other the em dash, and the numbers could not be compared.
+ * `spot-C1` typed the **prototype's own default base point** into both sides first
+ * (28 500 E · 30 200 N · 102.5 Z · 12.5°), so that both would print coordinates. **Not since
+ * 2026-10-08**: the owner made the app's Coordinate-system card read-only, so the app refuses
+ * the typing, and its base point is the boot file's — none, on the design's mock. The step now
+ * places the spot and nothing else; the prototype keeps its own literal base point, so from
+ * `spot-C1` on its states print map coordinates where the app's print the file's own level or
+ * the em dash, and differ from the phase-6 captures there (`tests/parity/phase6/README.md`).
  */
 const ANNOTATION_STATES = {
   'grids-iso': `click(tbBtn('3D perspective (Home)'))`,
@@ -387,13 +388,8 @@ const ANNOTATION_STATES = {
     input: [CLICK(CORNER[0], CORNER[1])]
   },
   'spot-C1': {
-    js:
-      `click(tbBtn('Coordinate system & true north')); await sleep(500);` +
-      ` const cf = coordFields();` +
-      ` typeInto(cf[0], '28500'); await sleep(200); typeInto(cf[1], '30200'); await sleep(200);` +
-      ` typeInto(cf[2], '102.5'); await sleep(200); typeInto(cf[3], '12.5'); await sleep(500);` +
-      ` click(tbBtn('Coordinate system & true north')); await sleep(400);` +
-      ` click($('button[data-tip="Spot coordinate (C)"]'))`,
+    // No base point is typed in first since 2026-10-08: the app's card is read-only (above).
+    js: `click($('button[data-tip="Spot coordinate (C)"]'))`,
     input: [CLICK(SECOND[0], SECOND[1])]
   },
   'dims-wall': {

@@ -43,8 +43,10 @@
  * Phase 3, the consent gate — what reaches outside the view or cannot be undone is asked for,
  * and only the user's click does it. So "nothing moved" also means every model is still loaded,
  * the base point is what it was, the saved filter sets are all there and the sidebar is asking
- * nothing; `gradeView` checks `pendingKind` (the pending row holds *that* request), `basePoint`,
- * `loadedModels`, `filterSets` and `unloadAsk`; and a gapped clause behind a dash or a colon is
+ * nothing; `gradeView` checks `pendingKind` (the pending row holds *that* request),
+ * `loadedModels`, `filterSets` and `unloadAsk` — and checked `basePoint` until 2026-10-08, when
+ * the Coordinate-system card became read-only and its one case went (the fingerprint still sees
+ * it, as "nothing moved"); and a gapped clause behind a dash or a colon is
  * read as hung on an excused verb, as one behind a comma already was (`HANGER`). After its
  * review: a contraction negates (`n't` could never match where it stood in `NEGATION`).
  *
@@ -507,7 +509,7 @@ function gradeView(spec, obs, truth) {
    * check names only the fields the case cares about; a field the observation does not carry
    * fails, it is never assumed.
    */
-  for (const [field, id] of [['display', 'display'], ['interface', 'interface'], ['history', 'history'], ['camera', 'camera'], ['basePoint', 'base-point']]) {
+  for (const [field, id] of [['display', 'display'], ['interface', 'interface'], ['history', 'history'], ['camera', 'camera']]) {
     if (!v[field]) continue
     const got = after[field] || {}
     const wrong = Object.entries(v[field])
@@ -619,7 +621,7 @@ function gradeView(spec, obs, truth) {
   /*
    * 2026-10-02, phase 3 — the consent gate. What a request leaves behind before the user has
    * clicked anything, and what the click then does. The same rule: what the observation does
-   * not carry fails. (`basePoint` is in the loop above, with the other read-backs.)
+   * not carry fails. (`basePoint` was in the loop above until 2026-10-08: nothing can change it.)
    */
   if (v.pendingKind !== undefined) {
     // Not merely "something is waiting": the row holds this request, as an action.

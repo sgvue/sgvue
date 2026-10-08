@@ -22,6 +22,7 @@ import {
   invertFrame,
   isIdentityMapConversion,
   isIdentitySitePlacement,
+  isIdentityWcs,
   isLocated,
   isSvy21,
   mapPlacement,
@@ -29,7 +30,6 @@ import {
   modelFrame,
   normaliseDeg,
   projectFrame,
-  sameBasePoint,
   toMap,
   toProject,
   toWorld,
@@ -403,12 +403,6 @@ describe('coordsFromGeoref', () => {
     }
     expect(coordsFromGeoref(g)).toEqual({ E: null, N: null, Z: null, angle: 43 })
   })
-
-  it('compares two base points field for field', () => {
-    const a = { E: 1, N: 2, Z: 3, angle: 4 }
-    expect(sameBasePoint(a, { ...a })).toBe(true)
-    expect(sameBasePoint(a, { ...a, angle: null })).toBe(false)
-  })
 })
 
 describe('crsChip', () => {
@@ -420,7 +414,7 @@ describe('crsChip', () => {
   })
 
   it('keeps the design’s own two chips for an SVY21 file', () => {
-    expect(crsChip(withCrs({}), false)).toEqual({ short: 'SVY21', long: 'SVY21 · EPSG:3414' })
+    expect(crsChip(withCrs({}))).toEqual({ short: 'SVY21', long: 'SVY21 · EPSG:3414' })
     expect(isSvy21(withCrs({}))).toBe(true)
     // However the file spells it.
     expect(isSvy21(withCrs({ name: 'SVY 21', description: '', geodeticDatum: '' }))).toBe(true)
@@ -430,19 +424,14 @@ describe('crsChip', () => {
   it('names another CRS rather than claiming SVY21', () => {
     const g = withCrs({ name: 'EPSG:32648', description: 'WGS 84 / UTM zone 48N', geodeticDatum: 'WGS 84' })
     expect(isSvy21(g)).toBe(false)
-    expect(crsChip(g, false)).toEqual({ short: 'EPSG:32648', long: 'EPSG:32648' })
-    // …even when the user has typed a base point as well: the file's declaration wins.
-    expect(crsChip(g, true).short).toBe('EPSG:32648')
+    expect(crsChip(g)).toEqual({ short: 'EPSG:32648', long: 'EPSG:32648' })
   })
 
-  it('keeps the design’s status chip once the user has typed a base point', () => {
-    expect(crsChip(none, true)).toEqual({ short: 'SVY21', long: DASH })
-    expect(crsChip(null, true).short).toBe('SVY21')
-  })
-
-  it('is the em dash with no georeferencing and nothing typed', () => {
-    expect(crsChip(none, false)).toEqual({ short: DASH, long: DASH })
-    expect(crsChip(null, false)).toEqual({ short: DASH, long: DASH })
+  it('is the em dash with no projected CRS — nothing can be typed in to stand for one (2026-10-08)', () => {
+    // Until the card was made read-only, a typed base point put the design's `SVY21` in the status
+    // bar. A base point is the file's or there is none, so the chip says what the file declares.
+    expect(crsChip(none)).toEqual({ short: DASH, long: DASH })
+    expect(crsChip(null)).toEqual({ short: DASH, long: DASH })
     // Georeferenced, but with no projected CRS to name.
     const site: Georeference = {
       source: 'IfcSite',
@@ -450,7 +439,7 @@ describe('crsChip', () => {
       method: 'IfcSite placement',
       site: { placement: [1, 2, 3] }
     }
-    expect(crsChip(site, false).short).toBe(DASH)
+    expect(crsChip(site).short).toBe(DASH)
   })
 })
 
@@ -760,5 +749,177 @@ describe('P, the federation frame, and each model’s frame M_i⁻¹ ∘ P (2026
     expect(coordsFromGeoref(bySite)).toEqual(want)
     // `Scale` moves nothing here either.
     expect(coordsFromGeoref(byConversion({ scale: 1000 }))).toEqual(want)
+  })
+})
+
+/* ────────────────── 2026-10-08, rule 4: the context's WorldCoordinateSystem ────────────────── */
+
+/**
+ * Revit "Project Base Point" with no EPSG code: no map conversion; the base point's E / N / H on
+ * the `Model` context's WorldCoordinateSystem; the turn to true north only in `TrueNorth`. The
+ * site stands at the file's zero here — `withSiteOffset` moves it, as an internal origin off the
+ * base point does.
+ */
+const TN: readonly [number, number] = [Math.sin(rad(A)), Math.cos(rad(A))]
+const byWcs = (extra: Partial<Georeference> = {}): Georeference => ({
+  source: 'WorldCoordinateSystem',
+  sources: ['WorldCoordinateSystem'],
+  method: 'WorldCoordinateSystem',
+  wcs: { origin: [O[0], O[1], O[2]] },
+  trueNorth: TN,
+  ...extra
+})
+/** The same building with its internal origin (4, −2.5) m off the base point, not turned. */
+const withSiteOffset = (): Georeference => {
+  const s = [4, -2.5, 0] as const
+  const c = Math.cos(rad(A))
+  const n = Math.sin(rad(A))
+  return byWcs({
+    sources: ['WorldCoordinateSystem', 'IfcSite'],
+    method: 'WorldCoordinateSystem + IfcSite placement',
+    wcs: { origin: [O[0] - (c * s[0] - n * s[1]), O[1] - (n * s[0] + c * s[1]), O[2]] },
+    site: { placement: [s[0], s[1], s[2]] }
+  })
+}
+
+describe('rule 4 — the WorldCoordinateSystem places a model that has no map conversion (2026-10-08)', () => {
+  it('takes the WCS as the map position, and TrueNorth as the turn — the turn that puts true north on map north', () => {
+    const m = mapPlacement(byWcs())
+    expect(m).toMatchObject({ placedBy: 'WorldCoordinateSystem', ambiguous: false })
+    expect(m.trueNorthDeg!).toBeCloseTo(A, 12)
+    expect(m.wcs).toEqual({ origin: [O[0], O[1], O[2]], rotationDeg: 0, readAs: 'map position' })
+    near(m.operation!.origin, O)
+    expect(m.operation!.rotationDeg).toBeCloseTo(A, 12)
+    // The sign: `TrueNorth` is north in the project's own axes, and the operation turns it onto
+    // the map's +Y. Turned the other way it would land 86.8° off.
+    near(toWorld(m.operation, TN[0], TN[1], 0), [O[0], O[1] + 1, O[2]], 1e-12)
+    // …which is IfcOpenShell's reading too: its `get_true_north` is "how far project north turns
+    // anticlockwise to reach true north", +43.4103° here — this turn's negative.
+    const ifcopenshellTrueNorth = (Math.atan2(TN[1], TN[0]) * 180) / Math.PI - 90
+    expect(m.trueNorthDeg!).toBeCloseTo(-ifcopenshellTrueNorth, 12)
+    // And it is the operation the same export with an EPSG code states in its map conversion:
+    // Revit writes the conversion's X axis and `TrueNorth` from one angle.
+    sameOp(m.operation, mapPlacement(byConversion()).operation)
+  })
+
+  it('turns by TrueNorth only when nothing else turns the project', () => {
+    // A site placement that turns (Revit's Survey Point with no EPSG code: the turn is there).
+    const siteTurn = mapPlacement(byWcs({ site: { placement: [-8, 3, 0], rotationDeg: A } }))
+    expect(siteTurn.trueNorthDeg).toBeNull()
+    expect(siteTurn.operation).toEqual({ origin: [O[0], O[1], O[2]], rotationDeg: 0 })
+    // A tilted site states a turn too, though not one angle can say.
+    expect(mapPlacement(byWcs({ site: { placement: [1, 2, 0], pureZRotation: false } })).trueNorthDeg).toBeNull()
+    // A WCS that turns of its own: its turn, and not TrueNorth's on top of it.
+    const own = mapPlacement(byWcs({ wcs: { origin: [O[0], O[1], O[2]], rotationDeg: 30 } }))
+    expect(own).toMatchObject({ trueNorthDeg: null, operation: { rotationDeg: 30 } })
+    // A tilted WCS keeps its move and is read as no turn — and still no TrueNorth.
+    const tilted = mapPlacement(
+      byWcs({ wcs: { origin: [O[0], O[1], O[2]], rotationDeg: 12, pureZRotation: false } })
+    )
+    expect(tilted).toMatchObject({ trueNorthDeg: null, operation: { origin: [O[0], O[1], O[2]], rotationDeg: 0 } })
+    // No TrueNorth, or "true north is project north" — Revit's own (6.12e-17, 1) included.
+    for (const trueNorth of [undefined, [0, 1] as const, [6.123233995736766e-17, 1] as const]) {
+      const m = mapPlacement(byWcs({ trueNorth }))
+      expect(m.trueNorthDeg).toBeNull()
+      expect(m.operation).toEqual({ origin: [O[0], O[1], O[2]], rotationDeg: 0 })
+    }
+  })
+
+  it('composes the site placement under it: an internal origin off the base point lands on the same map', () => {
+    const g = withSiteOffset()
+    expect(detectMethod(g)).toBe('WorldCoordinateSystem + IfcSite placement')
+    sameOp(federationFrame(g), federationFrame(bySite))
+    expect(frameKey(federationFrame(g))).toBe(SITE_KEY)
+    // The site's offset is turned by TrueNorth before the base point is added — not after.
+    expect(mapPlacement(g).trueNorthDeg!).toBeCloseTo(A, 12)
+  })
+
+  it('reads a WCS beside a conversion as IfcOpenShell does — undone before it — and says the pair is ambiguous', () => {
+    const w = [5, 2, 1] as const
+    const c = Math.cos(rad(A))
+    const n = Math.sin(rad(A))
+    const g = byConversion({
+      sources: ['IfcMapConversion', 'WorldCoordinateSystem'],
+      eastings: O[0] + c * w[0] - n * w[1],
+      northings: O[1] + n * w[0] + c * w[1],
+      orthogonalHeight: O[2] + w[2],
+      wcs: { origin: [w[0], w[1], w[2]] },
+      trueNorth: TN
+    })
+    const m = mapPlacement(g)
+    expect(m).toMatchObject({ placedBy: 'IfcMapConversion', ambiguous: true, trueNorthDeg: null })
+    expect(m.wcs).toEqual({ origin: [5, 2, 1], rotationDeg: 0, readAs: 'undone before the conversion' })
+    // map = C ∘ WCS⁻¹: the WCS's own origin lands where the conversion's E / N / H are.
+    near(toWorld(m.operation, ...w), [g.eastings!, g.northings!, g.orthogonalHeight!], 1e-9)
+    sameOp(federationFrame(g), federationFrame(bySite))
+    expect(detectMethod(g)).toBe('IfcMapConversion')
+    // Read with the WCS left out, the building would stand |w| from where it is.
+    const ignored = mapPlacement({ ...g, wcs: undefined }).operation!
+    expect(Math.hypot(ignored.origin[0] - O[0], ignored.origin[1] - O[1])).toBeCloseTo(Math.hypot(5, 2), 9)
+  })
+
+  it('changes nothing for a WCS that is the identity: every reading from before rule 4 stands', () => {
+    const still = byConversion({ wcs: { origin: [0, 0, 0] } })
+    expect(isIdentityWcs(still)).toBe(true)
+    expect(mapPlacement(still)).toEqual(mapPlacement(byConversion()))
+    expect(mapPlacement({ ...bySite, wcs: { origin: [0, 0, 0], rotationDeg: 0 } })).toEqual(mapPlacement(bySite))
+    expect(mapPlacement(none)).toEqual({
+      operation: null,
+      placedBy: 'none',
+      metresPerMapUnit: 1,
+      mapUnit: null,
+      mapUnitKnown: true,
+      scale: null,
+      wcs: null,
+      trueNorthDeg: null,
+      ambiguous: false
+    })
+    // TrueNorth alone still places nothing: without a WCS it is a readout (2026-09-20).
+    expect(mapPlacement({ ...none, trueNorth: TN }).operation).toBeNull()
+    expect(isIdentityWcs(byWcs())).toBe(false)
+    expect(isIdentityWcs({ ...none, wcs: { origin: [0, 0, 0], rotationDeg: 5 } })).toBe(false)
+  })
+
+  it('reads a WCS tilted at the origin as the identity, as it reads a tilted site — and a tilt still blocks TrueNorth', () => {
+    // The site's own rule (`isIdentitySitePlacement`): a tilt one angle cannot say is not a move.
+    const tilted: Georeference = { ...none, wcs: { origin: [0, 0, 0], pureZRotation: false }, trueNorth: TN }
+    expect(isIdentityWcs(tilted)).toBe(true)
+    expect(isIdentitySitePlacement({ ...none, site: { pureZRotation: false } })).toBe(true)
+    // So it places nothing, gives no base point from a WCS, and names no method — the note's rule
+    // then counts it as a model with no map position, which it is.
+    expect(mapPlacement(tilted)).toMatchObject({ operation: null, placedBy: 'none', wcs: null, trueNorthDeg: null })
+    expect(detectMethod(tilted)).toBe('none')
+    expect(federationFrame(tilted)).toBeNull()
+    // Moved as well, it is the map position — read as no turn, and TrueNorth is still not added
+    // beside it: a tilt is a turn the file states.
+    const movedTilted = byWcs({ wcs: { origin: [O[0], O[1], O[2]], pureZRotation: false } })
+    expect(mapPlacement(movedTilted)).toMatchObject({
+      placedBy: 'WorldCoordinateSystem',
+      trueNorthDeg: null,
+      operation: { origin: [O[0], O[1], O[2]], rotationDeg: 0 }
+    })
+  })
+
+  it('names the method after the conversion’s pattern, and reads the base point off P', () => {
+    expect(detectMethod(byWcs())).toBe('WorldCoordinateSystem')
+    expect(detectMethod({ ...byWcs(), wcs: undefined })).toBe('none')
+    const want = { E: O[0], N: O[1], Z: O[2], angle: A }
+    expect(coordsFromGeoref(byWcs())).toEqual(want)
+    expect(coordsFromGeoref(withSiteOffset())).toEqual(want)
+    // No turn stated anywhere: the three coordinates, and no angle — never a claimed north.
+    expect(coordsFromGeoref(byWcs({ trueNorth: undefined }))).toEqual({ ...want, angle: null })
+  })
+
+  it('lands a WCS model where its own declaration puts it, whichever model boots', () => {
+    const models = [bySite, byConversion(), byWcs(), withSiteOffset()]
+    for (const boot of models) {
+      const P = federationFrame(boot)
+      for (const m of models) {
+        const frame = modelFrame(boot, m)
+        for (const w of [[0, 0, 0], [20, 12, 4], [-3.5, 7.25, -1]] as [number, number, number][]) {
+          near(toWorld(P, ...toProject(frame, ...w)), toWorld(mapPlacement(m).operation, ...w), 1e-6)
+        }
+      }
+    }
   })
 })

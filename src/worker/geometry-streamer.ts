@@ -630,7 +630,8 @@ export function streamGeometry(
     if (away > FAR_PLACEMENT_METRES) {
       warnings.push({
         kind: 'farPlacement',
-        detail: `${(away / 1000).toFixed(2)} km from the federation offset`
+        detail: `${(away / 1000).toFixed(2)} km from the federation offset`,
+        metres: away
       })
     }
     // Back in the project frame's own coordinates: how far the vertices sit from its origin.
@@ -646,7 +647,8 @@ export function streamGeometry(
     if (local > PRECISION_METRES) {
       warnings.push({
         kind: 'precision',
-        detail: `${(local / 1000).toFixed(2)} km from the project origin — float32 resolves about ${((local * 1.2e-7 * 1000) | 0) + 1} mm there`
+        detail: `${(local / 1000).toFixed(2)} km from the project origin — float32 resolves about ${((local * 1.2e-7 * 1000) | 0) + 1} mm there`,
+        metres: local
       })
     }
   }

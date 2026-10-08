@@ -14,7 +14,6 @@
  */
 import { federate, removeModel, EMPTY_FEDERATION, type Federation } from '../../shared/federate'
 import {
-  coordsFromGeoref,
   federationFrame,
   mapPlacement,
   modelFrame,
@@ -25,7 +24,7 @@ import { isSiteLike } from '../../shared/site'
 import type { FederationOffset, GeometryChunk } from '../../shared/geometry-contract.types'
 import type { Georeference, ModelIndex } from '../../shared/model-index.types'
 import type { SessionFile } from '../../shared/session-codec'
-import { useShell, setViewer, type CoordState } from '../state/shell'
+import { useShell, setViewer } from '../state/shell'
 import type { ModelMeta, Viewer } from '../viewer/viewer-core'
 import { elementBoxes } from './element-boxes'
 import { deepFreeze } from './store'
@@ -235,8 +234,12 @@ export class FederationController {
     // The first model of a boot fixes the federation offset for the session — every later
     // model is streamed against it. The store keeps it so the property card can report a box
     // in the file's own coordinates rather than the scene's — and, beside it, P, whose
-    // `frameKey` marks every camera a session, a link or a viewpoint saves.
-    if (boot) useShell.getState().setOffset(items[0].offset, federationFrame(this.bootGeoref))
+    // `frameKey` marks every camera a session, a link or a viewpoint saves, and the boot
+    // model's georeferencing that defined P, which the base point is read off (2026-10-08: set
+    // once, here, and never by a model that joins later — the card is read-only).
+    if (boot) {
+      useShell.getState().setOffset(items[0].offset, federationFrame(this.bootGeoref), this.bootGeoref)
+    }
     /** Keys this batch joined, and which of them replaced a model, for the undo below. */
     const joined: string[] = []
     const replaced = new Set<string>()
@@ -255,17 +258,7 @@ export class FederationController {
       this.undoBatch(at, joined, replaced, boot)
       throw err
     }
-    if (boot) {
-      // 2026-10-08 — the base point is P read off the boot model's own georeferencing, so it
-      // describes the frame every model was placed in. Only a boot sets it: a model that joins
-      // later is placed in that same frame, and its own declaration is not the federation's.
-      const coords = coordsFromGeoref(this.bootGeoref)
-      if (coords && useShell.getState().coords.E == null) {
-        useShell.setState({ coords })
-        this.viewer.setCoords(coords)
-      }
-      this.viewer.frameExtents()
-    }
+    if (boot) this.viewer.frameExtents()
     if (reveal) await reveal
     if (gen !== this.gen) return false
     useShell.getState().commitModels(this.federation)
@@ -337,14 +330,17 @@ export class FederationController {
     }
   }
 
-  /** Nothing is loaded: the next model to boot chooses the offset and the frame afresh. */
+  /**
+   * Nothing is loaded: the next model to boot chooses the offset and the frame afresh — and the
+   * base point goes with them (2026-10-08: it used to stay, and the next boot left it standing).
+   */
   private resetFrame(): void {
     this.offset = null
     this.bootGeoref = null
     this.frameChosen = false
     this.frameEpoch++
     this.frameUsers = 0
-    useShell.getState().setOffset([0, 0, 0], null)
+    useShell.getState().setOffset([0, 0, 0], null, null)
   }
 
   /**
@@ -489,9 +485,8 @@ export class FederationController {
     this.frameChosen = false
     this.frameEpoch++
     this.frameUsers = 0
-    const coords: CoordState = { E: null, N: null, Z: null, angle: null }
-    useShell.setState({ coords, offset: [0, 0, 0], frame: null })
-    this.viewer?.setCoords(coords)
+    // The offset, the frame, the declaration that defined it and the base point, all cleared.
+    useShell.getState().setOffset([0, 0, 0], null, null)
     // A batch that committed and was then refused (`bootFailed`) is still in the store's lists.
     if (useShell.getState().loaded.length) useShell.getState().commitModels(this.federation)
   }
@@ -583,6 +578,11 @@ export class FederationController {
       element.bbox = own.box
       element.solidCount = own.parts
     }
+    // 2026-10-08 — how far this model landed from the offset another model set, when the stream
+    // said it was far: the Coordinate-system card's note reads it. The model that set the offset
+    // measured against its own first part, which says nothing about the others, so it has none.
+    const far = summary.warnings.find((w) => w.kind === 'farPlacement')
+    if (far && !summary.offsetFromThisModel) index.farPlacementMetres = far.metres
     // Freezing the index walks every element and every property set it carries — `deepFreeze`
     // — which is what "indexing properties" is on this side.
     onStage(3)

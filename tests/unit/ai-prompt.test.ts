@@ -317,7 +317,6 @@ describe('the system contract', () => {
       'opening model files or a recent file',
       'unloading a model',
       'copying the share link or GlobalIds',
-      'changing the base point',
       'deleting a viewpoint or a markup',
       'forgetting a filter set',
       // Phase 4: what the Schedules window only asks for.
@@ -342,7 +341,7 @@ describe('the system contract', () => {
       'A result that says asked, pending or dialog means nothing has happened yet',
       'you are never told whether the user clicked',
       'Say what you asked for and what the user has to click',
-      'never that a file was opened, a model unloaded, anything copied, the base point changed, or anything deleted or printed',
+      'never that a file was opened, a model unloaded, anything copied, or anything deleted or printed',
       'The same holds for a change the scope guard holds behind Apply'
     ]) {
       expect([said, honest.includes(said)]).toEqual([said, true])
@@ -350,6 +349,10 @@ describe('the system contract', () => {
     for (const line of [asks, honest]) {
       expect([line.slice(0, 24), line.match(/\b[A-Z]{3,}\b/g)]).toEqual([line.slice(0, 24), null])
     }
+    // 2026-10-08: the Coordinate-system card is read-only, so the base point is nothing to ask for
+    // and nothing to claim — neither line names it any more.
+    expect(asks).not.toContain('base point')
+    expect(honest).not.toContain('base point')
     // Exactly two lines for the phase: the only two that name the new tool or the pending result.
     expect(DESIGN_SYSTEM_LINES.filter((l) => /request_user_action/.test(l))).toEqual([asks])
     expect(DESIGN_SYSTEM_LINES.filter((l) => /asked, pending or dialog/.test(l))).toEqual([honest])

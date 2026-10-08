@@ -7,9 +7,11 @@
  * card is open or **either** plane is set.
  */
 import { filterIsLive } from '../../../shared/filter-stack'
-import { coordsFromGeoref, crsChip, sameBasePoint } from '../../../shared/georef'
+import { labelText } from '../../../shared/fmt'
+import { coordsFromGeoref, crsChip, mapPlacement } from '../../../shared/georef'
 import type { Georeference } from '../../../shared/model-index.types'
-import type { CoordState, ShellState } from '../shell'
+import type { ShellState } from '../shell'
+import { modelFile } from './models'
 
 export interface OnOff {
   bg: string
@@ -91,92 +93,143 @@ export interface StatusValues {
   units: string
   /**
    * The design hard-codes `SVY21` (`SGVue.dc.html:710`). `shared/georef.ts` states the data
-   * rule: the file's projected CRS when it declares one, the design's chip when that CRS is
-   * SVY21 / EPSG:3414 or the user has typed a base point this session, and the em dash when
-   * there is neither.
+   * rule: the projected CRS the boot file declares, the design's chip when that CRS is SVY21 /
+   * EPSG:3414, and the em dash when it declares none.
    */
   crs: string
 }
 
 /**
- * Whether the base point in state came from the user rather than from a file. The boot model
- * fills `coords` when it states one (`federation-store.ts`; until 2026-10-08, the first model to
- * carry georeferencing), and a federation that carries none leaves every field `null` until the
- * Coordinate-system card is typed into — so a value with no file behind it is the user's own.
- */
-export const hasManualCoords = (
-  coords: CoordState,
-  federation: ShellState['federation']
-): boolean =>
-  (coords.E != null || coords.N != null || coords.Z != null || coords.angle != null) &&
-  !federation.models.some((m) => m.meta.georef.source !== 'none')
-
-/**
  * The Coordinate-system card's caption suffix — the one visible addition in the port, the
  * user's own request (2026-09-20, *"auto detect which way the model is using and show it"*):
  * ` · ` and the detected georeferencing method, appended to the design's `project base point`.
- * `''` when the file carries no georeferencing, and `''` again the moment the four fields
- * stop showing what the file said — the caption names where *these numbers* came from, so it
- * must not keep claiming the file once they are the user's own. When it is not empty the
- * card's row gains `flex-wrap:wrap`.
+ * `''` when the file carries no georeferencing. When it is not empty the card's row gains
+ * `flex-wrap:wrap`.
+ *
+ * `georef` is the store's `bootGeoref`: the declaration that defined the federation's frame,
+ * whose base point the four fields are. Until 2026-10-08 the fields could be typed into, and the
+ * caption had to stop naming the file the moment they stopped being its numbers; the card is
+ * read-only since then, so the fields are always the file's and only the method is asked.
  */
-export function coordsCaption(georef: Georeference | null, coords: CoordState): string {
-  const fromFile = coordsFromGeoref(georef)
+export function coordsCaption(georef: Georeference | null): string {
   const method = georef?.method ?? 'none'
-  return method !== 'none' && !!fromFile && sameBasePoint(fromFile, coords) ? ` · ${method}` : ''
+  return method === 'none' ? '' : ` · ${method}`
 }
 
 /**
- * The georeferencing the Coordinate-system card and the CRS chips speak for (2026-10-08): the
- * loaded model whose own declaration **these four fields are** — since the base point is P, the
- * federation's frame, and only the boot model fills it, that is the boot model (or one placed
- * exactly as it is) — else, while the fields are blank or the user's own, the first model that
- * states any georeferencing, which is what every chip read before.
+ * Whose the base point is, for the assistant's `get_view_state` (2026-10-02): `file` when the
+ * declaration that defined the federation's frame states one — the only place it comes from since
+ * 2026-10-08, when the Coordinate-system card became read-only — and `none` when it states none.
+ * (`user`, for numbers typed into the card or applied from a reply, cannot happen any more.)
  */
-export function cardGeoref(
-  federation: ShellState['federation'],
-  coords: CoordState
-): Georeference | null {
-  const stated = federation.models.map((m) => m.meta.georef).filter((g) => g.source !== 'none')
-  return (
-    stated.find((g) => {
-      const fromFile = coordsFromGeoref(g)
-      return !!fromFile && sameBasePoint(fromFile, coords)
-    }) ??
-    stated[0] ??
-    null
+export function basePointSource(bootGeoref: Georeference | null): 'file' | 'none' {
+  return coordsFromGeoref(bootGeoref) ? 'file' : 'none'
+}
+
+/* ───────────────── the Coordinate-system card's note (2026-10-08, owner-chosen) ───────────────── */
+
+/** A model's name as the note prints it: file text, through `labelText`, and clipped there. */
+export const LINE_UP_NAME_CHARS = 120
+
+/** One loaded model that could not be lined up with the others, and why. */
+export interface NotLinedUp {
+  /** The model's key. */
+  key: string
+  /**
+   * Its file's name as the sidebar's model row shows it under the model's name (`modelFile`:
+   * the picked file's, else the library's, else the index's) — file text, so through `labelText`.
+   */
+  name: string
+  /**
+   * `no map position` — its file states none (`placedBy` is `none`) while another loaded model's
+   * does; `far` — the geometry stream's `farPlacement`: it lands more than 5 km from the
+   * federation offset another model set.
+   */
+  reason: 'no map position' | 'far'
+  /** For `far`: how far it stands, in metres. */
+  metres?: number
+}
+
+/**
+ * Which loaded models could not be lined up, and why — the fact the Coordinate-system card's note
+ * says and `get_model_info` / `get_view_state` report (2026-10-08). Asked for by the owner: of the
+ * ways offered to say so, *"One-line note on screen"*.
+ *
+ * Nothing to say with one model loaded: lining up is about the others. Then, per model:
+ *
+ *  · **no map position** — its own declaration places it nowhere (`mapPlacement`'s `none`) while
+ *    another loaded model's does. Its world coordinates were taken as map coordinates, which for
+ *    a genuinely local file is the wrong place. This reason wins over `far`, which follows from it.
+ *  · **far** — its geometry landed more than `FAR_PLACEMENT_METRES` from the federation offset
+ *    (`ModelIndexMeta.farPlacementMetres`, the stream's own warning): a map position in another
+ *    unit, a doubled offset, a datum from another survey.
+ *
+ * **When the boot model is the one without a map position**, the scene's origin is that model's
+ * own, and every model that does have one lands kilometres from it: it is the boot model that is
+ * named, and no distance is — a model that stands where its own map position puts it is not
+ * the one that could not be lined up. `bootGeoref` is the declaration that defined the frame, so
+ * this holds after the boot model is unloaded too.
+ */
+export function notLinedUp(
+  s: Pick<ShellState, 'bootGeoref' | 'library' | 'uploadNames'> & {
+    federation: Pick<ShellState['federation'], 'models'>
+  }
+): NotLinedUp[] {
+  const models = s.federation.models
+  if (models.length < 2) return []
+  const placed = (g: Georeference | null): boolean => mapPlacement(g).placedBy !== 'none'
+  const somePlaced = models.some((m) => placed(m.meta.georef))
+  const frameUnplaced = somePlaced && !placed(s.bootGeoref)
+  const out: NotLinedUp[] = []
+  for (const { meta } of models) {
+    const file = modelFile(meta.modelKey, meta.fileName, s.library, s.uploadNames[meta.modelKey])
+    const name = labelText(file || meta.modelKey, LINE_UP_NAME_CHARS)
+    if (somePlaced && !placed(meta.georef)) {
+      out.push({ key: meta.modelKey, name, reason: 'no map position' })
+    } else if (!frameUnplaced && meta.farPlacementMetres != null) {
+      out.push({ key: meta.modelKey, name, reason: 'far', metres: meta.farPlacementMetres })
+    }
+  }
+  return out
+}
+
+/** A distance as the note says it: kilometres, to a tenth. */
+const km = (metres: number): string => (metres / 1000).toFixed(1)
+
+/**
+ * The note's one line — `''` when there is nothing to say, and then the card draws nothing:
+ *
+ *   `Tower B.ifc could not be lined up — it has no map position.`
+ *   `STR.ifc could not be lined up — it sits 12.3 km from the others.`
+ *   `2 models could not be lined up: Tower B.ifc (no map position), STR.ifc (12.3 km away).`
+ */
+export function lineUpNote(issues: readonly NotLinedUp[]): string {
+  if (!issues.length) return ''
+  if (issues.length === 1) {
+    const [one] = issues
+    return one.reason === 'far'
+      ? `${one.name} could not be lined up — it sits ${km(one.metres ?? 0)} km from the others.`
+      : `${one.name} could not be lined up — it has no map position.`
+  }
+  const each = issues.map((m) =>
+    m.reason === 'far' ? `${m.name} (${km(m.metres ?? 0)} km away)` : `${m.name} (no map position)`
   )
-}
-
-/**
- * Whose the base point is (2026-10-02 — the assistant reads it back, and may ask to change it):
- * `file` while the four fields are exactly what the federation's georeferencing states — the
- * caption's own test, on the model the Coordinate-system card reads — `none` while every field
- * is blank, and `user` otherwise: somebody has typed into the card, or applied a change to it.
- */
-export function basePointSource(
-  coords: CoordState,
-  federation: ShellState['federation']
-): 'file' | 'user' | 'none' {
-  if (coords.E == null && coords.N == null && coords.Z == null && coords.angle == null) return 'none'
-  const fromFile = coordsFromGeoref(cardGeoref(federation, coords))
-  return fromFile && sameBasePoint(fromFile, coords) ? 'file' : 'user'
+  return `${issues.length} models could not be lined up: ${each.join(', ')}.`
 }
 
 export type StatusState = Pick<
   ShellState,
-  'stats' | 'visibleCount' | 'federation' | 'units' | 'coords'
+  'stats' | 'visibleCount' | 'federation' | 'units' | 'bootGeoref'
 >
 
 export function statusValues(s: StatusState): StatusValues {
-  const georef = cardGeoref(s.federation, s.coords)
   return {
     backend: s.stats.backend,
     fps: s.stats.fps,
     visibleCount: s.visibleCount,
     total: s.federation.elements.length,
     units: s.units,
-    crs: crsChip(georef ?? null, hasManualCoords(s.coords, s.federation)).short
+    crs: crsChip(s.bootGeoref).short
   }
 }
 

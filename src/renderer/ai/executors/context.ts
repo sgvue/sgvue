@@ -79,17 +79,8 @@ export type PendingAction =
   | { kind: 'copy_link' }
   /** The property card's Copy, for one GlobalId or several, one per line. */
   | { kind: 'copy_guids'; text: string }
-  /**
-   * The Coordinate-system card's fields: the ones to set, in metres and degrees — and `was`,
-   * what all four held when it was asked. The label shows each new number beside the one it
-   * replaces, so the click sets them only while the four are still what the label was written
-   * against; if the user has typed into the card since, nothing is set.
-   */
-  | {
-      kind: 'set_base_point'
-      coords: Partial<Record<'E' | 'N' | 'Z' | 'angle', number>>
-      was: Record<'E' | 'N' | 'Z' | 'angle', number | null>
-    }
+  // (`set_base_point`, the Coordinate-system card's four fields, was one until 2026-10-08, when
+  // the owner made the card read-only: nothing in the app changes the base point any more.)
 
 /**
  * The patch of a change the scope guard held: **visibility, and nothing else** — the six keys
@@ -216,24 +207,14 @@ export const alreadyWaiting = (waiting: string): Record<string, unknown> => ({
   alreadyWaiting: waiting
 })
 
-/** Control characters, and Unicode's invisible direction and width marks. */
-const UNSEEN = /[\p{Cc}\u200B-\u200F\u202A-\u202E\u2066-\u2069]/gu
-
 /**
  * A name as a pending label, or the result of a request, may carry it (2026-10-02, the gate's
- * review): control characters and the invisible direction and width marks are taken out, and it
- * is clipped at `max` characters. **Every name that goes into a label or a request's result
- * comes through here.**
- *
- * A viewpoint's or a filter set's name is whatever was typed, and a file's is whatever the disk
- * has. A label is what the user reads before they click Apply: a newline in a name would break
- * the row in two, and a right-to-left override would show its text in another order — either
- * could make the row read as something it is not.
+ * review): control characters and the invisible direction and width marks out, clipped at `max`.
+ * **Every name that goes into a label or a request's result comes through here.** It lives in
+ * `shared/fmt.ts` since 2026-10-08, because the Coordinate-system card's note prints model names
+ * through it too; every executor still takes it from here.
  */
-export const labelText = (text: string, max: number): string => {
-  const clean = text.replace(UNSEEN, '')
-  return clean.length > max ? clean.slice(0, max) + '…' : clean
-}
+export { labelText } from '../../../shared/fmt'
 
 /**
  * A gated action, asked for: the pending row gets the label and the action, and the model is

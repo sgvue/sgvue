@@ -179,7 +179,7 @@ export interface GridAxisRecord {
 
 /* ────────────────────────────── georeferencing ────────────────────────────── */
 
-export type GeorefSource = 'IfcMapConversion' | 'IfcSite' | 'ePset' | 'none'
+export type GeorefSource = 'IfcMapConversion' | 'IfcSite' | 'ePset' | 'WorldCoordinateSystem' | 'none'
 
 /**
  * Which declaration actually carries the model's position — `shared/georef.ts`'s
@@ -188,13 +188,18 @@ export type GeorefSource = 'IfcMapConversion' | 'IfcSite' | 'ePset' | 'none'
  * does) while its site placement carries the real position and rotation.
  *
  * The values are the strings the Coordinate-system card appends to its caption and
- * `get_model_info` reports, so there is one spelling and it cannot drift.
+ * `get_model_info` reports, so there is one spelling and it cannot drift. The two
+ * `WorldCoordinateSystem` ones are 2026-10-08's (rule 4): a Revit export from the Survey Point,
+ * Project Base Point or Internal Origin with no EPSG code, and every Revit IFC2X3 one, carries its
+ * map position there and nowhere else.
  */
 export type GeorefMethod =
   | 'IfcSite placement'
   | 'IfcMapConversion'
   | 'IfcMapConversion + IfcSite placement'
   | 'ePset_MapConversion'
+  | 'WorldCoordinateSystem'
+  | 'WorldCoordinateSystem + IfcSite placement'
   | 'none'
 
 export interface ProjectedCrs {
@@ -236,6 +241,22 @@ export interface SiteGeoref {
    * False when the placement is not a pure rotation about `+Z` (a tilted site). The rotation
    * is then not usable as one angle and is read as none; the translation still stands.
    */
+  pureZRotation?: boolean
+}
+
+/**
+ * The 3D `Model` context's `WorldCoordinateSystem` (2026-10-08), recorded only when it is not the
+ * identity — which IFC says it normally is. Revit writes the chosen point's Easting, Northing and
+ * Elevation as its `Location`, in project length units, whenever it writes no `IfcMapConversion`.
+ * web-ifc does not apply it to any placement (`docs/TRAPS.md`), so it is applied — or, beside a
+ * map conversion, undone — in `shared/georef.ts`'s `mapPlacement`.
+ */
+export interface WcsGeoref {
+  /** Its `Location`, metres (the project length unit applied). */
+  origin: readonly [number, number, number]
+  /** Its turn about `+Z`, degrees, counter-clockwise positive. Absent when it does not turn. */
+  rotationDeg?: number
+  /** False when its axes are not a pure turn about `+Z`: the turn is then read as none. */
   pureZRotation?: boolean
 }
 
@@ -286,6 +307,8 @@ export interface Georeference {
    * are already map-aligned states — means "true north is context north".
    */
   trueNorth?: readonly [number, number]
+  /** The `Model` context's `WorldCoordinateSystem`, when it is not the identity (2026-10-08). */
+  wcs?: WcsGeoref
   /** The IFC2X3 pset the values came from, e.g. `ePset_MapConversion`. */
   epsetName?: string
 }
@@ -425,6 +448,15 @@ export interface ModelIndexMeta {
   storeys: readonly Storey[]
   grids: readonly GridAxisRecord[]
   georef: Georeference
+  /**
+   * 2026-10-08 — how far, in metres, the centre of what this model drew stands from the
+   * federation offset another model set, when that is past `FAR_PLACEMENT_METRES` (the geometry
+   * stream's `farPlacement` warning, `worker/geometry-streamer.ts`). Written by the renderer once
+   * the model has streamed and before the index is frozen (`model/federation-store.ts`), as each
+   * element's `bbox` is. Absent when it is nearer, when this model set the offset itself, and
+   * before it has streamed. It is what says a model "sits 12.3 km from the others".
+   */
+  farPlacementMetres?: number
   /** The seven design attributes plus every pset/qto key in this model. */
   propKeys: readonly string[]
   counts: ModelCounts

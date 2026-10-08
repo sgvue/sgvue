@@ -23,7 +23,8 @@
  * Phase 3, the consent gate: `manage_views`' `delete`, `manage_markups`' `delete` and `clear`
  * with its `kind`, and `request_user_action` — an action, and for each action what it names.
  * **A recent file is a name**: one that holds a path separator is refused here, before any
- * executor sees it, so no tool input can carry a path. The base point's numbers are bounded.
+ * executor sees it, so no tool input can carry a path. (The base point's four numbers were taken
+ * here too until 2026-10-08, when the owner made the Coordinate-system card read-only.)
  *
  * Phase 4: `make_schedule`'s formats, order and calculated columns; `schedule` beside `ids` and
  * `selection`; `manage_schedules` — an operation and at most two names, each one that may cross
@@ -34,7 +35,6 @@
 import { z } from 'zod'
 import { HL } from '../../../shared/colors'
 import {
-  BASE_POINT_MAX,
   FILTER_SET_NAME_MAX,
   INTERFACE_CARDS,
   INTERFACE_SEARCH_MAX,
@@ -105,12 +105,6 @@ const Ids = z
     MAX_TOOL_IDS,
     `at most ${MAX_TOOL_IDS} ids — narrow the set with rules, or run the query again with a LIMIT and act on a rule instead`
   )
-
-/** One of the base point's three coordinates, in metres (2026-10-02): finite, and on this planet. */
-const BasePointMetres = z
-  .number()
-  .min(-BASE_POINT_MAX, `between -${BASE_POINT_MAX} and ${BASE_POINT_MAX} metres`)
-  .max(BASE_POINT_MAX, `between -${BASE_POINT_MAX} and ${BASE_POINT_MAX} metres`)
 
 /**
  * A saved schedule setup's or a template's name (2026-10-02, phase 4): what may cross the
@@ -391,15 +385,7 @@ export const TOOL_INPUTS = {
     model: z.string().max(MAX_MODEL_KEY_CHARS).optional(),
     ids: Ids.optional(),
     selection: z.boolean().optional(),
-    schedule: z.boolean().optional(),
-    E: BasePointMetres.optional(),
-    N: BasePointMetres.optional(),
-    Z: BasePointMetres.optional(),
-    angle: z
-      .number()
-      .min(-360, 'between -360 and 360 degrees')
-      .max(360, 'between -360 and 360 degrees')
-      .optional()
+    schedule: z.boolean().optional()
   }),
   // 2026-10-02, phase 4 — the Schedules window's own controls. What is sent on is the
   // operation and these two names, and nothing else.

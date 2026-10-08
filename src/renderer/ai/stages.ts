@@ -74,8 +74,7 @@ const REQUEST_PHRASE: Record<string, string> = {
   open_recent: 'asking to open a recent file',
   unload_model: 'asking to unload a model',
   copy_link: 'asking to copy the link',
-  copy_guids: 'asking to copy GlobalIds',
-  set_base_point: 'asking to change the base point'
+  copy_guids: 'asking to copy GlobalIds'
 }
 
 /** `manage_schedules`, operation by operation. The three that only ask say so. */

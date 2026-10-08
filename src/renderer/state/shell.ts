@@ -63,13 +63,19 @@
  *   (`setOutsideActions`), as the viewer is handed in.
  * · **`copyGuid` says whether it copied**, and flashes only when it did: the design's flashed
  *   on a rejected write, and in this app every write was rejected (`../clipboard.ts`).
- * · The base point (`coords`) became a part the reply's `revert` puts back
- *   (`selectors/snapshot.ts`), since an applied request can now change it.
+ *
+ * 2026-10-08 — **the base point is read-only.** The owner: *"Maybe just make the coordinates
+ * system toggle a read only, dont let user change anything."* The design's `setCoord` (`:1039`)
+ * is gone, and with it the card's `onChange`, the assistant's request to change the base point
+ * and a session's or a reply's revert putting one back: `coords` is written in exactly one place,
+ * `setOffset`, from `bootGeoref` — the boot model's georeferencing, the declaration that defined
+ * the federation's frame — and stays right after any unload.
  */
 import { create } from 'zustand'
 import * as fstack from '../../shared/filter-stack'
 import type { FilterSet } from '../../shared/filter-stack'
-import type { BasePoint, ProjectFrame } from '../../shared/georef'
+import { coordsFromGeoref, type BasePoint, type ProjectFrame } from '../../shared/georef'
+import type { Georeference } from '../../shared/model-index.types'
 import { classColors, colorBy, colorByGroups, colorByIds, HL, type ColorByState } from '../../shared/colors'
 import {
   hlFn,
@@ -155,12 +161,16 @@ export type { SecKind, SecPlane, Sections }
 /**
  * `SGVue.dc.html:849`'s `coords`, but **without the prototype's literal defaults** — plan
  * §3.5 item 5 and the fidelity contract's "never a placeholder". A value is filled from the
- * file's georeferencing when it is there and stays `null` when it is not.
+ * file's georeferencing when it is there and stays `null` when it is not — and since 2026-10-08
+ * nothing else fills it: the card is read-only (`setOffset`).
  *
  * `shared/georef.ts` owns the shape, because the viewer's spot labels and the property card's
  * Centroid row read the same four numbers through the same `toMap`.
  */
 export type CoordState = BasePoint
+
+/** No base point: every field blank, never a zero. */
+const NO_COORDS: CoordState = { E: null, N: null, Z: null, angle: null }
 
 /** Where the context menu wants to open. The menu itself is Phase 4. `:892`. */
 export interface CtxState {
@@ -287,6 +297,16 @@ export interface ShellState {
    * everything except the camera.
    */
   frame: ProjectFrame | null
+  /**
+   * 2026-10-08 — the boot model's georeferencing: **the declaration that defined P** (`frame`),
+   * set with it and the offset at boot (`setOffset`) and kept after that model is unloaded, as the
+   * frame is. The base point (`coords`), the Coordinate-system card's chip and caption, the status
+   * bar's CRS chip and `basePointSource` are all read off it, so they describe the frame actually
+   * in use — after any unload, and after a boot model whose own geometry failed once another model
+   * stood in its frame. `null` while nothing is loaded, and for a federation with no file behind
+   * its boot model (the design's mock, the demo building).
+   */
+  bootGeoref: Georeference | null
 
   /* ── the design's `state` (`:846–853`), in its own order ── */
   theme: Theme
@@ -461,8 +481,6 @@ export interface ShellState {
    * card. The level plane is never touched by a bubble.
    */
   gridClick: (name: string) => void
-  /** `:1039`. One field of the base point, from the Coordinate-system card. */
-  setCoord: (k: keyof CoordState, v: string) => void
   /** `:2060`. The Markups card's mm / m toggle. */
   setUnits: (units: Units) => void
   /** `:894`. The viewer's `on.measure` / `on.spot`. */
@@ -604,7 +622,16 @@ export interface ShellState {
 
   /* ── federation plumbing (`buildFederation` / `boot` / `setModels`) ── */
   setLibrary: (files: readonly LibraryFile[]) => void
-  setOffset: (offset: readonly [number, number, number], frame: ProjectFrame | null) => void
+  /**
+   * The federation's offset, its frame P and the declaration that defined P — fixed together at
+   * boot, and cleared together when nothing is loaded. **The one place `coords` is written**
+   * (2026-10-08, the read-only card): the base point is P read off `bootGeoref`.
+   */
+  setOffset: (
+    offset: readonly [number, number, number],
+    frame: ProjectFrame | null,
+    bootGeoref: Georeference | null
+  ) => void
   beginModels: (loadMsg: string) => void
   commitModels: (federation: Federation) => void
 
@@ -761,8 +788,9 @@ export const CLIPBOARD_REFUSED = 'The clipboard could not be written, so nothing
  * button calls** (2026-10-02, the consent gate). Each branch is the action the control of that
  * thing calls: the action bar's Undo, a Viewpoints row and its ×, a Markups row's × and a
  * list's `clear`, the Filter card's × on a saved set and its Save where that forgets one, the
- * Coordinate-system card's fields, the property card's Copy — and, handed in by the model layer,
- * a Recent pill and "copy link to this state".
+ * property card's Copy — and, handed in by the model layer, a Recent pill and "copy link to this
+ * state". (The Coordinate-system card's fields were one until 2026-10-08, when the card became
+ * read-only and nothing in the app could change the base point any more.)
  *
  * A request is fixed to what it named when it was made. When that is no longer there at the
  * click — a viewpoint deleted since, a markup list that has changed, an undo history that has
@@ -825,21 +853,6 @@ function performGated(a: PendingAction, get: () => ShellState, fail: (note: stri
       s.saveFilterSet(a.name)
       return ''
     }
-    case 'set_base_point': {
-      const fields = ['E', 'N', 'Z', 'angle'] as const
-      // The label showed each new number beside the one it replaces. If any of the four has
-      // changed since — the user typed into the card, a model with other georeferencing was
-      // loaded — that label is no longer what this click would do, so it does nothing.
-      if (fields.some((k) => s.coords[k] !== a.was[k])) {
-        return 'The base point has changed since that was asked, so nothing was set.'
-      }
-      // The card's own action, field by field, as typing into each field calls it.
-      for (const k of fields) {
-        const v = a.coords[k]
-        if (v !== undefined) get().setCoord(k, String(v))
-      }
-      return ''
-    }
     case 'copy_guids':
       void s.copyGuid(a.text).then((ok) => {
         if (!ok) fail(CLIPBOARD_REFUSED)
@@ -888,6 +901,7 @@ export const useShell = create<ShellState>((set, get) => ({
   library: [],
   offset: [0, 0, 0],
   frame: null,
+  bootGeoref: null,
 
   theme: 'dark',
   panelOpen: true,
@@ -909,7 +923,7 @@ export const useShell = create<ShellState>((set, get) => ({
   proj: 'persp',
   card: null,
   sections: NO_SECTIONS,
-  coords: { E: null, N: null, Z: null, angle: null },
+  coords: NO_COORDS,
   ctx: null,
   measures: [],
   spots: [],
@@ -1424,15 +1438,6 @@ export const useShell = create<ShellState>((set, get) => ({
     )
   },
 
-  /** `SGVue.dc.html:1039`. A field that does not parse is ignored, as the design ignores it. */
-  setCoord: (k, v) => {
-    const n = parseFloat(v)
-    if (isNaN(n)) return
-    const coords = { ...get().coords, [k]: n }
-    set({ coords })
-    viewer?.setCoords(coords)
-  },
-
   setUnits: (units) => set({ units }),
 
   setMeasures: (list) => set({ measures: list, measureCount: list.length }),
@@ -1780,7 +1785,8 @@ export const useShell = create<ShellState>((set, get) => ({
       stack: n.stack,
       hlColor: n.hlColor,
       view: n.view,
-      coords: n.coords,
+      // No `coords` (2026-10-08): the base point is the boot file's, read-only, and a payload's
+      // own is not read back (`shared/session-codec.ts`, `sessionPatch`).
       uploadNames: n.uploadNames
     })
     const v = viewer
@@ -1792,7 +1798,6 @@ export const useShell = create<ShellState>((set, get) => ({
         {
           grids: (on) => v?.setGrids(on),
           levels: (on) => v?.setLevels(on),
-          coords: (c) => v?.setCoords(c),
           snap: (on) => v?.setSnap(on),
           modelColors: (map, native) => v?.setModelColors(map, native),
           highlightColor: (c) => v?.setHighlightColor(c),
@@ -1885,7 +1890,11 @@ export const useShell = create<ShellState>((set, get) => ({
 
   setLibrary: (library) => set({ library }),
 
-  setOffset: (offset, frame) => set({ offset, frame }),
+  setOffset: (offset, frame, bootGeoref) => {
+    const coords = coordsFromGeoref(bootGeoref) ?? NO_COORDS
+    set({ offset, frame, bootGeoref, coords })
+    viewer?.setCoords(coords)
+  },
 
   beginModels: (loadMsg) => set({ ready: false, loadMsg }),
 

@@ -40,13 +40,13 @@
  * Not in any part, and never restored: `uploadNames`. It follows the federation, which only
  * the user's own click loads or unloads, and putting an old copy back would undo that loading.
  *
- * 2026-10-02, phase 3 — **the base point is a part** (`coords`). Until then it stood beside
- * `uploadNames`, because the assistant could not change it. It can ask to now, and the user's
- * Apply changes it (`state/shell.ts`, `applyPending`): what that click changed joins the
- * reply's undo (`mergeUndo`), so the reply's `revert` puts the old base point back — which the
- * Coordinate-system card itself has no control for. What a revert still cannot put back is
- * what was deleted — a viewpoint, a markup, a saved filter set — and that is exactly why those
- * are asked for rather than done.
+ * 2026-10-02, phase 3 — the base point (`coords`) was a part: the assistant could ask to change
+ * it, the user's Apply changed it, and the reply's `revert` put the old one back. **Not since
+ * 2026-10-08**, when the owner made the Coordinate-system card read-only: nothing in the app can
+ * change the base point — it is the boot file's (`state/shell.ts`, `setOffset`) — so there is
+ * nothing to put back, and `coords` stands beside `uploadNames` again (`NOT_REVERTED`). What a
+ * revert cannot put back is what was deleted — a viewpoint, a markup, a saved filter set — and
+ * that is exactly why those are asked for rather than done.
  *
  * Phase 4, and its follow-up the same day — **a markup the assistant placed is not a part, and a
  * revert takes it away all the same** (`ai/executors/saved.ts`, `place_spot` / `place_measure`).
@@ -185,9 +185,7 @@ export const TURN_PARTS = {
   sidebar: { extra: ['panelOpen'] },
   card: { extra: ['card'] },
   tool: { extra: ['tool'] },
-  search: { extra: ['search'] },
-  /** The Coordinate-system card's four fields. Changed only by the user — by hand, or by Apply. */
-  basePoint: { payload: ['coords'] }
+  search: { extra: ['search'] }
 } as const satisfies Record<string, PartSpec>
 
 export type TurnPart = keyof typeof TURN_PARTS
@@ -195,7 +193,9 @@ export type TurnPart = keyof typeof TURN_PARTS
 /** The session keys no part covers, each with its reason (the header has them in full). */
 export const NOT_REVERTED: Readonly<Record<string, string>> = {
   uploadNames:
-    'follows the federation; a model is loaded or unloaded only by the user’s own click, and a revert must not undo that'
+    'follows the federation; a model is loaded or unloaded only by the user’s own click, and a revert must not undo that',
+  coords:
+    'the base point is the boot file’s and read-only since 2026-10-08 — nothing in the app changes it, so a reply never has one to put back'
 }
 
 const PART_NAMES = Object.keys(TURN_PARTS) as TurnPart[]

@@ -146,11 +146,12 @@ describe('the review state, cut into parts', () => {
       const parts = partsOf(key, 'payload')
       expect([key, parts.length]).toEqual([key, key in NOT_REVERTED ? 0 : 1])
     }
-    // Phase 3: `coords` — the base point — is a part now. What is left follows the federation,
-    // which only the user's own click loads or unloads.
-    expect(Object.keys(NOT_REVERTED).sort()).toEqual(['uploadNames'])
+    // What follows the federation, which only the user's own click loads or unloads — and, since
+    // 2026-10-08, the base point: the boot file's, read-only, so no reply ever changes it. (It
+    // was a part, `basePoint`, from phase 3 until then.)
+    expect(Object.keys(NOT_REVERTED).sort()).toEqual(['coords', 'uploadNames'])
     for (const key of Object.keys(NOT_REVERTED)) expect(source).toContain(key)
-    expect(partsOf('coords', 'payload')).toEqual(['basePoint'])
+    expect(partsOf('coords', 'payload')).toEqual([])
   })
 
   it('covers what a payload adds to that — the camera and the legacy section — and nothing else', () => {
@@ -226,10 +227,11 @@ describe('what changed between two snapshots', () => {
       [{ panelOpen: !st().panelOpen }, 'sidebar'],
       [{ card: 'filter' }, 'card'],
       [{ tool: 'measure' }, 'tool'],
-      [{ search: 'wall' }, 'search'],
-      [{ coords: { ...st().coords, E: 99 } }, 'basePoint']
+      [{ search: 'wall' }, 'search']
     ]
     for (const [patch, part] of one) expect([patch, changedParts(at(), at(patch))]).toEqual([patch, [part]])
+    // The base point is no part (2026-10-08): nothing a reply does can change it.
+    expect(changedParts(at(), at({ coords: { ...st().coords, E: 99 } }))).toEqual([])
     // The camera's own pose, and its projection, are the camera part.
     const cam = rv.rig.getCamera()
     expect(changedParts(at(), at({}, { ...cam, theta: cam.theta + 0.1 }))).toEqual(['camera'])
@@ -653,19 +655,6 @@ const KINDS: Kind[] = [
     calls: () => [['manage_views', { op: 'restore', number: 1 }]],
     parts: ['vis', 'sections', 'camera', 'levels'],
     read: () => [st().sections, st().storeyVis, st().levels, st().view, st().activeView, rv.rig.getCamera()]
-  },
-  {
-    // Phase 3. The tool changes nothing — it asks; the user's Apply types the numbers in, and
-    // that joins the reply's undo. The Coordinate-system card has no reset of its own.
-    name: 'the base point, changed by the user’s Apply on a request',
-    setup: () => {
-      st().setCoord('E', '12345.457')
-      st().setCoord('N', '23456.766')
-    },
-    calls: () => [['request_user_action', { action: 'set_base_point', E: 28500, angle: 12.5 }]],
-    applied: true,
-    parts: ['basePoint'],
-    read: () => st().coords
   },
   {
     name: 'several tools in one reply',
@@ -1167,7 +1156,7 @@ describe('a revert after the federation changed keeps the rules a session restor
     expect(changedBy(at)).toEqual(['camera', 'grids'])
     const grids = !st().grids
     // The model now stands somewhere else in the scene: another whole-metre offset.
-    st().setOffset([1000, 2000, 0], st().frame)
+    st().setOffset([1000, 2000, 0], st().frame, st().bootGeoref)
     rv.rig.orbit(50, 0, null)
     const mine = rv.rig.getCamera()
     rv.calls.length = 0
@@ -1251,22 +1240,23 @@ describe('a change the scope guard held, applied later, joins the reply’s reve
     expect(offersRevert(at)).toBe(false)
   })
 
-  it('…so a base point that reply asked for cannot be set afterwards, where nothing could have put it back', async () => {
-    st().setCoord('E', '12345.457')
-    const coords = st().coords
+  it('…so a deletion that reply asked for cannot be done afterwards, where nothing could have put it back', async () => {
+    // (Until 2026-10-08 this was a base point asked for by the reply; the card is read-only now.)
+    st().saveView()
+    const views = st().views
     const at = await reply([
       ['toggle_display', { grids: !st().grids }],
-      ['request_user_action', { action: 'set_base_point', E: 28500, angle: 12.5 }]
+      ['manage_views', { op: 'delete', number: 1 }]
     ])
-    expect(st().chatMsgs[at].pending?.action).toMatchObject({ kind: 'set_base_point' })
+    expect(st().chatMsgs[at].pending?.action).toMatchObject({ kind: 'delete_view' })
     st().revertTurn(at)
     expect(st().chatMsgs[at].pending).toBeNull()
     told = []
     st().applyPending(at)
-    expect(st().coords).toBe(coords)
+    expect(st().views).toBe(views)
     expect(told).toEqual([])
     // A reply with nothing to revert keeps its request: only a revert takes one away.
-    const only = await reply([['request_user_action', { action: 'set_base_point', E: 28500 }]])
+    const only = await reply([['manage_views', { op: 'delete', number: 1 }]])
     expect(offersRevert(only)).toBe(false)
     expect(st().chatMsgs[only].pending).not.toBeNull()
   })

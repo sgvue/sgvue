@@ -317,7 +317,8 @@ describe('read-only guard', () => {
       'request_user_action.action=unload_model → confirm',
       'request_user_action.action=copy_link → apply',
       'request_user_action.action=copy_guids → apply',
-      'request_user_action.action=set_base_point → apply',
+      // (`set_base_point → apply` until 2026-10-08, when the owner made the Coordinate-system
+      // card read-only: what nobody can change, the assistant cannot ask to change.)
       // Phase 4 — the Schedules window's own confirmation and its Open dialog. (`print` raised
       // the print dialog itself until the same day's follow-up: that dialog's default button
       // prints, so printing is asked in the window's own confirm, as a deletion is.)
@@ -649,11 +650,8 @@ describe('read-only guard', () => {
       'ids',
       'selection',
       // Phase 4: `copy_guids` for what the open schedule lists — a flag, like `selection`.
-      'schedule',
-      'E',
-      'N',
-      'Z',
-      'angle'
+      // (E, N, Z and angle went with `set_base_point` on 2026-10-08: the card is read-only.)
+      'schedule'
     ])
     expect(ask.strict).toBe(true)
     expect(ask.input_schema.additionalProperties).toBe(false)
@@ -663,6 +661,43 @@ describe('read-only guard', () => {
     const inputs = readFileSync(join(SRC, 'renderer/ai/executors/inputs.ts'), 'utf8')
     expect(inputs).toMatch(/recent: z\s*\.string\(\)[\s\S]{0,160}never a path/)
     // And no preload key or IPC channel was added for any of this: both lists are pinned above.
+  })
+
+  /**
+   * 2026-10-08 — the owner: *"Maybe just make the coordinates system toggle a read only, dont let
+   * user change anything."* The base point is the boot file's: the store writes `coords` in one
+   * place, `setOffset`, with the federation's frame, and the one module that calls that is the
+   * federation controller. No tool can reach it, and no other store write names the key.
+   */
+  it('keeps the base point read-only: `coords` is written by the store’s setOffset alone', () => {
+    /** Every call of `callee` in `code`, with its whole argument list. */
+    const callsOf = (code: string, callee: RegExp): string[] =>
+      [...code.matchAll(callee)].map((m) => {
+        let depth = 0
+        let i = m.index! + m[0].length - 1
+        const start = i
+        for (; i < code.length; i++) {
+          if (code[i] === '(') depth++
+          else if (code[i] === ')' && --depth === 0) break
+        }
+        return code.slice(start, i + 1)
+      })
+    const writes = FILES.filter(({ path }) => path.startsWith('src/renderer/')).flatMap(({ path, text }) =>
+      callsOf(stripComments(text), /\b(?:set|setState)\(/g)
+        .filter((args) => /\bcoords\b\s*[:,}]/.test(args))
+        .map((args) => `${path} ${args.replace(/\s+/g, ' ')}`)
+    )
+    expect(writes).toEqual(['src/renderer/state/shell.ts ({ offset, frame, bootGeoref, coords })'])
+    // …and that is the store's `setOffset`, which the federation controller alone calls.
+    const callers = FILES.filter(({ text }) => /\bsetOffset\(/.test(stripComments(text))).map(({ path }) => path)
+    expect(callers.sort()).toEqual(['src/renderer/model/federation-store.ts'])
+    expect(aiFilesNaming(/\bsetOffset\b|\bsetCoords?\b/)).toEqual([])
+    // The design's `setCoord` is gone from the store, and the card's fields are `readOnly`.
+    const shell = stripComments(FILES.find((f) => f.path === 'src/renderer/state/shell.ts')!.text)
+    expect(shell).not.toMatch(/\bsetCoord\b/)
+    const card = stripComments(FILES.find((f) => f.path === 'src/renderer/app/CoordsCard.tsx')!.text)
+    expect(card).toMatch(/<input[^>]*\breadOnly\b/)
+    expect(card).not.toMatch(/onChange/)
   })
 
   it('has exactly one executor per tool, and no executor without a tool', () => {

@@ -463,7 +463,7 @@ describe('toolbar, status bar and lanes', () => {
       visibleCount: 40,
       federation,
       units: 'm' as const,
-      coords: { E: null, N: null, Z: null, angle: null }
+      bootGeoref: null
     }
     expect(statusValues(s)).toEqual({
       backend: 'WebGL2',
@@ -471,8 +471,8 @@ describe('toolbar, status bar and lanes', () => {
       visibleCount: 40,
       total: federation.elements.length,
       units: 'm',
-      // The mock federation has no georeferencing and nothing typed, so the CRS chip is the
-      // design's own em dash rather than its literal `SVY21` (`shared/georef.ts`).
+      // The mock federation has no georeferencing, so the CRS chip is the design's own em dash
+      // rather than its literal `SVY21` (`shared/georef.ts`).
       crs: '—'
     })
   })

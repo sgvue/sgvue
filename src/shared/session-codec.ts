@@ -110,6 +110,14 @@ export interface SessionPayload {
   stack: readonly FilterStep[]
   hlColor: string
   view: string | null
+  /**
+   * The base point — **written, never read back** since 2026-10-08, when the owner made the
+   * Coordinate-system card read-only: the base point always comes from the boot file
+   * (`sessionPatch` leaves it out). It is still written, as the boot file states it, for a build
+   * from before then, which restores it over its own reading of the same file — the same numbers
+   * for every file that build can read, and the base point of the frame the camera was saved in
+   * for one it cannot (a Revit export placed by its `WorldCoordinateSystem`).
+   */
   coords: SessionCoords
   cam: SessionCamera | null
   /**
@@ -128,6 +136,12 @@ export interface SessionPayload {
  * `section` key is derived from it on the way out and is never read back into it.
  */
 export type SessionSource = Omit<SessionPayload, 'models' | 'files' | 'cam' | 'frame' | 'section'>
+
+/**
+ * What a restore writes back (`sessionPatch`): everything a session saves but the base point,
+ * which since 2026-10-08 is the boot file's alone and is never restored from a payload.
+ */
+export type SessionRestore = Omit<SessionSource, 'coords'>
 
 /* ────────────────────────────── the two section planes ────────────────────────────── */
 
@@ -247,11 +261,15 @@ export function sessionPayload(
  *
  * `theme` is the port's one addition, and it is plan §3.5 item 2: the prototype persisted it
  * and then never applied it, so a session saved in light came back dark.
+ *
+ * `coords` is the one key the design restores (`:1697`) that this does not, since 2026-10-08:
+ * the Coordinate-system card is read-only and the base point always comes from the boot file, so
+ * a payload's own — typed into a build from before then, or written by this one — is ignored.
  */
 export function sessionPatch(
   p: Partial<SessionPayload>,
-  s: Pick<SessionSource, 'treeMode' | 'grids' | 'levels' | 'sections' | 'hlColor' | 'view' | 'coords' | 'theme'>
-): SessionSource {
+  s: Pick<SessionSource, 'treeMode' | 'grids' | 'levels' | 'sections' | 'hlColor' | 'view' | 'theme'>
+): SessionRestore {
   const pick = <K extends keyof SessionPayload>(k: K, d: SessionPayload[K]): SessionPayload[K] =>
     p[k] === undefined ? d : (p[k] as SessionPayload[K])
   return {
@@ -272,7 +290,6 @@ export function sessionPatch(
     stack: pick('stack', []),
     hlColor: pick('hlColor', s.hlColor),
     view: pick('view', s.view),
-    coords: pick('coords', s.coords),
     // `:1699` never restored these two; the design saves both (`:1682`) and the plan asks for
     // them back. `shadows` still goes through its own restore step below, because the design
     // routes it through `setShadows` rather than through the state patch.
@@ -288,11 +305,13 @@ export function sessionPatch(
  * The order is load-bearing: `setSection` before `setCamera` (a cut plane that arrives after a
  * camera flight re-frames nothing), `setShadows` before the camera, and `applyVis` **last**,
  * because it is the call that reads every one of the keys the patch has just written.
+ *
+ * The design's third step, `setCoords`, is not here since 2026-10-08: a restore never changes
+ * the base point, which is the boot file's (`sessionPatch`).
  */
 export const RESTORE_ORDER = [
   'grids',
   'levels',
-  'coords',
   'snap',
   'modelColors',
   'highlightColor',
@@ -311,7 +330,6 @@ export type RestoreStep = (typeof RESTORE_ORDER)[number]
 export interface RestoreTarget {
   grids(on: boolean): void
   levels(on: boolean): void
-  coords(c: SessionCoords): void
   snap(on: boolean): void
   modelColors(map: Record<string, string>, native: boolean): void
   highlightColor(c: string): void
@@ -335,7 +353,7 @@ export interface RestoreTarget {
  * meant something else.
  */
 export function applyRestore(
-  n: SessionSource,
+  n: SessionRestore,
   p: Partial<SessionPayload>,
   t: RestoreTarget,
   liveFrame: string
@@ -346,8 +364,6 @@ export function applyRestore(
   did('grids')
   t.levels(n.levels)
   did('levels')
-  t.coords(n.coords)
-  did('coords')
   t.snap(n.snap)
   did('snap')
   t.modelColors(n.modelColors || {}, n.nativeMats)

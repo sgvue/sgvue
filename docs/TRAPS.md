@@ -65,6 +65,20 @@ named so each trap can be traced to its original write-up.
   toss — IfcOpenShell's own reader takes the first. A sub-context of the `Model` context (`Body`)
   is a legal `SourceCRS` and the same frame: judge it by its `ParentContext`. Fall back to the
   first only when none is on the `Model` context. — 2026-10-08
+- **web-ifc 0.0.77 does not apply the `Model` context's `WorldCoordinateSystem` — neither its
+  move nor its turn.** A one-slab file streamed once with an identity WCS and once with a WCS
+  moved 1 km / 2 km / 300 m and turned 30° gives the very same `flatTransformation`, and
+  `GetCoordinationMatrix` stays the identity (`COORDINATE_TO_ORIGIN` is false); our own
+  `placementMatrix` composes only the `PlacementRelTo` chain, so grids and storeys agree with the
+  geometry. Revit writes the map position **there**, in project length units, whenever it writes
+  no EPSG code (its Survey Point, Project Base Point and Internal Origin exports) and in every
+  IFC2X3 export — the turn only in `TrueNorth` for the last two. So `shared/georef.ts`'s
+  `mapPlacement` applies it, once: a reader that ignores it puts those files at their local
+  origin. IfcOpenShell's `get_local_placement` ignores it too, and its `auto_xyz2enh` returns a
+  file with no map conversion unmoved; beside a conversion it undoes the WCS first, which is the
+  reading taken for that pair. If an upgrade starts applying it, the test in
+  `tests/unit/georef-federation.fixture.test.ts` fails before the position is added twice.
+  — 2026-10-08
 - **A file can hold many `IfcSite` entities; only the one `IfcProject` aggregates is the model's
   position.** The reference model has **16** — road-marking families exported as sites. Taking
   "the first by expressId" is a coin toss that this file happens to win. Walk

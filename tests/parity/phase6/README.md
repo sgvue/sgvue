@@ -85,6 +85,14 @@ without it one side would print coordinates and the other the em dash and the nu
 be compared. The values are the prototype's: `28500 E · 30200 N · 102.5 Z · 12.5°`. They stay
 typed for the three states that follow, which is why `coords-card` shows them on both sides.
 
+**Not since 2026-10-08.** The owner made the app's Coordinate-system card read-only, so the app
+refuses the typing and its base point is the boot file's — none, on the design's mock — and
+`spot-C1` now places the spot and types nothing. From `spot-C1` on, the app's states therefore
+differ from the captures measured below: its spot tag reads the level in the file's own metres,
+the Markups list's E / N / Z and the four Coordinate-system fields are blank, and the status
+bar's CRS chip stays the em dash, where the prototype keeps its own literal base point. The
+numbers below are the phase-6 measurement and are not re-baselined.
+
 ## The mask, and what the sidecars answer
 
 Each capture writes its surfaces' `getBoundingClientRect()`s beside the PNG. Phase 6 adds

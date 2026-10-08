@@ -1260,7 +1260,7 @@ test('a viewpoint is renamed by double-click: Enter keeps it, Esc cancels', asyn
 
 test('a spot shows its level only; a click on the tag shows E, N and Z, a second folds it', async () => {
   // 2026-09-28, owner-requested. The demo has no georeferencing, so the level is the file's own
-  // z until the Coordinate-system card is filled in.
+  // z — and since 2026-10-08 the Coordinate-system card is read-only, so it stays the file's.
   const { app, page } = await launch(dir)
   try {
     await openDemo(page)
@@ -1312,27 +1312,97 @@ test('a spot shows its level only; a click on the tag shows E, N and Z, a second
     expect((await folded.textContent())!.trim()).toBe(level)
     expect(await actionText(page)).toContain('1 spots')
 
-    // The Coordinate-system card re-renders both states: folded, the level is now the map Z.
+    // The Coordinate-system card is read-only (2026-10-08, the owner's): its four fields take no
+    // typing, and the tag keeps the file's own level — the demo states no base point.
     await page.locator('button[data-tip="Coordinate system & true north"]').click()
     const field = (label: string) => page.locator('label', { hasText: label }).locator('input')
-    await field('Easting m').fill('28500')
-    await field('Northing m').fill('30200')
-    await field('Elevation m').fill('102.5')
-    await field('True north °').fill('12.5')
-    await expect(folded).toHaveText(signedF3(102.5 + f.z))
-    await folded.click()
-    const rows = open.locator('span')
-    // E, N and Z are numbers now, and Z is the level the folded tag showed.
-    await expect(rows.nth(1)).not.toHaveText('—')
-    await expect(rows.nth(5)).toHaveText(signedF3(102.5 + f.z).slice(1))
-    // And open, it follows the card too.
-    await field('Elevation m').fill('50')
-    await expect(rows.nth(5)).toHaveText(signedF3(50 + f.z).slice(1))
-    await open.click()
-    await expect(folded).toHaveText(signedF3(50 + f.z))
+    for (const label of ['Easting m', 'Northing m', 'Elevation m', 'True north °']) {
+      await expect(field(label)).toHaveAttribute('readonly', '')
+      await expect(field(label)).toHaveValue('')
+    }
+    await field('Easting m').click()
+    await page.keyboard.type('28500')
+    await expect(field('Easting m')).toHaveValue('')
+    await expect(folded).toHaveText(level)
     expect(await actionText(page)).toContain('1 spots')
   } finally {
     await app.close()
+  }
+})
+
+/**
+ * 2026-10-08 — coordinates part 2. The Coordinate-system card is read-only (the owner: *"Maybe just
+ * make the coordinates system toggle a read only, dont let user change anything."*), its caption
+ * names the method that placed the boot file, and a one-line note under the caption names a
+ * model that could not be lined up (the owner's choice: *"One-line note on screen"*). Two synthetic
+ * fixtures that line up, then one of them beside `tiny.ifc`, which states no map position.
+ */
+test('the Coordinate-system card is read-only, and names a model that could not be lined up', async () => {
+  const A = join(ROOT, 'tests/fixtures/georef/a-site-placement.ifc')
+  const B = join(ROOT, 'tests/fixtures/georef/b-map-conversion.ifc')
+  const caption = (page: Page) => page.locator('span', { hasText: /^project base point/ })
+  const field = (page: Page, label: string) => page.locator('label', { hasText: label }).locator('input')
+  const note = (page: Page) => page.locator('[data-role="coords-note"]')
+
+  // ── two files that line up: the file's base point, read-only, and no note ──
+  {
+    const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: `${A}:::${B}` })
+    try {
+      await page.getByText(DROP_COPY).click()
+      await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+      await page.locator('button[data-tip="Coordinate system & true north"]').click()
+      await expect(caption(page)).toHaveText('project base point · IfcSite placement')
+      const want: [string, string][] = [
+        ['Easting m', '12345.457'],
+        ['Northing m', '23456.766'],
+        ['Elevation m', '5.05'],
+        ['True north °', '-43.4103']
+      ]
+      for (const [label, value] of want) {
+        await expect(field(page, label)).toHaveValue(value)
+        await expect(field(page, label)).toHaveAttribute('readonly', '')
+      }
+      // Typing reaches no field; a value can still be selected, to be copied.
+      await field(page, 'Northing m').click()
+      await page.keyboard.press('ControlOrMeta+A')
+      await page.keyboard.type('30200')
+      await expect(field(page, 'Northing m')).toHaveValue('23456.766')
+      expect(
+        await field(page, 'Northing m').evaluate((e) => {
+          const i = e as HTMLInputElement
+          return i.value.slice(i.selectionStart ?? 0, i.selectionEnd ?? 0)
+        })
+      ).toBe('23456.766')
+      await expect(note(page)).toHaveCount(0)
+      expect(await statusText(page)).toContain('SVY21')
+    } finally {
+      await app.close()
+    }
+  }
+
+  // ── one of them beside a file with no map position: the note, on one line, its title whole ──
+  {
+    const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: `${A}:::${TINY}` })
+    try {
+      await page.getByText(DROP_COPY).click()
+      await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+      await page.locator('button[data-tip="Coordinate system & true north"]').click()
+      const text = 'tiny.ifc could not be lined up — it has no map position.'
+      await expect(note(page)).toHaveText(text)
+      await expect(note(page)).toHaveAttribute('title', text)
+      const style = await note(page).evaluate((e) => {
+        const c = getComputedStyle(e)
+        return [c.whiteSpace, c.overflow, c.textOverflow, c.fontSize, Math.round(e.getBoundingClientRect().height)]
+      })
+      expect(style.slice(0, 4)).toEqual(['nowrap', 'hidden', 'ellipsis', '12px'])
+      // One line of 12 px text.
+      expect(style[4]).toBeLessThan(20)
+      // The base point is still the boot file's, and still read-only.
+      await expect(field(page, 'Easting m')).toHaveValue('12345.457')
+      await expect(field(page, 'Easting m')).toHaveAttribute('readonly', '')
+    } finally {
+      await app.close()
+    }
   }
 })
 

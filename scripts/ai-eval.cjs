@@ -61,7 +61,8 @@
  * saved. Cleared before the window loads, in `openFixture`.
  *
  * Phase 3, the consent gate: the view also carries the loaded models and the base point (both
- * from `get_view_state`), and the store the saved filter sets by name and what the sidebar's
+ * from `get_view_state` — the base point read-only since 2026-10-08, so only "nothing moved"
+ * reads it), and the store the saved filter sets by name and what the sidebar's
  * unload confirmation reads, if it is up — so a case can show that a request left all of it
  * alone, and what the user's Apply then did. The Apply is the store's own `applyPending`, as it
  * always was here; a request that needs a real click — a clipboard write wants user activation —

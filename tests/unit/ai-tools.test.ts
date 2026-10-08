@@ -37,8 +37,6 @@
 import type { Anthropic } from '@anthropic-ai/sdk'
 import { describe, expect, it } from 'vitest'
 import {
-  BASE_POINT_KEYS,
-  BASE_POINT_MAX,
   DESIGN_TOOL_NAMES,
   FILTER_SET_NAME_MAX,
   GATED_CALLS,
@@ -1056,12 +1054,9 @@ describe('parity with the user — phase 3: the consent gate', () => {
       'model',
       'ids',
       'selection',
-      // Phase 4: the open schedule's rows, for copy_guids.
-      'schedule',
-      'E',
-      'N',
-      'Z',
-      'angle'
+      // Phase 4: the open schedule's rows, for copy_guids. (E, N, Z and angle went with
+      // `set_base_point` on 2026-10-08, when the Coordinate-system card became read-only.)
+      'schedule'
     ])
     expect(ask.input_schema.required).toEqual(['action'])
     expect(ask.input_schema.properties.action.enum).toEqual(REQUEST_ACTIONS)
@@ -1070,11 +1065,8 @@ describe('parity with the user — phase 3: the consent gate', () => {
       'open_recent',
       'unload_model',
       'copy_link',
-      'copy_guids',
-      'set_base_point'
+      'copy_guids'
     ])
-    expect([...BASE_POINT_KEYS]).toEqual(['E', 'N', 'Z', 'angle'])
-    for (const k of BASE_POINT_KEYS) expect([k, ask.input_schema.properties[k].type]).toEqual([k, 'number'])
     expect(ask.input_schema.properties.recent.description).toContain('a name, never a path')
     expect(ask.input_schema.properties.ids.description).toContain(`at most ${MAX_TOOL_IDS}`)
   })
@@ -1095,11 +1087,12 @@ describe('parity with the user — phase 3: the consent gate', () => {
       'raises the sidebar’s own "Unload …?" confirmation',
       'it is refused while only one model is loaded',
       'the result never contains what would be copied',
-      'which changes every coordinate read-out',
       'wait behind an Apply button under your reply'
     ]) {
       expect([said, d.includes(said)]).toEqual([said, true])
     }
+    // 2026-10-08: the base point is read-only, and nothing here offers to change it.
+    expect(d).not.toMatch(/base point|set_base_point/)
   })
 
   it('refuses a recent file that is a path, a number out of range, and an action it does not have', () => {
@@ -1117,28 +1110,17 @@ describe('parity with the user — phase 3: the consent gate', () => {
       parseToolInput('request_user_action', { action: 'open_recent', recent: 'x'.repeat(RECENT_NAME_MAX + 1) })
     ).toThrow(/request_user_action: recent/)
     expect(() => parseToolInput('request_user_action', {})).toThrow(/request_user_action: action/)
-    for (const action of ['unload_all', 'delete_file', 'save_model', 'quit', 'set_api_key', 'open_path']) {
+    for (const action of ['unload_all', 'delete_file', 'save_model', 'quit', 'set_api_key', 'open_path', 'set_base_point']) {
       expect(() => parseToolInput('request_user_action', { action })).toThrow(/request_user_action: action/)
     }
     // An extra key is dropped, never passed on: no path, name to write or content reaches an executor.
     expect(parseToolInput('request_user_action', { action: 'open_files', path: 'C:/x.ifc', file: 'x' })).toEqual({
       action: 'open_files'
     })
-    // The base point: finite, bounded metres and degrees.
-    expect(parseToolInput('request_user_action', { action: 'set_base_point', E: 28500, angle: -12.5 })).toEqual({
-      action: 'set_base_point',
-      E: 28500,
-      angle: -12.5
+    // 2026-10-08: the base point's four numbers are no input any more — dropped, like any extra key.
+    expect(parseToolInput('request_user_action', { action: 'copy_link', E: 28500, angle: -12.5 })).toEqual({
+      action: 'copy_link'
     })
-    expect(() => parseToolInput('request_user_action', { action: 'set_base_point', E: BASE_POINT_MAX * 10 })).toThrow(
-      /request_user_action: E/
-    )
-    expect(() => parseToolInput('request_user_action', { action: 'set_base_point', Z: Number.NaN })).toThrow(
-      /request_user_action: Z/
-    )
-    expect(() => parseToolInput('request_user_action', { action: 'set_base_point', N: '30200' })).toThrow(
-      /request_user_action: N/
-    )
     // After review: a filter set's name is bounded as a viewpoint's lookup name is — it is the
     // model's own text, it is stored, and it is shown in the Filter card and in a pending label.
     expect(FILTER_SET_NAME_MAX).toBe(200)
@@ -1147,9 +1129,6 @@ describe('parity with the user — phase 3: the consent gate', () => {
       expect(() => parseToolInput('manage_filters', { op, name: 'x'.repeat(201) })).toThrow(/manage_filters: name.*at most 200 characters/)
     }
     expect(toolByName('manage_filters')!.input_schema.properties.name.description).toContain('at most 200 characters')
-    expect(() => parseToolInput('request_user_action', { action: 'set_base_point', angle: 361 })).toThrow(
-      /request_user_action: angle — between -360 and 360 degrees/
-    )
     expect(() =>
       parseToolInput('request_user_action', { action: 'copy_guids', ids: Array(MAX_TOOL_IDS + 1).fill(1) })
     ).toThrow(/request_user_action: ids/)
@@ -1223,15 +1202,25 @@ describe('parity with the user — phase 3: the consent gate', () => {
     }
     // Every action of request_user_action is gated: there is no call of it that acts.
     for (const action of REQUEST_ACTIONS) expect([action, gateOf('request_user_action', { action }) !== null]).toEqual([action, true])
-    // Eleven of phase 3, three of phase 4 (the Schedules window's delete, print and open_file).
-    expect(GATED_CALLS).toHaveLength(14)
+    // Eleven of phase 3, three of phase 4 (the Schedules window's delete, print and open_file) —
+    // less `set_base_point`, which went with the read-only Coordinate-system card (2026-10-08).
+    expect(GATED_CALLS).toHaveLength(13)
   })
 
   it('get_view_state says it reads the base point back, and whose it is', () => {
     const d = toolByName('get_view_state')!.description
-    for (const said of ['(basePoint)', 'E, N and Z in metres', 'file when the four are what the file states', 'Read-only.']) {
+    for (const said of [
+      '(basePoint)',
+      'E, N and Z in metres',
+      'file when the four are what the file states',
+      // 2026-10-08: read-only, and the models the Coordinate-system card's note names.
+      'nothing in the app can change it',
+      '(notLinedUp)',
+      'Read-only.'
+    ]) {
       expect([said, d.includes(said)]).toEqual([said, true])
     }
+    expect(d).not.toContain('user when someone has changed them')
   })
 })
 

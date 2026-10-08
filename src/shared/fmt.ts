@@ -96,3 +96,26 @@ export const group = (v: number): string => v.toLocaleString('en-US')
  */
 export const group3 = (v: number): string =>
   v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+
+/* ────────────────────────────── text, not numbers ────────────────────────────── */
+
+/** Control characters, and Unicode's invisible direction and width marks. */
+const UNSEEN = /[\p{Cc}\u200B-\u200F\u202A-\u202E\u2066-\u2069]/gu
+
+/**
+ * A name as a pending label, or the result of a request, may carry it (2026-10-02, the gate's
+ * review): control characters and the invisible direction and width marks are taken out, and it
+ * is clipped at `max` characters. **Every name that goes into a label or a request's result
+ * comes through here** — and since 2026-10-08 every model name the Coordinate-system card's note
+ * prints, which is why it lives here and not in `renderer/ai/executors/context.ts`, which
+ * re-exports it.
+ *
+ * A viewpoint's or a filter set's name is whatever was typed, and a file's is whatever the disk
+ * has. A label is what the user reads before they click Apply: a newline in a name would break
+ * the row in two, and a right-to-left override would show its text in another order — either
+ * could make the row read as something it is not.
+ */
+export const labelText = (text: string, max: number): string => {
+  const clean = text.replace(UNSEEN, '')
+  return clean.length > max ? clean.slice(0, max) + '…' : clean
+}

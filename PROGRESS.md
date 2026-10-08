@@ -3,6 +3,72 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-08 — coordinates, part 2: the WorldCoordinateSystem, a note for a model that cannot be lined up, and a read-only Coordinate-system card
+
+**Did:** rule 4 of the owner's five (*"Yes, all five"*), and the two things they chose for the
+card — *"One-line note on screen"* and *"Maybe just make the coordinates system toggle a read
+only, dont let user change anything."* **(A) The `WorldCoordinateSystem`.** Measured first:
+web-ifc 0.0.77 applies the `Model` context's WCS to no placement, neither its move nor its turn
+(a test pins it with an inline STEP file; `docs/TRAPS.md`). So `mapPlacement` applies it: with no
+map conversion and a WCS that is not the identity, M = the WCS (its origin through the length
+unit, its own turn), then `TrueNorth`'s turn, atan2(x, y), only when nothing else turns — the
+sign is the one that puts the project's true north on map north, and equals the conversion the
+same Revit export writes with an EPSG code. Beside a conversion the WCS is undone first, M = C ∘
+WCS⁻¹ — IfcOpenShell's reading — and `get_model_info` says `ambiguous`. `placedBy` and the
+caption's method gain `WorldCoordinateSystem` (`+ IfcSite placement`). The index builder reads
+the 3D `Model` context's WCS (`readWcs`, `Georeference.wcs`; `placementMatrix`'s axis step
+factored out as `axisMatrix`). Three fixtures: (i) Revit Project Base Point with no EPSG code,
+(j) its IFC2X3 twin, (k) a WCS beside a conversion. **(B) The note.** `notLinedUp` / `lineUpNote`
+(`selectors/status.ts`): a loaded model whose file states no map position while another's does,
+or one the stream flagged `farPlacement` (now with its distance; recorded only for a model that
+did not set the offset); a boot model with no map position is named, and no distance is. One
+line under the caption row, the caption span's style string plus `nowrap` / `hidden` /
+`ellipsis`, the whole text as its `title`; names are the sidebar's file line through
+`labelText` (moved to `shared/fmt.ts`). `get_model_info` and `get_view_state` report
+`notLinedUp`. **(C) Read-only.** The four fields are `readOnly`; `setCoord`, the `onChange`,
+`request_user_action`'s `set_base_point` (zod, schema, `PendingAction`, `performGated`, the
+gate — 13 calls — the ticker, the prompt, the eval case and its grader check), the `basePoint`
+revert part, the `user` source and the dev hook `setCoords` are gone. The store keeps
+`bootGeoref` — the declaration that defined P — beside `frame`; `setOffset` is the one place
+`coords` is written, and the base point, both chips, the caption and the source are read off it,
+so they stay right after the boot model is unloaded (the part-1 review's deferred item) and are
+cleared with the frame. A session's `coords` is ignored on restore and still written, for older
+builds. Docs: two allowed-deviation entries and four amended, five decision lines, three
+decision rows and six amended, a trap, `SYSTEM_SPEC.md`, `AI_EVAL.md`, `COMMANDS.md`.
+
+**Measured:** the eleven fixtures federate within 1 mm in all 110 ordered pairs, and IfcOpenShell
+agrees product by product: `auto_xyz2enh` for (a), (b), (f) and (k), and its own `get_wcs` and
+`get_true_north`, composed as Revit writes them, for (i) and (j) — `auto_xyz2enh` returns a file
+with no conversion unmoved. Production builds against the
+commit before (the real main process, files through the Open dialog's dev gate, 1280 × 820, both
+themes): the demo's card byte-identical, its window byte-identical to one of this build's own
+two renderings (overlay-label antialiasing alternates run to run, 1 802 / 1 729 px, in both
+builds); `a-site-placement.ifc` + `b-map-conversion.ifc` — card byte-identical, no note;
+`a-site-placement.ifc` + `tiny.ifc` — the note `tiny.ifc could not be lined up — it has no map
+position.`, clipped (288 > 270 px) with its whole `title`, the card 294.2 → 323.0 px, the window
+with the card closed byte-identical; (i) + (a) — 26 km apart before, one building after, and the
+card's base point the synthetic position under `WorldCoordinateSystem + IfcSite placement`
+(before: `E 4 · N -2.5 · Z 0` under `IfcSite placement`).
+
+**Verified:** `npm run typecheck` exit 0; `npm test` **144 files passed / 2 skipped, 2 829 tests
+passed / 3 skipped**; `npm run build` exit 0; `npm run test:e2e` **63 passed, 6 skipped** in
+8.1 m (one new case: the card read-only with a fixture's base point, a value selectable, no note
+for a pair that lines up, the note on one clipped line with its title for one that does not) —
+peak one process 412 MB, all 802 MB, GPU dedicated 265 MB, `clean:`; the eval oracle **65 / 65**
+and the null agent **0 / 65** (`ai-eval.cjs --dry-run` / `--null`, guarded). Nothing survived.
+
+**After the deep review** (code approved; two stale doc statements): `SYSTEM_SPEC.md` counts
+thirteen gated calls and thirteen `PendingAction` kinds, and drops the base point's stale-request
+clause; a WCS tilted at the origin is the identity, as a tilted site is (a test each in
+`georef.test.ts` and `render-selectors.test.ts`); the IfcOpenShell wording says what is its
+reading and what is ours; the phase-6 parity chain's `spot-C1` types nothing into the read-only
+card (`tests/parity/phase6/README.md` says why its states differ from there on); the rule-4 row
+records two limits; the web-ifc probe closes its models. `npm run typecheck` exit 0; `npm test`
+**2 831 passed / 3 skipped** (144 files / 2 skipped).
+
+**Not verified:** a real Revit export with no EPSG code (none in `samples/`), macOS, and the
+owner's own files.
+
 ## 2026-10-08 — coordinates, part 1: the federation is assembled in map space
 
 **Did:** the owner's mixed federation — *"My ifc are based on site placement while other are
@@ -1563,47 +1629,26 @@ passed, 6 skipped** (3.8 min; one new case on the demo: grid C outlines in the e
 recolours it), peak working set 220 MB one process / 777 MB all, GPU dedicated 265 MB, `clean:`;
 `frame-triggers.cjs` 24 / 24 and 0 renders at rest. No Electron of this run survived.
 
-## 2026-09-28 — a spot shows its level only, and the snap takes the surface being looked at
-
-**Did:** the owner's *"I need the spot coordinate to show level only most of the time and
-prioritize on the surface camera is watching on."*, with their choices. **(1) The spot tag**
-is collapsed for every new spot to one line, `▽ +110.900`: a drawn 8 × 7 px triangle (the
-self-hosted IBM Plex Mono maps no triangle, so a typed one would fall back), then the map Z —
-or with no base point the file's own z — with `+` / U+2212 (`signedF3`). A click on the tag
-shows the design's grid, byte for byte (`spotGridHtml`, the old `spotHtml` moved to
-`shared/annotate.ts`), and a second click folds it; per spot, session only. Collapsed it stands
-at (33, −7) so its corner sits on the dot where the grid's does at (70, −34). The tag takes the
-click like a grid bubble (`pointer-events`, `cursor`, `user-select`, a `title`) and the click
-never reaches the canvas. The Markups list, `N spots` and `on.spot` are unchanged. **(2) The
-snap** (`snap.ts`, `SnapDepth`), spot and laser alike: a candidate more than `1 mm × scale`
-beyond the hit face's plane from the camera, or on the cut-away side of the section, is never
-taken; on-plane candidates first, then visible off-plane ones, the design's rule in each; an
-edge whose foot is hidden gives its nearest-to-camera visible point inside 11 px. Without the
-depth view it is the design's rule, case for case. **(3)** `exportName()` cuts each part so the
-suggested name fits main's 200-character cap (last review's item).
-
-**Verified:** `npm run typecheck` exit 0; `npm test` **119 files passed / 2 skipped, 1 884 tests
-passed / 3 skipped** (14 new: 10 snap, 2 spot-tag HTML, 1 `signedF3`, 1 export name);
-`npm run build` exit 0; `npm run test:e2e` **39 passed, 6 skipped** (3.5 min; one new case: a
-spot's tag is one line, a click opens the design's grid — its `innerHTML` equal to
-`spotGridHtml` — with the canvas's pixels and `1 spots` unchanged, a second click folds it,
-and the Coordinate-system card re-renders both states), peak working set 228 MB one process /
-776 MB all, GPU dedicated 260 MB, `clean:`. Parity (phase-6 chain on the mock, guarded, each
-theme its own run, HEAD → this build): label readback identical for the first ten states; from
-`spot-C1` the tag is `+110.900` (85 × 28) for the 153 × 82 grid, and the spot and
-`markups-card`'s second measurement moved from the wall's hidden bottom-back corner to the sill
-face under the cursor (`Z 110.000 → 110.900`, `M2 Y 9 025 · Z 2 700 → 8 865 · 1 800`).
-Toggling the tag and back leaves the frame pixel-identical, both themes.
-
 ## Earlier work
 
-Compressed: the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-09-28 — a spot shows its level only, and the snap takes the surface being looked at.** The
+owner: *"I need the spot coordinate to show level only most of the time and prioritize on the
+surface camera is watching on."* A new spot's tag is one line, `▽ +110.900` — a drawn triangle,
+then the map Z, or with no base point the file's own z — a click opens the design's E / N / Z
+grid byte for byte and a second folds it, per spot for the session, and the click never reaches
+the canvas. The snap, spot and laser alike, never takes a corner or edge hidden behind the face
+under the cursor or cut away by the section, tries on-plane candidates first, and gives an edge
+whose foot is hidden its nearest visible point within 11 px (`SnapDepth`); without the depth view
+it is the design's rule. 1 884 unit tests; e2e 39 passed, 6 skipped; on the phase-6 parity chain
+the spot moved from a hidden corner 900 mm below to the sill face under the cursor.
 
 **2026-09-28 — the assistant exports a schedule and colours the model by one of its columns.**
 The owner's last two schedule abilities. `export_schedule` (view, `{format}` of `xlsx` · `csv` ·

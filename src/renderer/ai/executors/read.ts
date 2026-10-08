@@ -43,7 +43,7 @@ import {
   type SummaryRow
 } from '../analysis'
 import { modelLabel } from '../../state/selectors/models'
-import { basePointSource } from '../../state/selectors/status'
+import { basePointSource, notLinedUp, type NotLinedUp } from '../../state/selectors/status'
 import { cameraNow, groupCounts } from './view'
 import { carriedInFederation, topOf, valueHints } from './names'
 import { scheduleBriefOf } from './schedule'
@@ -67,15 +67,22 @@ export const MAP_UNIT_NAME_CHARS = 60
 
 /**
  * 2026-10-08 — how one model was put into the federation's map space, for `get_model_info`:
- * the declaration that placed it (`IfcMapConversion`, `ePset_MapConversion`, `site placement` —
- * its world coordinates are its map coordinates — or `none`); the unit its Eastings, Northings
- * and height were read in, with `assumedMetre` when the file names none or one that is not a
- * length this knows; and that `Scale`, reported beside it as written, was not applied.
+ * the declaration that placed it (`IfcMapConversion`, `ePset_MapConversion`,
+ * `WorldCoordinateSystem` — rule 4, where Revit writes the map position with no EPSG code —
+ * `site placement` — its world coordinates are its map coordinates — or `none`); the unit its
+ * Eastings, Northings and height were read in, with `assumedMetre` when the file names none or one
+ * that is not a length this knows; that `Scale`, reported beside it as written, was not applied;
+ * the context's `WorldCoordinateSystem` when it is not the identity and how it was read; the turn
+ * `TrueNorth` put into the placement, if any; and `ambiguous` when a map conversion and a
+ * `WorldCoordinateSystem` that is not the identity stand together, which IFC leaves open.
  */
 function placementReadout(georef: Georeference): {
   placedBy: PlacedBy
   mapUnit: { name: string | null; metresPerUnit: number; assumedMetre: boolean }
   scaleApplied: false
+  worldCoordinateSystem: { originMetres: readonly number[]; rotationDeg: number; readAs: string } | null
+  trueNorthAppliedDeg: number | null
+  ambiguous: string | null
 } {
   const p = mapPlacement(georef)
   return {
@@ -85,7 +92,14 @@ function placementReadout(georef: Georeference): {
       metresPerUnit: p.metresPerMapUnit,
       assumedMetre: p.mapUnit === null || !p.mapUnitKnown
     },
-    scaleApplied: false
+    scaleApplied: false,
+    worldCoordinateSystem: p.wcs
+      ? { originMetres: [...p.wcs.origin], rotationDeg: p.wcs.rotationDeg, readAs: p.wcs.readAs }
+      : null,
+    trueNorthAppliedDeg: p.trueNorthDeg,
+    ambiguous: p.ambiguous
+      ? 'The file states a map conversion and a WorldCoordinateSystem that is not the identity. IFC leaves that pair ambiguous; the WorldCoordinateSystem was undone before the conversion, as IfcOpenShell reads it.'
+      : null
   }
 }
 
@@ -849,6 +863,8 @@ export const get_model_info: Executor = (input, ctx) => {
   const wanted = typeof input.model === 'string' ? input.model : null
   const models = s.federation.models.filter((m) => !wanted || m.meta.modelKey === wanted)
   if (!models.length) return notLoaded(wanted, s.loaded)
+  // 2026-10-08 — which loaded models could not be lined up: the Coordinate-system card's note.
+  const issues = notLinedUp(s)
   return {
     forModel: {
       message: `${models.length} model${models.length === 1 ? '' : 's'}.`,
@@ -914,6 +930,10 @@ export const get_model_info: Executor = (input, ctx) => {
            */
           projectBasePoint: coordsFromGeoref(meta.georef),
           ...placementReadout(meta.georef),
+          // 2026-10-08 — whether it lines up with the others, as the Coordinate-system card's
+          // note says: `null` when it does (and with one model loaded, when there is nothing to
+          // line up with).
+          notLinedUp: lineUpOf(issues.find((x) => x.key === meta.modelKey)),
           corenetX: corenetReadout(meta.georef)
         },
         storeys: meta.storeys.map((x) => ({
@@ -931,6 +951,21 @@ export const get_model_info: Executor = (input, ctx) => {
       }))
     }
   }
+}
+
+/**
+ * 2026-10-08 — one model's entry in the Coordinate-system card's note, as the assistant reads it:
+ * why it could not be lined up — it states no map position while another model does, or it landed
+ * far from the federation offset another model set — and how far, in kilometres. `null` when it
+ * lines up.
+ */
+function lineUpOf(
+  issue: NotLinedUp | undefined
+): { reason: 'it has no map position' | 'it sits far from the others'; km: number | null } | null {
+  if (!issue) return null
+  return issue.reason === 'far'
+    ? { reason: 'it sits far from the others', km: Math.round((issue.metres ?? 0) / 100) / 10 }
+    : { reason: 'it has no map position', km: null }
 }
 
 /** Models `get_view_state` lists one by one. A federation has a handful; past this it says so. */
@@ -962,12 +997,17 @@ export const VIEW_MODEL_NAME_CHARS = 120
  *   viewpoints     the saved viewpoints — name, what each holds, which was restored last — the
  *                  first twenty, with `viewpointsTotal` when there are more
  *
- * and since phase 3, what `request_user_action` may ask the user to change:
+ * and since phase 3:
  *
  *   basePoint      the Coordinate-system card's four fields — E, N, Z in metres, `angle` the
- *                  true-north rotation in degrees — and `source`: `file`, `user` or `none`. It
- *                  was the one session key left out until then; every E / N / Z read-out is
- *                  computed with it, so the assistant has to be able to see whose numbers they are
+ *                  true-north rotation in degrees — and `source`: `file` or `none`. Every
+ *                  E / N / Z read-out is computed with it. (`user` too until 2026-10-08, when
+ *                  the owner made the card read-only: the base point is the boot file's alone.)
+ *
+ * and since 2026-10-08:
+ *
+ *   notLinedUp     the loaded models the Coordinate-system card's note names — each one's key,
+ *                  why it could not be lined up and how far — or `[]`
  *
  * `section` stays the one string it was (`grid C + level L2`): the evaluation suite grades it,
  * and `sectionPlanes` is where the detail is. It starts from `viewStateCore`, not from the
@@ -1026,7 +1066,11 @@ export const get_view_state: Executor = (_input, ctx) => {
       ...(camera ? { camera } : {}),
       viewpoints: saved.viewpoints,
       ...(saved.truncated ? { viewpointsTotal: saved.total, viewpointsTruncated: true } : {}),
-      basePoint: basePointState(s)
+      basePoint: basePointState(s),
+      notLinedUp: notLinedUp(s).map((x) => ({
+        model: x.key,
+        ...lineUpOf(x)!
+      }))
     }
   }
 }
@@ -1038,20 +1082,20 @@ export interface BasePointState {
   Z: number | null
   /** True north, degrees clockwise from project north. */
   angle: number | null
-  source: 'file' | 'user' | 'none'
+  source: 'file' | 'none'
 }
 
 /**
- * `get_view_state`'s `basePoint`, and what `request_user_action` reads back beside a request to
- * change it (2026-10-02). A field the file does not state and nobody has typed is `null` — never
- * a zero, which would read as a coordinate.
+ * `get_view_state`'s `basePoint` (2026-10-02). A field the file does not state is `null` — never
+ * a zero, which would read as a coordinate. Since 2026-10-08 the four fields are always the boot
+ * file's: the card is read-only and nothing can change them, so `source` is `file` or `none`.
  */
 export const basePointState = (s: ShellState): BasePointState => ({
   E: s.coords.E,
   N: s.coords.N,
   Z: s.coords.Z,
   angle: s.coords.angle,
-  source: basePointSource(s.coords, s.federation)
+  source: basePointSource(s.bootGeoref)
 })
 
 export const measure_between: Executor = (input, ctx) => {

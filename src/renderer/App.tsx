@@ -310,7 +310,8 @@ async function installDevTools(viewer: Viewer): Promise<void> {
     hint: () => shell().hint,
     setTool: (t: 'select' | 'measure' | 'spot') => viewer.setTool(t),
     setSnap: (b: boolean) => viewer.setSnap(b),
-    setCoords: (c: Record<string, number>) => viewer.setCoords(c),
+    // No `setCoords` since 2026-10-08: the base point is the boot file's, read-only, and the store
+    // pushes it to the viewer (`setOffset`) — a hook that set the viewer's alone would split them.
     /**
      * Phase 7. The design gives colour-by-property no manual control — only the assistant's
      * `color_by_property` tool sets it (`SGVue.dc.html:1547`), which is Phase 9 — so the
