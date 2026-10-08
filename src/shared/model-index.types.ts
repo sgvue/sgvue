@@ -252,16 +252,32 @@ export interface Georeference {
    * fields below. `'none'` when every one of them is identity.
    */
   method: GeorefMethod
-  /** `IfcMapConversion`, map units. Not scaled by the model's length unit. */
+  /**
+   * `IfcMapConversion`, as written, in the map unit (`mapUnit`; the metre when the file names
+   * none). Not scaled by the model's length unit, nor by `scale`.
+   */
   eastings?: number
   northings?: number
   orthogonalHeight?: number
   xAxisAbscissa?: number
   xAxisOrdinate?: number
-  /** Degrees clockwise from map north, derived from the two axis components. */
+  /**
+   * Degrees anticlockwise about `+Z`, from map east to the engineering `+X` axis:
+   * `atan2(xAxisOrdinate, xAxisAbscissa)`, derived from the two axis components.
+   */
   rotationDeg?: number
-  /** `IfcMapConversion.Scale` — file units → map units, independent of the length unit. */
+  /**
+   * `IfcMapConversion.Scale` as written. Reported, **never applied** (2026-10-08): exporters
+   * write it as absent, 0.001 and 1000 for the same millimetre model in a metre CRS.
+   */
   scale?: number
+  /**
+   * `IfcProjectedCRS.MapUnit` — IFC2X3: `ePset_ProjectedCRS`'s `MapUnit`, a name — as the file
+   * names it (an SI unit as prefix + name, `MILLIMETRE`), and `metres` per one of it when it
+   * reads as a length. Absent when the file names no map unit: Eastings, Northings and
+   * OrthogonalHeight are then metres (`shared/georef.ts`, `mapPlacement`).
+   */
+  mapUnit?: { name: string; metres?: number }
   crs?: ProjectedCrs
   site?: SiteGeoref
   /**

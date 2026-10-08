@@ -21,11 +21,17 @@ import { ATTR_KEYS, attr } from '../../../shared/attr'
 import { rankKeys } from '../../../shared/prop-names'
 import { displayState, sectionPlanes, viewStateCore } from '../../../shared/ai-schema'
 import { corenetReadout } from '../../../shared/corenet'
-import { coordsFromGeoref, isIdentityMapConversion, toMap } from '../../../shared/georef'
+import {
+  coordsFromGeoref,
+  isIdentityMapConversion,
+  mapPlacement,
+  toMap,
+  type PlacedBy
+} from '../../../shared/georef'
 import { visFn, type Rule } from '../../../shared/rules'
 import { measureKind, unitLabel, type UnitKind } from '../../../shared/units'
 import type { ShellState } from '../../state/shell'
-import type { SpatialNode, Units } from '../../../shared/model-index.types'
+import type { Georeference, SpatialNode, Units } from '../../../shared/model-index.types'
 import {
   METRICS,
   auditModel,
@@ -50,10 +56,38 @@ import {
   brief,
   capped,
   chatMatch,
+  labelText,
   notLoaded,
   validValues,
   type Executor
 } from './context'
+
+/** A map unit's name is file text; past this it is clipped, like every other name in a result. */
+export const MAP_UNIT_NAME_CHARS = 60
+
+/**
+ * 2026-10-08 — how one model was put into the federation's map space, for `get_model_info`:
+ * the declaration that placed it (`IfcMapConversion`, `ePset_MapConversion`, `site placement` —
+ * its world coordinates are its map coordinates — or `none`); the unit its Eastings, Northings
+ * and height were read in, with `assumedMetre` when the file names none or one that is not a
+ * length this knows; and that `Scale`, reported beside it as written, was not applied.
+ */
+function placementReadout(georef: Georeference): {
+  placedBy: PlacedBy
+  mapUnit: { name: string | null; metresPerUnit: number; assumedMetre: boolean }
+  scaleApplied: false
+} {
+  const p = mapPlacement(georef)
+  return {
+    placedBy: p.placedBy,
+    mapUnit: {
+      name: p.mapUnit === null ? null : labelText(p.mapUnit, MAP_UNIT_NAME_CHARS),
+      metresPerUnit: p.metresPerMapUnit,
+      assumedMetre: p.mapUnit === null || !p.mapUnitKnown
+    },
+    scaleApplied: false
+  }
+}
 
 const asRules = (v: unknown): Rule[] => (Array.isArray(v) ? (v as Rule[]) : [])
 
@@ -874,11 +908,12 @@ export const get_model_info: Executor = (input, ctx) => {
           trueNorth: meta.georef.trueNorth ?? null,
           epsetName: meta.georef.epsetName ?? null,
           /**
-           * The map coordinates of the project frame's origin and the total rotation from
-           * project north to true north — what the Coordinate-system card shows, and what
-           * every E / N / Z readout in the app is computed with.
+           * The map coordinates of this model's project frame's origin and the total rotation
+           * from project north to true north. The Coordinate-system card shows the **boot**
+           * model's, which is the frame the whole federation is placed in.
            */
           projectBasePoint: coordsFromGeoref(meta.georef),
+          ...placementReadout(meta.georef),
           corenetX: corenetReadout(meta.georef)
         },
         storeys: meta.storeys.map((x) => ({

@@ -8,7 +8,7 @@ import { federate } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { group } from '../../src/shared/fmt'
 import type { FilterStep } from '../../src/shared/rules'
-import { coordsCaption } from '../../src/renderer/state/selectors/status'
+import { basePointSource, cardGeoref, coordsCaption } from '../../src/renderer/state/selectors/status'
 import { groupTree, treeGroups, withSelection } from '../../src/renderer/state/selectors/tree'
 import { ruleRows, valueOptions } from '../../src/renderer/state/selectors/filter'
 import {
@@ -47,6 +47,51 @@ describe('coordsCaption — the 2026-09-20 caption rule', () => {
   it('appends nothing once the fields are the user’s own', () => {
     expect(coordsCaption(conversion('IfcMapConversion'), { ...FILE, E: 28501 })).toBe('')
     expect(coordsCaption(conversion('IfcMapConversion'), { ...FILE, angle: null })).toBe('')
+  })
+})
+
+/**
+ * 2026-10-08 — the card, the CRS chips and `basePointSource` speak for the model whose own
+ * declaration the four fields are: the boot model, since only it fills them. Before, they read the
+ * first model that stated any georeferencing, which after a session reorder or a removal need
+ * not be the one the numbers came from.
+ */
+describe('cardGeoref — the declaration the base point came from', () => {
+  const placed = (key: string, georef: Georeference): ReturnType<typeof mockModelIndex> => ({
+    ...mockModelIndex(key),
+    georef
+  })
+  const site: Georeference = {
+    source: 'IfcSite',
+    sources: ['IfcSite'],
+    method: 'IfcSite placement',
+    site: { placement: [12345.457, 23456.766, 5.05], rotationDeg: -43.4103 }
+  }
+  const other: Georeference = {
+    source: 'IfcMapConversion',
+    sources: ['IfcMapConversion'],
+    method: 'IfcMapConversion',
+    eastings: 1000,
+    northings: 2000,
+    orthogonalHeight: 0
+  }
+  const blank = { E: null, N: null, Z: null, angle: null }
+  const P = { E: 12345.457, N: 23456.766, Z: 5.05, angle: -43.4103 }
+
+  it('names the model whose base point the fields are, wherever it stands in the list', () => {
+    const fed = federate([placed('ARC', other), placed('STR', site)])
+    expect(cardGeoref(fed, P)).toBe(fed.models[1].meta.georef)
+    expect(coordsCaption(cardGeoref(fed, P), P)).toBe(' · IfcSite placement')
+    expect(basePointSource(P, fed)).toBe('file')
+  })
+
+  it('falls back to the first model that states any, for the chips, while the fields are blank or typed', () => {
+    const fed = federate([placed('ARC', mockModelIndex('ARC').georef), placed('STR', other), placed('MEP', site)])
+    expect(cardGeoref(fed, blank)).toBe(fed.models[1].meta.georef)
+    expect(cardGeoref(fed, { ...P, E: 1 })).toBe(fed.models[1].meta.georef)
+    expect(basePointSource({ ...P, E: 1 }, fed)).toBe('user')
+    expect(basePointSource(blank, fed)).toBe('none')
+    expect(cardGeoref(federate([mockModelIndex('ARC')]), blank)).toBeNull()
   })
 })
 

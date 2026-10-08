@@ -146,11 +146,10 @@ CREATE TABLE classification (
 
 -- One row per element THAT HAS GEOMETRY; an element with none has no row, so join with
 -- LEFT JOIN when you are counting elements and with an inner join when you are measuring.
--- Axis-aligned bounding box in the PROJECT frame, in METRES, Z-up: the frame the building was
--- drawn in, which is the file's world coordinates put through the spatial-root
--- IfcSite.ObjectPlacement's inverse (shared/georef.ts). x and y are therefore the building's
--- own axes, not map east and north; max_z - min_z is height, and the federation offset is NOT
--- subtracted. The box is an axis-aligned APPROXIMATION of the solid — the union of the
+-- Axis-aligned bounding box in the PROJECT frame, in METRES, Z-up: each file's world
+-- coordinates put through its own map conversion, then into the project frame of the first
+-- model loaded (shared/georef.ts). x and y are therefore that building's own axes, not map east
+-- and north; max_z - min_z is height, and the federation offset is NOT subtracted. The box is an axis-aligned APPROXIMATION of the solid — the union of the
 -- element's placed part boxes — so it is never smaller than the element and can be larger for
 -- a rotated or diagonal one. Report anything computed from it as bounding-box arithmetic, not
 -- as solid geometry, and prefer an authored Qto quantity when one exists.

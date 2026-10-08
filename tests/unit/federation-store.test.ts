@@ -12,6 +12,16 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mockGeometryChunks, mockModelIndex } from '../../src/renderer/dev/mock-adapter'
+import {
+  coordsFromGeoref,
+  federationFrame,
+  frameKey,
+  modelFrame,
+  projectFrame,
+  type ProjectFrame
+} from '../../src/shared/georef'
+import type { FederationOffset, GeometryChunk } from '../../src/shared/geometry-contract.types'
+import type { Georeference } from '../../src/shared/model-index.types'
 import { FederationController, type BatchItem } from '../../src/renderer/model/federation-store'
 import { useShell } from '../../src/renderer/state/shell'
 import type { ModelMeta, Viewer } from '../../src/renderer/viewer/viewer-core'
@@ -163,5 +173,149 @@ describe('reveal and the landing page fresh start', () => {
     expect(useShell.getState()).toMatchObject({ booted: false, loaded: [] })
     expect(stub.calls).toEqual(expect.arrayContaining(['removeModel:ARC', 'removeModel:STR']))
     expect(fed.current.models).toHaveLength(0)
+  })
+})
+
+/**
+ * 2026-10-08 — the federation is assembled in map space. `prepare` streams each model through
+ * its own frame against the boot model's (M_i⁻¹ ∘ P), the store holds P, and the base point is
+ * set once, at boot, from the boot model — never from a model that joins later. The worker is
+ * replaced by a fake that hands back an index and records the frame it was asked to stream with.
+ */
+describe('map-space federation: the boot model fixes P, each model streams through its own frame', () => {
+  const SITE = { placement: [12345.457, 23456.766, 5.05] as const, rotationDeg: -43.4103 }
+  const bySite: Georeference = {
+    source: 'IfcSite',
+    sources: ['IfcSite'],
+    method: 'IfcSite placement',
+    site: { placement: [...SITE.placement], rotationDeg: SITE.rotationDeg }
+  }
+  const byConversion: Georeference = {
+    source: 'IfcMapConversion',
+    sources: ['IfcMapConversion'],
+    method: 'IfcMapConversion',
+    eastings: SITE.placement[0],
+    northings: SITE.placement[1],
+    orthogonalHeight: SITE.placement[2],
+    xAxisAbscissa: Math.cos((SITE.rotationDeg * Math.PI) / 180),
+    xAxisOrdinate: Math.sin((SITE.rotationDeg * Math.PI) / 180),
+    scale: 0.001
+  }
+  const elsewhere: Georeference = { ...byConversion, eastings: 1000, northings: 2000 }
+
+  /**
+   * A parse worker that never runs: each key's index, and the frames it was asked to stream with.
+   * A key's geometry can be made to wait for `gates[key]` first — which may reject, as a stream
+   * that runs out of memory does.
+   */
+  function fakeParse(
+    georefs: Record<string, Georeference>,
+    gates: Record<string, Promise<unknown>> = {}
+  ): { asked: Record<string, ProjectFrame | null>; askedOffset: Record<string, FederationOffset | null> } {
+    const asked: Record<string, ProjectFrame | null> = {}
+    const askedOffset: Record<string, FederationOffset | null> = {}
+    const parse = {
+      load: async (_blob: Blob, key: string) => ({ ...mockModelIndex('ARC'), modelKey: key, georef: georefs[key] }),
+      geometry: async (key: string, offset: FederationOffset | null, frame: ProjectFrame | null, onChunk: (c: GeometryChunk) => void) => {
+        asked[key] = frame
+        askedOffset[key] = offset
+        await gates[key]
+        for (const chunk of mockGeometryChunks('ARC')) onChunk({ ...chunk, header: { ...chunk.header, modelKey: key } })
+        return { offset: offset ?? [10, 20, 0], offsetFromThisModel: offset === null, frame, chunks: 0 }
+      },
+      close: () => {},
+      cancel: () => {}
+    }
+    ;(fed as unknown as { parse: typeof parse }).parse = parse
+    return { asked, askedOffset }
+  }
+  const pick = (key: string): { path: string; name: string; blob: Blob; key: string } => ({
+    path: `/x/${key}.ifc`,
+    name: `${key}.ifc`,
+    blob: new Blob([]),
+    key
+  })
+
+  it('streams the boot model through its own site frame and a map-converted model through M⁻¹ ∘ P', async () => {
+    const { asked } = fakeParse({ SITE: bySite, CONV: byConversion })
+    const a = await fed.prepare(pick('SITE'), () => {})
+    const b = await fed.prepare(pick('CONV'), () => {})
+    expect(asked.SITE).toEqual(projectFrame(bySite))
+    expect(asked.CONV).toEqual(modelFrame(bySite, byConversion))
+    expect(b.frame).toEqual(asked.CONV)
+    await fed.addBatch([a, b])
+    // The store holds P — for a boot model placed by its site, its site frame, key and all.
+    expect(useShell.getState().frame).toEqual(federationFrame(bySite))
+    expect(frameKey(useShell.getState().frame)).toBe('12345.457,23456.766,5.050@-43.4103')
+    // Each model's grids and storeys went through that model's own frame.
+    expect(stub.metas.get('SITE')!.frame).toEqual(projectFrame(bySite))
+    expect(stub.metas.get('CONV')!.frame).toEqual(asked.CONV)
+  })
+
+  it('takes P from a boot model placed by IfcMapConversion — a new frameKey, the same building', async () => {
+    const { asked } = fakeParse({ CONV: byConversion, SITE: bySite })
+    const a = await fed.prepare(pick('CONV'), () => {})
+    const b = await fed.prepare(pick('SITE'), () => {})
+    // The boot model streams as it always did: its site is at the file's zero.
+    expect(asked.CONV).toBeNull()
+    expect(asked.SITE).toEqual(modelFrame(byConversion, bySite))
+    await fed.addBatch([a, b])
+    expect(frameKey(useShell.getState().frame)).toBe('12345.457,23456.766,5.050@-43.4103')
+  })
+
+  it('sets the base point once, at boot, from the boot model — a later model never fills it', async () => {
+    fakeParse({ PLAIN: { source: 'none', sources: [], method: 'none' }, CONV: byConversion, FAR: elsewhere })
+    await fed.addBatch([await fed.prepare(pick('PLAIN'), () => {})])
+    // The boot model states nothing, so P is the identity and the card stays blank…
+    expect(useShell.getState().coords).toEqual({ E: null, N: null, Z: null, angle: null })
+    await fed.addBatch([await fed.prepare(pick('CONV'), () => {})])
+    // …and a georeferenced model that joins later does not fill it with numbers that describe
+    // its own frame rather than the scene's.
+    expect(useShell.getState().coords).toEqual({ E: null, N: null, Z: null, angle: null })
+    expect(useShell.getState().frame).toBeNull()
+  })
+
+  it('takes the base point from P when the boot model states one', async () => {
+    fakeParse({ CONV: byConversion, FAR: elsewhere })
+    await fed.addBatch([await fed.prepare(pick('CONV'), () => {})])
+    expect(useShell.getState().coords).toEqual(coordsFromGeoref(byConversion))
+    expect(stub.calls).toContain('setCoords')
+    await fed.addBatch([await fed.prepare(pick('FAR'), () => {})])
+    expect(useShell.getState().coords).toEqual(coordsFromGeoref(byConversion))
+  })
+  it('hands the frame back when the boot model fails before anything stands in it', async () => {
+    // The first file parsed chooses the frame, and its stream then fails: nothing is loaded and
+    // nothing else was streamed in that frame, so the next file chooses afresh — its own site
+    // frame, its own offset, and the card's base point from it, not from a file that is not there.
+    const { asked, askedOffset } = fakeParse(
+      { BAD: elsewhere, GOOD: bySite },
+      { BAD: Promise.reject(new Error('out of memory')) }
+    )
+    await expect(fed.prepare(pick('BAD'), () => {})).rejects.toThrow('out of memory')
+    const good = await fed.prepare(pick('GOOD'), () => {})
+    expect(asked.GOOD).toEqual(projectFrame(bySite))
+    expect(askedOffset.GOOD).toBeNull()
+    await fed.addBatch([good])
+    expect(useShell.getState().frame).toEqual(federationFrame(bySite))
+    expect(useShell.getState().coords).toEqual(coordsFromGeoref(bySite))
+  })
+
+  it('keeps the frame once another model stands in it, so nothing it placed moves', async () => {
+    let fail = (_e: Error): void => {}
+    const held = new Promise((_ok, no) => (fail = no))
+    const { asked } = fakeParse({ BAD: elsewhere, B: bySite, C: byConversion }, { BAD: held })
+    const bad = fed.prepare(pick('BAD'), () => {})
+    // BAD's parse finishes first and chooses the frame; B is streamed in it while BAD's own
+    // stream is still running.
+    const b = await fed.prepare(pick('B'), () => {})
+    expect(b.frame).toEqual(modelFrame(elsewhere, bySite))
+    fail(new Error('out of memory'))
+    await expect(bad).rejects.toThrow('out of memory')
+    // B was placed in BAD's frame, so that frame stays: a later model lands beside B, and the
+    // store describes the frame B is in.
+    const c = await fed.prepare(pick('C'), () => {})
+    expect(asked.C).toEqual(modelFrame(elsewhere, byConversion))
+    await fed.addBatch([b, c])
+    expect(useShell.getState().frame).toEqual(federationFrame(elsewhere))
   })
 })

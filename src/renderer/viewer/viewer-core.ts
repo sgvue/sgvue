@@ -132,9 +132,9 @@ export type Tool = 'select' | 'measure' | 'spot'
 /**
  * Grids and storeys in the **project frame**; `offset` is what puts them in the scene.
  *
- * The caller has already put both through the federation's project frame — the same transform
- * the geometry went through in the worker (`renderer/model/federation-store.ts`'s `metaOf`) —
- * so everything here is square with the building, and all that is left is the offset.
+ * The caller has already put both through the model's own frame — the same transform the
+ * geometry went through in the worker (`renderer/model/federation-store.ts`'s `metaOf`) — so
+ * everything here is square with the building, and all that is left is the offset.
  *
  * A grid is its two plan endpoints, not the design's `{ axis, v }`: a real `IfcGridAxis` is a
  * curve and the reference model's grid runs at ~43° in the file's own world coordinates
@@ -143,8 +143,9 @@ export type Tool = 'select' | 'measure' | 'spot'
 export interface ModelMeta {
   offset?: readonly [number, number, number]
   /**
-   * The frame those coordinates are in, carried beside the offset so anything converting
-   * scene ↔ project ↔ map has both. `null`/absent is the identity.
+   * The frame this model's coordinates were brought into the project frame with — its own,
+   * project → its world (M_i⁻¹ ∘ P since 2026-10-08) — carried beside the offset so anything
+   * converting scene ↔ project ↔ world has both. `null`/absent is the identity.
    */
   frame?: ProjectFrame | null
   grids?: readonly {

@@ -13,10 +13,13 @@
  *    the placement.
  *  · **The scene is the project frame.** A shared-coordinates export states its position and
  *    its rotation to true north on the spatial-root `IfcSite.ObjectPlacement`, so its world
- *    axes are map axes and the building stands at an angle to them. The inverse of that
- *    placement — the federation's `ProjectFrame`, chosen by the boot model and then fixed — is
- *    composed on the left beside the axis swap, so everything downstream is square with the
- *    building. This is still the only place the frames meet.
+ *    axes are map axes and the building stands at an angle to them. The inverse of the model's
+ *    frame is composed on the left beside the axis swap, so everything downstream is square
+ *    with the building. Since 2026-10-08 that frame is the model's own, M_i⁻¹ ∘ P
+ *    (`shared/georef.ts`'s `modelFrame`): world → project is `P⁻¹ ∘ M_i`, through the model's
+ *    own map conversion into map space and out into the boot model's project frame, so a model
+ *    placed by its site and one placed by `IfcMapConversion` land together. This is still the
+ *    only place the frames meet.
  *  · **Nothing stays on the wasm heap.** Every vertex and index array is `.slice()`d and
  *    every placement vector freed inside `ifc-source.ts` before this file sees it.
  *  · **Placements are composed in Float64.** Revit shared coordinates routinely put a model
@@ -298,14 +301,16 @@ export interface GeometryStreamOptions {
    */
   offset: FederationOffset | null
   /**
-   * The federation's project frame — the boot model's spatial-root `IfcSite.ObjectPlacement`,
-   * read as project → world. Its inverse is composed on the left of every placement, so the
-   * scene comes out in the frame the building was drawn in rather than in the map-aligned
-   * world coordinates a shared-coordinates export writes. `null` is the identity.
+   * This model's frame, project → its own world: `modelFrame(boot, georef)`, M_i⁻¹ ∘ P, where
+   * P is the federation's frame — the boot model's project frame in map coordinates — and M_i
+   * this model's own world → map operation (2026-10-08). Its inverse is composed on the left of
+   * every placement, so the scene comes out in the frame the boot building was drawn in, with
+   * this model where its own declaration puts it on the map. `null` is the identity.
    *
    * The caller owns it (`renderer/model/federation-store.ts`), exactly as it owns the offset:
-   * the first model of the boot batch chooses it and every later model is placed against the
-   * same one, which is what keeps a second discipline federated by world coordinates.
+   * the boot model fixes P, and each model's frame is computed against it. For a model whose map
+   * operation is the boot model's own — the identity for both, on a Revit "Shared Coordinates"
+   * federation — it is the boot model's site frame itself, exactly as before.
    */
   frame: ProjectFrame | null
   /** Called once per chunk with the buffers that may be transferred rather than copied. */
@@ -526,10 +531,11 @@ export function streamGeometry(
 
       /*
        * frame⁻¹ × R × flatTransformation, in Float64: out of web-ifc's Y-up frame into IFC
-       * Z-up, and out of the file's world coordinates into the frame the building was drawn
-       * in. Then T(−offset), which for a column-major matrix is just the offset taken off the
-       * translation column — the rotation and scale stay untouched and only the large numbers
-       * shrink. Written out through a Float32Array so `matrix16` holds what the GPU will see.
+       * Z-up, and out of the file's world coordinates — through its map position — into the
+       * frame the boot building was drawn in. Then T(−offset), which for a column-major
+       * matrix is just the offset taken off the translation column — the rotation and scale
+       * stay untouched and only the large numbers shrink. Written out through a Float32Array
+       * so `matrix16` holds what the GPU will see.
        */
       if (toProjectM) multiply4(toProjectM, toZUp(m, zUp), composed)
       else toZUp(m, composed)

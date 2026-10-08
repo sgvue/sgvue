@@ -99,10 +99,10 @@ export interface StatusValues {
 }
 
 /**
- * Whether the base point in state came from the user rather than from a file. The first model
- * to carry georeferencing fills `coords` (`federation-store.ts`), and a federation that carries
- * none leaves every field `null` until the Coordinate-system card is typed into — so a value
- * with no file behind it is the user's own.
+ * Whether the base point in state came from the user rather than from a file. The boot model
+ * fills `coords` when it states one (`federation-store.ts`; until 2026-10-08, the first model to
+ * carry georeferencing), and a federation that carries none leaves every field `null` until the
+ * Coordinate-system card is typed into — so a value with no file behind it is the user's own.
  */
 export const hasManualCoords = (
   coords: CoordState,
@@ -127,6 +127,28 @@ export function coordsCaption(georef: Georeference | null, coords: CoordState): 
 }
 
 /**
+ * The georeferencing the Coordinate-system card and the CRS chips speak for (2026-10-08): the
+ * loaded model whose own declaration **these four fields are** — since the base point is P, the
+ * federation's frame, and only the boot model fills it, that is the boot model (or one placed
+ * exactly as it is) — else, while the fields are blank or the user's own, the first model that
+ * states any georeferencing, which is what every chip read before.
+ */
+export function cardGeoref(
+  federation: ShellState['federation'],
+  coords: CoordState
+): Georeference | null {
+  const stated = federation.models.map((m) => m.meta.georef).filter((g) => g.source !== 'none')
+  return (
+    stated.find((g) => {
+      const fromFile = coordsFromGeoref(g)
+      return !!fromFile && sameBasePoint(fromFile, coords)
+    }) ??
+    stated[0] ??
+    null
+  )
+}
+
+/**
  * Whose the base point is (2026-10-02 — the assistant reads it back, and may ask to change it):
  * `file` while the four fields are exactly what the federation's georeferencing states — the
  * caption's own test, on the model the Coordinate-system card reads — `none` while every field
@@ -137,8 +159,7 @@ export function basePointSource(
   federation: ShellState['federation']
 ): 'file' | 'user' | 'none' {
   if (coords.E == null && coords.N == null && coords.Z == null && coords.angle == null) return 'none'
-  const georef = federation.models.find((m) => m.meta.georef.source !== 'none')?.meta.georef
-  const fromFile = coordsFromGeoref(georef ?? null)
+  const fromFile = coordsFromGeoref(cardGeoref(federation, coords))
   return fromFile && sameBasePoint(fromFile, coords) ? 'file' : 'user'
 }
 
@@ -148,7 +169,7 @@ export type StatusState = Pick<
 >
 
 export function statusValues(s: StatusState): StatusValues {
-  const georef = s.federation.models.find((m) => m.meta.georef.source !== 'none')?.meta.georef
+  const georef = cardGeoref(s.federation, s.coords)
   return {
     backend: s.stats.backend,
     fps: s.stats.fps,

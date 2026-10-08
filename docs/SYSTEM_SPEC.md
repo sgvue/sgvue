@@ -430,7 +430,7 @@ buildingSMART's own validation service uses. The table below is the contract.
 | Units | `IfcProject.UnitsInContext` → `IfcUnitAssignment`: `IfcSIUnit` with prefixes, `IfcConversionBasedUnit` (feet, inches…), `IfcDerivedUnit`; per measure kind (length, area, volume, angle, mass, time); display conversion only |
 | Materials | `IfcRelAssociatesMaterial` → `IfcMaterial`, `IfcMaterialLayerSet(Usage)`, `IfcMaterialProfileSet(Usage)`, `IfcMaterialConstituentSet`, `IfcMaterialList`; layer names/thicknesses kept |
 | Classification | `IfcRelAssociatesClassification` → `IfcClassificationReference` (system, identification, name) incl. Uniclass/OmniClass/IFC-SG codes |
-| Georeferencing | IFC4/4X3: `IfcMapConversion` + `IfcProjectedCRS` (Eastings, Northings, OrthogonalHeight, XAxisAbscissa/Ordinate → rotation, `Scale` independent of the length unit, CRS name e.g. EPSG:3414); the **spatial-root** `IfcSite` (the one `IfcProject` aggregates) — RefLatitude/RefLongitude (DMS lists), RefElevation, and its `ObjectPlacement` read as a **full transform**: translation, rotation about `+Z`, and whether that rotation is a pure one; the `Model` context's `TrueNorth`; **CORENET X convention**: SVY21 coordinates *and the rotation to true north* on `IfcSite.ObjectPlacement`; IFC2X3: `ePset_MapConversion` / `ePSet_MapConversion` psets. Every readout names its source, and `method` names which declaration is in force |
+| Georeferencing | IFC4/4X3: `IfcMapConversion` + `IfcProjectedCRS` (the conversion on the 3D `Model` context or a sub-context of it; Eastings, Northings, OrthogonalHeight in the CRS's `MapUnit` — the metre when it names none — XAxisAbscissa/Ordinate → rotation, `Scale` recorded as written and never applied, CRS name e.g. EPSG:3414); the **spatial-root** `IfcSite` (the one `IfcProject` aggregates) — RefLatitude/RefLongitude (DMS lists), RefElevation, and its `ObjectPlacement` read as a **full transform**: translation, rotation about `+Z`, and whether that rotation is a pure one; the `Model` context's `TrueNorth`; **CORENET X convention**: SVY21 coordinates *and the rotation to true north* on `IfcSite.ObjectPlacement`; IFC2X3: `ePset_MapConversion` / `ePSet_MapConversion` psets. Every readout names its source, and `method` names which declaration is in force |
 | Geometry | Tessellated by web-ifc in metres (it applies the length prefix and Z-up conversion — never applied twice); placements composed in Float64; `IfcSpace` included via `StreamAllMeshesWithTypes`; surface styles (`IfcStyledItem`, transparency) from the file |
 | Grids | `IfcGrid` / `IfcGridAxis` with axis curves; axis-aligned lines drawn, others recorded. The index keeps the file's own axis order; the **federation's** list is ordered once where it is unioned (`shared/federate.ts`) — by the grid's own `u`/`v`/`w` family, then naturally on the name — so the Section card's chips, the assistant's schema and `get_model_info` agree. A Revit export lists axes in creation order, which on the reference model starts at `L` and `22`. |
 | Nothing invented | No default origin, no synthetic GUIDs, no fabricated counts; missing data is reported as missing |
@@ -460,10 +460,22 @@ position and the rotation to true north, so the file's world axes are map axes a
 stands at an angle to them — 43.41° on the reference model. The app therefore renders the
 **project** frame: `geometry-streamer.ts` composes the inverse of that placement on the left of
 every placement, beside the Y-up → Z-up rotation it already composes, and grid segments and
-storey placements go through the same transform before anything draws them. The frame is a
-federation constant, chosen by the boot batch's first model and then fixed, so models still
-federate by their world coordinates. `shared/georef.ts` owns it (`ProjectFrame`,
-`projectFrame`, `toProject`, `toWorld`, `frameKey`) and is pure and unit-tested.
+storey placements go through the same transform before anything draws them.
+
+**The federation is assembled in map space** (since 2026-10-08). One exporter writes a model's
+map position on its site placement, another in an `IfcMapConversion` over a site at the file's
+zero; both are compliant, and by world coordinates they land kilometres apart. So each model
+gets its own world → map operation from its own declaration — `T(E·u, N·u, H·u) · Rz(θ)`, θ the
+conversion's X axis, u the map unit, `Scale` never applied, `TrueNorth` never stacked on it,
+identity when there is none — and the federation's frame is the boot model's project frame
+expressed in map coordinates, **P = M_boot ∘ Site_boot**, chosen once like the offset. Each model
+streams through its own frame **M_i⁻¹ ∘ P**, so it lands where its own declaration puts it on the
+map, read in the boot building's project frame. For a model placed the way the boot model is —
+every model of a Revit "Shared Coordinates" federation — that frame is the boot model's site
+frame itself, so nothing about such a federation changed. `shared/georef.ts` owns it all
+(`ProjectFrame`, `projectFrame`, `mapPlacement`, `federationFrame`, `modelFrame`, `toProject`,
+`toWorld`, `frameKey`) and is pure and unit-tested; `tests/unit/georef-federation.fixture.test.ts`
+federates one synthetic building written eight ways, every pair within a millimetre.
 
 **Federation and precision.** Every model is opened without recentring. The first streamed
 mesh defines a whole-metre federation offset, and placements are composed in 64-bit floating
@@ -604,11 +616,12 @@ shared-coordinates export states its position *and* its rotation to true north t
 world axes are map axes and the building stands at an angle to them; without this every
 axis-aligned thing the app draws is wrong by that angle, and the reference model's sample wall
 reads `87.489 × 82.787 m` instead of the `120.150 × 0.300 m` its own `Qto_WallBaseQuantities`
-states. The frame is a federation constant, exactly like the offset: the boot batch's first
-model chooses it, every model added later is streamed through the same one, and models still
-federate by their world coordinates. `null` is the identity — every file that leaves its site at
-the origin, and the design's own mock federation, whose code path is then byte for byte the one
-before the frame existed.
+states. The federation's frame P is a constant, exactly like the offset: the boot model fixes
+it — since 2026-10-08 its project frame expressed in map coordinates (§5) — and every model is
+streamed through its own frame against it, M_i⁻¹ ∘ P, so models federate by their **map**
+coordinates. `null` is the identity — every file that leaves its site at the origin and states
+no map conversion, and the design's own mock federation, whose code path is then byte for byte
+the one before the frame existed.
 
 `geometry-streamer.ts` remains **the only place the frames meet**. Grid segments and storey
 placements come out of the index in world metres and go through the same transform in
@@ -940,7 +953,9 @@ instead of re-sending the prompt. A second identical turn should report a non-ze
 **Tools.** The design's fifteen view-and-report tools, kept with their names and schemas, plus
 read-only additions: `get_element`, `get_entity_raw`, `list_values`, `find_properties`, `search`,
 `get_spatial_tree`, `get_relationships`, `get_model_info` (header, MVD, schema, units,
-georeferencing with the CORENET X check, counts, SHA-256), `get_view_state`, `measure_between`,
+georeferencing with the CORENET X check — and, since 2026-10-08, which declaration placed each
+model in the federation's map space, in which map unit, and that `Scale` was not applied —
+counts, SHA-256), `get_view_state`, `measure_between`,
 `find_nearby` and `query_sql`; and, since 2026-09-28, four for the Schedules window:
 `make_schedule` builds a schedule (or changes the open one) and shows it there,
 `get_schedule` reads the one that is open — rows, subtotals and totals computed by the ported

@@ -275,9 +275,11 @@ export interface ShellState {
    */
   offset: readonly [number, number, number]
   /**
-   * The federation's project frame: the boot model's spatial-root `IfcSite.ObjectPlacement`,
-   * read as project → world, which the geometry pipeline undid so the scene stands square
-   * with the building. `null` is the identity.
+   * The federation's frame, P: the boot model's project frame expressed in map coordinates —
+   * its own map operation over its spatial-root `IfcSite.ObjectPlacement`, project → map
+   * (`shared/georef.ts`'s `federationFrame`, 2026-10-08) — which the geometry pipeline undid so
+   * the scene stands square with the building. For a boot model whose map operation is the
+   * identity it is that site placement, as it always was. `null` is the identity.
    *
    * It is here, beside the offset, because the session, the share link and every saved
    * viewpoint store a camera in **scene** coordinates — so each of them records which frame

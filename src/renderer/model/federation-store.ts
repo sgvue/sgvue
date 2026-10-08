@@ -13,10 +13,17 @@
  * applies the design's own pruning rules.
  */
 import { federate, removeModel, EMPTY_FEDERATION, type Federation } from '../../shared/federate'
-import { coordsFromGeoref, projectFrame, toProject, type ProjectFrame } from '../../shared/georef'
+import {
+  coordsFromGeoref,
+  federationFrame,
+  mapPlacement,
+  modelFrame,
+  toProject,
+  type ProjectFrame
+} from '../../shared/georef'
 import { isSiteLike } from '../../shared/site'
 import type { FederationOffset, GeometryChunk } from '../../shared/geometry-contract.types'
-import type { ModelIndex } from '../../shared/model-index.types'
+import type { Georeference, ModelIndex } from '../../shared/model-index.types'
 import type { SessionFile } from '../../shared/session-codec'
 import { useShell, setViewer, type CoordState } from '../state/shell'
 import type { ModelMeta, Viewer } from '../viewer/viewer-core'
@@ -33,7 +40,11 @@ export interface BatchItem {
   index: ModelIndex
   chunks: GeometryChunk[]
   offset: FederationOffset
-  /** The project frame the chunks were streamed in. `null` is the identity. */
+  /**
+   * The frame the chunks were streamed in — this model's own, project → its world
+   * (`shared/georef.ts`'s `modelFrame`, M_i⁻¹ ∘ P since 2026-10-08) — which its grids and
+   * storeys go through too. `null` is the identity.
+   */
   frame: ProjectFrame | null
   /**
    * The file it came from, for the session and the share link. Recorded when the model
@@ -70,13 +81,14 @@ export const modelKeyOf = (fileName: string): string =>
  *
  * Both come out of the index in the file's **world** coordinates — `readGrids` applies the
  * placement chain by hand, and a storey's placement is the world position of its floor — so
- * both go through the federation's project frame here, which is the same transform the
- * geometry went through in the worker. The viewer then subtracts the offset, as before.
+ * both go through the model's own frame here (`BatchItem.frame`, M_i⁻¹ ∘ P), which is the same
+ * transform the geometry went through in the worker. The viewer then subtracts the offset, as
+ * before. Exported for `tests/unit/georef-federation.fixture.test.ts`.
  *
  * A storey with no placement of its own falls back to its authored `Elevation`, which is what
  * the ladder shows: the ring is then where the file's own number puts it rather than nowhere.
  */
-const metaOf = (
+export const metaOf = (
   index: ModelIndex,
   offset: FederationOffset,
   frame: ProjectFrame | null
@@ -99,13 +111,12 @@ const metaOf = (
   site: index.elements.filter(isSiteLike).map((e) => e.expressId)
 })
 
-/**
- * Project base point and true north from the file, or `null` for every field the file does
- * not carry. Never a default — the fidelity contract's "never a placeholder", and plan §3.5
- * item 5, which is exactly this: the prototype duplicated the renderer's own numbers in the UI.
- */
-export function coordsOf(index: ModelIndex): CoordState | null {
-  return coordsFromGeoref(index.georef)
+/** What one `prepare` has done so far, for its failure path. */
+interface Preparing {
+  /** Its file was parsed: the worker holds it open under its key. */
+  done: boolean
+  /** The choice of frame (`frameEpoch`) it was streamed in, or `null` before its stream. */
+  epoch: number | null
 }
 
 /** The lowest slot no loaded model holds — the slot `federate` gives a new key. */
@@ -125,15 +136,25 @@ export class FederationController {
   /** The first model's first mesh fixes this; every later model is placed against it. */
   private offset: FederationOffset | null = null
   /**
-   * The first model *prepared* fixes this — its spatial-root site placement — and every later
-   * model is streamed through the same one, which is what keeps the federation aligned by
-   * world coordinates while the scene stands square with the first building.
+   * The georeferencing of the first model *prepared* — the boot model — which fixes the
+   * federation's frame, P = M_boot ∘ Site_boot (`shared/georef.ts`'s `federationFrame`), and
+   * the base point that describes it. Every model, that one included, is streamed through its
+   * own `modelFrame(boot, its georef)` = M_i⁻¹ ∘ P: since 2026-10-08 the federation lines up in
+   * **map** space — each model where its own declaration puts it — while the scene stands
+   * square with the first building.
    *
-   * `null` is a legitimate value (an identity frame), so a separate flag records that it has
-   * been chosen rather than `??=` asking again on the next model.
+   * `null` is a legitimate value (a model loaded with no file behind it), so a separate flag
+   * records that it has been chosen rather than `??=` asking again on the next model.
    */
-  private frame: ProjectFrame | null = null
+  private bootGeoref: Georeference | null = null
   private frameChosen = false
+  /**
+   * How many models have been streamed in the frame `bootGeoref` fixes, and which choice of
+   * frame that is. A model that then fails to prepare gives the choice back when it was the last
+   * of them and nothing is loaded (`handBack`); any other stands in that frame, and keeps it.
+   */
+  private frameUsers = 0
+  private frameEpoch = 0
   private federation: Federation = EMPTY_FEDERATION
   private viewer: Viewer | null = null
   /**
@@ -213,8 +234,9 @@ export class FederationController {
     useShell.getState().beginModels(boot ? 'Building federation…' : 'Rebuilding federation…')
     // The first model of a boot fixes the federation offset for the session — every later
     // model is streamed against it. The store keeps it so the property card can report a box
-    // in the file's own coordinates rather than the scene's.
-    if (boot) useShell.getState().setOffset(items[0].offset, items[0].frame)
+    // in the file's own coordinates rather than the scene's — and, beside it, P, whose
+    // `frameKey` marks every camera a session, a link or a viewpoint saves.
+    if (boot) useShell.getState().setOffset(items[0].offset, federationFrame(this.bootGeoref))
     /** Keys this batch joined, and which of them replaced a model, for the undo below. */
     const joined: string[] = []
     const replaced = new Set<string>()
@@ -233,7 +255,17 @@ export class FederationController {
       this.undoBatch(at, joined, replaced, boot)
       throw err
     }
-    if (boot) this.viewer.frameExtents()
+    if (boot) {
+      // 2026-10-08 — the base point is P read off the boot model's own georeferencing, so it
+      // describes the frame every model was placed in. Only a boot sets it: a model that joins
+      // later is placed in that same frame, and its own declaration is not the federation's.
+      const coords = coordsFromGeoref(this.bootGeoref)
+      if (coords && useShell.getState().coords.E == null) {
+        useShell.setState({ coords })
+        this.viewer.setCoords(coords)
+      }
+      this.viewer.frameExtents()
+    }
     if (reveal) await reveal
     if (gen !== this.gen) return false
     useShell.getState().commitModels(this.federation)
@@ -275,11 +307,6 @@ export class FederationController {
       ...this.federation,
       models: [...this.federation.models, { slot, meta: index }]
     })
-    const coords = coordsOf(index)
-    if (coords && useShell.getState().coords.E == null) {
-      useShell.setState({ coords })
-      this.viewer!.setCoords(coords)
-    }
     return replacing ? 'replaced' : 'joined'
   }
 
@@ -313,9 +340,29 @@ export class FederationController {
   /** Nothing is loaded: the next model to boot chooses the offset and the frame afresh. */
   private resetFrame(): void {
     this.offset = null
-    this.frame = null
+    this.bootGeoref = null
     this.frameChosen = false
+    this.frameEpoch++
+    this.frameUsers = 0
     useShell.getState().setOffset([0, 0, 0], null)
+  }
+
+  /**
+   * 2026-10-08 — a model that fails to prepare after it was streamed gives back what it fixed of
+   * the federation — the choice of frame its parse may have made, and the offset its stream may
+   * have set — when it was the last model streamed in that frame and nothing is loaded. The next
+   * model then chooses afresh, so the frame, every camera's `frameKey` and the base point never
+   * describe a model that is not there. A model that has been streamed in that frame stands in
+   * it, so while one does, the frame stays.
+   */
+  private handBack(preparing: Preparing): void {
+    if (preparing.epoch !== this.frameEpoch) return
+    this.frameUsers--
+    if (this.frameUsers > 0 || this.federation.models.length) return
+    this.offset = null
+    this.bootGeoref = null
+    this.frameChosen = false
+    this.frameEpoch++
   }
 
   /**
@@ -438,8 +485,10 @@ export class FederationController {
     this.indexes.length = 0
     this.federation = EMPTY_FEDERATION
     this.offset = null
-    this.frame = null
+    this.bootGeoref = null
     this.frameChosen = false
+    this.frameEpoch++
+    this.frameUsers = 0
     const coords: CoordState = { E: null, N: null, Z: null, angle: null }
     useShell.setState({ coords, offset: [0, 0, 0], frame: null })
     this.viewer?.setCoords(coords)
@@ -462,11 +511,12 @@ export class FederationController {
   async prepare(file: PreparedFile, onStage: (index: number) => void): Promise<BatchItem> {
     const gen = this.gen
     const modelKey = file.key ?? modelKeyOf(file.name)
-    const parsed = { done: false }
+    const parsed: Preparing = { done: false, epoch: null }
     try {
       return await this.parseInto(file, modelKey, gen, onStage, parsed)
     } catch (err) {
       if (parsed.done && gen === this.gen) this.parse.close(modelKey)
+      if (gen === this.gen) this.handBack(parsed)
       throw err
     }
   }
@@ -476,7 +526,7 @@ export class FederationController {
     modelKey: string,
     gen: number,
     onStage: (index: number) => void,
-    parsed: { done: boolean }
+    parsed: Preparing
   ): Promise<BatchItem> {
     const replaced = (): Error => new Error('replaced by a new pick')
     const started = performance.now()
@@ -492,15 +542,20 @@ export class FederationController {
     parsed.done = true
     if (gen !== this.gen) throw replaced()
     onStage(2)
-    // The first model prepared chooses the project frame from its own spatial-root site
-    // placement; every later model is streamed through that same frame, so the federation
-    // still lines up by world coordinates.
+    // The first model prepared is the boot model: its georeferencing fixes the federation's
+    // frame P. Every model — that one included — streams through its own frame, M_i⁻¹ ∘ P, so
+    // the federation lines up by map coordinates, each model by its own declaration.
     if (!this.frameChosen) {
-      this.frame = projectFrame(index.georef)
+      this.bootGeoref = index.georef
       this.frameChosen = true
+      this.frameEpoch++
+      this.frameUsers = 0
     }
+    const frame = modelFrame(this.bootGeoref, index.georef)
+    this.frameUsers++
+    parsed.epoch = this.frameEpoch
     const chunks: GeometryChunk[] = []
-    const summary = await this.parse.geometry(modelKey, this.offset, this.frame, (chunk) =>
+    const summary = await this.parse.geometry(modelKey, this.offset, frame, (chunk) =>
       chunks.push(chunk)
     )
     if (gen !== this.gen) throw replaced()
@@ -538,8 +593,9 @@ export class FederationController {
     if (summary.frame) {
       const f = summary.frame
       console.log(
-        `[sgvue] project frame · origin ${f.origin.map((v) => v.toFixed(3)).join(', ')} m · ` +
-          `${f.rotationDeg.toFixed(4)}° · ${index.georef.method}`
+        `[sgvue] model frame · origin ${f.origin.map((v) => v.toFixed(3)).join(', ')} m · ` +
+          `${f.rotationDeg.toFixed(4)}° · ${index.georef.method} · placed by ` +
+          mapPlacement(index.georef).placedBy
       )
     }
     console.log(
@@ -588,8 +644,10 @@ export class FederationController {
     this.indexes.length = 0
     this.federation = EMPTY_FEDERATION
     this.offset = null
-    this.frame = null
+    this.bootGeoref = null
     this.frameChosen = false
+    this.frameEpoch++
+    this.frameUsers = 0
     this.attach(null)
   }
 }

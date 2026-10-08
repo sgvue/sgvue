@@ -52,6 +52,45 @@ export function siFactor(unitName: string, prefix: string): number {
   return Math.pow(base, prefixPower(unitName))
 }
 
+/** The US survey foot, exactly: 1200 / 3937 m. The international foot is 0.3048 m. */
+export const US_SURVEY_FOOT = 1200 / 3937
+
+/** Length units by label, with every character but a letter taken out. */
+const LENGTH_LABEL: Readonly<Record<string, number>> = {
+  M: 1,
+  MM: 1e-3,
+  CM: 1e-2,
+  DM: 1e-1,
+  KM: 1e3,
+  FT: 0.3048,
+  FOOT: 0.3048,
+  INTERNATIONALFOOT: 0.3048,
+  USFT: US_SURVEY_FOOT,
+  FTUS: US_SURVEY_FOOT,
+  USFOOT: US_SURVEY_FOOT,
+  FOOTUS: US_SURVEY_FOOT,
+  SURVEYFOOT: US_SURVEY_FOOT,
+  USSURVEYFOOT: US_SURVEY_FOOT
+}
+
+/**
+ * Metres per one of a length unit that is only **named** — IFC2X3's `ePset_ProjectedCRS`
+ * `MapUnit`, which a property set can hold only as text: `METRE`, `MILLIMETRE`, `FOOT`,
+ * `US survey foot`, `.METRE.`, … (2026-10-08). `undefined` for a label this does not know: the
+ * caller decides what that means, and says so.
+ */
+export function lengthUnitFromLabel(label: string): number | undefined {
+  const key = label
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .replace(/FEET/g, 'FOOT')
+    .replace(/(METRE|METER)S$/, '$1')
+  if (Object.hasOwn(LENGTH_LABEL, key)) return LENGTH_LABEL[key]
+  const si = /^([A-Z]*?)(METRE|METER)$/.exec(key)
+  if (!si) return undefined
+  return si[1] ? (Object.hasOwn(SI_PREFIX, si[1]) ? SI_PREFIX[si[1]] : undefined) : 1
+}
+
 /** Units with nothing read from the file yet: metres, m², m³, radians. */
 export const IDENTITY_UNITS: Units = {
   byType: {},

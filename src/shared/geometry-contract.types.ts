@@ -114,11 +114,12 @@ export type FederationOffset = readonly [number, number, number]
  *
  * So `geometry-streamer.ts` composes the inverse of that placement on the left, once, next to
  * the Y-up → Z-up rotation it already composes: `frame⁻¹ × R × flatTransformation`, in Float64.
- * The frame is a **federation constant**, exactly like the offset — the boot batch's first
- * model chooses it and every model added later is placed against the same one, so models still
- * federate by their world coordinates and a second discipline with its own site placement
- * lands where it belongs. `null` is the identity, which is every file that leaves its site at
- * the origin, and the design's own mock federation.
+ * The federation's frame P is a **federation constant**, exactly like the offset — the boot
+ * model's project frame in map coordinates, chosen once — and since 2026-10-08 each model is
+ * streamed through its own frame against it, M_i⁻¹ ∘ P (`shared/georef.ts`'s `modelFrame`), so
+ * models federate by their **map** coordinates: one placed by its site placement and one placed
+ * by `IfcMapConversion` land together. `null` is the identity, which is every file that leaves
+ * its site at the origin and states no map conversion, and the design's own mock federation.
  *
  * Shape and semantics live in `shared/georef.ts` (`ProjectFrame`, `projectFrame`, `toProject`,
  * `toWorld`, `frameKey`); this is the re-export the contract is stated in.
@@ -139,7 +140,7 @@ export interface GeometrySummary {
   offset: FederationOffset
   /** True when this model defined the offset (the request carried `null`). */
   offsetFromThisModel: boolean
-  /** The project frame this model was streamed in, echoed back with the offset. */
+  /** The frame this model was streamed in — its own, M_i⁻¹ ∘ P — echoed back with the offset. */
   frame: import('./georef').ProjectFrame | null
   warnings: readonly GeometryWarning[]
   /** `GetCoordinationMatrix`, for the record. Identity while `COORDINATE_TO_ORIGIN` is false. */

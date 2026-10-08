@@ -3,6 +3,62 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-08 — coordinates, part 1: the federation is assembled in map space
+
+**Did:** the owner's mixed federation — *"My ifc are based on site placement while other are
+based on ifcmapconversion"* — and rules 1, 2, 3 and 5 of the five they approved (*"Yes, all
+five"*). Each model gets its own world → map operation from its own declaration
+(`mapPlacement`, `shared/georef.ts`: the `IfcMapConversion` on the 3D `Model` context or a
+sub-context of it, else IFC2X3's `ePset_MapConversion`, else the identity; E / N / H × the map
+unit; `Scale` never applied; `TrueNorth` never stacked). The federation's frame is the boot
+model's project frame in map coordinates, **P = M_boot ∘ Site_boot** (`federationFrame`), and
+each model streams through **M_i⁻¹ ∘ P** (`modelFrame`) — which is the boot's own site frame, not
+recomputed, for every model placed the way the boot is, so a Revit "Shared Coordinates"
+federation streams exactly as before. Grids and storeys go through the same frame (`metaOf`,
+now exported). The index builder takes the conversion on the `Model` context, reads
+`IfcProjectedCRS.MapUnit` (an SI prefix, a conversion factor) and IFC2X3's `ePset_ProjectedCRS`
+map unit by name
+(`lengthUnitFromLabel`, `shared/units.ts`). The base point is P: set once at boot from the boot
+model (`federation-store.ts`), never from a model that joins later; the card, the chips and
+`basePointSource` speak for the model whose declaration the fields are (`cardGeoref`).
+`get_model_info` reports `placedBy`, `mapUnit` and `scaleApplied: false`. `frameKey` is P's —
+unchanged for an identity-operation boot, new for a map-conversion boot. A boot model that
+fails to prepare gives the frame back when nothing is loaded and no other model has been streamed
+in it (the deep review's item; one that has stands in it, and keeps it). Eight synthetic
+fixtures of one building (`scripts/make-tiny-ifc.py` → `tests/fixtures/georef/`, the
+repository's coordinates only) and IfcOpenShell's own reading of three of them. No visible
+change: no element, control or copy. Five decision rows (and three 2026-09-20 rows amended), two
+traps, `SYSTEM_SPEC.md` §5 and §7. Rule 4 (the `WorldCoordinateSystem`), the on-screen note for
+a model that cannot be lined up and a read-only Coordinate-system card are part 2.
+
+**Measured:** every ordered pair of the eight fixtures (56) federates within 1 mm — vertices,
+element boxes, grid segments, storey heights — through the real index builder and streamer under
+Node, and IfcOpenShell's `util.geolocation` puts every product of (a), (b) and (f) where
+`mapPlacement` does. Against the build before, streamed under Node: 21 of 81 streams
+byte-identical — every model alone, every pair of identity-operation models, every pair sharing
+the boot's operation — and the other 60 are the mixed pairs this fixes. In the built app (a
+scratchpad harness under `safe-run.cjs`, 1280 × 820, ratio 1, everything but the 3D canvas
+hidden, 60 fps throughout): the mock in 9 states and `high-first.ifc` in 6, both themes, every
+bitmap identical to the build before, and `tiny.ifc` in 6 — 11 of 12 at the harness's 1.6 s
+settle, the twelfth an ortho → perspective flight caught 2 px (≤ 2/255) short of where it lands,
+and all 12 identical at a 5 s settle; the baseline captured twice and the final build twice, each
+reproducing itself. The pairs (a) + (b), (b) + (a), (a) + (f) and (g) + (e) loaded into one
+window put the two `Slab L1`s 25 524, 23 453, 25 524 and 13.8 m apart before and **0.0000 m**
+apart after.
+
+**Verified:** `npm run typecheck` exit 0; `npm test` **144 files passed / 2 skipped, 2 812 tests
+passed / 3 skipped** (34 new: 18 in `georef.test.ts`, 3 in `units.test.ts`, 6 in
+`federation-store.test.ts` with a fake parse bridge, 2 in `render-selectors.test.ts`, 1 in
+`ai-executors.test.ts` (`get_model_info`'s new fields), and the 4 of the new
+`georef-federation.fixture.test.ts`, which fails against the old single-frame rule, against a
+map unit ignored and against `Scale` applied); `npm run build` exit 0; `npm run test:e2e` **62
+passed, 6 skipped** in 7.8 m — peak one process 239 MB, all 782 MB, GPU dedicated 277 MB,
+`clean:`; nothing survived. The deep review's five fixes after that — the sub-context, the
+hand-back, the `bbox` schema sentence, no IfcOpenShell version in the committed JSON, the
+`rotationDeg` comment — were checked by typecheck, `npm test` and the generator run twice.
+
+**Not verified:** a real model (none in `samples/`), macOS, and the owner's own pair of files.
+
 ## 2026-10-08 — with the canvas grid off, the ground veil is not drawn
 
 **Did:** the owner: *"When off the canvas grid, please dont show the semi-opacity plane filter."*
@@ -1539,56 +1595,24 @@ theme its own run, HEAD → this build): label readback identical for the first 
 face under the cursor (`Z 110.000 → 110.900`, `M2 Y 9 025 · Z 2 700 → 8 865 · 1 800`).
 Toggling the tag and back leaves the frame pixel-identical, both themes.
 
-## 2026-09-28 — the assistant exports a schedule and colours the model by one of its columns
-
-**Did:** the owner's last two schedule abilities, in the words of the options they chose:
-*"Export from chat — 'Export this schedule to Excel' opens the normal Save dialog for you. You
-still pick where it goes."* and *"Colour 3D from chat — 'Colour the model by this schedule's
-Fire Rating column' — uses the same colour-by the table's right-click menu already has."*
-**`export_schedule`** (view, strict, `{format}`: `xlsx` · `csv` · `all_saved` ·
-`schedule_file`) posts `export {n, format}` over the port; the Schedules window runs the Export
-menu's own action (`EXPORT_ACTIONS`, which the menu now calls too) — its native Save dialog, its
-suggested name, its toast — and answers `exportAck` at once, or refuses by the menu's rules
-(`busy`, `no_schedule`, `nothing_saved`); one request at a time, 3 s for the answer, never a
-wait on the dialog; the window is raised through `openSchedules()`; the model is told the
-dialog is opening and never that a file was saved. The read-only guard exempts that exact name
-from the mutating-name test and now refuses a path, file name or file-content key at any depth.
-**`color_by_schedule_column`** (view, strict, `{column | null}`) is the heading menu's "Colour 3D
-by this column": the grouping moved to `schedule/colour.ts` (`colourColumn`) and the apply path
-to `schedule-link.ts`'s `colourByColumn`, both shared by the menu and the tool; the column is
-found by `removeColumns`' own rule (`columnsNamed`) among the visible ones; `null` clears; the
-report is `color_by_property`'s, factored out unchanged (`schemeOutcome`). Like the menu's, it
-is not on ⌘Z — colour-by is not a `VIS_KEY` (the task had expected undo to revert it). One prompt
-line. No new surface in either window.
-
-**Measured:** tools block 28 870 → 30 857 B (29 → 31 tools); `contractText()` 15 976 →
-16 431 B (UTF-8 bytes).
-
-**Verified:** `npm run typecheck` exit 0; `npm test` **119 files passed / 2 skipped, 1 870 tests
-passed / 3 skipped** (21 new — 1 guard (two guard cases rewritten), 1 prompt, 2 catalogue,
-2 message, 4 link, 3 Schedules-window export, 8 executor, one of which proves the menu's path
-and the tool's give the same scheme on the mock); `npm run build` exit 0; `npm run test:e2e` **38 passed, 6 skipped** in 3.4 m — the
-new case drives both tools over the real `ai:tool:exec` IPC with main's Save dialog stubbed: no
-window refused, `all_saved` refused with nothing saved and the window not raised, `xlsx` opens
-the Export menu's dialog attached to the Schedules window (window raised once) and a stubbed
-Save writes a real workbook through `exports.ts`, Cancel writes nothing, the tool's legend equals
-the heading menu's row for row and colour for colour, ⌘Z takes back a Hide and leaves the
-colours, an unknown column lists the visible ones, `null` clears — peak one process 216 MB, all
-774 MB, GPU dedicated 274 MB, `clean:`; nothing survived. One earlier full run failed the
-previous assistant case's last poll with `Object has been destroyed`: `tool()`'s window lookup
-checked the window but not its `webContents`, which a closing window loses first; it now checks
-both, and the schedules spec (9 passed) and the full run passed after. Not run: the paid AI eval
-suite.
-
 ## Earlier work
 
-Compressed: the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-09-28 — the assistant exports a schedule and colours the model by one of its columns.**
+The owner's last two schedule abilities. `export_schedule` (view, `{format}` of `xlsx` · `csv` ·
+`all_saved` · `schedule_file`) makes the Schedules window run its Export menu's own action — its
+native Save dialog, its toast — and answers at once, or refuses by the menu's rules; the tool is
+never told whether a file was saved. `color_by_schedule_column` (view, `{column | null}`) is the
+heading menu's "Colour 3D by this column", the grouping shared by the menu and the tool; like
+the menu's, it is not on ⌘Z. Tools block 28 870 → 30 857 B (29 → 31 tools). 1 870 unit tests;
+e2e 38 passed, 6 skipped.
 
 **2026-09-28 — the assistant makes and reads schedules: `make_schedule`, `get_schedule`.** The
 owner: *"wire the schedules with the AI. Improve AI abilities."* `make_schedule` (view) takes a

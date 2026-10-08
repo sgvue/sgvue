@@ -872,8 +872,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-09-19 — **anything that changes what is drawn must call `invalidate()`**. The frame loop draws on demand.
 - 2026-09-19 — a pick ray walks a uniform grid, and the grid is a **filter**: the candidate walk is still the answer.
 - 2026-09-19 — **`forceSinglePass` on the glass material is refused**: the two-pass back-then-front order is drawn result.
-- 2026-09-20 — **the scene is the model's project frame**, not the file's world frame; `geometry-streamer.ts` is where they meet.
-- 2026-09-20 — a session, a share link and a viewpoint record `frameKey`; on a mismatch everything restores but the camera.
+- 2026-09-20 — **the scene is the model's project frame**, not the file's world frame; `geometry-streamer.ts` is where they meet. *(Amended 2026-10-08: the frame is the boot model's project frame expressed in map coordinates, P = M_boot ∘ Site_boot, and each model streams through its own M_i⁻¹ ∘ P — the federation lines up in map space, not by world coordinates; below.)*
+- 2026-09-20 — a session, a share link and a viewpoint record `frameKey`; on a mismatch everything restores but the camera. *(Amended 2026-10-08: the key is P's — unchanged for a boot model whose map operation is the identity, new for one placed by a map conversion.)*
 - 2026-09-20 — **the spatial-root `IfcSite`** is the one `IfcProject` aggregates, never the first by expressId.
 - 2026-09-20 — a level ring sits at the storey's own `ObjectPlacement`; the ladder and the tag print the authored `Elevation`.
 - 2026-09-20 — **`IfcElement.bbox` is unioned from the part boxes before the index freezes**: project frame, conservative, and said so everywhere.
@@ -1036,6 +1036,11 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-05 — **the public repository, `sgvue/sgvue`, is the source of truth**: every push is public at once; commits carry the project's public commit identity; the privacy search runs before every push; `sgvue/releases` stays the download channel. The private repository is an archive of the history before publication.
 - 2026-10-05 — **Dependabot proposes no major version update** for any dependency, npm or Actions (`'*'` with `update-types: [version-update:semver-major]`): a toolchain major is a measured change, not a bot PR. Security updates are unaffected — `update-types` applies to version updates only.
 - 2026-10-08 — **with the canvas grid off, the ground veil is not drawn** (owner-requested): `buildScene` builds it with `visible = groundGrid` and the rig's `setGroundGrid` moves it with the helper, so a theme change keeps it and every rig rebuild (`buildRig`) takes the flag; the opaque ground stays, and takes the shadow. The veil casts nothing, so the shadow map is untouched and `invalidate()` is all the toggle needs. The veil also carried the ground's depth, so with the grid off what is below grade — edges, glass, annotations — is drawn too.
+- 2026-10-08 — **the federation is assembled in map space** (owner-approved, coordinates part 1): each model's world → map operation comes from its own declaration — `mapPlacement` in `shared/georef.ts`, the one function the geometry, the grids and storeys, the base point and `get_model_info` all read; the `IfcMapConversion` on the 3D `Model` context (or a sub-context of it), else IFC2X3's `ePset_MapConversion`, else the identity — the federation's frame is **P = M_boot ∘ Site_boot** (`federationFrame`), and each model streams through **M_i⁻¹ ∘ P** (`modelFrame`), which is the boot's site frame itself, not recomputed, for every model placed the way the boot is. The offset, Float64 and `COORDINATE_TO_ORIGIN = false` are unchanged; `frameKey` is P's. **The base point is P**: set once, at boot, from the boot model, never by a model that joins later; the card, the chips and `basePointSource` speak for the model whose declaration the fields are (`cardGeoref`).
+- 2026-10-08 — **`IfcMapConversion.Scale` is never applied for placement**, only reported as written: exporters write it absent, 0.001 and 1000 for the same millimetre model in a metre CRS, and web-ifc has already applied the length unit.
+- 2026-10-08 — **E, N and H are multiplied by the map unit**, `IfcProjectedCRS.MapUnit` (IFC2X3: `ePset_ProjectedCRS`'s, by name — `lengthUnitFromLabel`); **absent, it is the metre** — what Revit writes and the IFC4.3 Annex E examples; a name that is not a known length is read as metres and said so.
+- 2026-10-08 — **`TrueNorth` is never stacked on a map conversion**, and in part 1 it places nothing at all; the base point's angle still falls back to it, as a readout only, when nothing else states a rotation (2026-09-20).
+- 2026-10-08 — **CRS names are deliberately not compared**: every regime fixes one CRS a project, and the names are unreliable (EPSG:3414 and the compound EPSG:6927 for one grid, placeholders, free text), so models align by their operations whatever their CRS is called.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
@@ -1132,7 +1137,9 @@ One line each. **Read `docs/TRAPS.md` before touching `src/worker/` or
 - Never `COORDINATE_TO_ORIGIN: true` in a federation — it recentres each model and loses the offsets between them.
 - Revit shared coordinates sit ~33 km out, where float32 resolves ~4 mm. Subtract a shared origin in Float64.
 - Grid points need `placementMatrix()` applied by hand, and a grid axis is a segment, not a coordinate.
-- A Revit export puts the true-north rotation and the elevation on `IfcSite.ObjectPlacement`, not `IfcMapConversion`.
+- A Revit "Shared Coordinates" export puts the true-north rotation and the elevation on `IfcSite.ObjectPlacement`, not `IfcMapConversion`; its other Coordinate Base options put the position in `IfcMapConversion` (with an EPSG code) or the context's `WorldCoordinateSystem`.
+- `IfcMapConversion.Scale` is written absent, 0.001 or 1000 for the same mm model in a metre CRS — never apply it; E / N / H × the map unit.
+- Take the `IfcMapConversion` on the 3D `Model` context (a sub-context counts, by its `ParentContext`), not the first one in the file.
 - A file can hold many `IfcSite`s — 16 on the reference model. Only the one `IfcProject` aggregates is the position.
 - The federation offset's Z is the first placement's, not the datum — never read scene z = 0 as the ground.
 

@@ -28,7 +28,7 @@ import {
   COLOR_GROUP_CAP,
   VALID_VALUES_CAP
 } from '../../src/renderer/ai/executors/context'
-import { FIND_PROPERTIES_CAP, SPATIAL_DEPTH } from '../../src/renderer/ai/executors/read'
+import { FIND_PROPERTIES_CAP, MAP_UNIT_NAME_CHARS, SPATIAL_DEPTH } from '../../src/renderer/ai/executors/read'
 import { NEAREST_CAP, TOP_VALUES_CAP } from '../../src/renderer/ai/executors/names'
 import type { RawLine } from '../../src/worker/index-builder'
 import { rigViewer } from './rig-viewer'
@@ -310,6 +310,37 @@ describe('the additional read tools', () => {
     expect(geo.source).toBe('none')
     expect(geo.corenetX.status).toBe('na')
     expect(geo.corenetX.isSg).toBe(false)
+    // 2026-10-08 — how it was put into the federation's map space: by nothing, in metres,
+    // with `Scale` reported and never applied.
+    expect(m.georeferencing).toMatchObject({
+      placedBy: 'none',
+      mapUnit: { name: null, metresPerUnit: 1, assumedMetre: true },
+      scaleApplied: false
+    })
+  })
+
+  it('get_model_info says which declaration placed a model, in which map unit, and that Scale was not applied', async () => {
+    const georef = {
+      source: 'IfcMapConversion' as const,
+      sources: ['IfcMapConversion' as const],
+      method: 'IfcMapConversion' as const,
+      eastings: 40503.468,
+      northings: 76957.894,
+      orthogonalHeight: 16.568,
+      scale: 1000,
+      mapUnit: { name: 'FOOT' + 'T'.repeat(200), metres: 0.3048 }
+    }
+    useShell.getState().commitModels(federate([{ ...mockModelIndex('ARC'), georef }]))
+    const geo = ((await run('get_model_info', { model: 'ARC' })).models as Record<string, unknown>[])[0]
+      .georeferencing as Record<string, unknown>
+    expect(geo.placedBy).toBe('IfcMapConversion')
+    expect(geo.scale).toBe(1000)
+    expect(geo.scaleApplied).toBe(false)
+    const unit = geo.mapUnit as { name: string; metresPerUnit: number; assumedMetre: boolean }
+    expect(unit).toMatchObject({ metresPerUnit: 0.3048, assumedMetre: false })
+    // A name is file text, and clipped like every other.
+    expect(unit.name.length).toBeLessThanOrEqual(MAP_UNIT_NAME_CHARS + 1)
+    expect(unit.name.startsWith('FOOT')).toBe(true)
   })
 
   it('get_view_state reports the live stack with per-step counts', async () => {

@@ -13,24 +13,31 @@
 import { describe, expect, it } from 'vitest'
 import { DASH } from '../../src/shared/fmt'
 import {
+  composeFrames,
   coordsFromGeoref,
   crsChip,
   detectMethod,
+  federationFrame,
   frameKey,
+  invertFrame,
   isIdentityMapConversion,
   isIdentitySitePlacement,
   isLocated,
   isSvy21,
+  mapPlacement,
   mapRotationDeg,
+  modelFrame,
   normaliseDeg,
   projectFrame,
   sameBasePoint,
   toMap,
   toProject,
   toWorld,
-  worldToProjectMatrix
+  worldToProjectMatrix,
+  type ProjectFrame
 } from '../../src/shared/georef'
 import type { Georeference } from '../../src/shared/model-index.types'
+import { lengthUnitFromLabel, US_SURVEY_FOOT } from '../../src/shared/units'
 
 const none: Georeference = { source: 'none', sources: ['none'], method: 'none' }
 
@@ -444,5 +451,314 @@ describe('crsChip', () => {
       site: { placement: [1, 2, 3] }
     }
     expect(crsChip(site, false).short).toBe(DASH)
+  })
+})
+
+/* ────────────────────────── 2026-10-08: the federation in map space ────────────────────────── */
+
+/** The repository's synthetic map position — the one the `tests/fixtures/georef/` set carries. */
+const O = [12345.457, 23456.766, 5.05] as const
+const A = -43.4103
+const SITE_KEY = '12345.457,23456.766,5.050@-43.4103'
+const rad = (d: number): number => (d * Math.PI) / 180
+
+/** Placed by `IfcMapConversion` over a site at the file's zero (Revit "Project Base Point"). */
+const byConversion = (extra: Partial<Georeference> = {}): Georeference => ({
+  source: 'IfcMapConversion',
+  sources: ['IfcMapConversion'],
+  method: 'IfcMapConversion',
+  eastings: O[0],
+  northings: O[1],
+  orthogonalHeight: O[2],
+  xAxisAbscissa: Math.cos(rad(A)),
+  xAxisOrdinate: Math.sin(rad(A)),
+  scale: 0.001,
+  ...extra
+})
+
+/** The same building placed by its site, beside Revit's zero conversion ("Shared Coordinates"). */
+const bySite: Georeference = {
+  ...sample,
+  site: { expressId: 91, placement: [O[0], O[1], O[2]], rotationDeg: A }
+}
+
+/** A survey point: a local site offset that carries the turn, the survey point in the conversion. */
+const bySurveyPoint: Georeference = {
+  ...byConversion({
+    eastings: O[0] + 8,
+    northings: O[1] - 3,
+    xAxisAbscissa: 1,
+    xAxisOrdinate: 6.123233995736766e-17
+  }),
+  sources: ['IfcMapConversion', 'IfcSite'],
+  site: { placement: [-8, 3, 0], rotationDeg: A }
+}
+
+/** The same building with its map position stated in feet. */
+const inFeet = (): Georeference =>
+  byConversion({
+    eastings: O[0] / 0.3048,
+    northings: O[1] / 0.3048,
+    orthogonalHeight: O[2] / 0.3048,
+    mapUnit: { name: 'FOOT', metres: 0.3048 }
+  })
+
+const near = (a: readonly number[], b: readonly number[], tol = 1e-9): void => {
+  expect(a.length).toBe(b.length)
+  a.forEach((v, i) => expect(Math.abs(v - b[i]), `[${i}] ${v} vs ${b[i]}`).toBeLessThan(tol))
+}
+const sameOp = (a: ProjectFrame | null, b: ProjectFrame | null): void => {
+  expect(!!a).toBe(!!b)
+  if (!a || !b) return
+  near(a.origin, b.origin)
+  expect(Math.abs(normaliseDeg(a.rotationDeg - b.rotationDeg))).toBeLessThan(1e-9)
+}
+
+describe('mapPlacement — one model’s own world → map operation (2026-10-08)', () => {
+  it('reads IfcMapConversion as T(E·u, N·u, H·u) · Rz(θ), anticlockwise', () => {
+    const m = mapPlacement(byConversion())
+    expect(m.placedBy).toBe('IfcMapConversion')
+    expect(m.metresPerMapUnit).toBe(1)
+    expect(m.mapUnit).toBeNull()
+    near(m.operation!.origin, O)
+    expect(m.operation!.rotationDeg).toBeCloseTo(A, 9)
+    // World +X is the conversion's X axis on the map; world +Y a quarter turn anticlockwise of it.
+    near(toWorld(m.operation, 1, 0, 0), [O[0] + Math.cos(rad(A)), O[1] + Math.sin(rad(A)), O[2]])
+    near(toWorld(m.operation, 0, 1, 2), [O[0] - Math.sin(rad(A)), O[1] + Math.cos(rad(A)), O[2] + 2])
+  })
+
+  it('reads IFC2X3’s ePset the same way, under its own name', () => {
+    const epset: Georeference = {
+      ...byConversion(),
+      source: 'ePset',
+      sources: ['ePset'],
+      method: 'ePset_MapConversion'
+    }
+    const m = mapPlacement(epset)
+    expect(m.placedBy).toBe('ePset_MapConversion')
+    sameOp(m.operation, mapPlacement(byConversion()).operation)
+  })
+
+  it('is the identity for a model placed by its site, and for one that states nothing', () => {
+    expect(mapPlacement(bySite)).toMatchObject({ operation: null, placedBy: 'site placement' })
+    expect(mapPlacement(sample)).toMatchObject({ operation: null, placedBy: 'site placement' })
+    expect(mapPlacement(none)).toMatchObject({ operation: null, placedBy: 'none', metresPerMapUnit: 1 })
+    expect(mapPlacement(null)).toMatchObject({ operation: null, placedBy: 'none' })
+  })
+
+  it('turns by atan2(ordinate, abscissa) in all four quadrants', () => {
+    for (const d of [30, 120, -150, 210, -60]) {
+      const m = mapPlacement(
+        byConversion({ xAxisAbscissa: Math.cos(rad(d)), xAxisOrdinate: Math.sin(rad(d)) })
+      )
+      expect(m.operation!.rotationDeg, `${d}°`).toBeCloseTo(normaliseDeg(d), 9)
+      near(toWorld(m.operation, 1, 0, 0), [O[0] + Math.cos(rad(d)), O[1] + Math.sin(rad(d)), O[2]])
+      near(toWorld(m.operation, 0, 1, 0), [O[0] - Math.sin(rad(d)), O[1] + Math.cos(rad(d)), O[2]])
+    }
+  })
+
+  it('takes only the axis vector’s direction: it need not be unit length', () => {
+    const unit = mapPlacement(byConversion({ xAxisAbscissa: 0.6, xAxisOrdinate: 0.8 })).operation!
+    const long = mapPlacement(byConversion({ xAxisAbscissa: 3, xAxisOrdinate: 4 })).operation!
+    const short = mapPlacement(byConversion({ xAxisAbscissa: 3e-4, xAxisOrdinate: 4e-4 })).operation!
+    sameOp(long, unit)
+    sameOp(short, unit)
+    expect(unit.rotationDeg).toBeCloseTo((Math.atan2(4, 3) * 180) / Math.PI, 12)
+    // A point 1 m along world +X stays 1 m from the origin on the map: nothing is scaled.
+    const [x, y] = toWorld(long, 1, 0, 0)
+    expect(Math.hypot(x - O[0], y - O[1])).toBeCloseTo(1, 12)
+  })
+
+  it('multiplies E, N and H by the map unit — an SI prefix, the foot, the US survey foot', () => {
+    const inUnit = (metres: number, name: string): Georeference =>
+      byConversion({
+        eastings: O[0] / metres,
+        northings: O[1] / metres,
+        orthogonalHeight: O[2] / metres,
+        mapUnit: { name, metres }
+      })
+    for (const [metres, name] of [
+      [0.001, 'MILLIMETRE'],
+      [1000, 'KILOMETRE'],
+      [0.3048, 'FOOT'],
+      [US_SURVEY_FOOT, 'US SURVEY FOOT']
+    ] as const) {
+      const m = mapPlacement(inUnit(metres, name))
+      expect(m.metresPerMapUnit, name).toBe(metres)
+      expect(m.mapUnit).toBe(name)
+      expect(m.mapUnitKnown).toBe(true)
+      near(m.operation!.origin, O, 1e-6)
+    }
+    // The two feet differ by 2 ppm — 25 mm at a 12 km easting, which is why both are exact.
+    const survey = mapPlacement({ ...inFeet(), mapUnit: { name: 'US SURVEY FOOT', metres: US_SURVEY_FOOT } })
+    expect(Math.abs(survey.operation!.origin[0] - O[0])).toBeGreaterThan(0.02)
+    expect(lengthUnitFromLabel('US survey foot')).toBe(US_SURVEY_FOOT)
+  })
+
+  it('reads E, N and H as metres when the map unit is absent — and when it cannot be read, says so', () => {
+    expect(mapPlacement(byConversion()).metresPerMapUnit).toBe(1)
+    const unknown = mapPlacement(byConversion({ mapUnit: { name: 'CHAIN' } }))
+    expect(unknown).toMatchObject({ metresPerMapUnit: 1, mapUnit: 'CHAIN', mapUnitKnown: false })
+    near(unknown.operation!.origin, O)
+  })
+
+  it('places a model identically whether Scale is absent, 0.001 or 1000 — and reports it as written', () => {
+    const at = (scale: number | undefined): ReturnType<typeof mapPlacement> =>
+      mapPlacement(byConversion({ scale }))
+    expect(at(undefined).operation).toEqual(at(0.001).operation)
+    expect(at(1000).operation).toEqual(at(0.001).operation)
+    expect([at(undefined).scale, at(0.001).scale, at(1000).scale]).toEqual([null, 0.001, 1000])
+  })
+
+  it('takes Revit’s zero conversion and its 6.12e-17 ordinate for the identity — nothing turns twice', () => {
+    const revit: Georeference = {
+      source: 'IfcMapConversion',
+      sources: ['IfcMapConversion'],
+      method: 'none',
+      eastings: 0,
+      northings: 0,
+      orthogonalHeight: 0,
+      xAxisAbscissa: 1,
+      xAxisOrdinate: 6.123233995736766e-17,
+      scale: 0.001
+    }
+    expect(isIdentityMapConversion(revit)).toBe(true)
+    expect(mapPlacement(revit).operation).toBeNull()
+    expect(mapPlacement({ ...revit, xAxisOrdinate: 0 }).operation).toBeNull()
+    expect(
+      mapPlacement({ ...revit, xAxisAbscissa: undefined, xAxisOrdinate: undefined }).operation
+    ).toBeNull()
+    // …and with the shared coordinates on its site, P is that site placement, untouched.
+    expect(federationFrame({ ...revit, site: bySite.site })).toEqual(projectFrame(bySite))
+  })
+
+  it('never stacks TrueNorth on a conversion, and places nothing by it alone', () => {
+    const north: readonly [number, number] = [Math.sin(rad(A)), Math.cos(rad(A))]
+    expect(mapPlacement(byConversion({ trueNorth: north })).operation).toEqual(
+      mapPlacement(byConversion()).operation
+    )
+    expect(federationFrame(byConversion({ trueNorth: north }))).toEqual(federationFrame(byConversion()))
+    const onlyNorth: Georeference = { ...none, trueNorth: [0.5, Math.sqrt(3) / 2] }
+    expect(mapPlacement(onlyNorth).operation).toBeNull()
+    expect(federationFrame(onlyNorth)).toBeNull()
+  })
+})
+
+describe('P, the federation frame, and each model’s frame M_i⁻¹ ∘ P (2026-10-08)', () => {
+  it('is the boot model’s site frame itself when its map operation is the identity — frameKey unchanged', () => {
+    // The reference model and every Revit "Shared Coordinates" export: exactly today's key.
+    expect(federationFrame(sample)).toEqual(projectFrame(sample))
+    expect(frameKey(federationFrame(sample))).toBe('12345.457,23456.766,5.050@-43.4103')
+    expect(frameKey(federationFrame(bySite))).toBe(frameKey(projectFrame(bySite)))
+    // The design's mock and every file that states nothing: the identity.
+    expect(federationFrame(none)).toBeNull()
+    expect(frameKey(federationFrame(none))).toBe('identity')
+    expect(frameKey(federationFrame(null))).toBe('identity')
+  })
+
+  it('composes the map conversion over the site placement', () => {
+    const both: Georeference = {
+      source: 'IfcMapConversion',
+      sources: ['IfcMapConversion', 'IfcSite'],
+      method: 'IfcMapConversion + IfcSite placement',
+      eastings: 1000,
+      northings: 2000,
+      orthogonalHeight: 10,
+      xAxisAbscissa: 0,
+      xAxisOrdinate: 1,
+      site: { placement: [30, 40, 5], rotationDeg: 45 }
+    }
+    const P = federationFrame(both)!
+    // The map conversion turns by +90°, so the site's (30, 40) lands on (−40, 30).
+    near(P.origin, [960, 2030, 15])
+    expect(P.rotationDeg).toBeCloseTo(135, 9)
+  })
+
+  it('gives a model placed by its site and one placed by IfcMapConversion the same P', () => {
+    for (const g of [byConversion(), byConversion({ scale: undefined }), bySurveyPoint, inFeet()]) {
+      sameOp(federationFrame(g), federationFrame(bySite))
+      expect(frameKey(federationFrame(g))).toBe(SITE_KEY)
+    }
+  })
+
+  it('gives a boot model placed by a map conversion a new frameKey — its camera then falls back', () => {
+    // Its own stream is unchanged (its frame is its site frame, below); only the key moves, from
+    // the site frame it used to record to P.
+    expect(frameKey(projectFrame(byConversion()))).toBe('identity')
+    expect(frameKey(federationFrame(byConversion()))).toBe(SITE_KEY)
+    expect(frameKey(projectFrame(bySurveyPoint))).toBe('-8.000,3.000,0.000@-43.4103')
+    expect(frameKey(federationFrame(bySurveyPoint))).toBe(SITE_KEY)
+  })
+
+  it('is the boot model’s site frame, exactly, for every model placed the way the boot is', () => {
+    expect(modelFrame(bySite, bySite)).toEqual(projectFrame(bySite))
+    expect(modelFrame(sample, none)).toEqual(projectFrame(sample))
+    expect(modelFrame(sample, bySite)).toEqual(projectFrame(sample))
+    expect(modelFrame(byConversion(), byConversion())).toEqual(projectFrame(byConversion()))
+    // `Scale` is no part of the operation, so a different one is the same placement.
+    expect(modelFrame(byConversion(), byConversion({ scale: 1000 }))).toBeNull()
+    expect(modelFrame(bySurveyPoint, bySurveyPoint)).toEqual(projectFrame(bySurveyPoint))
+    expect(modelFrame(null, null)).toBeNull()
+  })
+
+  it('round-trips: world → project through frame_i, then P, lands where the model’s own declaration puts it', () => {
+    const models = [bySite, sample, byConversion(), inFeet(), bySurveyPoint, none]
+    const world: [number, number, number][] = [
+      [0, 0, 0],
+      [20, 12, 4],
+      [-3.5, 7.25, -1],
+      [12346, 23457, 6]
+    ]
+    for (const boot of models) {
+      const P = federationFrame(boot)
+      for (const m of models) {
+        const frame = modelFrame(boot, m)
+        const matrix = worldToProjectMatrix(frame)
+        const own = mapPlacement(m).operation
+        for (const w of world) {
+          const p = toProject(frame, ...w)
+          // Through P onto the map: exactly where model m's own operation puts its world point.
+          near(toWorld(P, ...p), toWorld(own, ...w), 1e-6)
+          // Back again, and the matrix the streamer composes agrees.
+          near(toWorld(frame, ...p), w, 1e-6)
+          if (!matrix) continue
+          const [x, y, z] = w
+          near(
+            [
+              matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+              matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+              matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]
+            ],
+            p,
+            1e-6
+          )
+        }
+      }
+    }
+  })
+
+  it('composes and inverts', () => {
+    const f: ProjectFrame = { origin: [12345.457, 23456.766, 5.05], rotationDeg: A }
+    const g: ProjectFrame = { origin: [-8, 3, 1], rotationDeg: 120 }
+    const id = composeFrames(invertFrame(f), f)!
+    near(id.origin, [0, 0, 0], 1e-9)
+    expect(Math.abs(id.rotationDeg)).toBeLessThan(1e-9)
+    // A null side is the identity and hands the other back as it is — the same object.
+    expect(composeFrames(null, f)).toBe(f)
+    expect(composeFrames(f, null)).toBe(f)
+    expect(composeFrames(null, null)).toBeNull()
+    expect(invertFrame(null)).toBeNull()
+    // (f ∘ g)(p) = f(g(p)).
+    near(toWorld(composeFrames(f, g), 1, 2, 3), toWorld(f, ...toWorld(g, 1, 2, 3)), 1e-9)
+  })
+
+  it('reads the base point off P, the map unit included', () => {
+    const want = { E: O[0], N: O[1], Z: O[2], angle: A }
+    expect(coordsFromGeoref(inFeet())).toEqual(want)
+    expect(coordsFromGeoref(byConversion())).toEqual(want)
+    expect(coordsFromGeoref(bySurveyPoint)).toEqual(want)
+    expect(coordsFromGeoref(bySite)).toEqual(want)
+    // `Scale` moves nothing here either.
+    expect(coordsFromGeoref(byConversion({ scale: 1000 }))).toEqual(want)
   })
 })

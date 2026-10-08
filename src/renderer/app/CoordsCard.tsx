@@ -9,8 +9,10 @@
  *   coordinates of the **project frame's** origin and the total rotation from project north to
  *   true north — `IfcMapConversion` composed over the spatial-root `IfcSite.ObjectPlacement`,
  *   either of which may be identity — and **left blank** when the file states none
- *   (`shared/georef.ts`). Typing into one sets `coords` and pushes it to the viewer, which is
- *   what moves the TN mark on the cube and re-renders every spot label.
+ *   (`shared/georef.ts`). Since 2026-10-08 they are the **boot model's**: the federation is
+ *   placed in that model's frame expressed in map coordinates, so its base point is the one that
+ *   holds for every model (`federation-store.ts`). Typing into one sets `coords` and pushes it to
+ *   the viewer, which is what moves the TN mark on the cube and re-renders every spot label.
  * · **The CRS chip.** The design writes `SVY21 · EPSG:3414`, which is true of its own Singapore
  *   subject and a placeholder for any other file, so it names the file's declared
  *   `IfcProjectedCRS` and shows the em dash when there is none. `SVY21 · EPSG:3414` is exactly
@@ -29,7 +31,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { crsChip } from '../../shared/georef'
 import type { CoordState } from '../state/shell'
 import { s } from './css'
-import { coordsCaption, hasManualCoords } from '../state/selectors/status'
+import { cardGeoref, coordsCaption, hasManualCoords } from '../state/selectors/status'
 import { Cross } from './icons'
 
 const LABEL =
@@ -43,7 +45,9 @@ const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'setCo
 export default function CoordsCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
   if (st.card !== 'coords') return null
-  const georef = st.federation.models.find((m) => m.meta.georef.source !== 'none')?.meta.georef
+  // 2026-10-08: the model whose declaration the four fields are — the boot model, whose frame
+  // the federation is placed in — else the first that states any (`selectors/status.ts`).
+  const georef = cardGeoref(st.federation, st.coords)
   const chip = crsChip(georef ?? null, hasManualCoords(st.coords, st.federation)).long
   // The one visible addition in the port, the user's own request (2026-09-20): the detected
   // method, appended inside the design's own caption span, in the design's own style.

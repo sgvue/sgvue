@@ -187,8 +187,9 @@ export class ParseWorkerBridge {
   /**
    * Stream one parsed model's geometry. `offset` is the federation offset already in force;
    * pass `null` for the first model and read the offset it chose off the summary. `frame` is
-   * the federation's project frame, which the caller always has — it read this model's index
-   * before asking for its geometry.
+   * this model's own frame against the federation's (M_i⁻¹ ∘ P, `shared/georef.ts`'s
+   * `modelFrame`), which the caller always has — it read this model's index before asking for
+   * its geometry.
    *
    * The model must already have been parsed by this bridge — the worker streams from the
    * model it still holds open, so nothing is re-read.

@@ -50,6 +50,21 @@ named so each trap can be traced to its original write-up.
   Coordinate-system card fills with zeros. Take the **composed matrix's X column** for the
   rotation (`atan2(m[1], m[0])`), check it really is a rotation about `+Z` before believing it,
   and undo the whole placement once in the geometry pipeline. — 2026-09-20
+- **`IfcMapConversion.Scale` cannot be read as an instruction: its direction depends on who wrote
+  the file, and when.** For the same millimetre model in a metre CRS, Revit's exporter wrote it
+  absent (up to its 25.x releases), 0.001 (26.1 to 27.0.x) and 1000 (27.3.0.12, August 2026 —
+  after buildingSMART's validation rule GRF005 had expected 1000 for more than a year, and
+  eighteen days before that rule was corrected to 0.001), and buildingSMART's own example files
+  disagree with each other. Applied literally, one cohort of files is drawn a thousand or a
+  million times too large. web-ifc has already put the geometry in metres, so place by E / N / H
+  × the map unit and never by `Scale`; report it as written. — 2026-10-08
+  ([revit-ifc Exporter.cs](https://github.com/Autodesk/revit-ifc/blob/IFC_v27.3.0.12/Source/Revit.IFC.Export/Exporter/Exporter.cs#L4124-L4143),
+  [ifc-gherkin-rules #522](https://github.com/buildingSMART/ifc-gherkin-rules/issues/522))
+- **Take the `IfcMapConversion` whose `SourceCRS` is the 3D `Model` context, not the first one in
+  the file.** A file can carry another on a 2D `Plan` context, and "the first" is then a coin
+  toss — IfcOpenShell's own reader takes the first. A sub-context of the `Model` context (`Body`)
+  is a legal `SourceCRS` and the same frame: judge it by its `ParentContext`. Fall back to the
+  first only when none is on the `Model` context. — 2026-10-08
 - **A file can hold many `IfcSite` entities; only the one `IfcProject` aggregates is the model's
   position.** The reference model has **16** — road-marking families exported as sites. Taking
   "the first by expressId" is a coin toss that this file happens to win. Walk

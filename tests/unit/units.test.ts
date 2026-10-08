@@ -8,8 +8,10 @@ import type { Units } from '../../src/shared/model-index.types'
 import { THIN_SPACE } from '../../src/shared/fmt'
 import {
   IDENTITY_UNITS,
+  US_SURVEY_FOOT,
   formatLength,
   formatValue,
+  lengthUnitFromLabel,
   measureKind,
   prefixPower,
   siFactor,
@@ -131,5 +133,34 @@ describe('measureKind', () => {
     expect(measureKind('IFCPOSITIVELENGTHMEASURE')).toBe('length')
     expect(measureKind('IFCTHERMALTRANSMITTANCEMEASURE')).toBeNull()
     expect(measureKind('')).toBeNull()
+  })
+})
+
+describe('lengthUnitFromLabel — a map unit IFC2X3 can only name (2026-10-08)', () => {
+  it('reads the metre with or without an SI prefix, however it is spelt', () => {
+    for (const label of ['METRE', 'metre', 'Meter', 'METRES', '.METRE.', 'm', 'M']) {
+      expect(lengthUnitFromLabel(label), label).toBe(1)
+    }
+    expect(lengthUnitFromLabel('MILLIMETRE')).toBe(1e-3)
+    expect(lengthUnitFromLabel('MILLI METRE')).toBe(1e-3)
+    expect(lengthUnitFromLabel('mm')).toBe(1e-3)
+    expect(lengthUnitFromLabel('CENTIMETRE')).toBe(1e-2)
+    expect(lengthUnitFromLabel('KILOMETRE')).toBe(1e3)
+  })
+
+  it('tells the international foot from the US survey foot', () => {
+    for (const label of ['FOOT', 'foot', 'feet', 'ft', 'International Foot']) {
+      expect(lengthUnitFromLabel(label), label).toBe(0.3048)
+    }
+    for (const label of ['US survey foot', 'US_SURVEY_FOOT', 'US Survey Feet', 'foot_us', 'usfoot', 'ftUS']) {
+      expect(lengthUnitFromLabel(label), label).toBe(US_SURVEY_FOOT)
+    }
+    expect(US_SURVEY_FOOT).toBe(1200 / 3937)
+  })
+
+  it('knows nothing it was not told — never a guess', () => {
+    for (const label of ['', 'CHAIN', 'YARD', 'SQUARE_METRE', 'BOGUSMETRE', 'constructor']) {
+      expect(lengthUnitFromLabel(label), label).toBeUndefined()
+    }
   })
 })

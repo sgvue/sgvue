@@ -43,7 +43,7 @@ import type {
   Units,
   XY
 } from '../shared/model-index.types'
-import { siFactor } from '../shared/units'
+import { lengthUnitFromLabel, siFactor } from '../shared/units'
 import { HEADER, STEP_TOKEN, type IfcLine, type ReadOnlyIfcSource } from './ifc-source'
 
 /* ────────────────────────────── stages ────────────────────────────── */
@@ -737,22 +737,7 @@ function readUnits(src: ReadOnlyIfcSource, modelID: number, projectLine: IfcLine
     if (!unitType) continue
     const name = text(unit.Name)
     const prefix = text(unit.Prefix)
-
-    let factor: number | undefined
-    if (entity === 'IfcSIUnit') {
-      factor = siFactor(name, prefix)
-    } else if (entity === 'IfcConversionBasedUnit') {
-      // e.g. DEGREE = 0.01745… RADIAN, INCH = 0.0254 METRE, expressed against an SI unit.
-      const conversion = src.line(modelID, ref(unit.ConversionFactor))
-      const value = numberOf(conversion?.ValueComponent)
-      const base = src.line(modelID, ref(conversion?.UnitComponent))
-      const baseName = base ? text(base.Name) : ''
-      const basePrefix = base ? text(base.Prefix) : ''
-      if (value !== null) factor = value * siFactor(baseName, basePrefix)
-    }
-    // IfcDerivedUnit (thermal transmittance, …) is recorded but not resolved to an SI
-    // factor: its values are reported exactly as authored.
-
+    const factor = unitFactor(src, modelID, unit, entity)
     byType[unitType] = { unitType, entity, name, prefix, ...(factor !== undefined ? { factor } : {}) }
   }
 
@@ -769,6 +754,33 @@ function readUnits(src: ReadOnlyIfcSource, modelID: number, projectLine: IfcLine
     volume: factorOf('VOLUMEUNIT', length * length * length),
     angle: factorOf('PLANEANGLEUNIT', 1)
   }
+}
+
+/**
+ * SI units per one of this `IfcNamedUnit` — an `IfcSIUnit` by its prefix, an
+ * `IfcConversionBasedUnit` through its `ConversionFactor` (the foot is 0.3048 m, the US survey
+ * foot 1200/3937 m) — or `undefined` when it does not resolve. Shared by the unit assignment
+ * and, since 2026-10-08, the map unit.
+ */
+function unitFactor(
+  src: ReadOnlyIfcSource,
+  modelID: number,
+  unit: IfcLine,
+  entity: string
+): number | undefined {
+  if (entity === 'IfcSIUnit') return siFactor(text(unit.Name), text(unit.Prefix))
+  if (entity !== 'IfcConversionBasedUnit') {
+    // IfcDerivedUnit (thermal transmittance, …) is recorded but not resolved to an SI
+    // factor: its values are reported exactly as authored.
+    return undefined
+  }
+  // e.g. DEGREE = 0.01745… RADIAN, INCH = 0.0254 METRE, expressed against an SI unit.
+  const conversion = src.line(modelID, ref(unit.ConversionFactor))
+  const value = numberOf(conversion?.ValueComponent)
+  const base = src.line(modelID, ref(conversion?.UnitComponent))
+  const baseName = base ? text(base.Name) : ''
+  const basePrefix = base ? text(base.Prefix) : ''
+  return value !== null ? value * siFactor(baseName, basePrefix) : undefined
 }
 
 /* ────────────── property / quantity set resolution ────────────── */
@@ -1267,6 +1279,52 @@ function readTrueNorth(
 const ROTATION_EPSILON_DEG = 1e-9
 
 /**
+ * The 3D `Model` `IfcGeometricRepresentationContext` — not a 2D `Plan` one. It is the engineering
+ * frame the geometry is in, so its map conversion is the one that places the model (2026-10-08).
+ * A sub-context of it is the same frame, and `IfcCoordinateReferenceSystemSelect` allows either
+ * as a conversion's `SourceCRS`, so a sub-context is judged by its `ParentContext`, one hop up.
+ */
+function isModelContext(
+  src: ReadOnlyIfcSource,
+  modelID: number,
+  id: number,
+  fromSubContext = false
+): boolean {
+  const type = id ? src.typeName(src.lineType(modelID, id)) : ''
+  const ctx = type ? src.line(modelID, id) : null
+  if (!ctx) return false
+  if (type === 'IfcGeometricRepresentationSubContext') {
+    return !fromSubContext && isModelContext(src, modelID, ref(ctx.ParentContext), true)
+  }
+  if (type !== 'IfcGeometricRepresentationContext') return false
+  if (text(ctx.ContextType).toLowerCase() !== 'model') return false
+  const dimensions = numberOf(ctx.CoordinateSpaceDimension)
+  return dimensions === null || dimensions === 3
+}
+
+/**
+ * `IfcProjectedCRS.MapUnit`: the name the file gives it and metres per one of it — only for a
+ * length, which is all IFC allows there (`IsLengthUnit`). `undefined` when the CRS names none.
+ */
+function readMapUnit(
+  src: ReadOnlyIfcSource,
+  modelID: number,
+  unitId: number
+): Georeference['mapUnit'] {
+  const unit = unitId ? src.line(modelID, unitId) : null
+  if (!unit) return undefined
+  const entity = src.typeName(src.lineType(modelID, unitId))
+  const name = text(unit.Name)
+  const length =
+    text(unit.UnitType) === 'LENGTHUNIT' && (entity !== 'IfcSIUnit' || name === 'METRE')
+  const metres = length ? unitFactor(src, modelID, unit, entity) : undefined
+  return {
+    name: entity === 'IfcSIUnit' ? text(unit.Prefix) + name : name,
+    ...(metres !== undefined ? { metres } : {})
+  }
+}
+
+/**
  * Where the model's coordinates come from. Every source found is recorded and none is
  * invented: a file with no georeferencing reports `'none'`, not a default origin.
  *
@@ -1288,12 +1346,17 @@ function readGeoreference(
 
   /* IFC4 / IFC4X3 — IfcMapConversion + IfcProjectedCRS. */
   const conversionCode = src.typeCode('IFCMAPCONVERSION')
-  const conversionId = conversionCode ? src.idsWithType(modelID, conversionCode, true)[0] : 0
+  const conversionIds = conversionCode ? src.idsWithType(modelID, conversionCode, true) : []
+  // The conversion of the 3D `Model` context, which is the frame the geometry is in; only a
+  // file with none on it falls back to the first one, as every reader before 2026-10-08 did.
+  const onModel = (id: number): boolean =>
+    isModelContext(src, modelID, ref(src.line(modelID, id)?.SourceCRS))
+  const conversionId = conversionIds.find(onModel) ?? conversionIds[0] ?? 0
   const conversion = conversionId ? src.line(modelID, conversionId) : null
   if (conversion) {
     sources.push('IfcMapConversion')
-    // Eastings/Northings/Height are already in map units; `Scale` is the file-unit → map-unit
-    // factor and is independent of the length unit, so none of these is scaled here.
+    // Eastings/Northings/Height are recorded as written, in the map unit read below; `Scale` is
+    // recorded and never applied — `shared/georef.ts`'s `mapPlacement` has why.
     const abscissa = numberOf(conversion.XAxisAbscissa)
     const ordinate = numberOf(conversion.XAxisOrdinate)
     out = {
@@ -1311,6 +1374,7 @@ function readGeoreference(
     }
     const crsLine = src.line(modelID, ref(conversion.TargetCRS))
     if (crsLine) {
+      const mapUnit = readMapUnit(src, modelID, ref(crsLine.MapUnit))
       out = {
         ...out,
         crs: {
@@ -1320,7 +1384,8 @@ function readGeoreference(
           verticalDatum: text(crsLine.VerticalDatum),
           mapProjection: text(crsLine.MapProjection),
           mapZone: text(crsLine.MapZone)
-        }
+        },
+        ...(mapUnit ? { mapUnit } : {})
       }
     }
   }
@@ -1353,6 +1418,19 @@ function readGeoreference(
         break
       }
       if (out.source === 'ePset') break
+    }
+    // Its companion `ePset_ProjectedCRS` (any of the spellings) can name the map unit — as
+    // text, the only way a property set can (2026-10-08). Nothing else of it is read here.
+    if (out.source === 'ePset') {
+      for (const psets of containerPsets) {
+        const crs = Object.entries(psets).find(([name]) => /^epset_projectedcrs$/i.test(name))
+        const label = crs?.[1].MapUnit
+        if (typeof label !== 'string' || !label.trim()) continue
+        const metres = lengthUnitFromLabel(label)
+        const mapUnit = { name: label.trim(), ...(metres !== undefined ? { metres } : {}) }
+        out = { ...out, mapUnit }
+        break
+      }
     }
   }
 

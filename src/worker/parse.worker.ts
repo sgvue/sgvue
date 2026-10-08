@@ -53,8 +53,9 @@ export type ParseRequest =
   /**
    * Stream this model's geometry. `offset` is the federation offset already in force, or
    * `null` for the first model — then the first mesh defines it and `geometryDone` reports
-   * what it turned out to be. `frame` is the federation's project frame, which the caller
-   * always knows: it read this model's index before asking for its geometry.
+   * what it turned out to be. `frame` is this model's own frame against the federation's
+   * (M_i⁻¹ ∘ P, `shared/georef.ts`'s `modelFrame`), which the caller always knows: it read this
+   * model's index before asking for its geometry.
    */
   | {
       type: 'geometry'
