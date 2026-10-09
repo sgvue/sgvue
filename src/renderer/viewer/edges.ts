@@ -28,7 +28,7 @@ import {
   Vector3
 } from 'three/webgpu'
 import type { GeometryChunk } from '../../shared/geometry-contract.types'
-import { ID_STRIDE } from '../../shared/federate'
+import { fedId } from '../../shared/federate'
 import { RENDER_ORDER_EDGE } from './batches'
 
 interface Piece {
@@ -111,7 +111,7 @@ export function createEdgeStore(): EdgeStore {
           positions[(at + i) * 3 + 1] = _v3.y
           positions[(at + i) * 3 + 2] = _v3.z
         }
-        const id = federationSlot * ID_STRIDE + part.elementId
+        const id = fedId(federationSlot, part.elementId)
         let list = ranges.get(id)
         if (!list) ranges.set(id, (list = []))
         // The streamer and the mock both emit a product's parts back to back, so the common

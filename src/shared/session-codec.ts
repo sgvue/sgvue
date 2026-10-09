@@ -25,8 +25,22 @@
  * what it restores through (`renderer/state/selectors/snapshot.ts`). `slotMapOf` and
  * `renumberId`, at the end of the element-id section, are that revert's half of `restorableIds`:
  * the same renumbering, for a snapshot taken and put back inside one app session.
+ *
+ * 2026-10-09: element ids are numbered by `ID_STRIDE` (a thousand million) and a payload says so
+ * in **`idStride`**; one without it was written before then with the design's 1 000 000, and its
+ * ids are read back by `liveHidden`'s legacy rule. A build from before then ignores `idStride`
+ * and reads the ids by its own stride: slot 0's are the same numbers in both and restore as its
+ * own did, and every other slot's decode to a slot no session has and are dropped — it hides
+ * nothing its own payload would not have.
  */
-import { ID_STRIDE } from './federate'
+import {
+  fedId,
+  fitsLocalId,
+  ID_STRIDE,
+  LEGACY_ID_STRIDE,
+  localOfId,
+  slotOfId
+} from './federate'
 import type { FilterStep } from './rules'
 import { NO_PLANE, type SecPlane, type Sections } from './sections'
 import { isDisplayUnit, type DisplayUnit } from './units'
@@ -41,7 +55,7 @@ export interface SessionFile {
   sha256: string
   /**
    * The federation slot the model had when the session was saved (refactor pass 2). Element
-   * ids are `slot × 1 000 000 + expressId`, so this is what says whether the session's ids —
+   * ids are `slot × idStride + expressId`, so this is what says whether the session's ids —
    * `hidden` — still name this file's elements once it is open again (`restorableIds`).
    * Absent in a payload written before it existed.
    */
@@ -137,13 +151,22 @@ export interface SessionPayload {
    * over that; one that does not — every payload written before — leaves the boot model's.
    */
   units: DisplayUnit
+  /**
+   * 2026-10-09 — the stride `hidden`'s element ids are numbered by: `ID_STRIDE`, written by every
+   * payload since. Absent in one written before, which is numbered by the design's 1 000 000
+   * (`idNumbering`, `liveHidden`).
+   */
+  idStride?: number
 }
 
 /**
  * What `sessionPayload()` reads off the state (`:1678`). The state holds `sections`; the legacy
  * `section` key is derived from it on the way out and is never read back into it.
  */
-export type SessionSource = Omit<SessionPayload, 'models' | 'files' | 'cam' | 'frame' | 'section'>
+export type SessionSource = Omit<
+  SessionPayload,
+  'models' | 'files' | 'cam' | 'frame' | 'section' | 'idStride'
+>
 
 /**
  * What a restore writes back (`sessionPatch`): everything a session saves but the base point,
@@ -257,7 +280,8 @@ export function sessionPayload(
     coords: s.coords,
     cam,
     frame,
-    units: s.units
+    units: s.units,
+    idStride: ID_STRIDE
   }
 }
 
@@ -431,9 +455,73 @@ export function sessionOrder<T>(
 }
 
 /**
+ * How the ids in a payload — or a saved viewpoint — are numbered, from its `idStride`
+ * (2026-10-09): `current` is `ID_STRIDE`, which every build since writes; `legacy` is no
+ * `idStride` at all, written before then with the design's 1 000 000; `null` is any other value
+ * — a later build's numbering, or a link someone edited — whose ids this build cannot read, so
+ * none of them is restored.
+ */
+export function idNumbering(idStride: unknown): 'current' | 'legacy' | null {
+  if (idStride === undefined || idStride === LEGACY_ID_STRIDE) return 'legacy'
+  return idStride === ID_STRIDE ? 'current' : null
+}
+
+/**
+ * The live ids one saved id names, given where each saved slot's model is now (`slots`: saved
+ * slot → live slot).
+ *
+ * `current`: exactly one, its slot moved and its own id kept — or none, when its slot belonged to
+ * no model that is here now.
+ *
+ * `legacy`: the design's stride could not keep a model of more than a million lines inside its
+ * block, so a saved id `N` may be `#N − s × 1 000 000` of the model on **any** saved slot `s`
+ * up to `N / 1 000 000` — and the reference model alone is past two million. So every such
+ * reading is tried, and the ones the live federation actually has (`exists`) are what it named.
+ * Two of them is an id the old numbering gave two elements at once, which that build drew, hid
+ * and listed as one: both are restored, which is the view that was saved.
+ *
+ * Anything that is not a whole, non-negative, exact number names nothing: a link is a string a
+ * person pasted.
+ */
+function liveIdsOf(
+  saved: number,
+  numbering: 'current' | 'legacy',
+  slots: ReadonlyMap<number, number>,
+  exists: (id: number) => boolean
+): number[] {
+  if (!Number.isSafeInteger(saved) || saved < 0) return []
+  if (numbering === 'current') {
+    const to = slots.get(slotOfId(saved))
+    return to === undefined ? [] : [fedId(to, localOfId(saved))]
+  }
+  const out: number[] = []
+  for (const [from, to] of slots) {
+    const local = saved - from * LEGACY_ID_STRIDE
+    if (!fitsLocalId(local)) continue
+    const id = fedId(to, local)
+    if (exists(id)) out.push(id)
+  }
+  return out
+}
+
+/** A `hidden` map, renumbered id by id for the live federation (`liveIdsOf`). */
+export function liveHidden(
+  hidden: Readonly<Record<number | string, boolean>>,
+  numbering: 'current' | 'legacy',
+  slots: ReadonlyMap<number, number>,
+  exists: (id: number) => boolean
+): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  for (const [id, on] of Object.entries(hidden)) {
+    for (const now of liveIdsOf(Number(id), numbering, slots, exists)) out[now] = on
+  }
+  return out
+}
+
+/**
  * A session's **element ids**, renumbered for the federation its files have just joined.
  *
- * An id is `slot × ID_STRIDE + expressId`, and a file need not come back on the slot it had:
+ * An id is `slot × stride + expressId`, and a file need not come back on the slot it had:
  * a model replaced before the save sat on a slot of its own (2026-09-24, refactor pass 2), a
  * removal leaves gaps, and a link opened with other models loaded joins on whatever slots are
  * free. So each id is moved from its file's **saved** slot to that file's **live** slot, matched
@@ -446,11 +534,13 @@ export function sessionOrder<T>(
  * A payload from before slots were recorded takes each file's place in `files` as its saved
  * slot, which is what a boot of those files in that order gave it. `active` is the saved
  * model key, carried to the key its file is open under now, and cleared when no file had it.
- * `live` is `sessionFiles()` as it stands after the join.
+ * `live` is `sessionFiles()` as it stands after the join, and `exists` says whether the live
+ * federation has an id — what reads a payload from before 2026-10-09 (`liveIdsOf`).
  */
 export function restorableIds(
   p: Partial<SessionPayload>,
-  live: readonly SessionFile[]
+  live: readonly SessionFile[],
+  exists: (id: number) => boolean
 ): Pick<SessionPayload, 'hidden' | 'active'> {
   const files = p.files ?? []
   const byPath = new Map(live.map((f) => [f.path, f]))
@@ -462,12 +552,8 @@ export function restorableIds(
     slotMap.set(expectedSlot(files[i], i), now.slot)
     keyMap.set(files[i].key, now.key)
   }
-  const hidden: Record<string, boolean> = {}
-  for (const [id, on] of Object.entries(p.hidden ?? {})) {
-    const n = Number(id)
-    const to = slotMap.get(Math.floor(n / ID_STRIDE))
-    if (to !== undefined) hidden[to * ID_STRIDE + (n % ID_STRIDE)] = on
-  }
+  const numbering = idNumbering(p.idStride)
+  const hidden = numbering ? liveHidden(p.hidden ?? {}, numbering, slotMap, exists) : {}
   const active = p.active != null ? (keyMap.get(p.active) ?? null) : null
   return { hidden, active }
 }
@@ -515,10 +601,16 @@ export function slotMapOf(
   return { slots, gone }
 }
 
-/** One id on the slot its model has now, or `null` when that model is no longer loaded. */
+/**
+ * One id on the slot its model has now, or `null` when that model is no longer loaded. A
+ * snapshot never leaves the window, so its ids are always this build's (`ID_STRIDE`) — but a
+ * `hidden` map can hold what a saved viewpoint held, which is whatever `localStorage` had, so
+ * anything that is not a whole, non-negative, exact number names nothing.
+ */
 export function renumberId(id: number, slots: ReadonlyMap<number, number>): number | null {
-  const to = slots.get(Math.floor(id / ID_STRIDE))
-  return to === undefined ? null : to * ID_STRIDE + (id % ID_STRIDE)
+  if (!Number.isSafeInteger(id) || id < 0) return null
+  const to = slots.get(slotOfId(id))
+  return to === undefined ? null : fedId(to, localOfId(id))
 }
 
 /* ────────────────────────────── the link ────────────────────────────── */

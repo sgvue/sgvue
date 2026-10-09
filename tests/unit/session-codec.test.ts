@@ -15,6 +15,7 @@ import {
   checkFiles,
   decodeState,
   encodeState,
+  idNumbering,
   legacySection,
   linkFor,
   payloadFromLink,
@@ -30,6 +31,7 @@ import {
   type SessionSource
 } from '../../src/shared/session-codec'
 import { NO_PLANE, NO_SECTIONS, sectionsLabel, type Sections } from '../../src/shared/sections'
+import { ID_STRIDE, LEGACY_ID_STRIDE } from '../../src/shared/federate'
 
 /** The live federation's project frame marker — `shared/georef.ts`'s `frameKey`. */
 const FRAME = '12345.457,23456.766,5.050@-43.4103'
@@ -97,8 +99,14 @@ describe('sessionPayload', () => {
       'cam',
       'frame',
       // 2026-10-09 — the port's: the display unit, which the design kept but never saved.
-      'units'
+      'units',
+      // 2026-10-09 — and how the element ids in `hidden` are numbered.
+      'idStride'
     ])
+  })
+
+  it('says how its element ids are numbered (2026-10-09)', () => {
+    expect(payload().idStride).toBe(ID_STRIDE)
   })
 
   it('records one file per model, with its path and hash', () => {
@@ -747,50 +755,139 @@ describe('sessionOrder — a session’s batch goes in so each file gets its own
 })
 
 describe('restorableIds — a session’s ids, renumbered onto the slots its files have now', () => {
+  const S = ID_STRIDE
   const f = (path: string, slot: number | undefined, key = path) => ({ key, path, name: path, sha256: '', ...(slot === undefined ? {} : { slot }) })
+  /** A payload this build writes: its ids are numbered by `ID_STRIDE`, and it says so. */
   const saved = (files: ReturnType<typeof f>[], hidden: Record<string, boolean>, active: string | null = null) =>
-    ({ files, hidden, active }) as Partial<SessionPayload>
+    ({ files, hidden, active, idStride: ID_STRIDE }) as Partial<SessionPayload>
+  /** Such a payload is exact: it never needs to ask which elements are here. */
+  const unasked = (): boolean => {
+    throw new Error('a payload numbered by ID_STRIDE asked which elements exist')
+  }
 
   it('restores them as they were when every file is back on the slot it had', () => {
-    const p = saved([f('/a', 0, 'A'), f('/b', 1, 'B')], { 5: true, 1_000_007: true }, 'B')
-    expect(restorableIds(p, [f('/a', 0, 'A'), f('/b', 1, 'B')])).toEqual({
-      hidden: { 5: true, 1_000_007: true },
+    const p = saved([f('/a', 0, 'A'), f('/b', 1, 'B')], { 5: true, [S + 7]: true }, 'B')
+    expect(restorableIds(p, [f('/a', 0, 'A'), f('/b', 1, 'B')], unasked)).toEqual({
+      hidden: { 5: true, [S + 7]: true },
       active: 'B'
     })
   })
 
   it('one model saved on slot 1 (it had replaced another) comes back on slot 0: its ids move with it', () => {
-    const p = saved([f('/a', 1, 'A')], { 1_000_005: true, 1_000_009: true }, 'A')
-    expect(restorableIds(p, [f('/a', 0, 'A')])).toEqual({ hidden: { 5: true, 9: true }, active: 'A' })
+    const p = saved([f('/a', 1, 'A')], { [S + 5]: true, [S + 9]: true }, 'A')
+    expect(restorableIds(p, [f('/a', 0, 'A')], unasked)).toEqual({ hidden: { 5: true, 9: true }, active: 'A' })
   })
 
   it('two models saved on 0 and 2 come back on 0 and 1', () => {
-    const p = saved([f('/a', 0), f('/b', 2)], { 3: true, 2_000_004: true })
-    expect(restorableIds(p, [f('/a', 0), f('/b', 1)]).hidden).toEqual({ 3: true, 1_000_004: true })
+    const p = saved([f('/a', 0), f('/b', 2)], { 3: true, [2 * S + 4]: true })
+    expect(restorableIds(p, [f('/a', 0), f('/b', 1)], unasked).hidden).toEqual({ 3: true, [S + 4]: true })
   })
 
   it('after boot, files that joined beside models already open keep their ids too', () => {
     const p = saved([f('/a', 0, 'A')], { 5: true }, 'A')
-    expect(restorableIds(p, [f('/other', 0, 'O'), f('/a', 1, 'A')])).toEqual({ hidden: { 1_000_005: true }, active: 'A' })
+    expect(restorableIds(p, [f('/other', 0, 'O'), f('/a', 1, 'A')], unasked)).toEqual({ hidden: { [S + 5]: true }, active: 'A' })
   })
 
   it('restores none when a file of the session is not open', () => {
-    expect(restorableIds(saved([f('/a', 0), f('/b', 1)], { 5: true }, '/a'), [f('/a', 0)])).toEqual({ hidden: {}, active: null })
+    expect(restorableIds(saved([f('/a', 0), f('/b', 1)], { 5: true }, '/a'), [f('/a', 0)], unasked)).toEqual({ hidden: {}, active: null })
   })
 
   it('a payload saved before slots were recorded: each file’s place in `files` is its slot', () => {
-    const p = saved([f('/a', undefined), f('/b', undefined)], { 7: true, 1_000_003: true })
-    expect(restorableIds(p, [f('/a', 0), f('/b', 1)]).hidden).toEqual({ 7: true, 1_000_003: true })
-    expect(restorableIds(p, [f('/a', 1), f('/b', 0)]).hidden).toEqual({ 1_000_007: true, 3: true })
+    const p = saved([f('/a', undefined), f('/b', undefined)], { 7: true, [S + 3]: true })
+    expect(restorableIds(p, [f('/a', 0), f('/b', 1)], unasked).hidden).toEqual({ 7: true, [S + 3]: true })
+    expect(restorableIds(p, [f('/a', 1), f('/b', 0)], unasked).hidden).toEqual({ [S + 7]: true, 3: true })
   })
 
   it('drops an id whose slot no file of the session had, and an active key no file had', () => {
-    const p = saved([f('/a', 0, 'A')], { 5: true, 3_000_001: true }, 'GONE')
-    expect(restorableIds(p, [f('/a', 0, 'A')])).toEqual({ hidden: { 5: true }, active: null })
+    const p = saved([f('/a', 0, 'A')], { 5: true, [3 * S + 1]: true }, 'GONE')
+    expect(restorableIds(p, [f('/a', 0, 'A')], unasked)).toEqual({ hidden: { 5: true }, active: null })
   })
 
   it('carries active to the key its file is open under now', () => {
     const p = saved([f('/a', 0, 'tiny')], {}, 'tiny')
-    expect(restorableIds(p, [f('/a', 0, 'tiny (2)')]).active).toBe('tiny (2)')
+    expect(restorableIds(p, [f('/a', 0, 'tiny (2)')], unasked).active).toBe('tiny (2)')
+  })
+
+  it('keeps an element past a million lines on its own model — what the old stride could not', () => {
+    // #2 348 438 is the last element of a 150 MB file. By the design's stride, on slot 1 it was
+    // 3 348 438 — read back as slot 3.
+    const p = saved([f('/a', 0, 'A'), f('/b', 1, 'B')], { 2_348_438: true, [S + 2_348_438]: true })
+    expect(restorableIds(p, [f('/a', 1, 'A'), f('/b', 0, 'B')], unasked).hidden).toEqual({
+      [S + 2_348_438]: true,
+      2_348_438: true
+    })
+  })
+})
+
+describe('restorableIds — a payload written before 2026-10-09, numbered by the design’s 1 000 000', () => {
+  const S = ID_STRIDE
+  const M = LEGACY_ID_STRIDE
+  const f = (path: string, slot: number | undefined, key = path) => ({ key, path, name: path, sha256: '', ...(slot === undefined ? {} : { slot }) })
+  /** No `idStride`: what every build wrote before the stride changed. */
+  const legacy = (files: ReturnType<typeof f>[], hidden: Record<string, boolean>, active: string | null = null) =>
+    ({ files, hidden, active }) as Partial<SessionPayload>
+  /** The live federation's ids, as `exists` is asked about them. */
+  const here = (...ids: number[]): ((id: number) => boolean) => {
+    const set = new Set(ids)
+    return (id) => set.has(id)
+  }
+
+  it('is read as legacy when it has no idStride, or states the design’s own', () => {
+    expect(idNumbering(undefined)).toBe('legacy')
+    expect(idNumbering(M)).toBe('legacy')
+    expect(idNumbering(S)).toBe('current')
+    expect(idNumbering(12_345)).toBeNull()
+    expect(idNumbering('1000000000')).toBeNull()
+  })
+
+  it('renumbers small ids onto the new stride, slot for slot', () => {
+    const p = legacy([f('/a', 0, 'A'), f('/b', 1, 'B')], { 5: true, [M + 7]: true }, 'B')
+    expect(restorableIds(p, [f('/a', 0, 'A'), f('/b', 1, 'B')], here(5, S + 7))).toEqual({
+      hidden: { 5: true, [S + 7]: true },
+      active: 'B'
+    })
+    // And onto whatever slots the files have now.
+    expect(restorableIds(p, [f('/a', 1, 'A'), f('/b', 0, 'B')], here(S + 5, 7)).hidden).toEqual({ [S + 5]: true, 7: true })
+  })
+
+  it('one big file on its own: an element past a million lines is still that file’s', () => {
+    // The old rule read 1 500 000 as slot 1 and dropped it: a session of one large model lost
+    // every hidden element past its millionth line.
+    const p = legacy([f('/big', 0, 'BIG')], { 12: true, 1_500_000: true, 2_348_438: true })
+    expect(restorableIds(p, [f('/big', 0, 'BIG')], here(12, 1_500_000, 2_348_438)).hidden).toEqual({
+      12: true,
+      1_500_000: true,
+      2_348_438: true
+    })
+  })
+
+  it('two big files: an id is matched to the element that is really there', () => {
+    // 1 700 000: A has an element #1 700 000; B has none at #700 000 (that line is a property).
+    // 1 500 123: A's #1 500 123 and B's #500 123 shared this id in the old build, which drew,
+    // hid and listed them as one — both are restored, which is the view that was saved.
+    const p = legacy([f('/a', 0, 'A'), f('/b', 1, 'B')], { 1_700_000: true, 1_500_123: true })
+    const live = here(1_700_000, 1_500_123, S + 500_123)
+    expect(restorableIds(p, [f('/a', 0, 'A'), f('/b', 1, 'B')], live).hidden).toEqual({
+      1_700_000: true,
+      1_500_123: true,
+      [S + 500_123]: true
+    })
+  })
+
+  it('an id no reading of which is here names nothing', () => {
+    const p = legacy([f('/a', 0, 'A')], { 5: true, 6: true })
+    expect(restorableIds(p, [f('/a', 0, 'A')], here(5)).hidden).toEqual({ 5: true })
+  })
+
+  it('a numbering it does not know restores no id, and still restores what is by name', () => {
+    const p = { ...legacy([f('/a', 0, 'A')], { 5: true }, 'A'), idStride: 12_345 } as Partial<SessionPayload>
+    expect(restorableIds(p, [f('/a', 0, 'A')], here(5))).toEqual({ hidden: {}, active: 'A' })
+  })
+
+  it('ignores a key that is not a whole, non-negative, exact number — a link is pasted text', () => {
+    const p = legacy([f('/a', 0, 'A')], { x: true, '-3': true, '1.5': true, '1e300': true, 5: true })
+    expect(restorableIds(p, [f('/a', 0, 'A')], () => true).hidden).toEqual({ 5: true })
+    const q = { ...p, idStride: ID_STRIDE } as Partial<SessionPayload>
+    expect(restorableIds(q, [f('/a', 0, 'A')], () => true).hidden).toEqual({ 5: true })
   })
 })

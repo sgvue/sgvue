@@ -169,6 +169,14 @@ named so each trap can be traced to its original write-up.
   it must be added to that remap. Model ids come from a free-slot search, never
   `models.length`, which repeats after a delete.
   — Marumi's `CLAUDE.md`
+- **A federation id must not overflow its stride.** `slot × stride + express id` is unique only
+  while every express id is below the stride. The design's 1 000 000 is a million IFC lines —
+  about 60–70 MB of IFC — so four 150 MB files federated together lost 1 146 elements to shared
+  ids, the viewer drew two elements as one record, the SQL index would not build, and every
+  restore that read a slot back out of an id (`Math.floor(id / stride)`) named the wrong model.
+  Compose an id only through `fedId` (`shared/federate.ts`), which refuses a local id past
+  `MAX_LOCAL_ID` rather than collide; decode only through `slotOfId` / `localOfId`; and anything
+  that keeps ids across builds records the stride it numbered them by (`idStride`). — 2026-10-09
 - **Dispose discipline.** Shared cap geometry leaked on every model removal; deleting the last
   model disposed shared geometries that a later load still needed. Seed the "still in use" set.
   — Marumi's `PROGRESS.md`

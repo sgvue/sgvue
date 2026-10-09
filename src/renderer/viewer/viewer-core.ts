@@ -44,7 +44,7 @@ import type { GeometryChunk } from '../../shared/geometry-contract.types'
 import type { Annotations, MeasureRecord, SpotRecord, SpotShown } from './annotations'
 import { createAnnotations } from './annotations'
 import type { DimRect } from '../../shared/annotate'
-import { ID_STRIDE } from '../../shared/federate'
+import { fedId } from '../../shared/federate'
 import type { DisplayUnit } from '../../shared/units'
 import type { BatchStore, ElementRecord } from './batches'
 import { createBatchStore } from './batches'
@@ -1308,7 +1308,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       (meta?.storeys ?? []).map((s) => ({ name: s.name, elev: s.elev - oz, authored: s.authored }))
     )
     unionGridsAndStoreys()
-    siteByModel.set(modelKey, new Set((meta?.site ?? []).map((x) => slot * ID_STRIDE + x)))
+    siteByModel.set(modelKey, new Set((meta?.site ?? []).map((x) => fedId(slot, x))))
     refreshFrameBox()
 
     restage(first)

@@ -12,6 +12,7 @@
  * has no handler at all (`tests/readonly-guard.test.ts` holds the two to each other).
  */
 import { z } from 'zod'
+import type { RejectReason } from './upload'
 
 // The channel names live in their own module so the sandboxed preload can import them without
 // pulling zod in with them — see `ipc-channels.ts` for what happens when it does.
@@ -26,6 +27,27 @@ export const PickedFile = z.object({
   size: z.number().int().nonnegative()
 })
 export type PickedFile = z.infer<typeof PickedFile>
+
+/**
+ * 2026-10-09 — a file main turned down for a reason the drop zone gives too (`validate` in
+ * `shared/upload.ts`): its name and that reason — never its path, because it is not opened, and
+ * never its size, which the row does not show. The renderer shows it the designed error row a
+ * drop of the same file gets.
+ */
+export interface RefusedFile {
+  name: string
+  reason: RejectReason
+}
+
+/**
+ * What `file:open` and `file:admit` answer: the files admitted, and those refused with a reason.
+ * Until 2026-10-09 they answered the admitted files alone, so a file over 600 MB picked in the
+ * Open dialog simply did not appear.
+ */
+export interface AdmitResult {
+  files: PickedFile[]
+  refused: RefusedFile[]
+}
 
 /**
  * `file:admit` — "these paths came from a drop, the recents list, a session or a share link;

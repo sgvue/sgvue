@@ -12,7 +12,7 @@
  * that arrives while the app is already running comes over IPC instead.
  */
 import { copyLink, payloadFromCode, payloadFromUrl, probeFiles, startAutosave } from './session'
-import { libraryOf, openPaths, openRecent, disposeUploads } from './upload-pipeline'
+import { libraryOf, openPaths, openRecent, disposeUploads, showRefused } from './upload-pipeline'
 import { setOutsideActions, useShell } from '../state/shell'
 import type { SessionPayload } from '../../shared/session-codec'
 import { api } from '../api'
@@ -31,7 +31,10 @@ export async function openLink(url: string): Promise<void> {
 export async function openPayload(payload: SessionPayload): Promise<void> {
   const probe = await probeFiles(payload)
   if (!probe.ok) {
-    useShell.getState().setInitErr(probe.message)
+    // 2026-10-09 — a file main refused (over 600 MB now, say) gets the drop zone's own row; the
+    // banner, set after it (`begin` clears the banner), names only files that really moved.
+    await showRefused(probe.refused)
+    if (probe.message) useShell.getState().setInitErr(probe.message)
     return
   }
   useShell.getState().setInitErr('')

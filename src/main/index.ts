@@ -5,7 +5,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { watchGpu } from './gpu-guard'
 import {
-  admit,
+  admitWithRefusals,
   isAdmitted,
   isRemotePath,
   mint,
@@ -176,18 +176,20 @@ function registerIpc(): void {
     // the chooser's answer from the environment instead. `app.isPackaged` is the gate: a
     // shipped build has no such path, and `tests/e2e` and the big-model harness use it to
     // exercise the real admit → token → protocol stream chain end to end.
+    // 2026-10-09: both channels answer the files admitted and those refused with the drop zone's
+    // own reason (`AdmitResult`), so a file over 600 MB picked here gets the designed row.
     const injected = !app.isPackaged && process.env.SGVUE_OPEN_PATHS
-    if (injected) return admit(injected.split(':::').filter(Boolean), 'any')
+    if (injected) return admitWithRefusals(injected.split(':::').filter(Boolean), 'any')
     const result = await openDialog(BrowserWindow.fromWebContents(event.sender), OPEN_OPTIONS)
-    if (result.canceled) return []
+    if (result.canceled) return { files: [], refused: [] }
     // The user browsed there, so a network path is theirs to open (`file-protocol.ts`).
-    return admit(result.filePaths, 'any')
+    return admitWithRefusals(result.filePaths, 'any')
   })
 
   // A network path passes here only if it is already on the user's own recents list.
   ipcMain.handle(CH_FILE_ADMIT, async (_event, raw: unknown) => {
     const { paths } = AdmitRequest.parse(raw)
-    return admit(paths, new Set((await listRecents()).map((r) => r.path)))
+    return admitWithRefusals(paths, new Set((await listRecents()).map((r) => r.path)))
   })
 
   // 2026-09-24 — after boot, a pick whose model is already open or loading is confirmed here,

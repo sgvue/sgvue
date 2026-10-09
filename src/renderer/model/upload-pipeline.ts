@@ -31,7 +31,7 @@
  * and `openRecent`, which runs from the user's click on Apply. `openDialogUp` is how a second
  * dialog is refused while one is up, and `openPaths` says whether main admitted anything.
  */
-import type { PickedFile } from '../../shared/ipc-contract'
+import type { AdmitResult, PickedFile, RefusedFile } from '../../shared/ipc-contract'
 import { NO_SECTIONS } from '../../shared/sections'
 import { restorableIds, sessionOrder, type SessionPayload } from '../../shared/session-codec'
 import * as up from '../../shared/upload'
@@ -51,7 +51,33 @@ export interface ChosenFile {
    * spelling, so it is never remembered — every stored path has passed `admit()` (2026-09-21).
    */
   unadmitted?: true
+  /**
+   * 2026-10-09 — main turned this file down (the Open dialog, a Recent pill, a link) for a
+   * reason the drop zone gives too. It has no path, is never opened, and gets the designed
+   * error row with that reason (`rejectOf`).
+   */
+  refused?: up.RejectReason
 }
+
+/** Why a chosen file gets the designed error row instead of a load — `null` when it loads. */
+const rejectOf = (f: ChosenFile): up.RejectReason | null => f.refused ?? up.validate(f.name, f.size)
+
+/** Main's answer to an admit, or nothing admitted when there is no bridge to ask. */
+const admitResult = (r: AdmitResult | null | undefined): AdmitResult => ({
+  files: r?.files ?? [],
+  refused: r?.refused ?? []
+})
+
+/**
+ * A refused file as the queue takes it: its name and main's reason, no path. Main sends no size,
+ * and none is read: `rejectOf` takes the reason before it would look at one.
+ */
+const refusedOf = (r: RefusedFile): ChosenFile => ({
+  path: '',
+  name: r.name,
+  size: 0,
+  refused: r.reason
+})
 
 /* ────────────────────────────── one live row ────────────────────────────── */
 
@@ -137,8 +163,8 @@ function supersede(key: string, old: Claim): void {
  * 2026-09-24 — after boot, which files of a pick go ahead. One whose model key is already open
  * or still loading is asked about, one question per file, and dropped silently on Cancel. A
  * file of the same stem as one **already kept from this pick** is not asked about — nothing of
- * it is open yet — and `queue` gives it ` (2)`. A file `validate` refuses is not asked about
- * either: it goes on to its designed error row.
+ * it is open yet — and `queue` gives it ` (2)`. A file `validate` refuses — or main refused,
+ * 2026-10-09 — is not asked about either: it goes on to its designed error row.
  */
 export async function confirmPick(
   files: readonly ChosenFile[],
@@ -149,7 +175,7 @@ export async function confirmPick(
   const keptKeys = new Set<string>()
   for (const f of files) {
     const key = modelKeyOf(f.name)
-    const valid = !up.validate(f.name, f.size)
+    const valid = !rejectOf(f)
     if (valid && !keptKeys.has(key) && isBusy(key) && !(await ask(f.name))) continue
     if (valid) keptKeys.add(key)
     kept.push(f)
@@ -184,7 +210,7 @@ const askReplace = (name: string): Promise<boolean> =>
 export function queue(files: readonly ChosenFile[]): number {
   let n = 0
   const valid = files.filter((f) => {
-    const bad = up.validate(f.name, f.size)
+    const bad = rejectOf(f)
     if (bad) addError(f.name, bad)
     return !bad
   })
@@ -382,8 +408,10 @@ async function join(hold: Promise<unknown>): Promise<void> {
       // designed surface for it and leaves the drop zone right there.
       const changed = verifyHashes(session)
       if (changed) return void discard(changed)
-      // Its ids only where they still name the same elements (`restorableIds` has the rule).
-      applySession({ ...session, ...restorableIds(session, fed.sessionFiles()) })
+      // Its ids only where they still name the same elements (`restorableIds` has the rule); a
+      // payload from before 2026-10-09 is read against the elements that are really here.
+      const live = fed.current.byId
+      applySession({ ...session, ...restorableIds(session, fed.sessionFiles(), (id) => live.has(id)) })
     }
   } catch (err) {
     // Refactor pass 2, P10: the batch has undone itself (`addBatch`). With a model already on
@@ -516,13 +544,20 @@ let dialogs = 0
  */
 export const openDialogUp = (): boolean => dialogs > 0
 
-/** The designed `upload` control and the drop zone, behind Electron's native Open dialog. */
+/**
+ * The designed `upload` control and the drop zone, behind Electron's native Open dialog.
+ *
+ * 2026-10-09 — a file main refused (larger than 600 MB, empty, not an IFC file, ifcXML) comes
+ * back with its reason and gets the designed error row, exactly as a drop of it does; it used to
+ * be dropped by main and the dialog closed on nothing at all.
+ */
 export async function openDialog(): Promise<void> {
   dialogs++
   try {
-    const picked = (await api()?.openDialog()) ?? []
+    const { files, refused } = admitResult(await api()?.openDialog())
+    const picked = [...files.map(chosenOf), ...refused.map(refusedOf)]
     if (!picked.length) return
-    await begin(picked.map(chosenOf))
+    await begin(picked)
   } finally {
     dialogs--
   }
@@ -547,18 +582,19 @@ export async function dropFiles(files: readonly File[]): Promise<void> {
   const chosen: ChosenFile[] = []
   for (const file of files) {
     const raw = bridge?.pathForFile(file) ?? ''
-    let admitted: PickedFile | undefined
+    let one: PickedFile | undefined
     if (raw) {
       try {
-        const list = (await bridge?.admitPaths([raw])) ?? []
-        admitted = list[0]
+        // A file main refuses is judged by `validate` on the drop's own name and size, which
+        // gives the same reason (2026-10-09): main's `refused` is not needed here.
+        one = admitResult(await bridge?.admitPaths([raw])).files[0]
       } catch {
         /* not admitted: this file keeps what the drop said, and the rest of the drop stands */
       }
     }
     chosen.push(
-      admitted
-        ? { ...chosenOf(admitted), file }
+      one
+        ? { ...chosenOf(one), file }
         : { path: raw, name: file.name, size: file.size, file, unadmitted: true }
     )
   }
@@ -570,17 +606,30 @@ export async function dropFiles(files: readonly File[]): Promise<void> {
  * A landing pill, a library row, a recents entry: a path the user has already chosen once.
  * Resolves `false` when main admitted none of them — the banner says so on the landing page,
  * and after boot, where that banner is not on screen, the caller can (2026-10-02).
+ *
+ * 2026-10-09 — a file main refused for a reason the drop zone gives (it has grown past 600 MB,
+ * say) gets the designed error row with that reason, as a drop does, rather than the banner's
+ * "no longer where it was"; it counts as answered, so this resolves `true`.
  */
 export async function openPaths(paths: readonly string[], session?: SessionPayload): Promise<boolean> {
-  const admitted = (await api()?.admitPaths(paths)) ?? []
-  if (!admitted.length) {
+  const { files, refused } = admitResult(await api()?.admitPaths(paths))
+  if (!files.length && !refused.length) {
     useShell
       .getState()
       .setInitErr('That file is no longer where it was. Pick it again to start.')
     return false
   }
-  await begin(admitted.map(chosenOf), session)
+  await begin([...files.map(chosenOf), ...refused.map(refusedOf)], session)
   return true
+}
+
+/**
+ * 2026-10-09 — files main refused while a session or a share link was being checked
+ * (`model/session.ts`, `probeFiles`): each gets the designed error row with its reason, through
+ * the same `begin` a pick takes.
+ */
+export async function showRefused(refused: readonly RefusedFile[]): Promise<void> {
+  if (refused.length) await begin(refused.map(refusedOf))
 }
 
 /**

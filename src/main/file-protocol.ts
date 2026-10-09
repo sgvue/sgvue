@@ -25,8 +25,8 @@ import { randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { MAX_FILE_BYTES } from '../shared/upload'
-import type { PickedFile } from '../shared/ipc-contract'
+import { MAX_FILE_BYTES, validate } from '../shared/upload'
+import type { AdmitResult, PickedFile, RefusedFile } from '../shared/ipc-contract'
 
 export const SCHEME = 'sgvue-file'
 
@@ -57,19 +57,35 @@ export const isRemotePath = (path: string): boolean => /^[\\/]{2}/.test(path)
 /**
  * What every gate agrees on: a regular IFC file of a sane size, by its **real** path.
  * `remote` lets a network path through; `admit` says who may ask for that.
+ *
+ * 2026-10-09 — a regular file turned down for a reason the drop zone also gives
+ * (`shared/upload.ts`, `validate`: not an IFC file, empty, larger than 600 MB, ifcXML) comes
+ * back as `refused`, with its name and that reason, so the caller can show the designed row a
+ * drop of the same file gets. Anything else — gone, not a file, a network path nobody reached —
+ * is `null`, as before.
+ *
+ * **`picked`** — the user chose this path in the Open dialog. Only then is a path whose real
+ * extension is not `.ifc` / `.ifczip` looked at any further: for a path the renderer names, it is
+ * `null` before `stat`, as it always was, so whether any other file is there — or how large — is
+ * never the renderer's to learn. Such a path cannot come from a legitimate named route anyway:
+ * recents, sessions and links hold admitted paths, and a drop judges its own `File`.
  */
 async function inspect(
   path: string,
-  remote = false
-): Promise<{ real: string; size: number } | null> {
+  remote = false,
+  picked = false
+): Promise<{ real: string; size: number } | { refused: RefusedFile } | null> {
   if (!remote && isRemotePath(path)) return null
   try {
     const real = await realpath(path)
-    if (!ALLOWED_EXT.has(extname(real).toLowerCase())) return null
+    const ifc = ALLOWED_EXT.has(extname(real).toLowerCase())
+    if (!ifc && !picked) return null
     const info = await stat(real)
     if (!info.isFile()) return null
-    if (info.size === 0 || info.size > MAX_FILE_BYTES) return null
-    return { real, size: info.size }
+    if (ifc && info.size > 0 && info.size <= MAX_FILE_BYTES) return { real, size: info.size }
+    const name = basename(real)
+    const reason = validate(name, info.size)
+    return reason ? { refused: { name, reason } } : null
   } catch {
     return null
   }
@@ -85,19 +101,44 @@ async function inspect(
  * recents list), and a path admitted earlier this session passes too. A share link, a stored
  * session or a made-up path naming another machine is refused before `realpath` runs. A
  * Windows mapped drive resolves to its `\\server\share` form, which is why recents are trusted.
+ *
+ * 2026-10-09 — `refused`, when given, collects the files turned down for a reason the drop zone
+ * gives too (`inspect`), so the Open dialog, a Recent pill and a link show the same designed
+ * row a drop does; a refused file is never admitted. "Not an IFC file" — and anything else that
+ * is not a `.ifc` / `.ifczip`, an ifcXML file included — is told only to the Open dialog
+ * (`trusted === 'any'`), whose files the user picked: for a path the renderer names
+ * (`file:admit`) it would say whether a file is there at all, which the gate has never answered.
+ * A named `.ifc` / `.ifczip` that is empty or over 600 MB is told on every route, by name and
+ * reason alone, never its size.
  */
 export async function admit(
   paths: readonly string[],
-  trusted: 'any' | ReadonlySet<string> = new Set()
+  trusted: 'any' | ReadonlySet<string> = new Set(),
+  refused?: RefusedFile[]
 ): Promise<PickedFile[]> {
   const out: PickedFile[] = []
   for (const path of paths) {
-    const found = await inspect(path, trusted === 'any' || trusted.has(path) || admitted.has(path))
+    const remote = trusted === 'any' || trusted.has(path) || admitted.has(path)
+    const found = await inspect(path, remote, trusted === 'any')
     if (!found) continue
+    if ('refused' in found) {
+      refused?.push(found.refused)
+      continue
+    }
     admitted.add(found.real)
     out.push({ path: found.real, name: basename(found.real), size: found.size })
   }
   return out
+}
+
+/** `file:open` and `file:admit`'s answer: what was admitted, and what was refused with a reason. */
+export async function admitWithRefusals(
+  paths: readonly string[],
+  trusted: 'any' | ReadonlySet<string> = new Set()
+): Promise<AdmitResult> {
+  const refused: RefusedFile[] = []
+  const files = await admit(paths, trusted, refused)
+  return { files, refused }
 }
 
 /**
@@ -146,7 +187,7 @@ export function registerFileProtocol(): void {
     // Re-check at fetch time. A symlink admitted an hour ago can point somewhere else now.
     // `entry.path` was admitted, so a network path here is one the user already reached.
     const found = await inspect(entry.path, true)
-    if (!found || found.real !== entry.path) return deny()
+    if (!found || !('real' in found) || found.real !== entry.path) return deny()
 
     try {
       return await net.fetch(pathToFileURL(found.real).toString())

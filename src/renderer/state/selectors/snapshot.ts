@@ -65,7 +65,7 @@
  * setups.
  */
 import type { ColorByState } from '../../../shared/colors'
-import { ID_STRIDE } from '../../../shared/federate'
+import { slotOfId } from '../../../shared/federate'
 import { frameKey } from '../../../shared/georef'
 import {
   renumberId,
@@ -322,11 +322,14 @@ export function revertPlan(undo: TurnUndo, live: TurnSnapshot): RevertPlan {
   // consults for the same question (`restoredVis`).
   const loaded = new Set(live.payload.models)
   const missing = new Set<string>()
-  /** One id as it is numbered now — or noted as its model's loss. */
+  /**
+   * One id as it is numbered now — or noted as its model's loss. A key that was never an id (a
+   * saved viewpoint's `hidden` is whatever `localStorage` held) is dropped and blames no model.
+   */
   const idNow = (id: number): number | null => {
     const now = renumberId(id, slots)
-    if (now === null) {
-      const key = keyOfSlot.get(Math.floor(id / ID_STRIDE))
+    if (now === null && Number.isSafeInteger(id) && id >= 0) {
+      const key = keyOfSlot.get(slotOfId(id))
       if (key !== undefined) missing.add(key)
     }
     return now

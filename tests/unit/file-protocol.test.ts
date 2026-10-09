@@ -10,6 +10,7 @@ import { mkdtemp, open, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import type { RefusedFile } from '../../src/shared/ipc-contract'
 
 let handler: ((request: { url: string }) => Promise<Response>) | null = null
 
@@ -24,10 +25,10 @@ vi.mock('electron', () => ({
   }
 }))
 
-const { admit, mint, pendingTokens, registerFileProtocol } = await import(
+const { admit, admitWithRefusals, mint, pendingTokens, registerFileProtocol } = await import(
   '../../src/main/file-protocol'
 )
-const { MAX_FILE_BYTES } = await import('../../src/shared/upload')
+const { MAX_FILE_BYTES, validate } = await import('../../src/shared/upload')
 
 let dir = ''
 let model = ''
@@ -87,6 +88,81 @@ describe('admit', () => {
     const out = await admit([model, join(dir, 'gone.ifc'), text])
     expect(out).toHaveLength(1)
     expect(out[0].name).toBe('model.ifc')
+  })
+})
+
+/**
+ * 2026-10-09 — a file turned down for a reason the drop zone gives too comes back with that
+ * reason, so the Open dialog, a Recent pill and a link show the designed row a drop does. It used
+ * to vanish: a 610 MB file picked in the Open dialog left no row and no banner.
+ */
+describe('admit — what it refuses, and why', () => {
+  let empty = ''
+  let xml = ''
+  beforeAll(async () => {
+    empty = join(dir, 'empty.ifc')
+    xml = join(dir, 'plan.ifcxml')
+    await writeFile(empty, '')
+    await writeFile(xml, '<ifcXML/>')
+  })
+
+  it('collects a file over 600 MB with the drop zone’s own reason, and never admits it', async () => {
+    const refused: RefusedFile[] = []
+    expect(await admit([big], 'any', refused)).toEqual([])
+    // Its name and its reason — never its size, and never its path.
+    expect(refused).toEqual([{ name: 'huge.ifc', reason: 'larger than 600 MB' }])
+    expect(refused[0].reason).toBe(validate('huge.ifc', MAX_FILE_BYTES + 1))
+    expect(mint(await realOf(big))).toBeNull()
+  })
+
+  it('tells the Open dialog every reason, each in the drop zone’s words', async () => {
+    const dialog: RefusedFile[] = []
+    await admit([big, empty, xml, text], 'any', dialog)
+    expect(dialog).toEqual([
+      { name: 'huge.ifc', reason: 'larger than 600 MB' },
+      { name: 'empty.ifc', reason: 'file is empty' },
+      { name: 'plan.ifcxml', reason: 'ifcXML is not supported' },
+      { name: 'notes.txt', reason: 'not an IFC file' }
+    ])
+  })
+
+  it('tells a path the renderer names only about an .ifc or .ifczip — nothing else is its to learn', async () => {
+    // A named path that is not a .ifc / .ifczip — an ifcXML file, a text file — answers exactly
+    // what a path with nothing there answers: whether a file is there, and how large, stays the
+    // gate's, as it was before 2026-10-09.
+    const named: RefusedFile[] = []
+    await admit([big, empty, xml, text, join(dir, 'gone.ifcxml')], new Set(), named)
+    expect(named).toEqual([
+      { name: 'huge.ifc', reason: 'larger than 600 MB' },
+      { name: 'empty.ifc', reason: 'file is empty' }
+    ])
+    // The recents list is a named route too, however trusted its network paths are.
+    const recents: RefusedFile[] = []
+    await admit([xml, text], new Set([xml, text]), recents)
+    expect(recents).toEqual([])
+  })
+
+  it('says nothing of a path that is gone or not a file — the caller’s "moved" covers those', async () => {
+    const refused: RefusedFile[] = []
+    await admit([join(dir, 'gone.ifc'), dir], 'any', refused)
+    expect(refused).toEqual([])
+  })
+
+  it('answers both lists at once for the IPC channels', async () => {
+    const out = await admitWithRefusals([model, big, join(dir, 'gone.ifc')], 'any')
+    expect(out.files.map((f) => f.name)).toEqual(['model.ifc'])
+    expect(out.refused).toEqual([{ name: 'huge.ifc', reason: 'larger than 600 MB' }])
+  })
+
+  it('still 403s a refused file at fetch time, whatever was minted before it grew', async () => {
+    const grows = join(dir, 'grows.ifc')
+    await writeFile(grows, 'ISO-10303-21;')
+    const [f] = await admit([grows])
+    const url = mint(f.path)!
+    const fh = await open(grows, 'r+')
+    await fh.truncate(MAX_FILE_BYTES + 1)
+    await fh.close()
+    expect((await fetchToken(url)).status).toBe(403)
   })
 })
 

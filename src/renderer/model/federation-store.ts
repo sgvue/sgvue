@@ -12,7 +12,13 @@
  * The store (`state/shell.ts`) is told about a new federation through `commitModels`, which
  * applies the design's own pruning rules.
  */
-import { federate, removeModel, EMPTY_FEDERATION, type Federation } from '../../shared/federate'
+import {
+  federate,
+  localIdRefusal,
+  removeModel,
+  EMPTY_FEDERATION,
+  type Federation
+} from '../../shared/federate'
 import {
   federationFrame,
   mapPlacement,
@@ -117,6 +123,21 @@ interface Preparing {
   done: boolean
   /** The choice of frame (`frameEpoch`) it was streamed in, or `null` before its stream. */
   epoch: number | null
+}
+
+/**
+ * 2026-10-09 — refuse a model whose ids would not fit inside its own block of federation ids
+ * (`shared/federate.ts`, `ID_STRIDE`), with the sentence its upload row shows. Thrown from
+ * `prepare`, so the row is the file's own and nothing of the model has reached the scene.
+ */
+function refuseUnnumberable(ids: Iterable<number>): void {
+  const refusal = localIdRefusal(ids)
+  if (refusal) throw new Error(refusal)
+}
+
+/** Every element id a model's geometry parts name, chunk by chunk. */
+function* partElementIds(chunks: readonly GeometryChunk[]): Generator<number> {
+  for (const chunk of chunks) for (const part of chunk.parts) yield part.elementId
 }
 
 /** The lowest slot no loaded model holds — the slot `federate` gives a new key. */
@@ -552,6 +573,9 @@ export class FederationController {
     })
     parsed.done = true
     if (gen !== this.gen) throw replaced()
+    // 2026-10-09 — a model whose ids would not fit its block is refused here, in its own upload
+    // row, before it can number into another model's (`shared/federate.ts`, `ID_STRIDE`).
+    refuseUnnumberable(index.elements.map((e) => e.id))
     onStage(2)
     // The first model prepared is the boot model: its georeferencing fixes the federation's
     // frame P. Every model — that one included — streams through its own frame, M_i⁻¹ ∘ P, so
@@ -571,6 +595,8 @@ export class FederationController {
       chunks.push(chunk)
     )
     if (gen !== this.gen) throw replaced()
+    // A product drawn but not indexed (a site's own terrain, an annotation) is numbered too.
+    refuseUnnumberable(partElementIds(chunks))
     this.offset = summary.offset
     /*
      * The two halves of the model meet here. The parse cannot fill `IfcElement.bbox` or

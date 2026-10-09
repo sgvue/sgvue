@@ -13,6 +13,7 @@
 import { MeshBasicMaterial, Vector4 } from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import type { GeometryChunk, GeometryRecord, PartRecord } from '../../src/shared/geometry-contract.types'
+import { ID_STRIDE } from '../../src/shared/federate'
 import {
   SLOT_MAX_PARTS,
   SLOT_MAX_VERTICES,
@@ -226,6 +227,44 @@ describe('batch store', () => {
     store.dispose()
   })
 
+  it('keeps two models’ elements apart where the design’s stride gave them one id (2026-10-09)', () => {
+    // #1 500 123 on slot 0 and #500 123 on slot 1 were both 1 500 123: one record, two
+    // elements' parts in it — the 4 × 150 MB federation held 104 762 records for 105 908.
+    const store = createBatchStore()
+    const m = mats()
+    store.addChunk(chunk([{ elementId: 1_500_123, geomIdx: 0 }]), 0, m)
+    const other = chunk([{ elementId: 500_123, geomIdx: 0, at: [9, 0, 0] }])
+    ;(other.header as { modelKey: string }).modelKey = 'N'
+    store.addChunk(other, 1, m)
+    expect(store.elements.size).toBe(2)
+    expect(store.elements.get(1_500_123)!.modelKey).toBe('M')
+    expect(store.elements.get(ID_STRIDE + 500_123)!.modelKey).toBe('N')
+    expect(store.elements.get(ID_STRIDE + 500_123)!.solidCount).toBe(1)
+    // An element id around twelve million, on a late slot, is exact.
+    store.addChunk(chunk([{ elementId: 12_345_678, geomIdx: 0 }]), 7, m)
+    expect(store.elements.has(7 * ID_STRIDE + 12_345_678)).toBe(true)
+    store.dispose()
+  })
+
+  it('refuses a part whose id would number into the next model’s block, adding nothing of its chunk', () => {
+    const store = createBatchStore()
+    const parts = createPartState()
+    expect(() =>
+      store.addChunk(
+        chunk([
+          { elementId: 5, geomIdx: 0 },
+          { elementId: ID_STRIDE, geomIdx: 0 }
+        ]),
+        0,
+        { ...mats(), parts }
+      )
+    ).toThrow(RangeError)
+    expect(store.elements.size).toBe(0)
+    expect(store.slots).toHaveLength(0)
+    expect(parts.count).toBe(0)
+    store.dispose()
+  })
+
   it('offsets element ids by the federation slot and keeps every part', () => {
     const store = createBatchStore()
     store.addChunk(
@@ -237,8 +276,8 @@ describe('batch store', () => {
       3,
       mats()
     )
-    expect([...store.elements.keys()].sort((a, b) => a - b)).toEqual([3_000_007, 3_000_009])
-    const rec = store.elements.get(3_000_007)!
+    expect([...store.elements.keys()].sort((a, b) => a - b)).toEqual([3 * ID_STRIDE + 7, 3 * ID_STRIDE + 9])
+    const rec = store.elements.get(3 * ID_STRIDE + 7)!
     expect(rec.modelKey).toBe('M')
     expect(rec.solidCount).toBe(2)
     expect(rec.slotOf).toEqual([0, 0])
@@ -319,8 +358,8 @@ describe('batch store', () => {
     expect(store.vertices).toBe(6)
 
     const dropped = store.removeModel('N')
-    expect(dropped).toEqual([1_000_001])
-    expect(store.elements.has(1_000_001)).toBe(false)
+    expect(dropped).toEqual([ID_STRIDE + 1])
+    expect(store.elements.has(ID_STRIDE + 1)).toBe(false)
     // Surviving records keep their slot indices, so the entry is marked rather than spliced.
     expect(store.slots).toHaveLength(2)
     expect(store.slots[1].removed).toBe(true)
@@ -350,12 +389,12 @@ describe('batch store', () => {
     const m = mats()
     store.addChunk(chunk([{ elementId: 1, geomIdx: 0 }]), 0, m)
     store.addChunk(chunk([{ elementId: 1, geomIdx: 0 }]), 1, m, 'M+incoming')
-    expect(store.elements.get(1_000_001)!.modelKey).toBe('M+incoming')
+    expect(store.elements.get(ID_STRIDE + 1)!.modelKey).toBe('M+incoming')
     expect(store.removeModel('M')).toEqual([1])
     store.relabel('M+incoming', 'M')
     expect(store.slots[1].modelKey).toBe('M')
-    expect(store.elements.get(1_000_001)!.modelKey).toBe('M')
-    expect(store.removeModel('M')).toEqual([1_000_001])
+    expect(store.elements.get(ID_STRIDE + 1)!.modelKey).toBe('M')
+    expect(store.removeModel('M')).toEqual([ID_STRIDE + 1])
     store.dispose()
   })
 

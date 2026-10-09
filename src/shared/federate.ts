@@ -5,10 +5,11 @@
  * `Federation`; given a `Federation` it returns a new one with a model removed. Nothing is
  * mutated, so the caller can diff old against new.
  *
- * The id scheme is the design's own (`design-reference/design/sample-model.js` `federate`):
- * an element's federation id is `slot * 1_000_000 + localId`, `localId` is kept, and every
- * element carries the `model` key it came from so the shell can filter, hide and colour by
- * source file.
+ * The id scheme is the design's own (`design-reference/design/sample-model.js` `federate`) with
+ * a wider stride: an element's federation id is `slot * ID_STRIDE + localId`, `localId` is kept,
+ * and every element carries the `model` key it came from so the shell can filter, hide and colour
+ * by source file. The design's stride, 1 000 000, is a million IFC lines; `ID_STRIDE` says why it
+ * is a thousand million now (2026-10-09).
  *
  * **The slot is never `models.length`.** Marumi's lesson: after a delete that number repeats
  * and the next model silently inherits the removed one's ids, which shows up as the wrong
@@ -26,8 +27,80 @@ import type {
   Storey
 } from './model-index.types'
 
-/** Federation ids are `slot * ID_STRIDE + localId` — the design's 1 000 000. */
-export const ID_STRIDE = 1_000_000
+/**
+ * Federation ids are `slot * ID_STRIDE + localId` (2026-10-09; the design's stride was 1 000 000).
+ *
+ * `localId` is the element's IFC express id — its `#` line number — and a real file passes a
+ * million of them at about 60–70 MB of IFC. With the design's stride such a model numbered into
+ * the next model's block: four 150 MB files federated together lost 1 146 elements to shared ids
+ * and the SQL index refused to build (`UNIQUE constraint failed: element.id`), and every restore
+ * that reads a slot back out of an id (`Math.floor(id / stride)`) named the wrong model for 57 %
+ * of a 150 MB file's elements.
+ *
+ * A thousand million holds every express id the 600 MB cap can admit many times over: the 610 MB
+ * test file has 9.4 million lines, and 600 MB of the shortest entity there is
+ * (`#12345678=IFCVERTEX();`, 22 bytes) would number under 29 million. A model with an id at or
+ * above it — a file numbered from a high start, or with huge gaps — is refused at load, never
+ * numbered into its neighbour (`localIdRefusal`).
+ *
+ * Every id is still an exact JavaScript integer up to slot `MAX_SLOT` — over nine million models
+ * — and federation ids live only in JavaScript numbers, JSON and SQLite's 64-bit `INTEGER`: no
+ * typed array, texture or shader ever holds one (the GPU buffers carry part *indices*,
+ * `viewer/batches.ts`). Decimal on purpose: `3000012345` still reads as slot 3, `#12345`; and the
+ * ids of the first four slots stay below 2³² − 1, so a `hidden` map keyed by them stays an
+ * indexed object (measured: a lookup keyed past that is about 5× slower in V8).
+ */
+export const ID_STRIDE = 1_000_000_000
+
+/**
+ * The design's stride. Every session, share link and viewpoint written before 2026-10-09 is
+ * numbered by it, and they carry no `idStride` (`shared/session-codec.ts`, `legacyIds`).
+ */
+export const LEGACY_ID_STRIDE = 1_000_000
+
+/** The largest local id a model may carry and still be numbered inside its own block. */
+export const MAX_LOCAL_ID = ID_STRIDE - 1
+
+/** The largest slot whose every id is still an exact JavaScript integer (`2⁵³ − 1`). */
+export const MAX_SLOT = Math.floor((Number.MAX_SAFE_INTEGER - MAX_LOCAL_ID) / ID_STRIDE)
+
+/** Whether a local id fits its block: a whole number from 0 to `MAX_LOCAL_ID`. */
+export const fitsLocalId = (localId: number): boolean =>
+  Number.isInteger(localId) && localId >= 0 && localId <= MAX_LOCAL_ID
+
+/**
+ * What the upload row says about a model that does not fit — the designed error row, and the
+ * landing page's banner around it (`model/upload-pipeline.ts`, `fail`).
+ */
+export const ID_RANGE_REFUSAL = `entity ids above #${MAX_LOCAL_ID} are not supported`
+
+/**
+ * One element's federation id. **The one place an id is composed** — the federation, the
+ * viewer's parts and edges, the site set and the assistant's references all call it — and it
+ * refuses rather than collide: a local id outside its block, or a slot past `MAX_SLOT`, throws.
+ */
+export function fedId(slot: number, localId: number): number {
+  if (!fitsLocalId(localId)) throw new RangeError(ID_RANGE_REFUSAL)
+  if (!Number.isInteger(slot) || slot < 0 || slot > MAX_SLOT) {
+    throw new RangeError(`federation slot ${slot} is out of range`)
+  }
+  return slot * ID_STRIDE + localId
+}
+
+/** The slot an id was numbered in. */
+export const slotOfId = (id: number): number => Math.floor(id / ID_STRIDE)
+
+/** The element's own id inside its file. */
+export const localOfId = (id: number): number => id - slotOfId(id) * ID_STRIDE
+
+/**
+ * The refusal for a model whose ids would not fit, or `null`. `ids` are every local id the
+ * model brings — its elements, and the elements its geometry parts name.
+ */
+export function localIdRefusal(ids: Iterable<number>): string | null {
+  for (const id of ids) if (!fitsLocalId(id)) return ID_RANGE_REFUSAL
+  return null
+}
 
 /** Two storeys count as the same level when their elevations agree to this, in metres. */
 export const STOREY_ELEVATION_TOLERANCE = 0.001
@@ -308,7 +381,7 @@ export function federate(models: readonly ModelIndex[], previous?: Federation): 
     for (const element of own) {
       elements.push({
         ...element,
-        id: slot * ID_STRIDE + element.id,
+        id: fedId(slot, element.id),
         localId: element.id,
         model: model.modelKey
       })

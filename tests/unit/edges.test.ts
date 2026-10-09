@@ -9,6 +9,7 @@
 import { LineBasicMaterial, type LineSegments } from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import type { GeometryChunk } from '../../src/shared/geometry-contract.types'
+import { ID_STRIDE } from '../../src/shared/federate'
 import { createEdgeStore } from '../../src/renderer/viewer/edges'
 
 const materials = { edge: new LineBasicMaterial(), selEdge: new LineBasicMaterial() }
@@ -69,9 +70,9 @@ describe('edge batch', () => {
     const store = createEdgeStore()
     store.addChunk(chunk([5, 5, 6], 2), 2, materials)
     // Federation ids, and the two parts of element 5 merged into one contiguous range.
-    expect([...store.ranges.keys()].sort((a, b) => a - b)).toEqual([2_000_005, 2_000_006])
-    expect(store.ranges.get(2_000_005)).toEqual([0, 0, 8])
-    expect(store.ranges.get(2_000_006)).toEqual([0, 8, 4])
+    expect([...store.ranges.keys()].sort((a, b) => a - b)).toEqual([2 * ID_STRIDE + 5, 2 * ID_STRIDE + 6])
+    expect(store.ranges.get(2 * ID_STRIDE + 5)).toEqual([0, 0, 8])
+    expect(store.ranges.get(2 * ID_STRIDE + 6)).toEqual([0, 8, 4])
     store.dispose()
   })
 
@@ -139,7 +140,7 @@ describe('edge batch', () => {
     store.addChunk(chunk([5], 1, 'N'), 1, materials)
     expect(store.group.children).toHaveLength(4)
     store.removeModel('N')
-    expect(store.ranges.has(1_000_005)).toBe(false)
+    expect(store.ranges.has(ID_STRIDE + 5)).toBe(false)
     expect(store.ranges.has(5)).toBe(true)
     store.rebuild(() => true)
     expect(lines(store)).toEqual({ edge: 2, sel: 0 })

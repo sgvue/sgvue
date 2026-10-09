@@ -40,7 +40,10 @@ const sgvue = {
     if (!paths[0]) throw new Error('paths: too small')
     if (rejects.has(paths[0])) throw new Error('main refused')
     const real = admits.get(paths[0])
-    return real ? [{ path: real, name: real.split(/[\\/]/).pop() ?? '', size: 10 }] : []
+    // Main's answer since 2026-10-09 (`AdmitResult`); its `refused` half is
+    // `tests/unit/admit-refusals.test.ts`'s.
+    const files = real ? [{ path: real, name: real.split(/[\\/]/).pop() ?? '', size: 10 }] : []
+    return { files, refused: [] }
   },
   pathForFile: (file: File) => dropped.get(file.name) ?? '',
   addRecent: async (file: { path: string }) => {

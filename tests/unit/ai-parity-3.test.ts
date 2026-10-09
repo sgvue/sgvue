@@ -42,7 +42,7 @@ import {
 import { STOPPED_ASK, installAi, sendChat } from '../../src/renderer/ai/bridge'
 import { labelText } from '../../src/renderer/ai/executors/context'
 import { toolPhrase } from '../../src/renderer/ai/stages'
-import type { AiEvent, AiToolExec, AiToolResult } from '../../src/shared/ipc-contract'
+import type { AdmitResult, AiEvent, AiToolExec, AiToolResult } from '../../src/shared/ipc-contract'
 import { connect, receive } from '../../src/renderer/model/schedule-link'
 import { copyLink } from '../../src/renderer/model/session'
 import { libraryOf, openDialogUp, openRecent } from '../../src/renderer/model/upload-pipeline'
@@ -59,6 +59,9 @@ import type { MeasureRecord, SpotRecord } from '../../src/renderer/viewer/annota
 import { emptySchedule } from '../../src/schedule/schedule/def'
 import { rigViewer, type RigViewer } from './rig-viewer'
 import { memoryStorage, resetShell } from './stub-viewer'
+
+/** Main's answer to an Open dialog the user cancelled, or to paths it admitted none of (`AdmitResult`). */
+const NOTHING: AdmitResult = { files: [], refused: [] }
 
 const KEYS = ['ARC', 'STR', 'SIT', 'MEP'] as const
 const full = federate(KEYS.map((k) => mockModelIndex(k)))
@@ -474,7 +477,7 @@ describe('a turn makes one request, of any kind', () => {
 
     // The Open dialog first: nothing else is asked while it is this turn's request.
     fresh()
-    let answer: (picked: unknown[]) => void = () => undefined
+    let answer: (picked: AdmitResult) => void = () => undefined
     const openDialog = vi.fn(() => new Promise((done) => (answer = done)))
     vi.stubGlobal('window', { sgvue: { openDialog } })
     expect((await run('request_user_action', { action: 'open_files' })).dialog).toBe(true)
@@ -483,7 +486,7 @@ describe('a turn makes one request, of any kind', () => {
     expect(await run('manage_views', { op: 'delete', number: 1 })).toEqual(refusal('the Open dialog'))
     expect(await run('request_user_action', { action: 'open_files' })).toEqual(refusal('the Open dialog'))
     expect(openDialog).toHaveBeenCalledTimes(1)
-    answer([])
+    answer(NOTHING)
     await vi.waitFor(() => expect(openDialogUp()).toBe(false))
   })
 
@@ -536,7 +539,7 @@ describe('request_user_action open_files — the native Open dialog, and nothing
   })
 
   it('opens the dialog through the upload control’s own call, and is not told what was picked', async () => {
-    let answer: (picked: unknown[]) => void = () => undefined
+    let answer: (picked: AdmitResult) => void = () => undefined
     const openDialog = vi.fn(() => new Promise((done) => (answer = done)))
     vi.stubGlobal('window', { sgvue: { openDialog } })
     const before = st()
@@ -565,16 +568,16 @@ describe('request_user_action open_files — the native Open dialog, and nothing
     expect(turn.asked).toBeNull()
 
     // The user cancels. The tool was never told — and the next request opens a dialog again.
-    answer([])
+    answer(NOTHING)
     await vi.waitFor(() => expect(openDialogUp()).toBe(false))
     expect((await run('request_user_action', { action: 'open_files' })).dialog).toBe(true)
     expect(openDialog).toHaveBeenCalledTimes(2)
-    answer([])
+    answer(NOTHING)
     await vi.waitFor(() => expect(openDialogUp()).toBe(false))
   })
 
   it('takes no path, whatever it is sent', async () => {
-    const openDialog = vi.fn(async () => [])
+    const openDialog = vi.fn(async () => NOTHING)
     vi.stubGlobal('window', { sgvue: { openDialog } })
     await run('request_user_action', { action: 'open_files', path: 'C:\\Models\\x.ifc', recent: 'x.ifc', file: 'x' })
     // The bridge's own call takes no argument at all: the dialog is main's.
@@ -689,7 +692,7 @@ describe('request_user_action open_recent — by name, from the app’s own list
 
 describe('openRecent — the model layer’s half: main’s own recents list, read fresh', () => {
   it('opens nothing that is not on main’s list, and does not even ask main to admit it', async () => {
-    const admitPaths = vi.fn(async () => [])
+    const admitPaths = vi.fn(async () => NOTHING)
     vi.stubGlobal('window', { sgvue: { listRecents: async () => [{ path: 'C:\\a\\on-list.ifc', name: 'on-list.ifc' }], admitPaths } })
     expect(await openRecent('C:\\a\\not-on-list.ifc')).toBe('gone')
     expect(admitPaths).not.toHaveBeenCalled()
@@ -699,7 +702,7 @@ describe('openRecent — the model layer’s half: main’s own recents list, re
   })
 
   it('says a file on the list has moved when main no longer admits it', async () => {
-    const admitPaths = vi.fn(async () => [])
+    const admitPaths = vi.fn(async () => NOTHING)
     vi.stubGlobal('window', { sgvue: { listRecents: async () => [{ path: 'C:\\a\\on-list.ifc', name: 'on-list.ifc' }], admitPaths } })
     expect(await openRecent('C:\\a\\on-list.ifc')).toBe('moved')
     // The path asked about is the list's own, and only that one.
@@ -1279,14 +1282,14 @@ describe('a call that only asks, for a turn that is no longer live', () => {
   let emit: ((event: AiEvent) => void) | null = null
   let results: AiToolResult[] = []
   let sent: { turnId: string }[] = []
-  let openDialog: Mock<() => Promise<unknown[]>>
+  let openDialog: Mock<() => Promise<AdmitResult>>
   let stop: () => void = () => undefined
 
   beforeEach(() => {
     exec = emit = null
     results = []
     sent = []
-    openDialog = vi.fn(async () => [])
+    openDialog = vi.fn(async () => NOTHING)
     vi.stubGlobal('window', {
       sgvue: {
         aiTurn: (request: { turnId: string }) => {

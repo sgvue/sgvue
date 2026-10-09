@@ -31,6 +31,7 @@ import {
   type SessionPayload
 } from '../../shared/session-codec'
 import { frameKey } from '../../shared/georef'
+import type { RefusedFile } from '../../shared/ipc-contract'
 import { getViewer, useShell } from '../state/shell'
 import { sessionSource } from '../state/selectors/snapshot'
 import { federation as fed } from './federation-store'
@@ -121,12 +122,18 @@ export const payloadFromCode = (code: string): SessionPayload | null => decodeSt
  * The SHA-256 is **not** re-hashed here: that would mean reading every byte of a 138 MB file
  * before the progress rows appear. It is checked where it is free — the parse hashes the file
  * it reads anyway — and `verifyHashes` below compares afterwards.
+ *
+ * 2026-10-09 — a file main **refused** for a reason the drop zone gives (it is over 600 MB now,
+ * say) is there, so it is not called moved: it comes back in `refused`, for the designed error
+ * row with that reason (`upload-pipeline.ts`, `showRefused`), and the session does not open —
+ * as it does not with a file missing. `message` then names only the files that really moved.
  */
 export async function probeFiles(payload: SessionPayload): Promise<{
   ok: boolean
   message: string
   paths: string[]
   payload: SessionPayload
+  refused: RefusedFile[]
 }> {
   const files = payload.files ?? []
   if (!files.length) {
@@ -134,33 +141,46 @@ export async function probeFiles(payload: SessionPayload): Promise<{
       ok: false,
       message: 'That session had no models in it. Pick a file to start again.',
       paths: [],
-      payload
+      payload,
+      refused: []
     }
   }
   const admitted: (string | null)[] = []
-  for (const f of files) {
+  const refused: RefusedFile[] = []
+  const refusedAt = new Set<number>()
+  for (const [i, f] of files.entries()) {
     // A call that rejects — the contract refuses an empty path, and main may refuse for its
     // own reasons — means main did not admit that file, so the person gets the designed
     // banner naming it rather than the whole probe going down with an unhandled rejection.
     let real: string | null = null
     try {
-      const [one] = (await api()?.admitPaths([f.path])) ?? []
-      real = one?.path ?? null
+      const answer = await api()?.admitPaths([f.path])
+      real = answer?.files?.[0]?.path ?? null
+      const why = answer?.refused?.[0]
+      if (!real && why) {
+        refused.push(why)
+        refusedAt.add(i)
+      }
     } catch {
       /* not admitted */
     }
     admitted.push(real)
   }
-  const canon = canonicalFiles(files, admitted)
+  const kept = <T>(list: readonly T[]): T[] => list.filter((_, i) => !refusedAt.has(i))
+  const canon = canonicalFiles(kept(files), kept(admitted))
   const verdict = checkFiles(canon.files, canon.probes)
+  if (refused.length) {
+    return { ok: false, message: verdict.ok ? '' : verdict.message, paths: [], payload, refused }
+  }
   return verdict.ok
     ? {
         ok: true,
         message: '',
         paths: canon.files.map((f) => f.path),
-        payload: { ...payload, files: canon.files }
+        payload: { ...payload, files: canon.files },
+        refused
       }
-    : { ok: false, message: verdict.message, paths: [], payload }
+    : { ok: false, message: verdict.message, paths: [], payload, refused }
 }
 
 /**

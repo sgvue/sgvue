@@ -158,11 +158,12 @@ describe('the review state, cut into parts', () => {
     const snap = turnSnapshot(st(), rv.rig.getCamera())
     const source = Object.keys(sessionSource(st()))
     const added = Object.keys(snap.payload).filter((k) => !source.includes(k)).sort()
-    expect(added).toEqual(['cam', 'files', 'frame', 'models', 'section'])
+    expect(added).toEqual(['cam', 'files', 'frame', 'idStride', 'models', 'section'])
     expect(partsOf('cam', 'payload')).toEqual(['camera'])
     expect(partsOf('section', 'payload')).toEqual(['sections'])
-    // Where the snapshot was taken, not review state: no part.
-    for (const key of ['files', 'frame', 'models']) expect(partsOf(key, 'payload')).toEqual([])
+    // Where the snapshot was taken — and, since 2026-10-09, how its ids are numbered — not
+    // review state: no part.
+    for (const key of ['files', 'frame', 'idStride', 'models']) expect(partsOf(key, 'payload')).toEqual([])
     // A snapshot never leaves the window: it names no file.
     expect(snap.payload.files).toEqual([])
   })
@@ -310,6 +311,14 @@ describe('element ids across a federation change', () => {
     // "The id still exists" proves nothing: slot 0 is another model's now.
     expect(renumberId(5, slots)).toBeNull()
   })
+
+  it('names nothing with a key that was never an id — and never throws on one (2026-10-09)', () => {
+    // A saved viewpoint's `hidden` is whatever `localStorage` held, and a restore puts it in the
+    // store as it is; slot 0 is live here, so a fraction on it used to reach `fedId` and throw.
+    const { slots } = slotMapOf([rec('ARC', 0)], [rec('ARC', 0)])
+    for (const bad of [1.5, -1, Number.NaN, Infinity, 2 ** 53]) expect(renumberId(bad, slots)).toBeNull()
+    expect(renumberId(5, slots)).toBe(5)
+  })
 })
 
 describe('revertPlan — what a revert does, against the state as it is now', () => {
@@ -323,6 +332,15 @@ describe('revertPlan — what a revert does, against the state as it is now', ()
     expect(plan.payload.hidden).toEqual({ 5: true })
     expect([plan.payload.theme, plan.payload.grids]).toEqual(['light', false])
     expect(plan.extra).toEqual({})
+    expect(plan.lost).toEqual({ models: [], camera: false })
+  })
+
+  it('drops a hidden key that was never an id, and blames no model for it', () => {
+    // What a viewpoint restored from a hand-edited `localStorage` can leave in `hidden`.
+    const id = st().federation.elements[0].id
+    const before = at({ hidden: { [id]: true, '1.5': true, x: true, '-3': true } })
+    const plan = revertPlan({ before, changed: ['vis'] }, at({ hidden: {} }))
+    expect(plan.payload.hidden).toEqual({ [id]: true })
     expect(plan.lost).toEqual({ models: [], camera: false })
   })
 

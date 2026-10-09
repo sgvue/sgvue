@@ -3,6 +3,54 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-09 — federation ids past a million lines, and the Open dialog's silent refusal
+
+**Did:** the two defects the owner's capacity measurement found (*"Are you able to find out how
+big of ifc models our app can handle?"*, then *"yes go ahead."*). **Ids:** a federation id was
+`slot × 1 000 000 + express id`, and a file passes a million lines at about 60–70 MB, so four
+150 MB files federated together lost 1 146 elements to shared ids and the SQL index would not
+build. The stride is now `ID_STRIDE` = 1 000 000 000; `fedId` (`shared/federate.ts`) is the one
+composer — the federation, the viewer's parts and edges, the site set, the assistant's references
+— and refuses a local id past 999 999 999; `slotOfId` / `localOfId` the one decoder (the session
+restore, the per-turn revert). A model past it is refused at load in its own row (`prepare`
+checks the index, then the parts). Sessions, links and viewpoints carry `idStride`; one written
+before is read by the design's stride against the elements really there (`liveHidden`), so an
+id past a million comes back on its own model. **Refusals:** main's `inspect` returns a file it
+turns down for a reason `validate` gives with that reason (`refused`), `file:open` and
+`file:admit` answer `{ files, refused }`, and the Open dialog, a Recent pill and a share link
+show the drop zone's designed row; "not an IFC file" — and anything else that is not a `.ifc` / `.ifczip` — is told only to the Open dialog, and a refusal carries a name and a reason, never a size. Docs: two
+rows in `docs/DECISIONS.md`, two decision lines and a trap line in `CLAUDE.md`, a trap in
+`docs/TRAPS.md`, `SYSTEM_SPEC.md` §3, §4, §7 and §9.
+
+**Measured, under Node** (the worktree's own worker modules, `federate` and `buildDatabase` on
+the real synthetic files; no Electron): cap-fed-A–D, before → after — distinct ids 104 762 →
+105 908, viewer records 104 762 → 105 908, the SQL index `UNIQUE constraint failed:
+element.id` → built in 8.5 s, every id an `INTEGER`, the largest 3 002 348 313; with every
+element hidden and the session reopened on reversed slots, the old rule put 41 695 back on the
+wrong element and dropped 19 133, the new one restores all 105 908 from an old payload and
+exactly the set from a new one. cap-590 alone (102 834 elements, largest express id 9 117 321):
+its session restored 11 270 by the old rule and dropped 91 564; all now.
+
+**After the deep review** (one must-fix, five should-fixes): `file:admit` had become an existence
+and size oracle — a renderer-named `.ifcxml` came back with its name and exact size, and every
+refusal carried its size. `inspect` now stops before `stat` at a path the renderer names whose
+extension is not `.ifc` / `.ifczip`, as it always did (`picked` is the Open dialog alone), and
+`RefusedFile` carries no size. `renumberId` returns `null` for a key that was never an id (a
+viewpoint's `hidden` is whatever `localStorage` held), where it had begun to throw, and the
+revert blames no model for one. `ai-parity-3`'s stubs answer the new contract; the chunk
+backstop reads as `prepare`'s rule (`localIdRefusal`). The parts' check stays after the stream:
+the worker has no per-stream cancel, and terminating it would close every loaded model's file.
+Measured for the decision row: `last.json`'s 4 MB cap holds 232 956 slot-1 hidden ids (279 547
+before), a Windows link 1 303 (1 564). **Verified**, rebased onto the display unit (the payload
+carries `units` beside `idStride`): `npm run typecheck` exit 0; `npm test` **149 files passed /
+3 skipped, 2 974 tests passed / 4 skipped** (two new files, `federation-ids` and
+`admit-refusals`); `npm run build` exit 0; the Node run on cap-fed-A–D repeated on that tree, the
+same numbers. **Not verified —
+no Electron was started, at the owner's word:** `npm run test:e2e`; the 4 × 150 MB federation and
+the 610 MB Open-dialog pick in the real app; a session, link and viewpoint written by 1.2.0 reopened
+in this build, and one of this build's opened in 1.2.0; the parity captures (nothing visible should
+differ). Not committed.
+
 ## 2026-10-09 — the display unit: the boot model's own, a third value `ft`, and every readout follows it
 
 **Did:** the owner's *"Why model units not automatically using the units provided by model? in
@@ -1649,86 +1697,27 @@ than that leaves the ground where the first build put it — as before. The refe
 ground moves up one metre, to its lowest storey's `+0` (its offset Z is −1); not re-measured,
 there is no sample model on this machine.
 
-## 2026-10-01 — five main-window requests: an action bar, a grouped toolbar, hover titles, an eye-first tree, file paths — and the bottom edge as one row
-
-**Did:** five owner requests, each a recorded deviation (CLAUDE.md, five rows in
-`docs/DECISIONS.md`). **(1) Action bar** — *"Can you move the clear button and undo button
-somewhere?"*: `undo`, `redo`, `N measures` + `clear` and `N spots` + `clear` left the status bar
-(`SGVue.dc.html:711–714`) for `ActionBar` (`app/StatusBar.tsx`) — the status bar's own card 3 px
-above it, same copy, tips, styles and handlers, drawn while `hasActionBar`. The status bar is its
-five fields again. The stage declares the bar's lane as `--abar` (30 px, else 0), which the
-colour legend and the Markups and Spatial-structure cards take; with the bar absent every
-computed length is the design's. **(1b) The bottom row** — the orchestrator's ruling on what
-(1) left overlapping, *fix the class, not the pixel*: the status bar, the action bar, the hint,
-the reset pill and the Ask pill no longer position themselves. They are the three zones of one
-grid row (`app/BottomRow.tsx`, `1fr minmax(0,auto) 1fr`) — the two bars · the hint under the
-pill · Ask — each keeping its markup, copy and style string less its positioning, the row
-taking no pointer events. A hint wraps (`text-wrap:balance`) instead of running under the bars,
-and `centrePlace` (`selectors/lanes.ts`) stands the centre above the bars where they leave it
-less than the pill's width or 200 px of hint. `VisibilityFrame` is the border, `ResetPill` the
-pill; `reset` and `Ask` are the stage's last two tab stops. **(2) Toolbar** — *"organize, group and add divider … separate
-the schedules toggle. Make it distinct"*: five groups (tools · panels · show · view ·
-Schedules) with four 1 × 18 px dividers; `column-gap` 10 → 4 px, so it is 737 px against 741; a
-divider that would end or start a wrapped row is `visibility:hidden`; Schedules is alone, last,
-in the accent's ink and outline. **(3) Property card** — a native `title` with the whole text on
-every clipped text: the four tiles, each set header (the set's own name), each property name
-(`fullText`). **(4) Tree** — eye-first like STOREYS: `[eye][label][count][chevron]` and
-`[eye][name / meta]`. **(5) Paths** — a file's full path as the `title` of its library row, its
-Recent pill and its loaded MODELS row (`ModelRow.path`, from `fed.sessionFiles()`); none for the
-demo. Also: `scripts/screenshot.cjs` gains five app-only states and the sidecar an `actionbar`
-rectangle; the e2e suite clicks Schedules "the way a hand does" (`openSchedulesWindow`, which
-tries again if no window came), because it is now the button under the view cube canvas's empty
-corner.
-**Measured** (mock, 1280 × 820, both themes; `tests/parity/2026-10-01-ui/README.md`): with a
-storey hidden, 3 measures, 2 spots, colour by Level and Markups open — status bar
-`[312, 781, 287, 27]` (before: 576 wide, under the whole reset pill), action bar
-`[312, 751, 284, 27]`, pill `[699, 771, 183, 36]`, legend `[312, 544, 230, 204]`, Markups
-`[312, 66, 330, 275]`: no two intersect. The bottom row, against a build of `d16f393`: at rest
-the status bar and the Ask pill have the same rectangles and 0 px differing, at 1280 × 820 and
-at 1 264 × 755; the pill alone has the same rectangle (571 / 452 px of its curved ends differ,
-≤ 37 / 93 of 255 — no `translateX` now). With the laser tool's 522 px hint, the pill and a full
-action bar — hint `[609, 773, 522, 33]`, pill `[609, 732, 183, 36]` above its start — no two of
-the five intersect at those two sizes, at 900 × 700 (the hint on three lines) or at 760 × 700
-(the centre above the bars); placed separately three pairs met, and six at the narrow two.
-Toolbar 741.03 → 737.03 px, one row; 0 cube pixels
-under the Schedules button in 3D and Plan, nearest 7.4 / 8.8 px (before 6.5 / 7.1), and at the
-real default window (1 264 × 755 inside) 4.3 / 2.5 px (before 3.9 / 1.1). Group eye x 16 = storey
-eye x 16 (was 251); element eye 31 (was 253). Before / after pixels: the sidebar above the tree
-0 px in all twelve captures, the Ask pill 0 in all twelve, the Markups card 0, the property
-card 0 / 3 px (two captures of one build: 3 / 3).
-**Verified:** `npm run typecheck` exit 0; `npm test` **120 files passed / 2 skipped, 1 906 tests
-passed / 3 skipped** (was 1 896: the action bar's rule and lane, `ModelRow.path`, `fullText`,
-`centrePlace`); `npm run build` exit 0; `npm run test:e2e` **45 passed, 6 skipped** (was 40 / 6:
-five new smoke cases — the two bars, the bottom row, the toolbar with its Tab order, cube and
-wrap, the tree and the card's titles, the three path titles), peak working set 311 MB one
-process / 778 MB all, GPU dedicated 260 MB, `clean:`. Before the bottom row the suite was run
-five times: the second lost the new toolbar case's Schedules click straight after its window
-resize (43 passed, 1 failed), which is what made `openSchedulesWindow` click again when no
-window comes; the three runs since passed. With the row it was run once, whole, and the row's
-own case four more times beside the action bar's. Every capture and measurement run went
-through `safe-run.cjs`; nothing survived.
-**Known:** the chat panel, the property card and the colour legend are not zones of the bottom
-row, and no lane is declared for its height. With an element selected, the chat panel open, a
-tool hint and something hidden — all four — the chat panel covers the reset pill above the hint
-at the default window; in a window of 900 px or less the open chat panel covers the pill and
-the top of a wrapped hint; where the centre stands above the bars (760 px) it is where a colour
-legend is. Between the side zones the pill stands over the hint's start (`flex-start`), not its
-middle as the ruling's string had it: centred, 39 px of it are under the open chat panel.
-`scripts/shell-sanity.cjs` finds the status bar by `data-role` now, and that edit was not run:
-the script does not parse at `d16f393` either (an unescaped backtick inside a template literal,
-since `5d942e1`). On a touch screen the Schedules button, under the cube's canvas at the
-default window, is reached from Window › Schedules. `dist/` predates this. Not committed; no
-version bump.
-
 ## Earlier work
 
-Compressed: the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-10-01 — five main-window requests: an action bar, a grouped toolbar, hover titles, an
+eye-first tree, file paths — and the bottom edge as one row.** Five owner requests, each a
+recorded deviation. Undo, redo and the markup counts left the status bar for an action bar above
+it (`ActionBar`, its lane `--abar`); the status bar, the action bar, the hint, the reset pill and
+the Ask pill became the three zones of one grid row (`BottomRow`, `centrePlace`), so no two of
+the five meet at 1280 × 820, 1 264 × 755, 900 × 700 or 760 × 700; the toolbar became five groups
+with four dividers (737 px, one row), Schedules alone and last in the accent; every clipped text
+on the property card carries its whole text as a `title`; the element tree is eye-first like
+STOREYS; a file's path is the `title` of its library row, its Recent pill and its MODELS row.
+1 906 unit tests; e2e 45 passed, 6 skipped. Left open then: the chat panel, the property card and
+the colour legend were not zones of the row — the first two took its lane, `--brow`, the same day.
 
 **2026-09-28 — Help › Check for updates… opens the product site, told this version.** The owner: *"Yes, open the page"*. The item opens `https://sgvue.github.io/?v=<version>` — `SITE_URL` (was `RELEASES_URL`) plus the URL-encoded build-time `__APP_VERSION__` — through `shell.openExternal`, with no network call by the app and `publish: null`. 1 896 unit tests (`menu.test.ts` pins the URL for three versions); e2e 40 passed, 6 skipped — the smoke case clicks the real item.
 

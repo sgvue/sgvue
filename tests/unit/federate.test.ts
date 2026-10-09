@@ -8,10 +8,11 @@
  *    kept, so removing a model leaves every surviving id exactly where it was.
  *  · **Parity.** The project header, the storey ladder and the id arithmetic must reproduce
  *    `design-reference/design/sample-model.js` `federate` on the prototype's own four
- *    discipline models, because that is the federation every parity screenshot is taken of.
+ *    discipline models, because that is the federation every parity screenshot is taken of —
+ *    the id blocks by the wider stride since 2026-10-09 (`ID_STRIDE`), which no surface shows.
  */
 import { describe, expect, it } from 'vitest'
-import { ID_STRIDE, federate, removeModel } from '../../src/shared/federate'
+import { ID_STRIDE, LEGACY_ID_STRIDE, federate, removeModel } from '../../src/shared/federate'
 import type {
   GridAxisRecord,
   IfcElement,
@@ -121,7 +122,7 @@ const storey = (name: string, elev: number, guid = ''): Storey => ({
 /* ────────────────────────────── ids and slots ────────────────────────────── */
 
 describe('federate — ids', () => {
-  it('numbers elements slot * 1 000 000 + localId and keeps localId', () => {
+  it('numbers elements slot * ID_STRIDE + localId and keeps localId', () => {
     const federation = federate([index('A', { ids: [7, 8] }), index('B', { ids: [7] })])
     expect(federation.elements.map((e) => e.id)).toEqual([7, 8, ID_STRIDE + 7])
     expect(federation.elements.map((e) => e.localId)).toEqual([7, 8, 7])
@@ -308,8 +309,12 @@ describe('federate — the prototype federation', () => {
     expect(ours.counts).toMatchObject({ models: 4, elements: 412, spaces: 0 })
   })
 
-  it("assigns the design's own id blocks", () => {
-    expect(ours.elements.map((e) => e.id)).toEqual(theirs.elements.map((e) => e.id))
+  it("assigns the design's own id blocks, numbered by the wider stride (2026-10-09)", () => {
+    // The design numbers block i from i × 1 000 000; ours from slot × ID_STRIDE. The same model
+    // in the same block, the same local id — only the stride differs, and no surface shows it.
+    expect(ours.elements.map((e) => e.id)).toEqual(
+      theirs.elements.map((e) => Math.floor(e.id / LEGACY_ID_STRIDE) * ID_STRIDE + e.localId)
+    )
     expect(ours.elements.map((e) => e.localId)).toEqual(theirs.elements.map((e) => e.localId))
     expect(ours.elements.map((e) => e.model)).toEqual(theirs.elements.map((e) => e.model))
   })

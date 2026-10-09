@@ -31,12 +31,12 @@ import {
   CH_UPDATE_OPEN
 } from '../shared/ipc-channels'
 import type {
+  AdmitResult,
   AiEvent,
   AiToolExec,
   AiToolResult,
   AiTurnStart,
   LinkOpen,
-  PickedFile,
   RecentAdd,
   RecentFile,
   SessionEnvelope,
@@ -64,15 +64,17 @@ const api = {
   },
   /**
    * Electron's native Open dialog, behind the design's own `upload` control and drop zone
-   * (fidelity contract, allowed deviations). Returns the chosen files, already admitted.
+   * (fidelity contract, allowed deviations). Returns the chosen files, already admitted — and,
+   * since 2026-10-09, those refused for a reason the drop zone gives too (`refused`).
    */
-  openDialog: (): Promise<PickedFile[]> => ipcRenderer.invoke(CH_FILE_OPEN),
+  openDialog: (): Promise<AdmitResult> => ipcRenderer.invoke(CH_FILE_OPEN),
   /**
    * "These paths came from a drop, the recents list, a session or a share link." Main applies
    * the same checks the dialog path gets and returns only what passed, so the caller learns
-   * which files have moved from what is missing.
+   * which files have moved from what is missing — and what it refused with the drop zone's own
+   * reason (`refused`, 2026-10-09).
    */
-  admitPaths: (paths: readonly string[]): Promise<PickedFile[]> =>
+  admitPaths: (paths: readonly string[]): Promise<AdmitResult> =>
     ipcRenderer.invoke(CH_FILE_ADMIT, { paths: [...paths] }),
   /**
    * A dropped `File` has no `path` in a sandboxed renderer. `webUtils.getPathForFile` is the

@@ -58,7 +58,7 @@ import {
   VIEW_NAME_MAX
 } from '../../../shared/tool-schemas'
 import { measureRows, spotRows, type MarkupRow } from '../../state/selectors/markups'
-import { viewpointFrameMatches, type Viewpoint } from '../../state/selectors/views'
+import { viewpointFrameMatches, viewpointHidden, type Viewpoint } from '../../state/selectors/views'
 import { getViewer, type ShellState } from '../../state/shell'
 import { askApply, labelText, type Executor, type ToolContext, type ToolOutcome } from './context'
 import { cameraKey, scopeCheck } from './view'
@@ -265,7 +265,8 @@ function restore(view: Viewpoint, number: number, ctx: ToolContext): ToolOutcome
   const total = s.federation.elements.length
   const shownNow = visFn(s)
   const shownNext = visFn({
-    hidden: view.hidden ?? {},
+    // What `restoreView` will hide: the viewpoint's ids as the live federation numbers them.
+    hidden: viewpointHidden(view, s.federation.models.map((m) => m.slot), (id) => s.byId.has(id)),
     storeyVis: view.storeyVis ?? {},
     modelVis: view.modelVis ?? {},
     stack: view.stack ?? []

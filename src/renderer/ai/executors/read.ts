@@ -16,7 +16,7 @@
  * active state, the interface), in full; the per-turn view state names the same things only
  * while they are off their defaults. The rule and the reasons are on the executor, below.
  */
-import { ID_STRIDE, orderGrids, type FederatedElement } from '../../../shared/federate'
+import { fedId, fitsLocalId, orderGrids, type FederatedElement } from '../../../shared/federate'
 import { ATTR_KEYS, attr } from '../../../shared/attr'
 import { rankKeys } from '../../../shared/prop-names'
 import { displayState, sectionPlanes, viewStateCore } from '../../../shared/ai-schema'
@@ -155,9 +155,12 @@ function boxReport(
   }
 }
 
-/** An expressId inside one file, as the federation id every other tool speaks. */
-const fedId = (s: ShellState, modelKey: string, expressId: number): number =>
-  slotOf(s, modelKey) * ID_STRIDE + expressId
+/**
+ * An expressId inside one file, as the federation id every other tool speaks — or `null` for one
+ * no element of a loaded model can have (outside its block, `shared/federate.ts`).
+ */
+const fedIdOf = (s: ShellState, modelKey: string, expressId: number): number | null =>
+  fitsLocalId(expressId) ? fedId(slotOf(s, modelKey), expressId) : null
 
 /* ────────────────────────────── the design's four ────────────────────────────── */
 
@@ -841,7 +844,8 @@ export const get_relationships: Executor = (input, ctx) => {
   if ('error' in found) return { forModel: { message: found.error } }
   const e = found.el
   const ref = (expressId: number): { id: number; name: string; type: string } | number => {
-    const other = s.byId.get(fedId(s, e.model, expressId))
+    const id = fedIdOf(s, e.model, expressId)
+    const other = id === null ? undefined : s.byId.get(id)
     return other ? { id: other.id, name: other.name, type: other.type } : expressId
   }
   return {

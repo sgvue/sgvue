@@ -109,7 +109,13 @@ import {
   type TurnSnapshot,
   type TurnUndo
 } from './selectors/snapshot'
-import { renameViews, viewpointFrameMatches, viewpointOf, type Viewpoint } from './selectors/views'
+import {
+  renameViews,
+  viewpointFrameMatches,
+  viewpointHidden,
+  viewpointOf,
+  type Viewpoint
+} from './selectors/views'
 import { askAboutText } from './selectors/props'
 import { tableCsv } from './selectors/chat'
 import { pickableFor } from './selectors/models'
@@ -1225,7 +1231,8 @@ export const useShell = create<ShellState>((set, get) => ({
     const sections = sectionsOf(v) ?? NO_SECTIONS
     set({
       sections,
-      hidden: v.hidden ?? {},
+      // 2026-10-09: a viewpoint saved before the ids were renumbered is read onto the live ones.
+      hidden: viewpointHidden(v, s.federation.models.map((m) => m.slot), (id) => s.byId.has(id)),
       storeyVis: v.storeyVis ?? {},
       modelVis: v.modelVis ?? {},
       stack: v.stack ?? [],

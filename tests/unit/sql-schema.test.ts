@@ -11,7 +11,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { federate } from '../../src/shared/federate'
+import { federate, ID_STRIDE } from '../../src/shared/federate'
 import { guardSql } from '../../src/shared/sql-guard'
 import { buildDatabase } from '../../src/worker/sql-schema'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
@@ -53,8 +53,8 @@ describe('sql schema — what got in', () => {
     const [[min, max]] = rows("SELECT MIN(id), MAX(id) FROM element WHERE model = 'STR'") as [
       [number, number]
     ]
-    expect(min).toBeGreaterThanOrEqual(1_000_000)
-    expect(max).toBeLessThan(2_000_000)
+    expect(min).toBeGreaterThanOrEqual(ID_STRIDE)
+    expect(max).toBeLessThan(2 * ID_STRIDE)
   })
 
   it('counts by storey, which is the query the storey panel asks', () => {

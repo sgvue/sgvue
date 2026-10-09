@@ -32,8 +32,9 @@ export interface GeometryRecord {
 export interface PartRecord {
   /**
    * The element's **model-local** `expressId`, exactly as `ModelIndex` records it. The
-   * federation id is `slot * 1_000_000 + elementId` (`shared/federate.ts`); a chunk knows
-   * its model but not its slot, so the renderer adds the offset when it attaches a chunk.
+   * federation id is `fedId(slot, elementId)` — `slot * ID_STRIDE + elementId`
+   * (`shared/federate.ts`); a chunk knows its model but not its slot, so the renderer adds the
+   * offset when it attaches a chunk.
    */
   elementId: number
   /** Index into the chunk's `geoms`. */

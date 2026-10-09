@@ -27,12 +27,14 @@ export interface SqlPayload {
 }
 
 /**
- * Element ids are the federation's own (`slot * 1_000_000 + localId`), so a row joins
- * straight to a selection, a pick or a geometry part with no translation.
+ * Element ids are the federation's own (`slot * ID_STRIDE + localId`, `shared/federate.ts`), so
+ * a row joins straight to a selection, a pick or a geometry part with no translation. Since
+ * 2026-10-09 the stride is 1 000 000 000, so an id past 2^31 is bound as a double by sql.js and
+ * stored as an exact `INTEGER` by the columns' affinity (`tests/unit/federation-ids.test.ts`).
  */
 export const SQL_SCHEMA = `
 -- SGVue model database. Read-only: PRAGMA query_only = 1 is set once it is built.
--- Element ids are federation ids (slot * 1000000 + localId), the same ids the viewer,
+-- Element ids are federation ids (slot * 1000000000 + localId), the same ids the viewer,
 -- the selection and the geometry parts use. Values are stored AS AUTHORED in the file:
 -- property.value is the text, property.num the number when there is one, and
 -- property.measure the IFC measure type (IFCLENGTHMEASURE, …) that says what unit it is in.
@@ -40,7 +42,7 @@ export const SQL_SCHEMA = `
 -- One row per loaded IFC file.
 CREATE TABLE model (
   key      TEXT PRIMARY KEY, -- element.model joins to this
-  slot     INTEGER,          -- id block: ids run slot*1000000 .. slot*1000000+999999
+  slot     INTEGER,          -- id block: ids run slot*1000000000 .. slot*1000000000+999999999
   name     TEXT,             -- IfcProject.Name
   file     TEXT,             -- file name as loaded
   schema   TEXT,             -- IFC2X3 | IFC4 | IFC4X3

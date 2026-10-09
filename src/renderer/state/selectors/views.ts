@@ -17,10 +17,16 @@
  * plane from a list this build wrote. A viewpoint saved before then has only `section`;
  * `restoreView` reads either through `sectionsOf`. The sub-line names both planes.
  */
+import { ID_STRIDE } from '../../../shared/federate'
 import { frameKey, type ProjectFrame } from '../../../shared/georef'
 import type { FilterStep } from '../../../shared/rules'
 import { sectionsLabel, type Sections } from '../../../shared/sections'
-import { legacySection, type SessionSection } from '../../../shared/session-codec'
+import {
+  idNumbering,
+  legacySection,
+  liveHidden,
+  type SessionSection
+} from '../../../shared/session-codec'
 import type { CameraState } from '../../viewer/camera'
 
 /** One saved viewpoint. `id` is the design's `Date.now()`. */
@@ -51,6 +57,11 @@ export interface Viewpoint {
    * treated as a mismatch.
    */
   frame?: string
+  /**
+   * 2026-10-09 — the stride `hidden`'s ids are numbered by (`shared/federate.ts`'s `ID_STRIDE`).
+   * Absent in a viewpoint saved before then, numbered by the design's 1 000 000 (`viewpointHidden`).
+   */
+  idStride?: number
 }
 
 /** What the state a viewpoint is cut from has to offer. */
@@ -105,8 +116,28 @@ export function viewpointOf(
     active: s.active,
     grids: s.grids,
     levels: s.levels,
-    frame: frameKey(s.frame)
+    frame: frameKey(s.frame),
+    idStride: ID_STRIDE
   }
+}
+
+/**
+ * The ids a viewpoint hides, numbered for the live federation (2026-10-09). A viewpoint records
+ * no files and no slots — it has always been restored onto the slots the models have now — so
+ * one saved by this build is restored as it was saved. One saved before then is numbered by the
+ * design's 1 000 000, which a model of more than a million lines overran: each of its ids is read
+ * on every live slot and kept where that element is really here (`shared/session-codec.ts`,
+ * `liveHidden`). A numbering this build does not know hides nothing.
+ */
+export function viewpointHidden(
+  v: Pick<Viewpoint, 'hidden' | 'idStride'>,
+  slots: readonly number[],
+  exists: (id: number) => boolean
+): Record<number | string, boolean> {
+  const numbering = idNumbering(v.idStride)
+  if (numbering === 'current') return v.hidden ?? {}
+  if (!numbering) return {}
+  return liveHidden(v.hidden ?? {}, 'legacy', new Map(slots.map((s) => [s, s])), exists)
 }
 
 /** True when a saved viewpoint's camera still means what it meant. */

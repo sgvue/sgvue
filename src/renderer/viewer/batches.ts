@@ -62,7 +62,7 @@ import {
   Vector4
 } from 'three/webgpu'
 import type { GeometryChunk, PartRecord } from '../../shared/geometry-contract.types'
-import { ID_STRIDE } from '../../shared/federate'
+import { fedId, localIdRefusal } from '../../shared/federate'
 import { linearRgba } from './materials'
 import type { PartState } from './part-state'
 
@@ -115,7 +115,7 @@ export interface Slot {
  * meshes and edge lines it no longer owns.
  */
 export interface ElementRecord {
-  /** Federation id: `slot * ID_STRIDE + expressId`. */
+  /** Federation id: `fedId(slot, expressId)` — `slot * ID_STRIDE + expressId`. */
   id: number
   modelKey: string
   /** Index into `BatchStore.slots`, one per part. */
@@ -295,7 +295,7 @@ export function createBatchStore(): BatchStore {
       vAt += g.vertexCount
       iAt += g.indexCount
 
-      const id = federationSlot * ID_STRIDE + part.elementId
+      const id = fedId(federationSlot, part.elementId)
       let rec = elements.get(id)
       if (!rec) {
         rec = {
@@ -417,6 +417,12 @@ export function createBatchStore(): BatchStore {
     },
 
     addChunk: (chunk, federationSlot, materials, modelKey = chunk.header.modelKey) => {
+      // 2026-10-09 — a part whose id would number into another model's block is refused before
+      // anything of its chunk is added, by the rule `model/federation-store.ts` refuses such a
+      // model with at load; this is the backstop, and the stream's failure path takes the model
+      // out again.
+      const refusal = localIdRefusal(chunk.parts.map((part) => part.elementId))
+      if (refusal) throw new RangeError(refusal)
       state = materials.parts
       const solid: PartRecord[] = []
       const glass: PartRecord[] = []
