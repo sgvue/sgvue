@@ -3,6 +3,64 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-09 — the id fix checked in the app and against 1.2.0; a file over 600 MB is told to split the model; an `.ifczip` opens from the Open dialog
+
+**Checked in the real app** — what the entry below left for the owner's word (*"go"*), each run
+through its guard, one Electron at a time. **The 4 × 150 MB federation** (cap-fed-A–D, one
+Open-dialog pick, the owner's large-model limits): revealed in 54.3 s; 105 908 elements, viewer
+records and visible; the SQL index in 8.3 s, every id an `INTEGER`, the largest 3 002 348 313, and
+`query_sql` answers; an element past #1 000 000 on slot 1 hidden, isolated (held behind Apply by
+the 5 % guard) and picked; the three elements the old stride numbered 3 178 507 — B's #2 178 507,
+C's #1 178 507, D's #178 507 — each get their own property card; the Schedules window's row click,
+the row highlight for the main window's selection (ids past 2³¹ both ways) and "Colour 3D by this
+column"; a scripted Vee turn hid four elements on slots 2 and 3 and its `revert` put back exactly
+the set before; `select_elements` and `copy_guids` with ten-digit ids. Guard peaks GPU 4 761 MB,
+renderer 5 977 MB; 11 026 MB private across the app. **A 610 MB file** got the designed row from
+the Open dialog, a drop, a Recent pill, a share link (its banner naming only the file that moved)
+and the dialog after boot (no "Replace model?"). **An entity numbered past #999 999 999** got its
+row and banner from a drop and the dialog; after boot, as a confirmed replacement, the old model
+stayed — `get_element` still answers for it, `get_entity_raw` does not, because the worker closed
+the key, as it always has for a replacement whose geometry fails. **Against 1.2.0** (the packaged
+`dist/win-unpacked`, driven through `safe-app.cjs`): it hid IfcWall, saved a viewpoint, hid IfcDoor,
+copied its link and autosaved, for cap-fed-A + B and for A alone. This build reopened that link,
+session and viewpoint with exactly the elements 1.2.0 showed hidden — 7 324 for 7 297 ids (27 ids
+1.2.0 had given two elements), 5 488 for the viewpoint, 3 652 and 2 739 for A alone — its
+`visible / total` equal to 1.2.0's every time; 1.2.0's own rule restores 4 688 and 1 556 of those
+links. 1.2.0 opening this build's link (30 hidden ids of six kinds) kept the five on slot 0 below a
+million and the ten between one and two million — read as its own numbers, so five slot-1
+elements its numbering gave those ids were hidden with them — dropped the rest, and showed no
+error; with A alone it kept the five below a million. **Parity** (#mock, chains A, B, C, F, T, both
+themes, against 7e2fcc9's captures): every label the same text in the same box; chrome 0 px but
+for the composer's caret (16 px) and a one-level antialias at one spot of the Markups card that
+flips from run to run of this build (45 / 15 px; a second run of `markups-card-light` is
+byte-identical to 7e2fcc9's); all 48 chat-panel crops identical; the 3D frames within the labels'
+own run-to-run antialiasing (≤ 8 386 px, at most 488 outside the labels' boxes). `npm run
+test:e2e` on the production build, in three runs: 65 passed, 6 skipped (opt-in and macOS-only).
+
+**Did — the owner's addition** (*"add consider splitting into multiple models message for files
+over 600mb."*): the size refusal reads `larger than 600 MB — consider splitting it into several
+models` — one constant, `TOO_LARGE` (`shared/upload.ts`), on every route and at the end of both of
+`.ifczip`'s size refusals, in the row and the landing page's banner. No element and no style
+string: the stage line wraps as designed — one line on the landing page, two in the sidebar —
+and never clips, so it has no `title`. **And a defect that turned up while checking it:** an
+`.ifczip` from the Open dialog, a Recent pill or a link reaches the worker as a `Blob` named by
+the model key, so it was never unzipped and went whole to web-ifc and never opened — a valid
+1.5 kB one took the renderer to 4.2 GB before web-ifc aborted, one declaring a 700 MB entry
+4.1 GB. The worker now knows an archive by its first four bytes as well as its name (`isIfczip`:
+`PK\x03\x04`, or `PK\x05\x06` for an empty one, which gets `the archive contains no .ifc file`).
+The design-parity chain's `landing-rejections` state sets the new size reason on both sides
+(`scripts/lib/parity-states.cjs`), since the app can no longer show the design's bare one. Docs:
+an allowed deviation, two decision lines and a trap line in `CLAUDE.md`, two rows in
+`docs/DECISIONS.md`, a trap in `docs/TRAPS.md`, `SYSTEM_SPEC.md` §3 and §4, a note in
+`tests/parity/phase8/README.md`, and `tests/parity/2026-10-09-split/README.md` with the
+captures' method and the fit. **Verified:** `npm run typecheck` exit 0; `npm test` 149 files
+passed / 3 skipped, 2 980 tests passed / 4 skipped (six new, on `isZipArchive` and `isIfczip`);
+in the app at the default window (1264 × 755 inside), both themes: the row on all five routes,
+the `.ifczip` refusal's row and banner from the Open dialog, a valid `.ifczip` from it opening
+(6 elements, the archive's hash); `npm run test:e2e` on the production build, three runs: 65
+passed, 6 skipped. The app runs were before the empty archive's `PK\x05\x06` was accepted, which
+the unit tests alone cover. Not committed.
+
 ## 2026-10-09 — federation ids past a million lines, and the Open dialog's silent refusal
 
 **Did:** the two defects the owner's capacity measurement found (*"Are you able to find out how

@@ -18,7 +18,16 @@
 export const MAX_FILE_BYTES = 600 * 1024 * 1024
 
 /**
- * `SGVue.dc.html:1155`, verbatim — including the extensions the drop zone advertises.
+ * 2026-10-09 — the design's `larger than 600 MB`, and then what to do about it. The owner: *"add
+ * consider splitting into multiple models message for files over 600mb."* One string, so every
+ * route that refuses a file for its size says the same — the drop, the Open dialog, a Recent
+ * pill, a share link — and `.ifczip`'s own refusal ends with it too (`worker/ifczip.ts`).
+ */
+export const TOO_LARGE = 'larger than 600 MB — consider splitting it into several models'
+
+/**
+ * `SGVue.dc.html:1155`, verbatim — including the extensions the drop zone advertises — but for
+ * the size reason, which carries the advice above (2026-10-09).
  *
  * `.ifcxml` is accepted by the extension test and then refused with its own reason: the design
  * offers it, and a silent "not an IFC file" for a file whose extension the zone lists would be
@@ -27,13 +36,13 @@ export const MAX_FILE_BYTES = 600 * 1024 * 1024
 export type RejectReason =
   | 'not an IFC file'
   | 'file is empty'
-  | 'larger than 600 MB'
+  | typeof TOO_LARGE
   | 'ifcXML is not supported'
 
 export function validate(name: string, size: number): RejectReason | null {
   if (!/\.(ifc|ifcxml|ifczip)$/i.test(name)) return 'not an IFC file'
   if (size === 0) return 'file is empty'
-  if (size > MAX_FILE_BYTES) return 'larger than 600 MB'
+  if (size > MAX_FILE_BYTES) return TOO_LARGE
   if (/\.ifcxml$/i.test(name)) return 'ifcXML is not supported'
   return null
 }

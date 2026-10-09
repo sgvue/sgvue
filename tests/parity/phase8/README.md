@@ -93,6 +93,9 @@ Phase 8 adds two readbacks to the sidecar both scripts write beside every PNG:
 **All three matched on every state, in both themes.** `landingText` is 29 lines in the
 rejection state and identical line for line, including `not an IFC file` / `file is empty` /
 `larger than 600 MB`, `open all four as a federation →` and `Parsed locally, never uploaded`.
+*(2026-10-09: the state now sets the size reason the app gives since then, `larger than 600 MB —
+consider splitting it into several models`, on both sides alike — the app can no longer show the
+design's bare one; `CLAUDE.md`, allowed deviations.)*
 
 ## Measured difference per state
 

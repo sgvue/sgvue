@@ -29,7 +29,7 @@ import { useShell } from '../../src/renderer/state/shell'
 const INITIAL = useShell.getState()
 
 /** The measured file, `cap-610.ifc` (639 475 090 bytes): main answers its name and reason, not its size. */
-const OVERSIZE: RefusedFile = { name: 'cap-610.ifc', reason: 'larger than 600 MB' }
+const OVERSIZE: RefusedFile = { name: 'cap-610.ifc', reason: 'larger than 600 MB — consider splitting it into several models' }
 
 /** What main answers for each path, and every path it was asked about. */
 let answers = new Map<string, AdmitResult>()
@@ -92,7 +92,7 @@ describe('the Open dialog', () => {
     dialogAnswer = { files: [], refused: [OVERSIZE] }
     await openDialog()
     expect(rows()).toEqual([
-      { name: 'cap-610.ifc', stage: 'larger than 600 MB', pct: 0, error: true, dismiss: true }
+      { name: 'cap-610.ifc', stage: 'larger than 600 MB — consider splitting it into several models', pct: 0, error: true, dismiss: true }
     ])
     const fromDialog = rows()
 
@@ -102,7 +102,7 @@ describe('the Open dialog', () => {
   })
 
   it('gives every reason a drop gives, in the drop’s own words', async () => {
-    const reasons: RejectReason[] = ['larger than 600 MB', 'file is empty', 'not an IFC file', 'ifcXML is not supported']
+    const reasons: RejectReason[] = ['larger than 600 MB — consider splitting it into several models', 'file is empty', 'not an IFC file', 'ifcXML is not supported']
     dialogAnswer = {
       files: [],
       refused: [
@@ -148,7 +148,7 @@ describe('the Open dialog', () => {
     await openDialog()
     expect(replaceAsked).toEqual([])
     expect(rows()).toEqual([
-      { name: 'cap-610.ifc', stage: 'larger than 600 MB', pct: 0, error: true, dismiss: true }
+      { name: 'cap-610.ifc', stage: 'larger than 600 MB — consider splitting it into several models', pct: 0, error: true, dismiss: true }
     ])
   })
 
@@ -164,7 +164,7 @@ describe('a Recent pill, and the assistant’s open_recent', () => {
     answers.set('C:\\m\\cap-610.ifc', { files: [], refused: [OVERSIZE] })
     expect(await openPaths(['C:\\m\\cap-610.ifc'])).toBe(true)
     expect(rows()).toEqual([
-      { name: 'cap-610.ifc', stage: 'larger than 600 MB', pct: 0, error: true, dismiss: true }
+      { name: 'cap-610.ifc', stage: 'larger than 600 MB — consider splitting it into several models', pct: 0, error: true, dismiss: true }
     ])
     expect(useShell.getState().initErr).toBe('')
   })
@@ -178,7 +178,7 @@ describe('a Recent pill, and the assistant’s open_recent', () => {
   it('Apply on open_recent: the row says why, and the chat is not told the file moved', async () => {
     answers.set('C:\\m\\cap-610.ifc', { files: [], refused: [OVERSIZE] })
     expect(await openRecent('C:\\m\\cap-610.ifc')).toBe('opening')
-    expect(useShell.getState().uploads.map((u) => u.stage)).toEqual(['larger than 600 MB'])
+    expect(useShell.getState().uploads.map((u) => u.stage)).toEqual(['larger than 600 MB — consider splitting it into several models'])
   })
 })
 
@@ -197,7 +197,7 @@ describe('a session or a share link', () => {
     answers.set('C:\\m\\cap-610.ifc', { files: [], refused: [OVERSIZE] })
     await openPayload(payload({ path: 'C:\\m\\cap-610.ifc', name: 'cap-610.ifc', key: 'cap-610' }))
     expect(rows()).toEqual([
-      { name: 'cap-610.ifc', stage: 'larger than 600 MB', pct: 0, error: true, dismiss: true }
+      { name: 'cap-610.ifc', stage: 'larger than 600 MB — consider splitting it into several models', pct: 0, error: true, dismiss: true }
     ])
     expect(useShell.getState().initErr).toBe('')
     expect(prepare).not.toHaveBeenCalled()

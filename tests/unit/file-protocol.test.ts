@@ -110,7 +110,7 @@ describe('admit — what it refuses, and why', () => {
     const refused: RefusedFile[] = []
     expect(await admit([big], 'any', refused)).toEqual([])
     // Its name and its reason — never its size, and never its path.
-    expect(refused).toEqual([{ name: 'huge.ifc', reason: 'larger than 600 MB' }])
+    expect(refused).toEqual([{ name: 'huge.ifc', reason: 'larger than 600 MB — consider splitting it into several models' }])
     expect(refused[0].reason).toBe(validate('huge.ifc', MAX_FILE_BYTES + 1))
     expect(mint(await realOf(big))).toBeNull()
   })
@@ -119,7 +119,7 @@ describe('admit — what it refuses, and why', () => {
     const dialog: RefusedFile[] = []
     await admit([big, empty, xml, text], 'any', dialog)
     expect(dialog).toEqual([
-      { name: 'huge.ifc', reason: 'larger than 600 MB' },
+      { name: 'huge.ifc', reason: 'larger than 600 MB — consider splitting it into several models' },
       { name: 'empty.ifc', reason: 'file is empty' },
       { name: 'plan.ifcxml', reason: 'ifcXML is not supported' },
       { name: 'notes.txt', reason: 'not an IFC file' }
@@ -133,7 +133,7 @@ describe('admit — what it refuses, and why', () => {
     const named: RefusedFile[] = []
     await admit([big, empty, xml, text, join(dir, 'gone.ifcxml')], new Set(), named)
     expect(named).toEqual([
-      { name: 'huge.ifc', reason: 'larger than 600 MB' },
+      { name: 'huge.ifc', reason: 'larger than 600 MB — consider splitting it into several models' },
       { name: 'empty.ifc', reason: 'file is empty' }
     ])
     // The recents list is a named route too, however trusted its network paths are.
@@ -151,7 +151,7 @@ describe('admit — what it refuses, and why', () => {
   it('answers both lists at once for the IPC channels', async () => {
     const out = await admitWithRefusals([model, big, join(dir, 'gone.ifc')], 'any')
     expect(out.files.map((f) => f.name)).toEqual(['model.ifc'])
-    expect(out.refused).toEqual([{ name: 'huge.ifc', reason: 'larger than 600 MB' }])
+    expect(out.refused).toEqual([{ name: 'huge.ifc', reason: 'larger than 600 MB — consider splitting it into several models' }])
   })
 
   it('still 403s a refused file at fetch time, whatever was minted before it grew', async () => {

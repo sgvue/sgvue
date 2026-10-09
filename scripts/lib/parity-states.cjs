@@ -464,7 +464,9 @@ const COLOR_STATES = {
  *
  * The upload rows carry invented file names and the design's **own** rejection reasons, set
  * identically on both sides — see `setUploads` in `UI` for why the rows are state rather than a
- * real parse on one side and a timer on the other.
+ * real parse on one side and a timer on the other. The size reason is the app's since 2026-10-09
+ * (`TOO_LARGE` in `shared/upload.ts`: the design's words, then the owner's advice to split the
+ * model), because the app can no longer show the design's bare one; it is set on both sides alike.
  */
 const LANDING_STATES = {
   landing: `freeze()`,
@@ -473,7 +475,7 @@ const LANDING_STATES = {
     `setDragging(false); freeze(); setUploads([` +
     ` { id: 'e1', name: 'site-plan.pdf', stage: 'not an IFC file', pct: 0, error: true, dismiss: true },` +
     ` { id: 'e2', name: 'arc-block-b.ifc', stage: 'file is empty', pct: 0, error: true, dismiss: true },` +
-    ` { id: 'e3', name: 'whole-campus.ifc', stage: 'larger than 600 MB', pct: 0, error: true, dismiss: true }` +
+    ` { id: 'e3', name: 'whole-campus.ifc', stage: 'larger than 600 MB — consider splitting it into several models', pct: 0, error: true, dismiss: true }` +
     `])`,
   'upload-midstage':
     `freeze(); setUploads([` +

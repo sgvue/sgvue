@@ -150,6 +150,14 @@ named so each trap can be traced to its original write-up.
 - **Parsing belongs in a worker.** Aquila left `StreamAllMeshes` synchronous and paid a 4.7 s
   frozen tab; Marumi's worker parses a 144 MB model in 5.7 s while the viewport holds 120 fps.
   — Aquila's and Marumi's `PROGRESS.md`
+- **Only a drop gives the parse worker the file's name.** A drop's bytes are a `File`; the Open
+  dialog's, a Recent pill's and a share link's are the `Blob` that `fetch` on `sgvue-file://`
+  returns, and `worker-bridge.ts` names a `Blob` by its model key — the file name without its
+  extension. So the worker's `.ifczip` test never matched on those routes, and the archive went
+  whole to web-ifc as if it were IFC text: a valid 1.5 kB archive took the renderer to 4.2 GB
+  before web-ifc aborted with `bad_alloc`, and never opened. Decide what a file is by its bytes
+  (`isZipArchive`: `PK\x03\x04`, or `PK\x05\x06` for an empty archive) as well as its name.
+  — 2026-10-09
 
 **Rendering at real sizes**
 

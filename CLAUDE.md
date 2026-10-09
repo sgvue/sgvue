@@ -899,6 +899,19 @@ Anything not on this list is a defect.
   same box, the 3D frame within two HEAD runs' own label antialiasing; the Markups card differs only
   inside its toggle — the new `ft` button 29.20 × 22 px, the title and the × not moved — and the
   chat panel not at all. `tests/parity/2026-10-09-units/README.md` has every number.
+- **2026-10-09 — a file refused for its size is told to split the model.** Asked for by the
+  owner in these words: *"add consider splitting into multiple models message for files over
+  600mb."* The design's reason, `larger than 600 MB` (`SGVue.dc.html:1155`), keeps its words and
+  gains ` — consider splitting it into several models`: one string, `TOO_LARGE`
+  (`shared/upload.ts`), so the drop, the Open dialog, a Recent pill and a share link say the same,
+  and an `.ifczip` whose one `.ifc` is that large ends the same way (`the .ifc file in the archive
+  is …`), in its row and in the landing page's banner. **No element, no control and no style
+  string was added or changed:** the stage line is the design's own, which wraps and never clips,
+  so it needs no `title`. **Measured** (the default window, 1264 × 755 inside, both themes
+  alike): on the landing page the stage is one line, 515 × 14.30 px, in a row 590 × 59.19; in the
+  sidebar after boot it wraps to two, 231 × 27.28 px, so that row is one 13.65 px line taller; the
+  `.ifczip` refusal is two lines in its row and two in the banner's 620 px box. Nothing in any of
+  them overflows or is clipped.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1145,6 +1158,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-09 — **Navisworks Manage 2026 places the georeferencing fixtures in two groups, and SGVue keeps its rule — no "Navisworks mode"**: fixtures a–f and i, appended with IFC reader v4 and Shared Coordinates on, split differently with "include True North" off and on — Navisworks positions as SGVue does (`Scale` ignored, feet honoured) but turns differently (inferred; the angle was not measured); SGVue places all seven as one building, as IfcOpenShell does and as IFC reads `TrueNorth` beside a conversion. For the two to agree, consultants export from Shared Coordinates or Survey Point (the turn in the site placement).
 - 2026-10-09 — **federation ids are `slot × ID_STRIDE + express id` with `ID_STRIDE` = 1 000 000 000, composed only by `fedId` and decoded only by `slotOfId` / `localOfId`** (`shared/federate.ts`): the design's 1 000 000 is a 60–70 MB file, and four 150 MB files lost 1 146 elements and the SQL index to shared ids. The bound: a unique, exact id for every express id below 10⁹ on slots 0 … 9 007 198; a model past it is refused at load in its own row (`entity ids above #999999999 are not supported`). No typed array, texture or shader holds an id. A session, a link and a viewpoint carry `idStride`; one without it is read by the design's stride against the elements really there (`liveHidden`), and an older build reading a new one reads slot 0's ids as it reads its own (they are the same numbers) and drops every other slot's.
 - 2026-10-09 — **`file:open` and `file:admit` answer `{ files, refused }`** (`AdmitResult`): a file main turns down for a reason `validate` gives — over 600 MB, empty, not IFC, ifcXML — gets the drop zone's designed row on every route: the Open dialog, a Recent pill, a link (whose banner then names only files that moved). "Not an IFC file" — and anything else that is not a `.ifc` / `.ifczip` — is told only to the Open dialog; for a path the renderer names, `inspect` stops before `stat`, as it always did. A refusal carries a name and a reason, never a size or a path.
+- 2026-10-09 — **the size refusal is `larger than 600 MB — consider splitting it into several models`** (owner-requested): one constant, `TOO_LARGE` (`shared/upload.ts`), which `validate` returns on every route and both of `.ifczip`'s size refusals end with; the design's words first, and the stage line wraps as designed, so no style string and no `title` was added.
+- 2026-10-09 — **the parse worker knows an `.ifczip` by its first four bytes as well as by its name** (`isZipArchive`, `isIfczip`, `worker/ifczip.ts`: `PK\x03\x04`, or `PK\x05\x06` for an empty archive): from the Open dialog, a Recent pill or a share link it is handed a `Blob` named by the model key (`worker-bridge.ts`), so an archive taken those ways went whole to web-ifc and never opened — a valid 1.5 kB one took the renderer to 4.2 GB before web-ifc aborted, one declaring a 700 MB entry 4.1 GB. `meta.fileName` is unchanged.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
@@ -1267,6 +1282,7 @@ One line each. **Read `docs/TRAPS.md` before touching `src/worker/` or
 - Two uploads in flight leak a worker — hold the handle locally and compare by identity before clearing it.
 - Every parse stage should finish with a real value, not a percentage. Geometry is ~55 % of the wall clock.
 - Parsing belongs in a worker: a synchronous `StreamAllMeshes` froze Aquila's tab for 4.7 s.
+- Only a drop gives the worker the file's name; any other route hands it a `Blob` named by the model key. Never branch on the extension there.
 
 **Rendering at real sizes**
 

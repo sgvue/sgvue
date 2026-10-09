@@ -57,7 +57,11 @@ describe('validate — the design’s own copy', () => {
 
   it('rejects over 600 MB, and accepts exactly 600 MB', () => {
     expect(validate('a.ifc', MAX_FILE_BYTES)).toBeNull()
-    expect(validate('a.ifc', MAX_FILE_BYTES + 1)).toBe('larger than 600 MB')
+    // 2026-10-09 — the design's words, then the owner's advice to split the model.
+    expect(validate('a.ifc', MAX_FILE_BYTES + 1)).toBe(
+      'larger than 600 MB — consider splitting it into several models'
+    )
+    expect(validate('a.ifc', MAX_FILE_BYTES + 1)?.startsWith('larger than 600 MB')).toBe(true)
   })
 
   it('refuses ifcXML by name rather than as "not an IFC file"', () => {

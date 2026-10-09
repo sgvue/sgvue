@@ -31,7 +31,7 @@ import type {
 import type { IfcElement, ModelCounts, ModelIndexMeta } from '../shared/model-index.types'
 import { streamGeometry } from './geometry-streamer'
 import { createReadOnlyIfcSource, type ReadBytes, type ReadOnlyIfcSource } from './ifc-source'
-import { ifcFromZip } from './ifczip'
+import { ifcFromZip, isIfczip } from './ifczip'
 import { buildModelIndex, readRawLine, type RawLine } from './index-builder'
 
 /* ────────────────────────────── protocol ────────────────────────────── */
@@ -123,7 +123,9 @@ async function parse(modelKey: string, fileName: string, source0: Blob): Promise
   // replaces the blob the parser reads (`ifczip.ts`).
   let file = source0
   let zipSha: string | null = null
-  if (/\.ifczip$/i.test(fileName)) {
+  // By its bytes as well as its name: only a drop's `File` brings the name (`isIfczip`).
+  const head = new Uint8Array(reader.readAsArrayBuffer(source0.slice(0, 4)))
+  if (isIfczip(fileName, head)) {
     const archive = new Uint8Array(reader.readAsArrayBuffer(source0))
     for (let at = 0; at < archive.length; at += HASH_BLOCK) {
       hasher.update(archive.subarray(at, Math.min(archive.length, at + HASH_BLOCK)))
