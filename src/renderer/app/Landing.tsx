@@ -36,7 +36,10 @@
  * · 2026-10-01 — when a newer version is out, a notice says so above the drop zone, with a
  *   button that opens the download page: the designed warning banner's own box, in the accent
  *   tokens. Main asks GitHub once per run (`main/updates.ts`); with no newer version, no
- *   answer or no network, nothing is drawn and the page is exactly what it was.
+ *   answer or no network, nothing is drawn and the page is exactly what it was;
+ * · 2026-10-09 — one line under the drop zone and its upload rows says that georeferencing is
+ *   taken from the first model opened (`GEOREF_NOTE`, `shared/upload.ts`), in the drop zone's
+ *   own caption style string. No control, no icon.
  *
  * The backdrop parallax is written **straight to CSS custom properties on the elements**
  * (`:1116–1125`) and never through state: a pointer move that re-rendered the page would
@@ -44,7 +47,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { UpdateInfo } from '../../shared/ipc-contract'
-import { openAllLabel } from '../../shared/upload'
+import { GEOREF_NOTE, openAllLabel } from '../../shared/upload'
 import { FADE_SECONDS } from '../viewer/materials'
 import * as pipeline from '../model/upload-pipeline'
 import { pick, useShell, type LibraryFile } from '../state/shell'
@@ -472,6 +475,12 @@ export default function Landing(): React.JSX.Element | null {
               ))}
             </div>
           )}
+
+          {/* 2026-10-09 — whose georeferencing the federation takes (owner-requested). The drop
+              zone's own caption style string, verbatim: one line of text, no control. */}
+          <span data-role="georef-note" style={s('font:400 12px/1.4 var(--mono);color:var(--faint)')}>
+            {GEOREF_NOTE}
+          </span>
 
           {/* Always drawn since 2026-09-24: the demo button below is always offered. */}
           <div style={s('display:flex;align-items:center;gap:10px')}>

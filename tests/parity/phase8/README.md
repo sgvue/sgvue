@@ -95,7 +95,13 @@ rejection state and identical line for line, including `not an IFC file` / `file
 `larger than 600 MB`, `open all four as a federation →` and `Parsed locally, never uploaded`.
 *(2026-10-09: the state now sets the size reason the app gives since then, `larger than 600 MB —
 consider splitting it into several models`, on both sides alike — the app can no longer show the
-design's bare one; `CLAUDE.md`, allowed deviations.)*
+design's bare one; `CLAUDE.md`, allowed deviations.)* *(2026-10-09, later: on the app every
+landing state has one element the prototype does not — `[data-role="georef-note"]`, the owner's
+line saying that georeferencing is taken from the first model opened, under the drop zone and its
+rows — so the app's `landingText` has two lines more there, and its centred column is 55.59 px
+taller: on the app what is above the note stands 27.8 px higher than the prototype's and what is
+below it 27.8 px lower, or the page scrolls where the column outgrows the window. `CLAUDE.md`,
+allowed deviations.)*
 
 ## Measured difference per state
 

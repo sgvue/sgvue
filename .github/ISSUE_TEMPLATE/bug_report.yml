@@ -16,7 +16,7 @@ body:
     attributes:
       label: SGVue version
       description: Help › About shows it.
-      placeholder: "1.2.0"
+      placeholder: "1.3.0"
     validations:
       required: true
   - type: dropdown

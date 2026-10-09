@@ -70,7 +70,7 @@ product site is **https://sgvue.github.io/**. Help › Check for updates… open
 | | |
 |---|---|
 | **System** | Windows 10 or 11, 64-bit · macOS 13 or later, Apple silicon or Intel |
-| **Memory** | 8 GB works for IFC files up to about 100 MB; 16 GB is recommended for 200 MB files or several models together |
+| **Memory** | About 8 GB for IFC files up to about 100 MB, 16 GB up to about 300 MB, and 32 GB for larger files up to 600 MB; with several models open, add their sizes together (measured on one PC) |
 | **Graphics** | Any graphics card with WebGL2. On a Windows PC with an NVIDIA card, SGVue uses it |
 | **Files** | `.ifc` or `.ifczip`, built for typical files of 50–200 MB; a single file over 600 MB is not opened |
 | **Disk (Windows)** | About 110 MB to download and 390 MB installed |
@@ -114,7 +114,7 @@ Your own IFC files go in `samples/`, which is git-ignored: never commit a real p
 | `docs/AI_REVIEW.md` · `docs/AI_EVAL.md` | The assistant's audit and its evaluation suite |
 | `docs/releases/` | Release notes, one file per version from 1.2.0 |
 | `CHANGELOG.md` | The released versions in brief |
-| `CLAUDE.md` · `PROGRESS.md` | The working notes and history of building SGVue with AI agents. Commit hashes cited in them refer to the project's history before it was published on 2026-10-05, and do not resolve in this repository |
+| `CLAUDE.md` · `PROGRESS.md` | The working notes and history of building SGVue with AI agents. Commit hashes cited in them from before the public repository's first commit (`27fb7ee`, 2026-10-05) refer to the project's private history and do not resolve in this repository; later ones do |
 
 ## Contributing
 

@@ -18,6 +18,8 @@
  *
  * 2026-10-08 — the owner's "the Ask VEE ai assistant answer are in one sentence": the design's
  * one-sentence reply line is replaced, in its place, by three formatting lines — 39.
+ * 2026-10-09 — the display unit: one line on the unit a length, an elevation or a coordinate is
+ * stated in — 40.
  */
 import { describe, expect, it } from 'vitest'
 import {

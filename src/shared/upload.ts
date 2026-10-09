@@ -128,6 +128,18 @@ export const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n)
 export const openAllLabel = (n: number): string =>
   `open all ${countWord(n)} as a federation →`
 
+/**
+ * 2026-10-09 — the landing page's one line on georeferencing, under the drop zone. The owner:
+ * *"Also add message saying the geo referencing will take reference from 1st model on upload
+ * page."* It says what `federationFrame` does (`shared/georef.ts`): the first model's project
+ * frame, read in map coordinates, is the federation's frame — its base point is the one the
+ * Coordinate-system card shows and its north the one the compass shows — and every other model
+ * is placed by its own map position relative to it.
+ */
+export const GEOREF_NOTE =
+  'Georeferencing is taken from the first model you open: its base point and north are the ' +
+  'reference, and the other models are placed relative to it.'
+
 /** `SGVue.dc.html:1928`. Anything not finished and not rejected is busy. */
 export const isBusy = (u: { done?: boolean; error?: boolean }): boolean => !u.done && !u.error
 

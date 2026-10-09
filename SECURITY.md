@@ -33,8 +33,8 @@ fixes.
   Windows); nothing returns it to a window, which learns only whether a key is set.
 - **The assistant's boundary**: no tool can write model data or reach the file system or the
   network; anything that leaves the view or cannot be undone — opening or unloading a file,
-  copying to the clipboard, changing the base point, deleting something of the user's — happens
-  only on the user's own click. Text inside a model that makes the assistant cross that line
+  copying to the clipboard, deleting something of the user's — happens only on the user's own
+  click. Text inside a model that makes the assistant cross that line
   without the click is in scope.
 - **The launch-time update check** (`src/main/updates.ts`) and the installers.
 

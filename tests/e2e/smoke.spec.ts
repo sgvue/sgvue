@@ -9,13 +9,14 @@
  * which does not have it. Everything is asserted through what a person can see, plus the two
  * files `main/sessions.ts` writes.
  */
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ABOUT_STORY, SITE_URL } from '../../src/main/about'
 import { spotGridHtml } from '../../src/shared/annotate'
 import { signedF3 } from '../../src/shared/fmt'
+import { GEOREF_NOTE } from '../../src/shared/upload'
 import { BOTTOM_GAP, HINT_MIN } from '../../src/renderer/state/selectors/lanes'
 import {
   actionText,
@@ -59,6 +60,21 @@ test('opens on the landing page, under the production CSP, with the pinned prelo
     // No recents in a fresh profile, so the design's `hasSamples: false` branch.
     await expect(page.getByText('Recent', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Resume last session')).toHaveCount(0)
+    // 2026-10-09 — one line under the drop zone: the first model opened is the georeferencing
+    // reference. The drop zone caption's own style, a column gap below it, one or two lines.
+    const note = page.locator('[data-role="landing"] [data-role="georef-note"]')
+    await expect(note).toHaveText(GEOREF_NOTE)
+    const look = (l: Locator): Promise<string[]> =>
+      l.evaluate((e) => {
+        const c = getComputedStyle(e)
+        return [c.fontFamily, c.fontSize, c.fontWeight, c.lineHeight, c.color]
+      })
+    expect(await look(note)).toEqual(await look(page.getByText('.ifc · .ifcxml · .ifczip', { exact: true })))
+    const zone = (await page.getByText(DROP_COPY).locator('xpath=ancestor::label').boundingBox())!
+    const line = (await note.boundingBox())!
+    expect(line.x).toBeCloseTo(zone.x, 1)
+    expect(line.y - (zone.y + zone.height)).toBeCloseTo(22, 1)
+    expect(line.height).toBeLessThanOrEqual(2 * 12 * 1.4 + 0.5)
 
     // 2 — the CSP meta tag, byte-identical to `electron.vite.config.ts`'s constant.
     const csp = await page.getAttribute('meta[http-equiv="Content-Security-Policy"]', 'content')

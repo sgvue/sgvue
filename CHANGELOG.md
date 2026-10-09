@@ -8,8 +8,21 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-09
+
 ### Added
 
+- Feet: SGVue opens in the first model's own unit — millimetres, metres or feet — and the unit
+  toggle gains **ft**, feet and inches to 1/16" for lengths and levels and decimal feet for
+  coordinates. The lengths, levels and coordinates SGVue shows follow the toggle — the
+  Coordinate-system card keeps the file's own map unit — and a session and a link remember it.
+- The laser meter reads each side of the clicked point along each axis (`X 1 200 + 2 300`); the
+  two sides add up to the whole.
+- The Coordinate-system card says, in one line, which model could not be lined up with the
+  others — no map position, or more than 5 km away.
+- The home page says, under the drop zone, that georeferencing is taken from the first model
+  opened: its base point and north are the reference, and the other models are placed
+  relative to it.
 - SGVue is open source, under the Apache License 2.0: `LICENSE`, `NOTICE`, and
   `THIRD_PARTY_NOTICES.md` — every third-party component the installers ship, with its licence,
   generated from the dependency tree and checked by `npm test`. All three are in every
@@ -21,15 +34,41 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ### Changed
 
+- Models are federated in map space: each file is placed by its own `IfcMapConversion`, its
+  `WorldCoordinateSystem` or its site placement, so files exported with different coordinate
+  settings line up. A map conversion's `Scale` is not applied, the map unit is respected, and
+  true north is never applied twice.
+- The Coordinate-system card is read-only: it shows the base point the first model's file
+  states, in that file's own map unit. A base point stored in a session or a link is ignored.
+- Ask Vee answers in paragraphs, lists and small tables instead of one sentence.
+- With the canvas grid off, parts below ground are no longer dimmed.
+- A file over 600 MB is refused with "larger than 600 MB — consider splitting it into several
+  models".
 - macOS builds are ad-hoc signed instead of unsigned, so a downloaded copy can be opened (after
-  one **Open Anyway**) rather than being reported as damaged. They are not notarised yet.
+  one **Open Anyway**) rather than being reported as damaged. They are not notarised yet. (The
+  1.2.0 disk images, published after its Windows installer, were already built this way.)
 - The Windows installer's entry in the installed-apps list links to https://sgvue.github.io/.
+
+### Fixed
+
+- Large models opened together no longer share element ids: with files over about 60–70 MB,
+  elements were lost and Vee's database could not be built. Sessions, links and viewpoints of
+  large files restore the elements that were hidden, those saved with 1.2.0 included.
+- A file refused from the Open dialog, a Recent pill or a link says why, as a dropped file
+  always did.
+- A zipped IFC (`.ifczip`) opens from the Open dialog, a Recent pill and a link, not only from a
+  drop.
+- Area and volume totals in Vee's answers carry the file's own units, where they always read m²
+  and m³.
 
 ### Removed
 
+- Vee's request to change the base point (`request_user_action`'s `set_base_point`).
 - From the repository only: the design tool's runtime and starter files, and the evaluation
   suite's HTML report builder, whose licences were never recorded. The design prototypes are
   read as source, and the evaluation writes its results as JSON.
+
+See [docs/releases/1.3.0.md](docs/releases/1.3.0.md).
 
 ## [1.2.0] - 2026-10-02
 
@@ -82,6 +121,7 @@ assistant, and the accessibility, performance and packaging pass. It was not pub
 releases page.
 
 [Unreleased]: https://github.com/sgvue/sgvue/commits/main
+[1.3.0]: https://github.com/sgvue/releases/releases/tag/v1.3.0
 [1.2.0]: https://github.com/sgvue/releases/releases/tag/v1.2.0
 [1.1.0]: https://github.com/sgvue/releases/releases/tag/v1.1.0
 [1.0.2]: https://github.com/sgvue/releases/releases/tag/v1.0.2

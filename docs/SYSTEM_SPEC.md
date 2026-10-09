@@ -9,8 +9,8 @@ Every section carries a **Status** line. Phase 0 is the scaffold, so most sectio
 the agreed design and say plainly which parts are not built yet. The document is updated at
 the end of every phase.
 
-- Version: 1.2.0 · all ten phases built (`docs/releases/1.2.0.md` is what changed since 1.1.0)
-- Last updated: 2026-10-02
+- Version: 1.3.0 · all ten phases built (`docs/releases/1.3.0.md` is what changed since 1.2.0)
+- Last updated: 2026-10-09
 - Specification of record for everything visible: `design-reference/design/SGVue.dc.html`
   and `design-reference/design/viewer-core.js`
 
@@ -72,7 +72,8 @@ the complete list* — and anything not on **that** list is a defect; each entry
 measurements are its row in `docs/DECISIONS.md`. The table below holds ten of them — the five
 the port began with and five of the dated ones — and is kept for their reasons, not as the
 list. The rest are recorded there and not here: among them the landing page's Recent pills,
-demo building and update notice, the sidebar's resizable sections, the toolbar's groups and
+demo building, update notice and (2026-10-09) its line saying that georeferencing is taken from
+the first model opened, the sidebar's resizable sections, the toolbar's groups and
 the bottom row, the two section cuts, the Schedules window, the assistant's name, its
 thinking trace, its per-reply revert and its consent gate, and (2026-10-09) the display unit's
 `ft` and its start in the boot model's own unit.
@@ -117,7 +118,7 @@ Coordinate-system card is read-only, the owner's: its fields are the file's and 
 | Graphics | **WebGL2.** WebGPU is opt-in by name only, since 2026-09-17 — see §7 and §10. A fallback GPU adapter forces WebGL2 in any case. |
 | Typical file size | 50–200 MB IFC files are the design target. **A single file larger than 600 MB is not opened** — refused when it is admitted, and again by the upload row, with the design's own copy `larger than 600 MB` and, since 2026-10-09, the owner's advice after it — `larger than 600 MB — consider splitting it into several models` (`TOO_LARGE`, `MAX_FILE_BYTES`, `shared/upload.ts`; §4) — and so is an `.ifczip` whose `.ifc` is that large (`the .ifc file in the archive is larger than 600 MB — consider splitting it into several models`). *(2026-10-09: on every route — a file picked in the Open dialog used to vanish with no row; main now answers it, with its reason, and the row is the one a drop gets. A model whose entity ids pass #999 999 999 is refused at load in its own row, `entity ids above #999999999 are not supported` — §7.)* |
 | Memory | Hard ceiling 3.5 GB. A warning appears around 600 MB of model data; loading is refused above 1.5 GB. The **GPU helper process** is watched separately, at `max(3 072 MB, 40 % of installed RAM)` of `phys_footprint` — 3 277 MB on an 8 GB machine, 9 830 MB on a 24 GB one (§10). *(Read against the code on 2026-10-02, for 1.2.0's published system requirements: the warning at 600 MB of model data and the refusal above 1.5 GB are **not built** — nothing in `src/` measures either. What is enforced is the per-file limit in the row above, web-ifc's 3.5 GB `MEMORY_LIMIT`, and the GPU guard.)* |
-| RAM guidance | 8 GB is workable for files up to ~100 MB. 16 GB is recommended for 200 MB files or a federation of several models. |
+| RAM guidance | 8 GB is workable for files up to ~100 MB. 16 GB is recommended for 200 MB files or a federation of several models. *(2026-10-09, measured for 1.3.0's published requirements: 8 GB for files up to ~100 MB, 16 GB up to ~300 MB, 32 GB from 300 MB to the 600 MB limit, and a federation counted by its combined size. On one Windows 11 PC — 64 GB of memory, an 8 GB NVIDIA card — synthetic single files of 200–590 MB opened in 17.6–49.4 s, about 8 s more per 100 MB, the app's processes together holding about 1 GB plus 1.6 GB per 100 MB, 10.5 GB at 590 MB, with orbiting at the display's 60 fps throughout; four 150 MB files opened together in 54 s and about 11 GB, as one file of their combined size does. The guidance is that PC's figures extrapolated; no 8, 16 or 32 GB machine was measured, nor a real model at these sizes, and the synthetic files repeat more geometry than the reference model does.)* |
 | Network | Not required. Two things use it. **The launch-time update check** (2026-10-01, the owner's choice "Check at every start"; packaged builds only): one `GET` from the main process to GitHub's "latest release" of the public releases repository, once per start, to learn the newest version number — no query, no body, no cookie, nothing about the user or the models (it is a web request, so GitHub sees what any server sees, the IP address and Chromium's standard headers — whose user agent, in a packaged build, names the app and its version); a newer version puts a notice with a link on the landing page, and offline, blocked or unanswered within 5 s it is silent. Nothing is downloaded and there is no auto-updater. **The AI assistant**, only when an API key is configured. |
 
 Neither installer is signed with a developer certificate. The Windows installer is unsigned;
@@ -164,6 +165,14 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > published with 1.2.0 on `sgvue/releases`, and `docs/releases/1.2.0.md` gives their
 > requirements.)* The system requirements published with it — the product site, the release
 > notes (`docs/releases/1.2.0.md`) and the releases page — are the table above, said for a user.
+> **2026-10-09, version 1.3.0:** its published requirements (`docs/releases/1.3.0.md`) are the
+> table above again, with the RAM guidance measured that day (the row's note) and the opening
+> times beside the file limit. `dist:win` wrote `dist/SGVue-1.3.0-setup.exe` — 115 467 186
+> bytes (110 MB as Windows counts it), unsigned — and its payload, extracted without running it,
+> is 78 of 78 files SHA-256-identical to `dist/win-unpacked` (409 314 742 bytes: 390 MB
+> installed), on which `npm run test:packaged` passes; so the disk sizes published, 1.2.0's
+> figures, still hold. The Windows installer is published first, and the macOS disk images once
+> they have been tested on a Mac.
 
 ---
 
@@ -1168,7 +1177,7 @@ match: one byte different anywhere in the prefix and everything after it is char
 | Position | Content | Cached | Changes when |
 |---|---|---|---|
 | `tools` | All 37 tools, **sorted by name** | — | the catalogue changes |
-| `system[0]` | The design's instruction lines — its reply-format line replaced by three formatting lines on 2026-10-08 — and the lines added since, 39 in all, + one paragraph on the extra read tools + the SQL schema DDL | breakpoint 1 | this file changes |
+| `system[0]` | The design's instruction lines — its reply-format line replaced by three formatting lines on 2026-10-08 — and the lines added since, 39 in all (40 since 2026-10-09's line on the display unit), + one paragraph on the extra read tools + the SQL schema DDL | breakpoint 1 | this file changes |
 | `system[1]` | `Model schema: {…}` — the design's `chatSchema()` | breakpoint 2 | the federation changes |
 | `messages[…]` | The conversation so far, with its own breakpoints stripped | — | every turn |
 | `messages[n]` | The current user turn (`[replying to …]` prefix when it is a reply) | breakpoint 3 | every turn |
@@ -2037,7 +2046,7 @@ if the file is still where it was.
 | `npm run build` | Type-checks the Node and web projects, then builds main, preload and renderer into `out/`. The renderer is minified |
 | `npm run preview` | Runs the built app without the dev server |
 | `npm run typecheck` | Type-checks the Node side and the web side |
-| `npm test` | Unit and guard tests (vitest) — 2 773 tests in 142 files at 1.2.0 (2026-10-02; two more files and three more tests skip without a real model in `samples/`). The count grows with every change: `PROGRESS.md`'s newest entry has the current one |
+| `npm test` | Unit and guard tests (vitest) — 2 984 tests in 150 files at 1.3.0 (2026-10-09; two more files and three more tests skip without a real model in `samples/`). The count grows with every change: `PROGRESS.md`'s newest entry has the current one |
 | `npm run test:e2e` | The Electron suite through `scripts/safe-e2e.cjs`: the smoke tests, the keyboard/ARIA walk and the packaged tests, all guarded. On Windows too, on the instruments Windows has |
 | `npm run test:packaged` | The **packaged** tree through `scripts/safe-app.cjs` — `dist/mac-arm64/SGVue.app` on macOS, `dist/win-unpacked` on Windows — which watches `SGVue Helper (…)` the way the other guards watch a dev Electron. Neither wrapper ever signals an SGVue that was already running, or anything later from its `.app` bundle (on Windows, its directory): a run may kill only what it started |
 | `npm run dist:mac` | `dist/SGVue-<version>-arm64.dmg` and `dist/SGVue-<version>-x64.dmg`, ad-hoc signed and not notarised (§3) — `<version>` is `package.json`'s, which `electron-builder.yml` builds the name from |
@@ -2136,3 +2145,9 @@ Icons come from the design's brand mark (`scripts/make-icons.py`).
 > twelve of fourteen runs that day; the two that did not failed in `settings.test.ts` on an
 > `EPERM` from `renameSync` while the machine was busy in its temp directory (`PROGRESS.md`
 > under that date).
+> **2026-10-09, version 1.3.0 (Windows 11):** `typecheck`, `test` (2 984 tests in 150 files; 3
+> tests and 2 files more skip without a real model), `build`, `test:e2e` (65 passed, 6 skipped,
+> as two guarded runs) and `test:packaged` (1 passed, 2 skipped) all pass, and `dist:win` wrote
+> `dist/SGVue-1.3.0-setup.exe` from this tree (§3). No macOS build was made here. The Electron
+> checks ran after the owner's own test of a packaged copy had ended, because SGVue's
+> single-instance lock would have met it.

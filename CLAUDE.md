@@ -912,6 +912,23 @@ Anything not on this list is a defect.
   sidebar after boot it wraps to two, 231 × 27.28 px, so that row is one 13.65 px line taller; the
   `.ifczip` refusal is two lines in its row and two in the banner's 620 px box. Nothing in any of
   them overflows or is clipped.
+- **2026-10-09 — the landing page says, in one line, that georeferencing is taken from the first
+  model opened.** Asked for by the owner in these words: *"Also add message saying the geo
+  referencing will take reference from 1st model on upload page."* Under the drop zone and its
+  upload rows, before the "or" divider: `Georeferencing is taken from the first model you open:
+  its base point and north are the reference, and the other models are placed relative to it.`
+  (`GEOREF_NOTE`, `shared/upload.ts`) — what `federationFrame` does: the first model's base point
+  is the one the Coordinate-system card shows and its north the one the compass shows. A
+  `<span data-role="georef-note">` in the drop zone caption's own style string
+  (`font:400 12px/1.4 var(--mono);color:var(--faint)`, the `.ifc · .ifcxml · .ifczip` line's);
+  **one new element, no control, no icon, no new style string.** **Measured** (`#mock&landing`,
+  the design's four sample pills, both themes alike): the note is 620 × 33.59 px, two lines; the
+  centred column grows by 55.59 px, so at 1280 × 820 what is above the note stands 27.8 px higher
+  and what is below 27.8 px lower, every element keeping its size; where the column then outgrows
+  the window the page scrolls, as designed, the column 4 px left beside the scrollbar — at the
+  default window (1264 × 755) by 22 px (it fitted exactly before), and with the update notice by
+  24 px at 1280 × 820 (fitted before) and 89 px at 1264 × 755 (34 before). The default viewer is
+  byte-identical to the build before, in both themes.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1160,6 +1177,9 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-09 — **`file:open` and `file:admit` answer `{ files, refused }`** (`AdmitResult`): a file main turns down for a reason `validate` gives — over 600 MB, empty, not IFC, ifcXML — gets the drop zone's designed row on every route: the Open dialog, a Recent pill, a link (whose banner then names only files that moved). "Not an IFC file" — and anything else that is not a `.ifc` / `.ifczip` — is told only to the Open dialog; for a path the renderer names, `inspect` stops before `stat`, as it always did. A refusal carries a name and a reason, never a size or a path.
 - 2026-10-09 — **the size refusal is `larger than 600 MB — consider splitting it into several models`** (owner-requested): one constant, `TOO_LARGE` (`shared/upload.ts`), which `validate` returns on every route and both of `.ifczip`'s size refusals end with; the design's words first, and the stage line wraps as designed, so no style string and no `title` was added.
 - 2026-10-09 — **the parse worker knows an `.ifczip` by its first four bytes as well as by its name** (`isZipArchive`, `isIfczip`, `worker/ifczip.ts`: `PK\x03\x04`, or `PK\x05\x06` for an empty archive): from the Open dialog, a Recent pill or a share link it is handed a `Blob` named by the model key (`worker-bridge.ts`), so an archive taken those ways went whole to web-ifc and never opened — a valid 1.5 kB one took the renderer to 4.2 GB before web-ifc aborted, one declaring a 700 MB entry 4.1 GB. `meta.fileName` is unchanged.
+- 2026-10-09 — **version 1.3.0 changes the version number and nothing else in the app** but for the landing page's georeferencing line (below, asked for while it was prepared); its notes (`docs/releases/1.3.0.md`) publish the large-model capacity measured that day as the system requirements — single files to 600 MB, 30–50 s to open above ~300 MB, 8 / 16 / 32 GB by size, said to be one PC's — and say what works differently for a 1.2.0 user; `CHANGELOG.md`'s open-source `[Unreleased]` entries are 1.3.0's; its installer, `dist/SGVue-1.3.0-setup.exe` (the unsigned NSIS wizard), is verified without being run; the Windows installer is published first and the macOS disk images after the owner's Mac test.
+- 2026-10-09 — **the landing page's georeferencing line is one constant, `GEOREF_NOTE`** (`shared/upload.ts`, beside the page's other copy), drawn as `<span data-role="georef-note">` after the drop zone and its upload rows and before the "or" divider, in the drop zone caption's own style string; it says the other models are placed *relative to* the first, not *to match* it — each stands where its own map position puts it (2026-10-08).
+- 2026-10-09 — **local folders, build output and IFC files are kept out of `app.asar`** (`electron-builder.yml` `files`, still a deny-list): the root folders a maintainer's `.git/info/exclude` keeps out of git — `reports/`, `research_notes/`, `reference/` — and `dist/`, `out-baseline/`, `tmp/` and `**/*.{ifc,ifczip}`. The first 1.3.0 package carried `reports/` and `research_notes/`, local notes holding a home path, until `tests/unit/asar-contents.test.ts` failed on it; electron-builder leaves out only its own output directory, so a build into `dist/<name>` packs the rest of `dist/`; a release built on GitHub never has these folders, a local `dist:win` does.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

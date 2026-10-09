@@ -1,7 +1,111 @@
 # SGVue Desktop — progress
 
-> Commit hashes cited in these notes refer to the project's history before it was published on
-> 2026-10-05, and do not resolve in this repository.
+> Commit hashes cited in these notes from before the public repository's first commit (`27fb7ee`,
+> 2026-10-05) refer to the project's private history and do not resolve in this repository;
+> later ones do.
+
+## 2026-10-09 — 1.3.0 prepared: the version, the release notes, a line on the landing page, an installer verified without being run — and two local folders kept out of it
+
+**Why:** the owner, 2026-10-09: *"after you done, tell me how to test, then u can push for
+private and also tidy up and push for public + installer releases."* and *"once window
+installer ok, just push window first. i will test mac version on separate device."* — then,
+once a packaged preview had passed the owner's own test (*"worked perfectly"*): *"Also add
+message saying the geo referencing will take reference from 1st model on upload page. then
+proceed."* This run is `docs/RELEASING.md`'s step 1 on this branch. It started no Electron
+while the owner's preview was open, because SGVue's single-instance lock would have met it.
+
+**Did — the release.** Version **1.3.0** — `npm version 1.3.0 --no-git-tag-version`:
+`package.json` and both root entries of `package-lock.json`. npm also rewrote the description's
+`—` escape as the character; it was put back, so `package.json` differs by the version
+alone. Nothing in `src/` holds a version: About, the landing page, the update check and Check for
+updates read the build-time `__APP_VERSION__`. `docs/releases/1.3.0.md`, in 1.2.0's voice and
+order: what's new — models line up on the map (and the landing page says whose georeferencing is
+the reference), units follow the model, the read-only Coordinate system card, the laser's two
+sides, Vee's answers, the canvas grid and what is below ground, open source — and four fixes; a
+new section, what works differently after updating — the base point, a model in metres opening
+in metres, cameras saved against a first model placed by its map conversion, and a 1.2.0 copy
+opening a 1.3.0 link; the system requirements, with the large-model capacity measured that day
+(the git-ignored report, paraphrased) said to be one PC's; and 1.2.0's install paragraphs, the
+Mac one worded to stay true before and after its disk images are added. `CHANGELOG.md`:
+`[1.3.0] - 2026-10-09` in Added / Changed / Fixed / Removed, with the `[Unreleased]`
+open-source entries moved into it — its macOS signing line now says the 1.2.0 disk images were
+already built that way — and its link. `README.md`: the Memory row, whose "16 GB … for several
+models together" does not hold for a large set. `SECURITY.md`: changing the base point is no
+longer among what only the user's click does — nobody can change it. `docs/SYSTEM_SPEC.md`: the
+header's version and date; §2's list of deviations recorded elsewhere; §3's RAM guidance — the
+measurement, dated, and what was not measured — and a 1.3.0 status line; §8.2's instruction
+lines, 40 since the display unit's line (the test pins 40; the spec said 39); §11's test count
+and a 1.3.0 status line. Three Decisions lines in `CLAUDE.md` and three rows in
+`docs/DECISIONS.md` — the release, the landing line, the packaging exclusion — and the landing
+line's allowed deviation. After the review: the bug-report template's version placeholder
+reads `1.3.0`, and `tests/unit/ai-prompt.test.ts`'s running count of instruction lines reaches
+40. The note on cited commit hashes — this file's header,
+`docs/DECISIONS.md`'s and the README's table — said every hash was of the private history; it
+now says that those from before the public repository's first commit (`27fb7ee`) do not resolve
+here and later ones do, the public history being pushed as it stands, not squashed. The oldest
+entry here, 2026-10-01's canvas grid at the file's zero, is compressed into Earlier work.
+
+**Did — the landing line** (the owner's addition). `GEOREF_NOTE` (`shared/upload.ts`):
+`Georeferencing is taken from the first model you open: its base point and north are the
+reference, and the other models are placed relative to it.` — what `federationFrame` does; "relative
+to it", not the brief's "placed to match", because a model stands where its own map position
+puts it. Drawn as `<span data-role="georef-note">` after the drop zone and its upload rows and
+before the "or" divider, in the drop zone caption's own style string — no new style, control or
+icon. `tests/unit/landing.test.ts` pins the words and the place and style in the page's source;
+the smoke e2e checks the text, the computed style against the caption's, a column gap under the
+drop zone and at most two lines. `tests/parity/phase8/README.md` notes the difference from the
+prototype. **Measured** on devtools builds before and after (`#mock&landing`, the four sample
+pills, device scale 1, both themes, through `scripts/screenshot.cjs` and a scratch harness that
+reads the rectangles): the note is 620 × 33.59 px, two lines in the caption's exact font and
+colour; the centred column grows 55.59 px, so at 1280 × 820 what is above the note stands 27.8 px
+higher and what is below 27.8 px lower, every element keeping its size; where the column then
+outgrows the window the page scrolls, the column 4 px left — at 1264 × 755 by 22 px (it fitted
+exactly before), with the update notice by 24 px at 1280 × 820 (it fitted) and 89 px at
+1264 × 755 (34 before). The default viewer (`#mock`) is byte-identical to the build before in
+both themes. The captures ran with Chromium's `--disable-features=CalculateNativeWinOcclusion
+--disable-backgrounding-occluded-windows` passed through `safe-run.cjs`: the first try failed
+with "Current display surface not available for capture", the window covered by another.
+
+**Found and fixed — two local folders inside the installer.** `electron-builder.yml`'s `files`
+is a deny-list, and `reports/` and `research_notes/` — kept out of git by this machine's
+`.git/info/exclude`, created since 1.2.0 — went into the first 1.3.0 package's `app.asar`: eight
+files, among them a local path holding the Windows profile name. `tests/unit/asar-contents.test.ts`
+failed on it, as it is there to. Three patterns now keep `reports/`, `research_notes/` and
+`reference/` (a real model's local folder, absent today) out of the archive, and — after the
+review — four more keep out `dist/`, `out-baseline/`, `tmp/` and every `.ifc` / `.ifczip`:
+electron-builder leaves out only its own output directory, which is how a build into
+`dist/<name>` packed the whole of `dist/`. The package was rebuilt within minutes and never left
+this PC, and the review's patterns leave `app.asar` byte-identical (3 056 entries).
+**Not touched:** `dist/test-1.3.0-preview/`, the owner's own test copy, whose 3.09 GB `app.asar`
+also holds `dist/`, `reports/` and `research_notes/` — local only, never to be shared.
+
+**Verified.** `npm run typecheck` exit 0; `npm test` **150 files passed / 2 skipped, 2 984
+tests passed / 3 skipped** (two new); `npm run build` exit 0. `npm run dist:win` →
+`dist/SGVue-1.3.0-setup.exe`, **115 467 186 bytes**, SHA-256
+`4a5f5e96acfd0fbb5fd62149aeb863f7ae9fc1a74da714b1bab2a2f9f51f61c1`, FileVersion and
+ProductVersion `1.3.0`, product `SGVue`, company `Yong Yen`, `NotSigned` — its one step that runs
+the uninstaller stub electron-builder has just built was refused by this session's command
+sandbox (`spawn EPERM`) and passed with the sandbox lifted for that command. It was packaged
+before the e2e suite, whose `packaged.spec.ts` holds the packaged version to `package.json`'s.
+`npm run test:e2e`, two guarded runs: **65 passed, 6 skipped** (smoke 31 in 3.9 min; the other
+nine specs 34 and 6 skipped in 3.5 min), peak one process 247 MB, all 795 MB, GPU dedicated
+293 MB, `clean:`. `npm run test:packaged` **1 passed, 2 skipped**, `clean:`, on the rebuilt tree.
+**The installer was not run.** Its payload, extracted with electron-builder's own 7-Zip, is
+**78 of 78 files SHA-256-identical** to `dist/win-unpacked` (409 314 742 bytes); `app.asar`'s top
+level is `node_modules`, `out`, `package.json`, its `package.json` reads `1.3.0`, and its
+renderer bundle carries the landing line and no `__sgvueDev`; a case-insensitive byte scan of the
+payload and of the setup `.exe`, as UTF-8 and UTF-16LE, found **0** hits for the owner's private
+identifiers and for the leaked files' names, and the public credit, the control, 5 and 2 times.
+The privacy search over `git diff 2a73643`, the new notes and the eight commit messages since —
+the owner's account, profile and real names, home paths, the owner's own repositories, e-mail
+addresses, IFC file names, coordinates and EPSG codes — found only the public commit identity,
+the co-author trailer, synthetic fixture names and the synthetic coordinates and their
+conversions. Before every Electron run the machine was checked for a running SGVue or Electron;
+there was none, and every guard ended `clean:`.
+
+**Checked and left.** `CONTRIBUTING.md`, `SUPPORT.md` and `docs/RELEASING.md` say nothing 1.3.0
+makes false. No macOS build was made here. Nothing is committed, tagged,
+pushed or published.
 
 ## 2026-10-09 — the id fix checked in the app and against 1.2.0; a file over 600 MB is told to split the model; an `.ifczip` opens from the Open dialog
 
@@ -1705,65 +1809,26 @@ run went through `safe-run.cjs`; nothing survived.
 package, built before this. Once repackaged, `npm run test:packaged` makes that one request per
 launch.
 
-## 2026-10-01 — the canvas grid stands at the file's zero, not at the first part streamed
-
-**Did:** the owner's report — *"I have an ifc model generated by Tekla. When federated model, it
-was aligned with my model and above canvas grid. But when i open it individually, the model is
-under the canvas grid."* **The cause:** the whole-metre federation offset, Z included, is
-rounded from the first placement web-ifc streams from the boot model (`geometry-streamer.ts`),
-and `scene.ts` drew the ground at scene z = 0 clamped into the box, calling that "the federation
-datum". It is the datum only when that first part sits near the file's zero. **The fix:**
-`groundLevel(datumZ, minZ, maxZ)` (`viewer/scene.ts`, pure) — the project frame's own zero,
-scene `0 − offset z`, whenever the box spans it, else the **bottom** of the box, never its top;
-`buildScene` takes the datum, and `viewer-core.ts` builds the rig one way (`buildRig`) at
-construction and on every `restage`. The offset is untouched. Everything that reads
-`rig.groundZ` — the veil, the grid helper, the gridlines and bubbles, the orbit pivot — follows;
-nothing else read scene 0 as the ground. `debug()` gains `ground`. The comments that called
-scene zero "the federation datum" are corrected, and the trap is recorded (CLAUDE.md,
-`docs/TRAPS.md`). **A second committed fixture**, `tests/fixtures/high-first.ifc`
-(`scripts/make-tiny-ifc.py`, which writes both; `tiny.ifc` regenerates byte-identical): a floor
-slab on the file's zero, two columns, a footing below zero and a strip of roof slab 12 m up,
-the roof first — web-ifc streams `IfcSlab` before the other classes here, whatever their ids.
-**Also fixed:** `scripts/shell-sanity.cjs` had not parsed since `5d942e1` (a comment inside the
-`BUBBLES` template literal quoted `declutter.after` in unescaped backticks); the two are
-escaped and the script runs to its end on the mock again, 92 s, every block.
-**Measured:** *the mock* (offset Z 0; ground 0 before and after): the `default` capture at
-1280 × 820 is byte-identical to `2893aff`'s in both themes — of five dark captures of the
-fixed build, four are byte-identical to one of `2893aff`'s, as are both light ones; the fifth
-differs by about 8 100 px, all of them the outlines of the overlay's bubbles and dimension
-labels, where five captures of `2893aff` differ from each other by 0–6 342 px of the same — and
-with the stage's chrome and labels hidden the boot view and Plan are byte-identical and the
-south elevation within 2 px, as two captures of `2893aff` are. *The
-fixture:* offset `[3, 0, 12]`, box −13 … 0.2 in scene coordinates; ground at scene 0 before (the
-roof, 98.5 % up, four of five elements under it) and at scene −12 after — the file's zero, only
-the footing below. *The Tekla steel-structure export* (relative figures only, through the app's
-own index builder and streamer under Node): first placement at 98 % of the model's height; the
-ground there before, 92 % of the elements wholly below it; at the file's zero after, 42 % up the
-box, 99.9 % of the elements wholly above it.
-**The guard tripped once:** loading that export in a guarded dev run (`safe-run.cjs`, default
-limits) read the GPU process at 242 MB when the load returned and 2 634 MB 1.7 s later — over
-the dev guard's 2 500 MB (renderer 2 121 MB). The guard ended the run, nothing survived, and it
-was **not** re-run with a raised limit, so there is no capture of that file in the app; its
-figures above came from Node, without Electron. The app's own guard allows
-`max(3 072 MB, 40 % of RAM)`.
-**Verified:** the new e2e case fails on a build of `2893aff` (576 px of grid across the middle
-of the slab, in Plan) and passes after; `safe-run.cjs frame-triggers.cjs` 24 / 24, 0 renders at
-rest, `clean:`; the totals are in the entry above.
-**Known:** `restage` still rebuilds the rig only on a scale change of about 10 %, so on a
-federation whose box does not span its datum, a later model that lowers the box's bottom by less
-than that leaves the ground where the first build put it — as before. The reference model's
-ground moves up one metre, to its lowest storey's `+0` (its offset Z is −1); not re-measured,
-there is no sample model on this machine.
-
 ## Earlier work
 
-Compressed: the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-10-01 — the canvas grid stands at the file's zero, not at the first part streamed.** The
+owner's report: a Tekla model opened alone hung under the canvas grid. The whole-metre offset's
+Z is rounded from the first placement web-ifc streams, and the ground was drawn at scene z = 0;
+`groundLevel` (`viewer/scene.ts`, pure) now stands it at the project frame's own zero whenever
+the box spans it, else at the box's bottom, and `viewer-core.ts` builds the rig one way
+(`buildRig`) at construction and on every `restage`; the offset is untouched. A second fixture,
+`tests/fixtures/high-first.ifc`, streams its roof first: its ground stands at scene −12, not 0,
+with only the footing below it. The mock is byte-identical; on the Tekla export the ground moved
+from 98 % to 42 % up the box. `scripts/shell-sanity.cjs` parses again. One guarded dev run
+tripped at 2 634 MB of GPU memory on that export and was not re-run.
 
 **2026-10-01 — five main-window requests: an action bar, a grouped toolbar, hover titles, an
 eye-first tree, file paths — and the bottom edge as one row.** Five owner requests, each a

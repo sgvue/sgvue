@@ -41,6 +41,21 @@ files:
   - '!test-results/*'
   - '!playwright-report/*'
   - '!playwright.config.{js,ts,mjs,cjs}'
+  # Local folders a maintainer's machine keeps out of git through `.git/info/exclude` rather
+  # than `.gitignore`: measurement reports, research notes, and a real model kept for a bug
+  # check. `reports/` and `research_notes/` were inside the first 1.3.0 package (2026-10-09)
+  # until tests/unit/asar-contents.test.ts caught them; a release built on GitHub never has them.
+  - '!reports/*'
+  - '!research_notes/*'
+  - '!reference/*'
+  # Build and scratch output. electron-builder leaves out only the output directory it is
+  # writing to, so a build into a folder of its own (`dist/<name>`) packed the whole of `dist/`,
+  # every earlier installer with it (2026-10-09).
+  - '!dist/*'
+  - '!out-baseline/*'
+  - '!tmp/*'
+  # No IFC file, anywhere: the app reads the models a user opens, and ships none.
+  - '!**/*.{ifc,ifczip}'
 asarUnpack:
   - '**/*.wasm'
 # 2026-10-05: the licence and the third-party notices go with every installer — beside app.asar,
