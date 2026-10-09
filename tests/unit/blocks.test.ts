@@ -10,7 +10,7 @@
  * whatever the reply holds; and the markup has exactly as many pieces for the reveal as
  * `wordCount` counts, in the same order.
  */
-import { createElement } from 'react'
+import { createElement, isValidElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { cellsOf, hasTable, parseBlocks, plainText, wordCount, type Block } from '../../src/renderer/ai/blocks'
@@ -310,6 +310,33 @@ describe('a long reply', () => {
 describe('the markup of a reply', () => {
   const html = (text: string, reveal = true): string => renderToStaticMarkup(createElement(ReplyText, { text, reveal }))
   const parts = (markup: string): number => markup.split('data-part="word"').length - 1
+  /**
+   * The text of each reveal piece, `[data-part="word"]`, in document order — read off the elements
+   * a reply renders, not out of its markup. No component a reply is drawn with uses a hook, so each
+   * is called here as React calls it; a `memo`'s own function is its `type`.
+   */
+  const pieceTexts = (text: string): string[] => {
+    const out: string[] = []
+    const walk = (node: unknown, into: string[] | null): void => {
+      if (typeof node === 'string' || typeof node === 'number') into?.push(String(node))
+      else if (Array.isArray(node)) for (const child of node) walk(child, into)
+      else if (isValidElement<{ children?: unknown; 'data-part'?: string }>(node)) {
+        const type: unknown = node.type
+        const { props } = node
+        if (typeof type === 'function') walk(type(props), into)
+        else if (typeof type === 'object') walk((type as { type: (p: object) => unknown }).type(props), into)
+        // A tag or a fragment: its children, gathered into a piece of their own if it is one.
+        else if (props['data-part'] !== 'word') walk(props.children, into)
+        else {
+          const piece: string[] = []
+          walk(props.children, piece)
+          out.push(piece.join(''))
+        }
+      }
+    }
+    walk(createElement(ReplyText, { text }), null)
+    return out
+  }
 
   it('draws one paragraph as a reply always was: its words straight in, nothing around them', () => {
     expect(html('**24 of 80** walls.')).toBe(
@@ -365,18 +392,25 @@ describe('the markup of a reply', () => {
       expect(parts(html(text, false))).toBe(0)
     }
     // …in reading order: the sentence's words, then each marker before its item's words.
-    const order = [...html(WALLS).matchAll(/data-part="word"[^>]*>(.*?)<\/span>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''))
+    const order = pieceTexts(WALLS)
     expect(markWords('**24 of 80 walls** have no Thermal Transmittance, and every level has some.')).toHaveLength(13)
     expect(order.slice(0, 3)).toEqual(['24', 'of', '80'])
     expect(order.slice(13, 16)).toEqual(['•', '12', 'are'])
   })
 
   it('never renders a reply’s text as HTML, in any block', () => {
-    const out = html('<img src=x onerror=alert(1)>\n- <script>x</script>\n\n| <b>a</b> |\n|---|\n| &amp; |')
-    expect(out).not.toMatch(/<img|<script|<b>/)
+    const out = html(
+      '<img src=x onerror=alert(1)>\n<IMG SRC=x ONERROR=alert(1)>\n- <script>x</script>\n- <SCRIPT>x</SCRIPT>\n\n' +
+        '| <b>a</b> |\n|---|\n| &amp; |\n| <B>b</B> |'
+    )
+    expect(out).not.toMatch(/<\s*(img|script|b)\b/i)
     expect(out).toContain('&lt;img')
     expect(out).toContain('&lt;script&gt;')
     expect(out).toContain('&lt;b&gt;a&lt;/b&gt;')
     expect(out).toContain('&amp;amp;')
+    // …and in upper case, which a browser reads as the same tags.
+    expect(out).toContain('&lt;IMG')
+    expect(out).toContain('&lt;SCRIPT&gt;')
+    expect(out).toContain('&lt;B&gt;b&lt;/B&gt;')
   })
 })

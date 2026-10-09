@@ -107,6 +107,11 @@ there was none, and every guard ended `clean:`.
 makes false. No macOS build was made here. Nothing is committed, tagged,
 pushed or published.
 
+**After the push — CodeQL** failed the public pull request on two alerts in
+`tests/unit/blocks.test.ts`, both test code: the reveal order is read off the React elements, not
+by stripping tags with a regex, and the no-HTML check is `/<\s*(img|script|b)\b/i`, with
+upper-case tags in its input.
+
 ## 2026-10-09 — the id fix checked in the app and against 1.2.0; a file over 600 MB is told to split the model; an `.ifczip` opens from the Open dialog
 
 **Checked in the real app** — what the entry below left for the owner's word (*"go"*), each run
