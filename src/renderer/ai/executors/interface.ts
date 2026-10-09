@@ -6,7 +6,7 @@
  * Eight settings, each through **the action or handler its own control calls**:
  *
  *   theme            the toolbar's Light / dark button            `setTheme`
- *   units            the Markups card's mm / m                    `setUnits`
+ *   units            the Markups card's mm / m / ft               `setUnits`
  *   treeMode         the sidebar's by Entity / by PredefType      `setTreeMode`
  *   sidebar          its collapse button and the rail's expand    `togglePanel`
  *   card             the six buttons that open a card, and its ×  `openCard` / `closeCard`

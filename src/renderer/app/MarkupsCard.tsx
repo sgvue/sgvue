@@ -4,7 +4,10 @@
  * A left-lane card, z-order 14, 330 px wide and scrolling. Two lists — `laser` and
  * `coordinates` — each with its own `clear`, numbered by position (`M1`, `C1`…), the tag
  * zooming to the markup and the × deleting it. The mm / m toggle is the design's `units` state,
- * which the status bar reads too.
+ * which the status bar reads too — and since 2026-10-09 (owner-requested) it is mm / m / ft, the
+ * third button in the design's own markup and style string, and every length, coordinate and
+ * elevation the app prints follows it (`shared/units.ts`), where the design's changed this list
+ * alone.
  *
  * Its `max-height` stops above the status bar (`calc(100% - 110px)`), and since 2026-10-01
  * above the action bar too: `--abar` (`selectors/lanes.ts`) is that bar's lane, `0px` without it.
@@ -45,9 +48,10 @@ export default function MarkupsCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
   if (st.card !== 'measure') return null
   const measures = measureRows(st.measures, st.units)
-  const spots = spotRows(st.spots)
+  const spots = spotRows(st.spots, st.units)
   const mm = on(st.units === 'mm')
   const m = on(st.units === 'm')
+  const ft = on(st.units === 'ft')
 
   const list = (
     label: string,
@@ -135,6 +139,15 @@ export default function MarkupsCard(): React.JSX.Element | null {
             )}
           >
             m
+          </button>
+          {/* 2026-10-09, owner-requested: feet and inches — the design's own button, a third time. */}
+          <button
+            onClick={() => st.setUnits('ft')}
+            style={s(
+              `font:500 11px/1 var(--mono);height:100%;padding:0 8px;color:${ft.fg};background:${ft.bg}`
+            )}
+          >
+            ft
           </button>
         </div>
         <button

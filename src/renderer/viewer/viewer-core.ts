@@ -45,6 +45,7 @@ import type { Annotations, MeasureRecord, SpotRecord, SpotShown } from './annota
 import { createAnnotations } from './annotations'
 import type { DimRect } from '../../shared/annotate'
 import { ID_STRIDE } from '../../shared/federate'
+import type { DisplayUnit } from '../../shared/units'
 import type { BatchStore, ElementRecord } from './batches'
 import { createBatchStore } from './batches'
 import type { CameraRig, CameraState, Projection } from './camera'
@@ -289,6 +290,11 @@ export interface Viewer {
    */
   setSections(cfg: SectionsConfig): void
   setCoords(c: Partial<BasePoint>): void
+  /**
+   * The display unit the labels print in (2026-10-09): the laser's readings, the spot tags, the
+   * grid and selection dimensions and the level tags (`annotations.ts`). `mm` until told.
+   */
+  setUnits(u: DisplayUnit): void
   setDims(ids: readonly number[] | null, on?: boolean | null, avoid?: readonly DimRect[]): void
   setSnap(b: boolean): void
   setGrids(b: boolean): void
@@ -1477,6 +1483,11 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       coords = { ...coords, ...c }
       cube?.setCompass(coords.angle ?? 0)
       annotations.setCoords(coords)
+      invalidateOcclusion()
+    },
+    // 2026-10-09. Every label that prints a length or a coordinate, re-rendered in the unit.
+    setUnits: (u) => {
+      annotations.setUnits(u)
       invalidateOcclusion()
     },
     // L751.

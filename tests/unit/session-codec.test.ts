@@ -54,6 +54,7 @@ const source = (over: Partial<SessionSource> = {}): SessionSource => ({
   hlColor: '#35C4B6',
   view: 'iso',
   coords: { E: 28500, N: 30200, Z: 102.5, angle: 12.5 },
+  units: 'mm',
   ...over
 })
 
@@ -94,7 +95,9 @@ describe('sessionPayload', () => {
       'view',
       'coords',
       'cam',
-      'frame'
+      'frame',
+      // 2026-10-09 — the port's: the display unit, which the design kept but never saved.
+      'units'
     ])
   })
 

@@ -482,7 +482,13 @@ describe('get_view_state covers the session’s own list of review state', () =>
      * the base point, so the assistant has to see what it is. Since 2026-10-08 the one thing that
      * moves it is the boot file's own georeferencing, fixed with the federation's frame.
      */
-    coords: { change: () => st().setOffset([0, 0, 0], null, STATES_ONE) }
+    coords: { change: () => st().setOffset([0, 0, 0], null, STATES_ONE) },
+    /**
+     * 2026-10-09 — the display unit joined the session when the app began to start in the boot
+     * model's own (a session or a link that states one restores it). `get_view_state` reads it
+     * as `units` and in `interface`.
+     */
+    units: { change: () => st().setUnits('ft') }
   }
 
   it('decides every key the session saves, and no key it does not', () => {
@@ -491,7 +497,7 @@ describe('get_view_state covers the session’s own list of review state', () =>
     // are what a session writes (`coords` included, for older builds, though it is never read back).
     const saved = Object.keys(sessionSource(st())).sort()
     expect(Object.keys(COVERAGE).sort()).toEqual(saved)
-    expect(saved).toHaveLength(19)
+    expect(saved).toHaveLength(20)
     const payload = sessionPayload(sessionSource(st()), [], [], null, 'identity')
     for (const key of saved) expect([key, key in payload]).toEqual([key, true])
   })

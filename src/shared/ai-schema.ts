@@ -53,6 +53,7 @@ import {
   type SecPlane,
   type Sections
 } from './sections'
+import { DEFAULT_DISPLAY_UNIT } from './units'
 import { roundedAngles, viewOn } from './view-angles'
 
 /** Values per category before the schema truncates. Plan §4 Phase 9. */
@@ -204,6 +205,12 @@ export interface ChatViewState {
    * named view it is on (or `null`) and its direction. Absent while it stands on `view`.
    */
   camera?: Omit<CameraBrief, 'projection'>
+  /**
+   * 2026-10-09 — the display unit, only while it is not the design's `mm`: `m`, or `ft` — what a
+   * length, an elevation or a coordinate stated to the user is written in. A model in feet
+   * starts in `ft`, so its every turn says so.
+   */
+  units?: string
 }
 
 /* ────────────────────────────── display and section read-back ────────────────────────────── */
@@ -321,6 +328,8 @@ export interface ViewStateSource extends VisState, DisplaySource {
   sections: Sections
   selIds: readonly number[]
   tool: string
+  /** The display unit (2026-10-09). */
+  units?: string
 }
 
 /* ────────────────────────────── the camera ────────────────────────────── */
@@ -356,7 +365,7 @@ export const MODELS_HIDDEN_CAP = 20
 /** The fields the per-turn view state carries only while something is off its default. */
 export type SparseViewState = Pick<
   ChatViewState,
-  'display' | 'tool' | 'modelsHidden' | 'modelsHiddenMore' | 'sectionPlanes' | 'camera'
+  'display' | 'tool' | 'modelsHidden' | 'modelsHiddenMore' | 'sectionPlanes' | 'camera' | 'units'
 >
 
 /**
@@ -398,6 +407,9 @@ export function sparseViewState(
     const { view, azimuthDeg, elevationDeg } = cameraBrief(camera)
     if (view === null || view !== s.view) out.camera = { view, azimuthDeg, elevationDeg }
   }
+
+  // The design's own `mm` (`SGVue.dc.html:851`) is the one the view state leaves unsaid.
+  if (s.units && s.units !== DEFAULT_DISPLAY_UNIT) out.units = s.units
 
   return out
 }

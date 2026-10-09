@@ -22,18 +22,27 @@
  * buttons follow in a row of their own, right-aligned, in their own style strings and order.
  *
  * The offset field is **millimetres**, as the design has it, and the division by 1000 happens
- * once, on the way to the viewer (`state/shell.ts`'s `sectionConfigOf`).
+ * once, on the way to the viewer (`state/shell.ts`'s `sectionConfigOf`). Since 2026-10-09
+ * (owner-requested) the field, its two nudge buttons and the summary's `offset mm` speak the
+ * display unit — metres and ±0.5 in `m`; in `ft` feet and inches at rest, as the ±2'-0" are
+ * written, and either feet and inches or decimal feet as typed — while the plane still holds
+ * millimetres (`selectors/section.ts`). In `mm` they are the design's own.
  *
  * Every grid the federation has gets a chip, at any angle: `section.ts` cuts along a segment,
  * so a 43° grid is sectioned like an axis-aligned one. The chips are grouped by the grid's own
  * IFC family — `A…E`, then `1…10` — one wrapping row a family.
  */
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { NO_PLANE, type SecKind, type SecPlane } from '../../shared/sections'
+import type { DisplayUnit } from '../../shared/units'
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
 import {
   chipPatch,
+  nudgeLabel,
+  nudgeOffset,
+  offsetText,
+  parseOffset,
   secCutStyle,
   secSummary,
   sectionGridFamilies,
@@ -59,8 +68,46 @@ const CLEAR =
 const SUMMARY =
   'font:400 11.5px/1.4 var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0'
 
+/** `:591` — the offset field's own style string. */
+const FIELD =
+  'width:100%;text-align:right;font:400 13px/1.4 var(--mono);color:var(--ink);background:var(--card);border:1px solid var(--border-strong);border-radius:8px;padding:6px 10px'
+
+/**
+ * One plane's offset field (`:591`). The plane holds millimetres; the field shows them in the
+ * display unit (2026-10-09, `selectors/section.ts`). In `mm` it is the design's field exactly —
+ * what is typed is parsed at once and the field shows the plane. In `m` and `ft` the text is
+ * kept as typed while the field has focus, so `1.` or `12'-6 1/` can be typed through, and the
+ * plane moves whenever the text reads as a number.
+ */
+function OffsetInput({
+  offset,
+  unit,
+  set
+}: {
+  offset: number
+  unit: DisplayUnit
+  set: (mm: number) => void
+}): React.JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <input
+      value={draft ?? offsetText(offset, unit)}
+      onChange={(e) => {
+        const text = e.target.value
+        if (unit !== 'mm') setDraft(text)
+        const mm = parseOffset(text, unit)
+        if (mm !== null) set(mm)
+      }}
+      onBlur={() => setDraft(null)}
+      inputMode={unit === 'mm' ? 'numeric' : unit === 'm' ? 'decimal' : 'text'}
+      className="fv-field"
+      style={s(FIELD)}
+    />
+  )
+}
+
 /** The store fields this component reads — it re-renders when one of them changes. */
-const KEYS = pick('card', 'cardTop', 'clearSections', 'closeCard', 'federation', 'sections', 'setSec')
+const KEYS = pick('card', 'cardTop', 'clearSections', 'closeCard', 'federation', 'sections', 'setSec', 'units')
 
 export default function SectionCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
@@ -87,7 +134,10 @@ export default function SectionCard(): React.JSX.Element | null {
    */
   const controls = (kind: SecKind, plane: SecPlane): React.JSX.Element => {
     const cut = secCutStyle(plane.cut)
-    const summary = `offset mm · ${secSummary(kind, plane)}`
+    // The design's `offset mm`, which names the field's unit — the display unit's since 2026-10-09.
+    const summary = `offset ${st.units} · ${secSummary(kind, plane)}`
+    const down = nudgeLabel(-1, st.units)
+    const up = nudgeLabel(1, st.units)
     return (
       <>
         <div
@@ -96,32 +146,25 @@ export default function SectionCard(): React.JSX.Element | null {
           )}
         >
           <button
-            onClick={() => st.setSec(kind, { offset: plane.offset - 500 })}
-            title="−500 mm"
+            onClick={() => st.setSec(kind, { offset: nudgeOffset(plane.offset, -1, st.units) })}
+            title={down.title}
             className="hv-step-ink"
             style={s(NUDGE)}
           >
-            −500
+            {down.text}
           </button>
-          <input
-            value={String(plane.offset)}
-            onChange={(e) => {
-              const n = parseFloat(e.target.value)
-              st.setSec(kind, { offset: isNaN(n) ? 0 : n })
-            }}
-            inputMode="numeric"
-            className="fv-field"
-            style={s(
-              'width:100%;text-align:right;font:400 13px/1.4 var(--mono);color:var(--ink);background:var(--card);border:1px solid var(--border-strong);border-radius:8px;padding:6px 10px'
-            )}
+          <OffsetInput
+            offset={plane.offset}
+            unit={st.units}
+            set={(offset) => st.setSec(kind, { offset })}
           />
           <button
-            onClick={() => st.setSec(kind, { offset: plane.offset + 500 })}
-            title="+500 mm"
+            onClick={() => st.setSec(kind, { offset: nudgeOffset(plane.offset, 1, st.units) })}
+            title={up.title}
             className="hv-step-ink"
             style={s(NUDGE)}
           >
-            +500
+            {up.text}
           </button>
         </div>
 

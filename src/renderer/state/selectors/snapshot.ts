@@ -14,8 +14,9 @@
  * the store by `sessionSource`, which `model/session.ts` uses too; and it is put back through
  * the app's own restore path, the store's `applySession` and the codec's `applyRestore` order.
  * Beside the payload stand the few things a session does not carry and the assistant can change
- * (`TurnExtra`): the selection, the colour-by scheme, the canvas grid, the units, the sidebar,
- * the open card, the armed tool, the tree's search and the viewpoint marked as restored.
+ * (`TurnExtra`): the selection, the colour-by scheme, the canvas grid, the sidebar, the open
+ * card, the armed tool, the tree's search and the viewpoint marked as restored. (The display
+ * unit stood here too until 2026-10-09, when a session started saving it.)
  *
  * **"Undo just this step"** — the control's own tooltip — is taken literally. The state is cut
  * into parts (`TURN_PARTS`), a reply's undo records **which parts that reply changed**, and
@@ -76,7 +77,7 @@ import {
   type SlotRecord
 } from '../../../shared/session-codec'
 import type { Tool } from '../../viewer/viewer-core'
-import type { CardName, ShellState, Units } from '../shell'
+import type { CardName, ShellState } from '../shell'
 
 /** `SGVue.dc.html:1678` — the state a session saves, read off the store. One list, two readers. */
 export const sessionSource = (s: ShellState): SessionSource => ({
@@ -98,7 +99,8 @@ export const sessionSource = (s: ShellState): SessionSource => ({
   stack: s.stack,
   hlColor: s.hlColor,
   view: s.view,
-  coords: s.coords
+  coords: s.coords,
+  units: s.units
 })
 
 /** What the assistant can change and a session does not carry. */
@@ -106,7 +108,6 @@ export interface TurnExtra {
   selIds: readonly number[]
   colorBy: ColorByState | null
   groundGrid: boolean
-  units: Units
   panelOpen: boolean
   card: CardName | null
   tool: Tool
@@ -133,7 +134,6 @@ export function turnSnapshot(s: ShellState, cam: SessionCamera | null): TurnSnap
       selIds: s.selIds,
       colorBy: s.colorBy,
       groundGrid: s.groundGrid,
-      units: s.units,
       panelOpen: s.panelOpen,
       card: s.card,
       tool: s.tool,
@@ -181,7 +181,7 @@ export const TURN_PARTS = {
   selection: { extra: ['selIds'] },
   theme: { payload: ['theme'] },
   treeMode: { payload: ['treeMode'] },
-  units: { extra: ['units'] },
+  units: { payload: ['units'] },
   sidebar: { extra: ['panelOpen'] },
   card: { extra: ['card'] },
   tool: { extra: ['tool'] },

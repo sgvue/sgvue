@@ -73,8 +73,9 @@ measurements are its row in `docs/DECISIONS.md`. The table below holds ten of th
 the port began with and five of the dated ones — and is kept for their reasons, not as the
 list. The rest are recorded there and not here: among them the landing page's Recent pills,
 demo building and update notice, the sidebar's resizable sections, the toolbar's groups and
-the bottom row, the two section cuts, the Schedules window, and the assistant's name, its
-thinking trace, its per-reply revert and its consent gate.
+the bottom row, the two section cuts, the Schedules window, the assistant's name, its
+thinking trace, its per-reply revert and its consent gate, and (2026-10-09) the display unit's
+`ft` and its start in the boot model's own unit.
 
 | Deviation | Why it is necessary |
 |---|---|
@@ -439,6 +440,23 @@ buildingSMART's own validation service uses. The table below is the contract.
 **Units.** Geometry from web-ifc is in metres. Property and quantity values are stored exactly
 as the file authored them, together with their measure type and unit, and converted only for
 display, following the design's millimetre/metre rules.
+
+> **Status: 2026-10-09 — the display unit** (owner-requested; `CLAUDE.md`, allowed desktop
+> deviations). The design's toggle is `mm` / `m` and changes the Markups card's list alone; the
+> app's is `mm` / `m` / `ft` — the third button in the design's own markup — and every length,
+> elevation and coordinate the app prints follows it, by one rule (`src/shared/units.ts`): in
+> `mm` every readout is what it was, byte for byte; in `m` what printed millimetres prints metres
+> to three decimals; in `ft` a length, a dimension or an elevation is feet and inches to the
+> nearest 1/16" (`12'-6 1/2"`, the international foot), a coordinate decimal feet, and an area
+> or a volume the app computes ft² / ft³. **Every boot starts in the boot model's own unit**
+> (`displayUnitOf`: an imperial conversion-based `LENGTHUNIT` → `ft`, shorter than a metre →
+> `mm`, a metre or longer → `m`, none → `mm`); a model that joins later leaves it alone, and a
+> session or a link that states one restores it. Property and quantity values are never
+> converted — a quantity total is labelled in the file's own unit (`ft²`, never the design's
+> literal `m²` for a model in feet). The Coordinate-system card states the base point in the
+> file's own **map** unit — `m`, `ft` or `US ft` — whatever the toggle says. The Schedules
+> window keeps its own unit system (ifcTable's), which already defaults new columns to the first
+> model's imperial or metric units.
 
 **Georeferencing.** Every readout names where it came from — `IfcMapConversion`, an
 `ePset_MapConversion` property set, or `IfcSite` placement — so a reader can tell a declared
@@ -1290,7 +1308,7 @@ kinds; a gated call is a `view` call that changes nothing by itself.
 | `find_nearby` | read | `id?`, `ids?` (≤ 25), `distance?`, `spaces?`, `limit?` (≤ 100) |
 | `query_sql` | read | `sql` |
 | `set_models` | view | `visible[]` (model keys, ≤ 200; `[]` shows every model) |
-| `set_interface` | view | `theme?` (`dark` / `light`), `units?` (`mm` / `m`), `treeMode?` (`entity` / `type`), `sidebar?` (`open` / `collapsed`), `card?` (`project` / `section` / `filter` / `coords` / `views` / `measure` / `none`), `tool?` (`select` / `measure` / `spot`), `search?` (≤ 200 characters), `schedulesWindow?` (`open`) |
+| `set_interface` | view | `theme?` (`dark` / `light`), `units?` (`mm` / `m` / `ft`), `treeMode?` (`entity` / `type`), `sidebar?` (`open` / `collapsed`), `card?` (`project` / `section` / `filter` / `coords` / `views` / `measure` / `none`), `tool?` (`select` / `measure` / `spot`), `search?` (≤ 200 characters), `schedulesWindow?` (`open`) |
 | `manage_views` | view | `op` (`list` / `save` / `restore` / `rename` / `delete`), `name?` (≤ 80 characters to give one; a lookup by name), `number?` (its place in the list), `to?` (the new name, ≤ 80) |
 | `manage_markups` | view | `op` (`list` / `focus` / `place_spot` / `place_measure` / `show` / `delete` / `clear`), `name?` (`M2`, `C1` — as the card names it), `kind?` (`measures` / `spots`, for `clear`); for placing: `id?` (an element) with `at?` (`top` / `centre` / `base` of its bounding box), or `point?` (`{x, y, z}`, project-frame metres, ±10⁷); `show?` (`level` / `full`, a spot tag's state) |
 | `request_user_action` | view | `action` (`open_files` / `open_recent` / `unload_model` / `copy_link` / `copy_guids`; `set_base_point` until 2026-10-08), `recent?` (a file's **name** on the recent list, ≤ 255 characters, never a path), `model?` (a loaded model's key), `ids?` (≤ 2 000), `selection?` or `schedule?` |
@@ -1392,9 +1410,10 @@ compared first, idempotent, bounded — and nothing that deletes, clears or plac
   words. There is no delete. *(Phase 3: such a restore is held behind Apply instead of refused,
   and `delete` exists as a request — below.)*
 - `manage_markups` — the Markups card, read: `list` returns the laser measurements (`M1 {x, y,
-  z}`, the lengths its rays read, in the card's unit — since 2026-10-08 with `sides {minus,
+  z}`, the lengths its rays read, in the card's unit — whole millimetres, metres, or since
+  2026-10-09 decimal feet while it shows `ft` — since 2026-10-08 with `sides {minus,
   plus}` per axis, each length split at the point, a side that reached no face left out) and
-  the spot coordinates (`C1 {E, N, Z}`, or `{level}` where the model has no base point), at most
+  the spot coordinates in metres (`C1 {E, N, Z}`, or `{level}` where the model has no base point), at most
   fifty of each with the totals and `truncated`; `focus` zooms to one (`focusPoint`). Nothing is
   placed, changed or removed. *(Phase 3: `delete` and `clear` ask for a removal — below.)*
 - `manage_filters` — `update`, above; it runs the scope guard, and an update that takes nothing
@@ -1772,7 +1791,7 @@ same button, same `Undo just this step` tip, the reverted reply dimmed — and w
 
 - **The snapshot is the session payload** — what a session and a share link save
   (`sessionPayload`, §9) — plus the few things a session does not carry and the assistant can
-  change (the selection, the colour-by scheme, the canvas grid, the units, the sidebar, the open
+  change (the selection, the colour-by scheme, the canvas grid, the sidebar, the open
   card, the armed tool, the tree's search, the viewpoint marked as restored), plus each model's
   key, digest and slot. It is put back through the same `applySession` path a session restores
   through, in the same order; there is no second mechanism.
@@ -1858,7 +1877,7 @@ if the file is still where it was.
 >
 > | File | Contents |
 > |---|---|
-> | `last.json` | `{ payload, savedAt }`. `payload` is the design's own `sessionPayload()` — `models, uploadNames, hidden, storeyVis, modelVis, active, modelColors, nativeMats, treeMode, grids, levels, shadows, theme, snap, dims, section, sections, stack, hlColor, view, coords, cam` — **plus** `files`: one `{ key, path, name, sha256 }` per loaded model, **and since 2026-10-01** `sections: { grid, level }`, the two section planes (each `{ name, offset, flip, cut }`). `section` is still written beside it, in its old single-plane shape — the plane that is cutting when only one of the two is, else the gridline plane if it is set, else the level plane, else "none" — so an older build restores one plane; reading takes `sections` when present, else the old `section` onto the plane of its `kind`, through one normaliser that coerces every field — a plane name longer than 200 characters is no plane — (`sectionsOf`, `shared/session-codec.ts`). A share link and a saved viewpoint follow the same rule. Written by the renderer, debounced 600 ms, exactly as `SGVue.dc.html:1685` debounces its own write. Capped at 4 MB; anything larger is refused. |
+> | `last.json` | `{ payload, savedAt }`. `payload` is the design's own `sessionPayload()` — `models, uploadNames, hidden, storeyVis, modelVis, active, modelColors, nativeMats, treeMode, grids, levels, shadows, theme, snap, dims, section, sections, stack, hlColor, view, coords, cam` — **plus** `files`: one `{ key, path, name, sha256 }` per loaded model, **and since 2026-10-01** `sections: { grid, level }`, the two section planes (each `{ name, offset, flip, cut }`), **and since 2026-10-09** `units`, the display unit — restored when it is `mm`, `m` or `ft`, and otherwise left as the boot model set it, so an older payload changes nothing. `section` is still written beside it, in its old single-plane shape — the plane that is cutting when only one of the two is, else the gridline plane if it is set, else the level plane, else "none" — so an older build restores one plane; reading takes `sections` when present, else the old `section` onto the plane of its `kind`, through one normaliser that coerces every field — a plane name longer than 200 characters is no plane — (`sectionsOf`, `shared/session-codec.ts`). A share link and a saved viewpoint follow the same rule. Written by the renderer, debounced 600 ms, exactly as `SGVue.dc.html:1685` debounces its own write. Capped at 4 MB; anything larger is refused. |
 > | `recents.json` | Up to six `{ path, name, size, sha256, openedAt }`, newest first. This is what the designed sample library is backed by on the desktop: the same pills, the same "open all N" copy, rendered only when the list is non-empty. Six, because the design's own count-in-words list stops there. |
 >
 > **File contents are never written — only paths and hashes.** A session or a share link that

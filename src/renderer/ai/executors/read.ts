@@ -283,7 +283,12 @@ export const summarize_elements: Executor = (input, ctx) => {
     ui: {
       table: {
         groupBy,
-        rows: rows.map((r) => ({ k: r.k, n: r.n, area: r.area, volume: r.volume, ids: r.ids }))
+        rows: rows.map((r) => ({ k: r.k, n: r.n, area: r.area, volume: r.volume, ids: r.ids })),
+        // 2026-10-09: the panel labels each total in the file's own unit, as the reply does.
+        units: {
+          ...(units.area ? { area: units.area } : {}),
+          ...(units.volume ? { volume: units.volume } : {})
+        }
       }
     }
   }

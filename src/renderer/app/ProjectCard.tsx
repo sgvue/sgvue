@@ -14,7 +14,7 @@ import { s } from './css'
 import { Cross } from './icons'
 
 /** The store fields this component reads — it re-renders when one of them changes. */
-const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'library', 'uploadNames')
+const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'library', 'uploadNames', 'units')
 
 export default function ProjectCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
@@ -24,9 +24,10 @@ export default function ProjectCard(): React.JSX.Element | null {
         federation: st.federation,
         library: st.library,
         coords: st.coords,
-        uploadNames: st.uploadNames
+        uploadNames: st.uploadNames,
+        units: st.units
       }),
-    [st.federation, st.library, st.coords, st.uploadNames]
+    [st.federation, st.library, st.coords, st.uploadNames, st.units]
   )
   if (st.card !== 'project') return null
   return (

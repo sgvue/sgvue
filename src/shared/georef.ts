@@ -43,8 +43,9 @@
  * Everything here is arithmetic on plain objects, so `tests/unit/georef.test.ts` can check it
  * against hand-computed literals with no file, no worker and no GPU.
  */
-import { DASH } from './fmt'
+import { DASH, FOOT } from './fmt'
 import type { Georeference, GeorefMethod } from './model-index.types'
+import { FOOT_FACTOR_TOLERANCE, US_SURVEY_FOOT } from './units'
 
 /**
  * The design's `coords` (`SGVue.dc.html:849`), with every field nullable. `angle` is degrees
@@ -537,7 +538,10 @@ export function worldToProjectMatrix(f: ProjectFrame | null | undefined): Float6
 
 /* ────────────────────────────── the project base point ────────────────────────────── */
 
-/** Coordinates are kept to a millimetre and the angle to 1e-4°, which is 0.2 mm over 100 m. */
+/**
+ * Coordinates are kept to a millimetre — to a thousandth of the unit asked for, since
+ * 2026-10-09 — and the angle to 1e-4°, which is 0.2 mm over 100 m.
+ */
 const mm = (v: number): number => Math.round(v * 1e3) / 1e3
 const deg4 = (v: number): number => Math.round(v * 1e4) / 1e4
 
@@ -571,8 +575,14 @@ const deg4 = (v: number): number => Math.round(v * 1e4) / 1e4
  * P's, so a file placed that way reads exactly as the geometry stands.
  *
  * `null` means "leave every field blank" — the card renders empty fields, never a default.
+ *
+ * `per` (2026-10-09) is metres per unit of the numbers asked for: 1, the default, for the metres
+ * every read-out computes with — the same numbers as before, to the bit — or the file's own map
+ * unit, `mapUnitOf(g).metres`, for the Coordinate-system card, which shows the base point as the
+ * file states it. E, N and Z are divided before they are rounded, so a position authored in feet
+ * reads back as authored.
  */
-export function coordsFromGeoref(g: Georeference | null | undefined): BasePoint | null {
+export function coordsFromGeoref(g: Georeference | null | undefined, per = 1): BasePoint | null {
   if (!g) return null
 
   const frame = projectFrame(g)
@@ -590,11 +600,11 @@ export function coordsFromGeoref(g: Georeference | null | undefined): BasePoint 
 
   // The project origin on the map: P's own origin.
   const hasPlan = num(g.eastings) != null || num(g.northings) != null || frame != null || byWcs
-  const E = hasPlan ? mm(pE) : null
-  const N = hasPlan ? mm(pN) : null
-  let Z = num(g.orthogonalHeight) != null || frame != null || byWcs ? mm(pZ) : null
+  const E = hasPlan ? mm(pE / per) : null
+  const N = hasPlan ? mm(pN / per) : null
+  let Z = num(g.orthogonalHeight) != null || frame != null || byWcs ? mm(pZ / per) : null
   // `IfcSite.RefElevation` is the last thing that states a height, and it is a height alone.
-  if (Z == null && g.site?.elevation != null) Z = mm(g.site.elevation)
+  if (Z == null && g.site?.elevation != null) Z = mm(g.site.elevation / per)
 
   let angle: number | null = null
   if (mapRot != null || siteRot != null || wcsRot != null || placed.trueNorthDeg != null) {
@@ -609,6 +619,25 @@ export function coordsFromGeoref(g: Georeference | null | undefined): BasePoint 
 
   if (E == null && N == null && Z == null && angle == null) return null
   return { E, N, Z, angle }
+}
+
+/* ────────────────────── the map unit the card speaks (2026-10-09) ────────────────────── */
+
+/**
+ * The unit the Coordinate-system card shows the base point in (2026-10-09, owner-requested): the
+ * file's own **map** unit — `IfcProjectedCRS.MapUnit` (`mapPlacement`) — and not the display
+ * toggle. `m` for the metre, for a file that names none, and for anything that is not a foot;
+ * `ft` for the international foot (0.3048 m); `US ft` for the US survey foot (1200 / 3937 m).
+ * `metres` is what the file's own unit is worth — the factor its E / N / H were multiplied by —
+ * so dividing by it gives back the numbers it authored.
+ */
+export function mapUnitOf(g: Georeference | null | undefined): { label: 'm' | 'ft' | 'US ft'; metres: number } {
+  const u = mapPlacement(g).metresPerMapUnit
+  // Relative, `FOOT_FACTOR_TOLERANCE`: the two feet differ by 2e-6, an exporter's rounding by less.
+  const near = (x: number): boolean => Math.abs(u / x - 1) < FOOT_FACTOR_TOLERANCE
+  if (near(US_SURVEY_FOOT)) return { label: 'US ft', metres: u }
+  if (near(FOOT)) return { label: 'ft', metres: u }
+  return { label: 'm', metres: 1 }
 }
 
 /* ────────────────────────────── the CRS chip ────────────────────────────── */

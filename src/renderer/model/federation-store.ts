@@ -22,7 +22,8 @@ import {
 } from '../../shared/georef'
 import { isSiteLike } from '../../shared/site'
 import type { FederationOffset, GeometryChunk } from '../../shared/geometry-contract.types'
-import type { Georeference, ModelIndex } from '../../shared/model-index.types'
+import type { Georeference, ModelIndex, Units } from '../../shared/model-index.types'
+import { DEFAULT_DISPLAY_UNIT, displayUnitOf } from '../../shared/units'
 import type { SessionFile } from '../../shared/session-codec'
 import { useShell, setViewer } from '../state/shell'
 import type { ModelMeta, Viewer } from '../viewer/viewer-core'
@@ -146,6 +147,11 @@ export class FederationController {
    * records that it has been chosen rather than `??=` asking again on the next model.
    */
   private bootGeoref: Georeference | null = null
+  /**
+   * 2026-10-09 — the same model's unit assignment, taken with `bootGeoref`: the display unit the
+   * app starts in (`shared/units.ts`, `displayUnitOf`). Cleared with it.
+   */
+  private bootUnits: Units | null = null
   private frameChosen = false
   /**
    * How many models have been streamed in the frame `bootGeoref` fixes, and which choice of
@@ -239,6 +245,13 @@ export class FederationController {
     // once, here, and never by a model that joins later — the card is read-only).
     if (boot) {
       useShell.getState().setOffset(items[0].offset, federationFrame(this.bootGeoref), this.bootGeoref)
+      // 2026-10-09 (owner-requested: *"Starts in the first model's unit"*): every boot starts in
+      // the boot model's own length unit — `mm`, `m` or `ft` — and the design's `mm` when it
+      // names none. A model that joins later leaves the unit alone; a session or a link that
+      // states one restores it over this, after the batch (`upload-pipeline.ts`). The demo and
+      // `#mock` choose no frame (they are not parsed), so their first model is the boot model.
+      const units = this.frameChosen ? this.bootUnits : items[0].index.units
+      useShell.getState().setUnits((units && displayUnitOf(units)) ?? DEFAULT_DISPLAY_UNIT)
     }
     /** Keys this batch joined, and which of them replaced a model, for the undo below. */
     const joined: string[] = []
@@ -337,6 +350,7 @@ export class FederationController {
   private resetFrame(): void {
     this.offset = null
     this.bootGeoref = null
+    this.bootUnits = null
     this.frameChosen = false
     this.frameEpoch++
     this.frameUsers = 0
@@ -357,6 +371,7 @@ export class FederationController {
     if (this.frameUsers > 0 || this.federation.models.length) return
     this.offset = null
     this.bootGeoref = null
+    this.bootUnits = null
     this.frameChosen = false
     this.frameEpoch++
   }
@@ -482,6 +497,7 @@ export class FederationController {
     this.federation = EMPTY_FEDERATION
     this.offset = null
     this.bootGeoref = null
+    this.bootUnits = null
     this.frameChosen = false
     this.frameEpoch++
     this.frameUsers = 0
@@ -542,6 +558,7 @@ export class FederationController {
     // the federation lines up by map coordinates, each model by its own declaration.
     if (!this.frameChosen) {
       this.bootGeoref = index.georef
+      this.bootUnits = index.units
       this.frameChosen = true
       this.frameEpoch++
       this.frameUsers = 0
@@ -645,6 +662,7 @@ export class FederationController {
     this.federation = EMPTY_FEDERATION
     this.offset = null
     this.bootGeoref = null
+    this.bootUnits = null
     this.frameChosen = false
     this.frameEpoch++
     this.frameUsers = 0

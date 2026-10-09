@@ -3,6 +3,70 @@
 > Commit hashes cited in these notes refer to the project's history before it was published on
 > 2026-10-05, and do not resolve in this repository.
 
+## 2026-10-09 — the display unit: the boot model's own, a third value `ft`, and every readout follows it
+
+**Did:** the owner's *"Why model units not automatically using the units provided by model? in
+other countries are feets"* — of the options offered, *"auto unit + feet"* — and, mid-build,
+*"and also the laser measurement unit, and review any other similar situation."* **The unit** is
+`mm | m | ft` (`shared/units.ts`, `DisplayUnit`); the Markups card's toggle gains the one new
+button, `ft`, in the design's own markup and style string, and the status bar reads it. **Every
+boot** sets it from the boot model's `LENGTHUNIT` (`displayUnitOf`: shorter than a metre `mm`, a
+metre or longer `m`, a foot or an inch `ft`, none `mm`; `federation-store.ts` keeps `bootUnits`
+beside `bootGeoref`); a model that joins later leaves it alone; sessions and links now save it
+(`units`, a payload key) and restore it when it is one of the three — an older payload keeps the
+boot model's. **One rule** (`shared/units.ts`): each readout keeps its own style and only its
+quantity and unit follow — `mm` byte for byte as before, `m` metres to three decimals where it
+printed millimetres, `ft` feet and inches to the nearest 1/16" (`ftIn` / `signedFtIn`:
+`12'-6 1/2"`, `0'-3/4"`, carries, U+2212, thin-space feet) for a length, dimension or elevation,
+decimal feet for a coordinate, ft² / ft³ for an area or volume the app computes. It reaches the
+laser's 3D labels and live reading, the Markups card, the grid and selection dimensions, the level
+tags, the storey list, the spot tag, the property card's geometry rows, the Spatial-structure
+card's site rows, a clash table's volume and the Section card's offset field (metres and ±0.5 in
+`m`; feet and inches at rest, `12'-6"` or decimal feet typed, and ±2'-0" in `ft`; still
+millimetres in the plane). The
+viewer hears it through `viewer.setUnits`: `annotations.ts` re-renders every reading and tag and
+rebuilds the grid dimensions and level tags. **Authored values are never converted**; a quantity
+total is labelled in the file's own unit (`ChatTable.units`; `unitLabel` writes `ft` / `ft²` /
+`ft³`), where the design's literal read `m²` for a model in feet. **The Coordinate-system card**
+speaks the file's map unit — `Easting m` / `ft` / `US ft` (`mapUnitOf`, `coordsFromGeoref(g, per)`),
+not the toggle. **The assistant:** `set_interface`'s `units` takes `ft`, the per-turn view state
+names `units` only while it is not `mm`, `manage_markups` lists laser lengths in decimal feet
+while the card shows `ft`, and one instruction line (39 → 40) asks for lengths in the display
+unit. The Schedules window is unchanged: ifcTable already has feet and already defaults new
+columns to the first model's imperial units. **A fixture in feet**, `tests/fixtures/feet.ifc`
+(`scripts/make-tiny-ifc.py`, `feet()`; every other fixture regenerates byte for byte), and
+`tests/e2e/feet.spec.ts`. Capture states `units-mm`, `units-m`, `units-ft`, `units-levels`,
+`units-section-level`, `units-coords-card`, `units-place-laser`, `units-place-spot` and
+`units-spot-full`, and `SGVUE_IFC`, in `scripts/screenshot.cjs`. Docs: the
+deviation entry and four decision lines in `CLAUDE.md`, a row in `docs/DECISIONS.md`,
+`SYSTEM_SPEC.md` (§2, §5, §8, §9), `COMMANDS.md`, `tests/parity/2026-10-09-units/README.md`.
+
+**After the deep review** (two must-fixes, four should-fixes, all done): the feet spec reads the
+status bar as it is written (`5 / 5·ft·`); this folder's parity README exists; the prompt line keeps
+coordinates in metres, or decimal feet in `ft` — the app never prints one in millimetres; a foot is
+known within 1e-7 of its factor (`FOOT_FACTOR_TOLERANCE`), so an exporter's rounded `0.30480061`
+is the US survey foot; the Section card's field rests in feet and inches in `ft`, as its nudges are
+written; `FOOT` and `US_SURVEY_FOOT` point at each other.
+
+**After the second review** (approved, two additions): the Section field reads back the thin space
+that groups its feet past 1 000 ft (`1 000'-0"`), the round trip tested to a million feet; and the
+owner's Navisworks Manage 2026 comparison of the georeferencing fixtures is recorded — a decision
+line and a row (SGVue keeps its rule).
+
+**Verified:** `npm run typecheck` exit 0; `npm test` **148 files passed / 2 skipped, 2 927 tests
+passed / 3 skipped** (`display-units.test.ts` 41, `feet.fixture.test.ts` 7, and the pins that
+listed the units); `npm run build` exit 0; `npm run test:e2e`, in two guarded runs (one would pass
+the shell's ten-minute limit), **65 passed, 6 skipped**, peak working set 240 MB one process /
+790 MB all, GPU dedicated 253 MB, `clean:` — one smoke case updated, because `tiny.ifc` is drawn in
+metres and now boots in `m`. **Measured** (`tests/parity/2026-10-09-units/README.md`; HEAD and
+this build through the guarded harness, both themes): two HEAD runs differ by the grid labels'
+antialiasing, 0–9 518 px a frame; this build in every mm state is the same — chrome 0 px, every
+overlay label the same text in the same box — the Markups card differing only inside its toggle
+(the `ft` button `[556.80, 82, 29.20, 22]`, the title and the × not moved) and the chat panel not at
+all; `m` and `ft` read as the rule says, no level tag or grid dimension overprints, the declutter
+keeps the same bubbles in all three units; the fixture in feet boots in `ft` with
+`Easting US ft 40503.387`. Not committed.
+
 ## 2026-10-08 — Vee's replies are laid out in paragraphs, lists and tables
 
 **Did:** the owner's *"the Ask VEE ai assistant answer are in one sentence, which is extremely
@@ -1656,33 +1720,17 @@ since `5d942e1`). On a touch screen the Schedules button, under the cube's canva
 default window, is reached from Window › Schedules. `dist/` predates this. Not committed; no
 version bump.
 
-## 2026-09-28 — Help › Check for updates… opens the product site, told this version
-
-**Did:** the owner's decision, *"From the next version, should Help › Check for updates open the
-new page instead of the GitHub releases list?"* → *"Yes, open the page"*. The item now opens
-`https://sgvue.github.io/?v=<version>`: `src/main/about.ts`'s one https base is renamed
-`RELEASES_URL` → `SITE_URL`, and `updatesUrl(version)` appends `?v=` and the URL-encoded version;
-`menu.ts` passes the build-time `__APP_VERSION__` — About's and the landing page's — because in a
-dev or e2e launch `app.getVersion()` reports Electron's own (packaged, they are the same string).
-Still `shell.openExternal`, no network call by the app, `publish: null`. Nothing else used the
-old constant. The site itself is published separately and is not in this repository. Docs:
-CLAUDE.md's deviation entry and index, `docs/DECISIONS.md` (the 2026-09-25 row amended, a new
-row), `docs/SYSTEM_SPEC.md`'s deviation row. **Verified:** `npm run typecheck` exit 0;
-`npm test` **120 files passed / 2 skipped, 1 896 tests passed / 3 skipped** (`menu.test.ts` pins
-the literal URL for `1.1.0`, `1.2.0-beta.1` and `1.2.0-beta.1+build.5` → `%2B`); `npm run build`
-exit 0; `npm run test:e2e` **40 passed, 6 skipped** — the smoke case clicks the real item and
-gets `https://sgvue.github.io/?v=1.1.0` — peak working set 217 MB one process / 769 MB all, GPU
-dedicated 260 MB, `clean:`. Not committed; no version bump.
-
 ## Earlier work
 
-Compressed: the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-09-28 — Help › Check for updates… opens the product site, told this version.** The owner: *"Yes, open the page"*. The item opens `https://sgvue.github.io/?v=<version>` — `SITE_URL` (was `RELEASES_URL`) plus the URL-encoded build-time `__APP_VERSION__` — through `shell.openExternal`, with no network call by the app and `publish: null`. 1 896 unit tests (`menu.test.ts` pins the URL for three versions); e2e 40 passed, 6 skipped — the smoke case clicks the real item.
 
 **2026-09-28 — 1.1.0 released: feature/ifc-table merged into main.** `main` fast-forwarded to the
 Schedules branch and the version set to 1.1.0; no code changed. Against 1.0.2 it carries

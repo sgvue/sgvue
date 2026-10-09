@@ -47,6 +47,7 @@
  * never in the cached prefix.
  */
 import { boxPlace, type BoxPlace } from '../../../shared/annotate'
+import { FOOT } from '../../../shared/fmt'
 import { visFn } from '../../../shared/rules'
 import { sectionsLabel } from '../../../shared/sections'
 import {
@@ -346,7 +347,9 @@ type SpotBrief = { name: string; E: number; N: number; Z: number } | { name: str
 /**
  * The Markups card's two lists, the first `MARKUPS_CAP` of each, numbered as the card numbers
  * them — by position, so `M1` is whatever is first now. Lengths are in the card's current unit:
- * whole millimetres, or metres to three decimals; coordinates and levels are metres.
+ * whole millimetres, or metres to three decimals — or, since 2026-10-09, decimal feet to three
+ * decimals while it shows `ft` (the card writes feet and inches; a number is what a model can
+ * reckon with, and `units` names it); coordinates and levels are metres.
  */
 export function markupsState(s: ShellState): {
   units: string
@@ -356,7 +359,8 @@ export function markupsState(s: ShellState): {
   spotsTotal: number
   truncated: boolean
 } {
-  const len = (metres: number): number => (s.units === 'm' ? +metres.toFixed(3) : Math.round(metres * 1000))
+  const len = (metres: number): number =>
+    s.units === 'ft' ? +(metres / FOOT).toFixed(3) : s.units === 'm' ? +metres.toFixed(3) : Math.round(metres * 1000)
   const m3 = (v: number): number => +v.toFixed(3)
   /** Each axis split at the point, in the card's unit — what its row lists. */
   const sidesOf = (m: ShellState['measures'][number]): MeasureBrief['sides'] => {
@@ -398,7 +402,7 @@ const markupsText = (s: ShellState): string => {
     return 'There are no markups — the user places them by clicking the model with the laser meter or the spot tool, and place_spot or place_measure places one at a point you name.'
   }
   const parts = [
-    m ? `${m} laser measurement${m === 1 ? '' : 's'} (M1${m > 1 ? `–M${m}` : ''}, lengths in ${s.units})` : '',
+    m ? `${m} laser measurement${m === 1 ? '' : 's'} (M1${m > 1 ? `–M${m}` : ''}, lengths in ${s.units === 'ft' ? 'decimal feet' : s.units})` : '',
     c ? `${c} spot coordinate${c === 1 ? '' : 's'} (C1${c > 1 ? `–C${c}` : ''}, in metres)` : ''
   ].filter(Boolean)
   const cut = m > MARKUPS_CAP || c > MARKUPS_CAP ? ` The first ${MARKUPS_CAP} of each are listed.` : ''
@@ -660,7 +664,7 @@ export const manage_markups: Executor = (input, ctx) => {
     // The row's ×, asked for (phase 3). `M2` is a position, and positions shift when a markup
     // is deleted — so the request is fixed to the record's own id, and the label quotes what
     // the card's row reads now, which is how the user can tell it is the one they mean.
-    const rows: MarkupRow[] = laser ? measureRows(s.measures, s.units) : spotRows(s.spots)
+    const rows: MarkupRow[] = laser ? measureRows(s.measures, s.units) : spotRows(s.spots, s.units)
     return askApply(
       `delete ${MARKUP_NOUN[laser ? 'measures' : 'spots']} ${name} (${rows[at].v.replace(/\s+/g, ' ')}), as the Markups card lists it now — it cannot be brought back`,
       laser ? { kind: 'delete_measure', id: mark.id } : { kind: 'delete_spot', id: mark.id },

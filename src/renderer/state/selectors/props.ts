@@ -19,10 +19,11 @@
  *   the element in the file's own coordinates, so the offset is added back. `Bounding box`,
  *   `Footprint` and `Box volume` are differences and are unaffected either way.
  */
-import { DASH, fixed2, fixed3, fmtV, mmv } from '../../../shared/fmt'
+import { DASH, fixed2, fixed3, fmtV } from '../../../shared/fmt'
 import type { FederatedElement, Federation } from '../../../shared/federate'
 import { toMap } from '../../../shared/georef'
-import type { CoordState } from '../shell'
+import { areaIn, areaUnit, coordIn, formatLength, volumeIn, volumeUnit } from '../../../shared/units'
+import type { CoordState, Units } from '../shell'
 
 /* ────────────────────────────── shapes ────────────────────────────── */
 
@@ -169,12 +170,17 @@ export function relRows(
  *
  * `box` is in scene coordinates and `offset` puts it back into the file's own; `coords` is the
  * project base point read from the file, or `null` fields where the file states none.
+ *
+ * 2026-10-09: every row the app computes follows the display unit (`shared/units.ts`) — the
+ * box's size and its base / top as lengths, the footprint and the box volume in m² / m³ or
+ * ft² / ft³, the centroid as a coordinate. `mm` is what the rows always printed.
  */
 export function geoRows(
   box: BoxLike | null,
   solids: number,
   coords: CoordState,
-  offset: Vec3
+  offset: Vec3,
+  units: Units = 'mm'
 ): GeoRow[] {
   if (!box) return []
   const [ox, oy, oz] = offset
@@ -187,14 +193,16 @@ export function geoRows(
   // `XAxisOrdinate` are optional; a file that omits them states no rotation, so the angle is
   // 0 — never defaulted when the file does state one.
   const map = toMap(coords, c.x, c.y, c.z)
+  const len = (v: number): string => formatLength(v, units)
+  const xyz = (v: number): string => fixed3(coordIn(v, units))
   return [
-    { k: 'Bounding box', v: `${mmv(sz.x)} × ${mmv(sz.y)} × ${mmv(sz.z)}` },
-    { k: 'Footprint', v: fixed2(sz.x * sz.y) + ' m²' },
-    { k: 'Box volume', v: fixed3(sz.x * sz.y * sz.z) + ' m³' },
-    { k: 'Base / top', v: `${mmv(mn.z)} → ${mmv(mx.z)}` },
+    { k: 'Bounding box', v: `${len(sz.x)} × ${len(sz.y)} × ${len(sz.z)}` },
+    { k: 'Footprint', v: fixed2(areaIn(sz.x * sz.y, units)) + ' ' + areaUnit(units) },
+    { k: 'Box volume', v: fixed3(volumeIn(sz.x * sz.y * sz.z, units)) + ' ' + volumeUnit(units) },
+    { k: 'Base / top', v: `${len(mn.z)} → ${len(mx.z)}` },
     {
       k: 'Centroid',
-      v: map ? `${fixed3(map.E)} E · ${fixed3(map.N)} N · ${fixed3(map.Z)} Z` : DASH
+      v: map ? `${xyz(map.E)} E · ${xyz(map.N)} N · ${xyz(map.Z)} Z` : DASH
     },
     { k: 'Geometry', v: `${solids} solid${solids === 1 ? '' : 's'}` }
   ]
@@ -211,6 +219,8 @@ export interface SelectionInput {
   solids: number
   coords: CoordState
   offset: Vec3
+  /** The display unit the geometry rows are written in (2026-10-09); `mm` when not given. */
+  units?: Units
 }
 
 /** The design's `sel` object, or `null` when nothing is selected. `:1854–1873`. */
@@ -235,7 +245,7 @@ export function selectionCard(input: SelectionInput): SelectionCard | null {
     psetCount: Object.keys(element.psets).length + Object.keys(element.qto).length,
     noPsets: psets.length === 0,
     relRows: relRows(federation.elements, element),
-    geoRows: geoRows(input.box, input.solids, input.coords, input.offset)
+    geoRows: geoRows(input.box, input.solids, input.coords, input.offset, input.units)
   }
 }
 

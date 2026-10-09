@@ -111,7 +111,7 @@ function SectionHead({
 /** The store fields this component reads — it re-renders when one of them changes. */
 const KEYS = pick(
   'byId', 'coords', 'copied', 'copyGuid', 'dims', 'federation', 'offset', 'propOpen', 'sel',
-  'selIds', 'select', 'toggleDims', 'toggleProp'
+  'selIds', 'select', 'toggleDims', 'toggleProp', 'units'
 )
 
 export default function PropertyCard(): React.JSX.Element | null {
@@ -126,11 +126,12 @@ export default function PropertyCard(): React.JSX.Element | null {
         box: element && viewer ? viewer.elementBox(element.id) : null,
         solids: element && viewer ? viewer.solidCount(element.id) : 0,
         coords: st.coords,
-        offset: st.offset
+        offset: st.offset,
+        units: st.units
       }),
     // `viewer` is a module-level handle, not state; the box is re-read whenever the selection,
     // the federation or the georeferencing changes, which is every time it can have moved.
-    [st.federation, element, st.coords, st.offset, viewer]
+    [st.federation, element, st.coords, st.offset, st.units, viewer]
   )
   if (!sel) return null
 

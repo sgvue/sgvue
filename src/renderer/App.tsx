@@ -156,6 +156,7 @@ function useShellHost(): {
       viewer.setLevels(st.levels)
       viewer.setGroundGrid(st.groundGrid)
       viewer.setCoords(st.coords)
+      viewer.setUnits(st.units)
       viewer.setTool(st.tool)
       viewer.setModelColors(st.modelColors, st.nativeMats)
       if (st.active) viewer.setPickable(pickableFor(st.active))

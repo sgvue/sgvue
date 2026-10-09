@@ -18,6 +18,7 @@
  * in front of the newest such reply is `done` (`veeStateOf`).
  */
 import type { ChatTable } from '../../ai/executors/context'
+import { volumeIn, volumeUnit, type DisplayUnit } from '../../../shared/units'
 import type { ChatMessage, ShellState } from '../shell'
 import { chatSuggest, type SuggestInput } from '../../ai/analysis'
 import { plainText } from '../../ai/blocks'
@@ -72,24 +73,42 @@ export interface ChatRow {
   wide: boolean
 }
 
-/** `:2029`. The table's middle column: a clash volume, else an area, else a volume, else blank. */
+/**
+ * `:2029`. The table's middle column: a clash volume, else an area, else a volume, else blank.
+ *
+ * 2026-10-09. A clash's overlap is a volume the app computes, so it follows the display unit —
+ * m³, or ft³ in `ft`. An area or a volume total is the file's own number, summed as authored,
+ * so a table that states its units (`ChatTable.units`, which `summarize_elements` always does)
+ * labels it in the file's own unit — `m²` on a metric Revit export as before, `ft²` on one in
+ * feet — and with no unit where the files do not settle one, as the reply says. A table that
+ * states none is labelled as the design labels it, `m²` / `m³`.
+ */
 export function tableQuantity(
-  table: Pick<ChatTable, 'clash'>,
-  row: { area?: number; volume?: number; vol?: number }
+  table: Pick<ChatTable, 'clash' | 'units'>,
+  row: { area?: number; volume?: number; vol?: number },
+  unit: DisplayUnit = 'mm'
 ): string {
-  if (table.clash) return (row.vol ?? 0) >= 0.001 ? (row.vol ?? 0).toFixed(3) + ' m³' : '<0.001 m³'
-  if (row.area) return row.area.toFixed(1) + ' m²'
-  if (row.volume) return row.volume.toFixed(2) + ' m³'
+  if (table.clash) {
+    const v = volumeIn(row.vol ?? 0, unit)
+    return v >= 0.001 ? v.toFixed(3) + ' ' + volumeUnit(unit) : '<0.001 ' + volumeUnit(unit)
+  }
+  const label = (u: string | undefined, design: string): string =>
+    !table.units ? ' ' + design : u ? ' ' + u : ''
+  if (row.area) return row.area.toFixed(1) + label(table.units?.area, 'm²')
+  if (row.volume) return row.volume.toFixed(2) + label(table.units?.volume, 'm³')
   return ''
 }
 
-/** `:2031`'s "copy csv", as a string. The header names the grouping the table was built on. */
-export function tableCsv(table: ChatTable): string {
+/**
+ * `:2031`'s "copy csv", as a string. The header names the grouping the table was built on. A
+ * clash volume is the number the table shows, in the display unit's cube (2026-10-09).
+ */
+export function tableCsv(table: ChatTable, unit: DisplayUnit = 'mm'): string {
   return [
     `${table.groupBy},count,quantity`,
     ...table.rows.map(
       (r) =>
-        `"${r.k}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? r.vol.toFixed(4) : ''}`
+        `"${r.k}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : ''}`
     )
   ].join('\n')
 }
@@ -102,7 +121,7 @@ export const BUBBLE_RADIUS = '11px 11px 11px 3px'
  * decided the side (`flex-end`) and the corner the notch is on (`11px 11px 3px 11px`); the
  * owner's handoff puts `You` on the left with the assistant's corner.
  */
-export function chatRow(m: ChatMessage, i: number): ChatRow {
+export function chatRow(m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): ChatRow {
   const mine = m.role === 'user'
   const table = m.table ?? null
   const trace = mine ? null : (m.trace ?? null)
@@ -128,7 +147,7 @@ export function chatRow(m: ChatMessage, i: number): ChatRow {
       ? table.rows.map((r) => ({
           k: r.k,
           n: String(r.n),
-          q: tableQuantity(table, r),
+          q: tableQuantity(table, r, unit),
           ids: r.ids
         }))
       : [],

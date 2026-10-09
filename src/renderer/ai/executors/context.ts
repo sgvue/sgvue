@@ -38,6 +38,14 @@ export interface ChatTable {
   groupBy: string
   clash?: boolean
   rows: { k: string; n: number; area?: number; volume?: number; vol?: number; ids: number[] }[]
+  /**
+   * 2026-10-09 — the unit the area and volume totals are in, **as the file writes it** (`m²`,
+   * `ft²` …: `summarize_elements`'s own `units`), a metric absent where the files do not settle
+   * one. The totals are as authored, so this is their label; the design's literal `m²` and `m³`
+   * labelled a model in feet wrong (`state/selectors/chat.ts`, `tableQuantity`). A clash table's
+   * overlap volume is the app's own, in the display unit.
+   */
+  units?: { area?: string; volume?: string }
 }
 
 /**

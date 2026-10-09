@@ -15,6 +15,7 @@
 import { DASH, group, group3 } from '../../../shared/fmt'
 import type { Federation } from '../../../shared/federate'
 import type { Units } from '../../../shared/model-index.types'
+import { coordIn, coordUnit, formatLength, type DisplayUnit } from '../../../shared/units'
 import type { CoordState, LibraryFile } from '../shell'
 import { baseSwatch, modelLabel } from './models'
 
@@ -39,6 +40,12 @@ export interface SpatialInput {
   library: readonly LibraryFile[]
   coords: CoordState
   uploadNames: Record<string, string>
+  /**
+   * The display unit (2026-10-09): the site's height and position are coordinates — metres, or
+   * decimal feet in `ft` — and the height to the top storey an elevation, in feet and inches in
+   * `ft`. `mm` and `m` print what these rows always printed, which was metres.
+   */
+  units?: DisplayUnit
 }
 
 /** `MILLI.METRE · SQUARE_METRE · CUBIC_METRE` from the file's own `IfcUnitAssignment`. */
@@ -53,10 +60,12 @@ export function unitsLine(units: Units): string {
 }
 
 const or = (v: string | undefined | null): string => (v ? v : DASH)
-const num3 = (v: number | null): string => (v == null ? DASH : group3(v))
 
 export function spatialCards(input: SpatialInput): SpatialCard[] {
-  const { federation: m, library, coords: co, uploadNames } = input
+  const { federation: m, library, coords: co, uploadNames, units = 'mm' } = input
+  /** A coordinate, comma-grouped to three decimals as the design's own `f3` here (`:1749`). */
+  const xyz = (v: number): string => group3(coordIn(v, units))
+  const cu = coordUnit(units)
   if (!m.models.length) return []
   const p = m.project
   const top = m.storeys.length ? m.storeys[m.storeys.length - 1] : null
@@ -96,13 +105,13 @@ export function spatialCards(input: SpatialInput): SpatialCard[] {
         { k: 'Name', v: or(p.site) },
         { k: 'GlobalId', v: or(first.site?.guid) },
         { k: 'CompositionType', v: or(first.site?.compositionType) },
-        { k: 'RefElevation', v: co.Z == null ? DASH : `${group3(co.Z)} m` },
+        { k: 'RefElevation', v: co.Z == null ? DASH : `${xyz(co.Z)} ${cu}` },
         {
           k: 'Easting / Northing',
           v:
             co.E == null || co.N == null
               ? DASH
-              : `${group3(co.E)} E · ${group3(co.N)} N (SVY21)`
+              : `${xyz(co.E)} E · ${xyz(co.N)} N (SVY21)`
         },
         {
           k: 'True north',
@@ -120,7 +129,11 @@ export function spatialCards(input: SpatialInput): SpatialCard[] {
         { k: 'CompositionType', v: or(first.building?.compositionType) },
         { k: 'Storeys', v: `${m.storeys.length} IfcBuildingStorey` },
         { k: 'Declared in', v: names.join('  ·  ') || DASH },
-        { k: 'Height to top', v: top ? `${num3(top.elev)} m (${top.name})` : DASH },
+        {
+          k: 'Height to top',
+          // An elevation: what it printed in `mm` and `m`, feet and inches in `ft`.
+          v: top ? `${units === 'ft' ? formatLength(top.elev, units) : `${group3(top.elev)} m`} (${top.name})` : DASH
+        },
         { k: 'Elements', v: group(m.elements.length) }
       ]
     }

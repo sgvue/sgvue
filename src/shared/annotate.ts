@@ -27,7 +27,16 @@
  * pointing into the positive half-plane. That is `(1, 0)` and `(0, 1)` for those two cases,
  * which is the design exactly, and it is well defined at 43°.
  */
-import { DASH, f3, fmtMM, mmPlain, signedF3, signedMm } from './fmt'
+import { DASH, FOOT, signedF3 } from './fmt'
+import {
+  coord3,
+  coordIn,
+  formatElevation,
+  formatLength,
+  lengthNumber,
+  lengthSuffix,
+  type DisplayUnit
+} from './units'
 
 /** A plan point or direction: `[x, y]`, metres. */
 export type XY = readonly [number, number]
@@ -501,10 +510,11 @@ export const LEVEL_TAG_DX = -30
  * the reference model: the tag read `+1 000` for the storey the ladder calls `+0`).
  *
  * So the ring's height and the tag's number are two arguments, not one. `signedMm` is the
- * design's own formatter, U+2212 and thin spaces included.
+ * design's own formatter, U+2212 and thin spaces included — and since 2026-10-09 the display
+ * unit's (`shared/units.ts`, `formatElevation`): `+4.000` in `m`, `+13'-1 1/2"` in `ft`.
  */
-export const levelTagHtml = (name: string, authoredElevation: number): string =>
-  `<b style="font-weight:500;color:var(--ink)">${name}</b>&nbsp; ${signedMm(authoredElevation)}`
+export const levelTagHtml = (name: string, authoredElevation: number, unit: DisplayUnit = 'mm'): string =>
+  `<b style="font-weight:500;color:var(--ink)">${name}</b>&nbsp; ${formatElevation(authoredElevation, unit)}`
 
 /* ────────────────────────────── laser meter ────────────────────────────── */
 
@@ -568,28 +578,34 @@ export const laserSideLengths = (s: LaserSides): number[] =>
 /**
  * L395. One reading in the 3D view — the axis in `--faint`, the length in `--ink`, as the
  * design's label for the whole ray. Since 2026-10-08 one such label stands at the middle of
- * each half of the ray that reached a face.
+ * each half of the ray that reached a face; since 2026-10-09 in the display unit
+ * (`formatLength`: `2 300 mm` · `2.300 m` · `7'-6 1/2"`).
  */
-export const laserLabelHtml = (axis: LaserAxis, metres: number): string =>
+export const laserLabelHtml = (axis: LaserAxis, metres: number, unit: DisplayUnit = 'mm'): string =>
   `<span style="color:var(--faint)">${axis}</span>&nbsp;` +
-  `<b style="font-weight:500;color:var(--ink)">${fmtMM(metres)}</b>`
+  `<b style="font-weight:500;color:var(--ink)">${formatLength(metres, unit)}</b>`
 
 /**
  * L617. The reading that follows the pointer: per axis, since 2026-10-08, its two sides joined
  * by a `+` in `--faint` (the axis letter's and the unit's colour) — or the one side that reached
- * a face — with the design's `·` between axes and its ` mm` once at the end.
+ * a face — with the design's `·` between axes and its ` mm` once at the end. Since 2026-10-09 in
+ * the display unit: ` m` once at the end in `m`, and in `ft` no unit at all — feet and inches
+ * say their own.
  */
-export const laserLiveHtml = (rays: readonly ({ axis: LaserAxis } & LaserSides)[]): string =>
+export const laserLiveHtml = (
+  rays: readonly ({ axis: LaserAxis } & LaserSides)[],
+  unit: DisplayUnit = 'mm'
+): string =>
   rays
     .map(
       (r) =>
         `<span style="color:var(--faint)">${r.axis}</span> ` +
         laserSideLengths(r)
-          .map((v) => `<b style="font-weight:500">${mmPlain(v)}</b>`)
+          .map((v) => `<b style="font-weight:500">${lengthNumber(v, unit)}</b>`)
           .join('<span style="color:var(--faint)"> + </span>')
     )
     .join('<span style="color:var(--border-strong)"> · </span>') +
-  '<span style="color:var(--faint)"> mm</span>'
+  (lengthSuffix(unit) ? `<span style="color:var(--faint)">${lengthSuffix(unit)}</span>` : '')
 
 /* ────────────────────────────── spot coordinates ────────────────────────────── */
 
@@ -598,12 +614,20 @@ export const laserLiveHtml = (rays: readonly ({ axis: LaserAxis } & LaserSides)[
  * the em dash where the design prints its own default base point. `f` is the point in the
  * file's coordinates (metres), `m` its map coordinates or `null` when the file states no base
  * point. Since 2026-09-28 this is the tag's **expanded** form, byte for byte what it always was.
+ *
+ * 2026-10-09: in the display unit, by the one rule (`shared/units.ts`) — E, N and Z are
+ * coordinates, so metres in `mm` and `m` and decimal feet in `ft`; the xyz row printed whole
+ * millimetres, so it prints metres to three decimals in `m` and decimal feet in `ft`, ungrouped
+ * as it always was.
  */
 export function spotGridHtml(
   f: { x: number; y: number; z: number },
-  m: { E: number; N: number; Z: number } | null
+  m: { E: number; N: number; Z: number } | null,
+  unit: DisplayUnit = 'mm'
 ): string {
-  const v = (n: number | null | undefined): string => (n == null ? DASH : f3(n))
+  const v = (n: number | null | undefined): string => (n == null ? DASH : coord3(n, unit))
+  const xyz = (n: number): string =>
+    unit === 'mm' ? String(Math.round(n * 1000)) : (unit === 'ft' ? n / FOOT : n).toFixed(3)
   const rule = 'border-top:1px solid var(--border);padding-top:3px;margin-top:1px'
   return (
     '<div style="display:grid;grid-template-columns:auto auto;gap:2px 10px;text-align:right">' +
@@ -611,8 +635,8 @@ export function spotGridHtml(
     `<span style="color:var(--faint)">N</span><span style="color:var(--ink)">${v(m?.N)}</span>` +
     `<span style="color:var(--faint)">Z</span><span style="color:var(--ink)">${v(m?.Z)}</span>` +
     `<span style="color:var(--faint);${rule}">xyz</span>` +
-    `<span style="${rule}">${Math.round(f.x * 1000)}, ${Math.round(f.y * 1000)}, ` +
-    `${Math.round(f.z * 1000)}</span></div>`
+    `<span style="${rule}">${xyz(f.x)}, ${xyz(f.y)}, ` +
+    `${xyz(f.z)}</span></div>`
   )
 }
 
@@ -630,10 +654,11 @@ export const SPOT_LEVEL_MARK =
 /**
  * 2026-09-28, owner-requested: the spot tag's **collapsed** form, its level only — `▽ +10.500`.
  * `z` is the number the grid's Z row prints (the map Z) or, with no base point, the file's own
- * z in metres; `signedF3` is `f3` with an explicit sign.
+ * z in metres; `signedF3` is `f3` with an explicit sign. A coordinate, so since 2026-10-09 it is
+ * metres in `mm` and `m` and decimal feet in `ft` (`coordIn`).
  */
-export const spotLevelHtml = (z: number): string =>
-  `${SPOT_LEVEL_MARK} <span style="color:var(--ink)">${signedF3(z)}</span>`
+export const spotLevelHtml = (z: number, unit: DisplayUnit = 'mm'): string =>
+  `${SPOT_LEVEL_MARK} <span style="color:var(--ink)">${signedF3(coordIn(z, unit))}</span>`
 
 /* ────────────────────── a markup placed on an element's box (2026-10-02) ────────────────────── */
 

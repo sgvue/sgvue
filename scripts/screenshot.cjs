@@ -16,6 +16,8 @@
  *   SGVUE_THEMES   comma-separated themes to capture each state in; default `dark,light`
  *   SGVUE_SETTLE   ms to wait after each state before capturing; default 1400
  *   SGVUE_UPDATE_LATEST  a version number: the landing page shows its update notice for it
+ *   SGVUE_IFC      an .ifc to open instead of the mock (2026-10-09): served over a `sgvue-file:`
+ *                  URL of this harness's own and loaded with `D.open`, as `shell-sanity.cjs` does
  *
  * It lives outside `src/` on purpose: `tests/readonly-guard.test.ts` allows disk writes only
  * from the three enumerated writers, and a screenshot must not become a fourth.
@@ -41,9 +43,10 @@
  * sentence, a bulleted list and a table, mid-reveal and settled, and one whose tool carries rules,
  * so the trace's rows stand under its blocks.
  */
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, net, protocol } = require('electron')
 const { mkdir, writeFile } = require('node:fs/promises')
-const { dirname, join, resolve } = require('node:path')
+const { basename, dirname, join, resolve } = require('node:path')
+const { pathToFileURL } = require('node:url')
 const { installGuard } = require('./lib/electron-guard.cjs')
 const { resolveBackend } = require('./lib/backend.cjs')
 
@@ -236,6 +239,16 @@ const FMT_READ =
  * inert because the operator ignores it. Driven through the designed controls, by their own
  * copy, exactly as every state above is.
  */
+/**
+ * 2026-10-09: the display unit set through the Markups card's own toggle — the card opened, the
+ * unit's button clicked by its copy, the card closed again (`D.tool` is the assistant's own
+ * `set_interface`, `card`, which is what reaches the card before there is a markup to open it).
+ */
+const UNIT_STATE = (unit) =>
+  `await D.tool('set_interface', { card: 'measure' }); await sleep(300);` +
+  ` click(byText('button', ${JSON.stringify(unit)})); await sleep(300);` +
+  ` await D.tool('set_interface', { card: 'none' })`
+
 const APP_ONLY_STATES = {
   'filter-absent':
     `click(tbBtn('Filter elements by parameter')); await sleep(300);` +
@@ -438,7 +451,43 @@ const APP_ONLY_STATES = {
     `${traceAt(FMT.send + 10)}; D.chat.step.begin(${JSON.stringify(TRACE.question)}); ${traceAt(FMT.start + 10)};` +
     ` D.chat.step.start(); ${traceAt(FMT.start + 10.1)}; await D.chat.step.exec('query_elements', ${TRACE.rules});` +
     ` ${traceAt(FMT.start + 10 + 5.8)}; D.chat.step.done(${JSON.stringify(FMT.rows)}); ${traceAt(FMT.start + 10 + 8.8)};` +
-    ` await sleep(200); ${FMT_READ}`
+    ` await sleep(200); ${FMT_READ}`,
+
+  /* ── 2026-10-09: the display unit — mm, m and feet and inches ────────────────
+   * `tests/parity/2026-10-09-units/README.md` has the commands and the measurements. A chain
+   * starts with one of `units-mm`, `units-m` or `units-ft` — the Markups card opened (through
+   * the assistant's own `set_interface`, since the card's button lives in the action bar only
+   * once there is a markup), its unit button clicked by its own copy, the card closed — and then
+   * runs the annotation and laser chains, so every label is captured in that unit. The
+   * `units-*` states that follow are for any model, the feet fixture among them
+   * (`SGVUE_IFC=tests/fixtures/feet.ifc`): levels on, a level cut in the Section card, and the
+   * Coordinate-system card.
+   * ──────────────────────────────────────────────────────────────────────────── */
+  'units-mm': UNIT_STATE('mm'),
+  'units-m': UNIT_STATE('m'),
+  'units-ft': UNIT_STATE('ft'),
+  'units-levels': `click(tbBtn('3D perspective (Home)')); await sleep(900); click(tbBtn('Levels (L)'))`,
+  // The second level's chip — `L1` on the mock, `Level 2` on the feet fixture — at the card's own
+  // 1 200 mm: the offset field, its nudges and the summary, in the unit.
+  'units-section-level':
+    `click(tbBtn('Levels (L)')); await sleep(300); click(tbBtn('Section from gridline / level')); await sleep(400);` +
+    ` click([...sectionCard().querySelector('[role="group"][aria-label="At a level"]').querySelectorAll('button')]` +
+    `.filter((b) => b.className.includes('hv-accent-line') && txt(b) !== 'cut')[1])`,
+  'units-coords-card':
+    `click(secClear()); await sleep(300); click(tbBtn('Coordinate system & true north'))`,
+  // A laser measurement from the top of the model's first slab — the viewer's own commit for a
+  // click, through the assistant's `manage_markups` — and the Markups card it lands in.
+  'units-place-laser':
+    `click(tbBtn('Coordinate system & true north')); await sleep(300);` +
+    ` const slab = D.federation().elements.find((e) => e.type === 'IfcSlab');` +
+    ` await D.tool('manage_markups', { op: 'place_measure', id: slab.id, at: 'top' }); await sleep(600);` +
+    ` click($('button[data-tip="Open the markups list"]'))`,
+  // A spot on top of the same slab, its tag opened to the full E / N / Z and the file's own xyz.
+  'units-place-spot':
+    ` const slab = D.federation().elements.find((e) => e.type === 'IfcSlab');` +
+    ` await D.tool('manage_markups', { op: 'place_spot', id: slab.id, at: 'top', show: 'full' })`,
+  // Every collapsed spot tag opened — the tag's own click.
+  'units-spot-full': `$$('div').filter((e) => e.title === 'Show E, N and Z').forEach((e) => e.click())`
 }
 
 /**
@@ -565,7 +614,19 @@ async function panelCrops(win, dir, stem) {
 
 app.enableSandbox()
 
+/** 2026-10-09: a real file to open instead of the mock — the feet fixture, say. */
+const IFC = process.env.SGVUE_IFC ? resolve(ROOT, process.env.SGVUE_IFC) : null
+if (IFC) {
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: 'sgvue-file',
+      privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true }
+    }
+  ])
+}
+
 app.whenReady().then(async () => {
+  if (IFC) protocol.handle('sgvue-file', () => net.fetch(pathToFileURL(IFC).toString()))
   const win = new BrowserWindow({
     width: SIZE[0],
     height: SIZE[1],
@@ -622,6 +683,15 @@ app.whenReady().then(async () => {
     scale: 1
   })
   await wait(2500) // fonts, renderer init, mock federation upload
+  if (IFC) {
+    // The parse and the stream, then the landing page's fade.
+    const name = basename(IFC)
+    const said = await win.webContents.executeJavaScript(
+      `window.__sgvueDev ? window.__sgvueDev.open('sgvue-file://model/${encodeURIComponent(name)}', ${JSON.stringify(name)}).then(() => 'ok') : 'no-devtools'`
+    )
+    console.log(`opened ${name}: ${said}`)
+    await wait(2500)
+  }
 
   const single = STATES.length === 1 && THEMES.length === 1 && OUT.endsWith('.png')
   const dir = single ? dirname(OUT) : OUT

@@ -38,7 +38,8 @@ type BetaTextBlockParam = Anthropic.Beta.BetaTextBlockParam
  * and markups are the user's own), phase 3, the consent gate (what only asks, and that a
  * request is never reported as done) and phase 4 (the Schedules window's own controls and a
  * schedule's rows as a set; placing a markup) — each marked where it sits. 37 lines — 39 since
- * 2026-10-08, when one design line became three (below).
+ * 2026-10-08, when one design line became three (below), and 40 since 2026-10-09, when the app
+ * began to print every length in the user's display unit and the replies were asked to as well.
  *
  * Phase 3 also brought two of the *added* lines up to date, because each said something that
  * stopped being true: `delete_set` forgets nothing by itself any more, and a viewpoint or a
@@ -106,6 +107,10 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   // 2026-09-20 — `docs/AI_REVIEW.md` finding 6. Two of the three facts are stated inside
   // individual tool results; the instruction that would make the model look was absent.
   'Quantities are as authored. summarize_elements totals the file’s own numbers in the file’s own units, and a model can author lengths in millimetres while areas are in square metres — read the unit each total carries, or call get_model_info for the unit assignment, before you put a unit on a number, and say so when a group’s total covers fewer elements than the group’s count. Every box-derived figure — get_element, measure_between, find_nearby, clash_check, the bbox table — is project-frame metres, Z-up, and is bounding-box arithmetic rather than solid geometry.',
+  // 2026-10-09 — owner: "Why model units not automatically using the units provided by model?
+  // in other countries are feets". The app speaks the display unit everywhere it prints a length;
+  // the per-turn view state names it when it is not millimetres, and a reply should match.
+  'State every length, elevation and distance you give the user in their display unit — millimetres, unless the view state names units: m for metres, or ft for feet and inches such as 12\'-6 1/2" — and a coordinate in metres, or in decimal feet when units is ft; convert what a tool reports in metres, and keep a property or quantity value in the unit the file authored it in.',
   // 2026-09-20 — gap 1. The three ways to name a set, and why one of them is the last resort.
   'To act on a set you found rather than one you can describe, pass ids to select_elements, apply_visibility or color_by_property — the ids query_sql, search or find_nearby returned — or selection:true for whatever the user has selected. Prefer rules whenever a rule can express the same set: a rule step shows in the Filter card, can be saved as a named filter set and survives a model being reloaded, while an id list is per session and does none of that. Ids you did not read from a tool this turn will not exist.',
   // 2026-09-20 — gap 8.

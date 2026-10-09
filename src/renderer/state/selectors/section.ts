@@ -12,7 +12,9 @@
  * `v`, `w`), which the card draws as one chip row a family with a rule between them.
  */
 import type { Federation } from '../../../shared/federate'
+import { FOOT, ftIn, MINUS, THIN_SPACE } from '../../../shared/fmt'
 import { LEVEL_DEFAULT_OFFSET_MM, type SecKind, type SecPlane } from '../../../shared/sections'
+import type { DisplayUnit } from '../../../shared/units'
 
 export interface SectionChip {
   name: string
@@ -91,3 +93,77 @@ export const planePatch = (name: string, kind: SecKind): Pick<SecPlane, 'name' |
  */
 export const chipPatch = (name: string, kind: SecKind, plane: SecPlane): Partial<SecPlane> =>
   plane.name === name ? { name: '' } : planePatch(name, kind)
+
+/* ─────────────────── the offset field in the display unit (2026-10-09) ─────────────────── */
+
+/**
+ * The offset is **millimetres**, as the design keeps it, whatever the field shows: a plane, a
+ * session, a viewpoint and the assistant's `set_section` all carry millimetres, and the level
+ * cut's default is still 1 200 mm. Since 2026-10-09 (owner-requested) the field and its two
+ * nudge buttons speak the display unit:
+ *
+ *  · `mm` — the design's own field and its ±500, unchanged;
+ *  · `m` — metres, nudged by 0.5 m (the same 500 mm);
+ *  · `ft` — feet and inches at rest (`3'-11 1/4"` for the level cut's 1 200 mm), as its nudges
+ *    are written, nudged by 2'-0" (609.6 mm); typed, either feet and inches (`12'-6"`) or decimal
+ *    feet (`12.5`).
+ */
+export const OFFSET_STEP_MM: Readonly<Record<DisplayUnit, number>> = { mm: 500, m: 500, ft: 2 * FOOT * 1000 }
+
+/** Millimetres to a thousandth: what a foot or a metre typed in, times 1 000, settles to. */
+const mm3 = (v: number): number => Math.round(v * 1000) / 1000
+
+/** The field's text for an offset in millimetres: `1200` · `1.2` · `3'-11 1/4"`. */
+export function offsetText(mm: number, unit: DisplayUnit): string {
+  if (unit === 'mm') return String(mm)
+  if (unit === 'ft') return ftIn(mm / 1000)
+  return String(Number((mm / 1000).toFixed(3)))
+}
+
+/**
+ * Decimal feet — `12.5`, `-3` — or feet and inches — `12'-6"`, `12' 6 1/2"`, `0'-3/4"`, `6"`,
+ * `−3'-6"` — to feet; `NaN` for anything else, such as a reading still being typed.
+ */
+export function parseFeet(text: string): number {
+  const t = text
+    .trim()
+    .replace(new RegExp(`[${MINUS}–]`, 'g'), '-')
+    // `ftIn` groups the feet with a thin space (`1 000'-0"`), so one between a digit and three
+    // more is no separator; any other thin space is read as the space it is (`6 1/2"`).
+    .replace(new RegExp(`(\\d)${THIN_SPACE}(?=\\d{3}(?!\\d))`, 'g'), '$1')
+  if (!/['"]/.test(t)) return t ? Number(t) : NaN
+  const m = /^([+-])?\s*(?:(\d+(?:\.\d+)?)\s*')?\s*-?\s*(?:(?:(\d+(?:\.\d+)?)(?:[\s-]+(\d+)\/(\d+))?|(\d+)\/(\d+))\s*"?)?$/.exec(t)
+  if (!m || (m[2] == null && m[3] == null && m[6] == null)) return NaN
+  // A fraction over zero is no number at all.
+  const frac = (n?: string, d?: string): number => (n != null && d != null ? Number(n) / Number(d) : 0)
+  const inches = Number(m[3] ?? 0) + frac(m[4], m[5]) + frac(m[6], m[7])
+  const feet = Number(m[2] ?? 0) + inches / 12
+  if (!Number.isFinite(feet)) return NaN
+  return m[1] === '-' ? -feet : feet
+}
+
+/**
+ * The offset a typed text stands for, in millimetres. In `mm` the design's own rule — what
+ * does not parse is `0`; in `m` and `ft` it is `null`, and the plane stays where it is while a
+ * reading is still being typed (`1.`, `12'-6 1/`).
+ */
+export function parseOffset(text: string, unit: DisplayUnit): number | null {
+  if (unit === 'mm') {
+    const n = parseFloat(text)
+    return isNaN(n) ? 0 : n
+  }
+  const v = unit === 'ft' ? parseFeet(text) * FOOT * 1000 : Number(text.trim() === '' ? NaN : text) * 1000
+  return Number.isFinite(v) ? mm3(v) : null
+}
+
+/** One click of `−` (`-1`) or `+` (`1`): the design's ±500 mm, or ±2'-0" in `ft`. */
+export const nudgeOffset = (mm: number, sign: 1 | -1, unit: DisplayUnit): number =>
+  unit === 'ft' ? mm3(mm + sign * OFFSET_STEP_MM.ft) : mm + sign * OFFSET_STEP_MM[unit]
+
+/** The nudge buttons' text and title: `−500` / `−500 mm`, `−0.5` / `−0.5 m`, `−2'-0"` twice. */
+export function nudgeLabel(sign: 1 | -1, unit: DisplayUnit): { text: string; title: string } {
+  const s = sign < 0 ? MINUS : '+'
+  if (unit === 'ft') return { text: `${s}2'-0"`, title: `${s}2'-0"` }
+  const n = unit === 'm' ? '0.5' : '500'
+  return { text: s + n, title: `${s}${n} ${unit}` }
+}

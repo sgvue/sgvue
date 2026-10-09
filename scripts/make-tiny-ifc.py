@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Dev utility — write the committed test fixtures: `tests/fixtures/tiny.ifc`, the smoke test's
-model, `tests/fixtures/high-first.ifc`, the ground-height check's (2026-10-01), and
-`tests/fixtures/georef/`, the map-space federation check's (2026-10-08).
+model, `tests/fixtures/high-first.ifc`, the ground-height check's (2026-10-01),
+`tests/fixtures/georef/`, the map-space federation check's (2026-10-08), and
+`tests/fixtures/feet.ifc`, the display unit's (2026-10-09).
 
 The end-to-end test needs a file that is **committed**, so `samples/` (git-ignored, real
 project models) cannot be it. This writes deterministic IFC files with nothing in them but
@@ -40,6 +41,10 @@ anybody — and the only site coordinates anywhere are the repository's syntheti
    and `get_true_north`, since `auto_xyz2enh` leaves a file with no conversion where it is.
    `tests/unit/georef-federation.fixture.test.ts` federates every pair of them, in either boot
    order.
+ · `feet.ifc` (2026-10-09) — one small building drawn in feet, as an imperial Revit export
+   writes it (FOOT, SQUARE FOOT and CUBIC FOOT conversion-based units, base quantities in square
+   and cubic feet), at the synthetic map position stated in US survey feet: the app starts in
+   `ft` for it (`tests/unit/feet.fixture.test.ts`, `tests/e2e/feet.spec.ts`).
 
 They are built with IfcOpenShell, the same reference implementation `expected-from-ifcopenshell.py`
 uses as ground truth, so the fixtures the app is measured against were not written by the app's
@@ -107,6 +112,7 @@ class Fixture:
         true_north: tuple[float, float] | None = None,
         plan_context: bool = False,
         wcs_at: tuple[float, float, float] | None = None,
+        feet: bool = False,
     ) -> None:
         global _counter
         _counter = 0  # every file numbers its own GlobalIds from 1
@@ -123,21 +129,34 @@ class Fixture:
         f.header.file_name.authorization = "none"
 
         # ── units: metres, so nothing here exercises a unit conversion by accident — or, for the
-        #    georeferencing fixtures, millimetres, which is what a Revit export writes ──
-        length = (
-            f.create_entity("IfcSIUnit", UnitType="LENGTHUNIT", Prefix="MILLI", Name="METRE")
-            if millimetres
-            else f.create_entity("IfcSIUnit", UnitType="LENGTHUNIT", Name="METRE")
-        )
-        units = f.create_entity(
-            "IfcUnitAssignment",
-            Units=[
-                length,
-                f.create_entity("IfcSIUnit", UnitType="AREAUNIT", Name="SQUARE_METRE"),
-                f.create_entity("IfcSIUnit", UnitType="VOLUMEUNIT", Name="CUBIC_METRE"),
-                f.create_entity("IfcSIUnit", UnitType="PLANEANGLEUNIT", Name="RADIAN"),
-            ],
-        )
+        #    georeferencing fixtures, millimetres, which is what a Revit export writes — or, for
+        #    `feet.ifc` (2026-10-09), feet, square feet and cubic feet, as an imperial Revit
+        #    export writes them: conversion-based units over the SI ones ──
+        if feet:
+            units = f.create_entity(
+                "IfcUnitAssignment",
+                Units=[
+                    self.conversion("LENGTHUNIT", "FOOT", 1, "IfcLengthMeasure", FOOT, "METRE"),
+                    self.conversion("AREAUNIT", "SQUARE FOOT", 2, "IfcAreaMeasure", FOOT**2, "SQUARE_METRE"),
+                    self.conversion("VOLUMEUNIT", "CUBIC FOOT", 3, "IfcVolumeMeasure", FOOT**3, "CUBIC_METRE"),
+                    f.create_entity("IfcSIUnit", UnitType="PLANEANGLEUNIT", Name="RADIAN"),
+                ],
+            )
+        else:
+            length = (
+                f.create_entity("IfcSIUnit", UnitType="LENGTHUNIT", Prefix="MILLI", Name="METRE")
+                if millimetres
+                else f.create_entity("IfcSIUnit", UnitType="LENGTHUNIT", Name="METRE")
+            )
+            units = f.create_entity(
+                "IfcUnitAssignment",
+                Units=[
+                    length,
+                    f.create_entity("IfcSIUnit", UnitType="AREAUNIT", Name="SQUARE_METRE"),
+                    f.create_entity("IfcSIUnit", UnitType="VOLUMEUNIT", Name="CUBIC_METRE"),
+                    f.create_entity("IfcSIUnit", UnitType="PLANEANGLEUNIT", Name="RADIAN"),
+                ],
+            )
 
         north = (
             {"TrueNorth": f.create_entity("IfcDirection", DirectionRatios=true_north)}
@@ -200,6 +219,23 @@ class Fixture:
         )
         self.aggregate(project, [site])
         self.aggregate(site, [self.building])
+
+    def conversion(self, unit_type: str, name: str, power: int, measure: str, factor: float, si: str):
+        """An `IfcConversionBasedUnit` — `name`, `factor` SI units per one of it, its dimension
+        `power` of a length — the way an imperial Revit export writes FOOT, SQUARE FOOT and
+        CUBIC FOOT (2026-10-09)."""
+        f = self.f
+        return f.create_entity(
+            "IfcConversionBasedUnit",
+            Dimensions=f.create_entity("IfcDimensionalExponents", power, 0, 0, 0, 0, 0, 0),
+            UnitType=unit_type,
+            Name=name,
+            ConversionFactor=f.create_entity(
+                "IfcMeasureWithUnit",
+                ValueComponent=f.create_entity(measure, factor),
+                UnitComponent=f.create_entity("IfcSIUnit", UnitType=unit_type, Name=si),
+            ),
+        )
 
     def point(self, x: float, y: float, z: float):
         return self.f.create_entity("IfcCartesianPoint", Coordinates=(float(x), float(y), float(z)))
@@ -690,10 +726,81 @@ def georef() -> None:
     )
 
 
+# ─────────────── 2026-10-09: a building drawn in feet ───────────────
+
+US_SURVEY_FOOT = 1200.0 / 3937.0
+
+
+def feet() -> None:
+    """`feet.ifc` — one small building **in feet**, as an imperial Revit export writes it: FOOT,
+    SQUARE FOOT and CUBIC FOOT as conversion-based units, two storeys at 0'-0" and 10'-6", a slab,
+    two walls 6" thick, a 1'-3" column, an upper slab 9" thick, a three-by-two grid at 20'-0" and
+    30'-0", and base quantities in the file's own square and cubic feet. It stands at the
+    repository's synthetic map position (`CLAUDE.md`, Rules), stated in US survey feet: an
+    `IfcMapConversion` whose `IfcProjectedCRS.MapUnit` is the US survey foot (1200 / 3937 m), its
+    E / N / H the synthetic position in that unit. The app starts in `ft` for it, and its
+    Coordinate-system card reads `US ft` (`tests/unit/feet.fixture.test.ts`,
+    `tests/e2e/feet.spec.ts`)."""
+    fx = Fixture("feet.ifc", "Feet", feet=True, true_north=(SIN, COS))
+    f = fx.f
+    level1, place1 = fx.storey("Level 1", 0.0)
+    level2, place2 = fx.storey("Level 2", 10.5)
+    slab = fx.element("IfcSlab", "Slab L1", place1, (0.0, 0.0, 0.0), (40.0, 30.0, 1.0), PredefinedType="FLOOR")
+    wall_s = fx.element("IfcWall", "Wall S", place1, (0.0, 0.0, 1.0), (40.0, 0.5, 9.5), PredefinedType="SOLIDWALL")
+    wall_w = fx.element("IfcWall", "Wall W", place1, (0.0, 0.5, 1.0), (0.5, 29.5, 9.5), PredefinedType="SOLIDWALL")
+    column = fx.element("IfcColumn", "Column C2", place1, (25.0, 17.5, 1.0), (1.25, 1.25, 9.5), PredefinedType="COLUMN")
+    grid = fx.grid(
+        place1,
+        [(tag, (x, -6.0), (x, 36.0)) for tag, x in (("A", 0.0), ("B", 20.0), ("C", 40.0))],
+        [(tag, (-6.0, y), (46.0, y)) for tag, y in (("1", 0.0), ("2", 30.0))],
+    )
+    upper = fx.element("IfcSlab", "Slab L2", place2, (0.0, 0.0, 0.0), (40.0, 30.0, 0.75), PredefinedType="FLOOR")
+    fx.contain(level1, [slab, wall_s, wall_w, column, grid])
+    fx.contain(level2, [upper])
+    fx.aggregate(fx.building, [level1, level2])
+
+    # Base quantities in the file's own units: square feet, cubic feet, feet.
+    def quantities(name: str, element, values: list[tuple[str, str, str, float]]) -> None:
+        f.create_entity(
+            "IfcRelDefinesByProperties",
+            GlobalId=gid(),
+            RelatedObjects=[element],
+            RelatingPropertyDefinition=f.create_entity(
+                "IfcElementQuantity",
+                GlobalId=gid(),
+                Name=name,
+                Quantities=[f.create_entity(kind, Name=key, **{field: value}) for key, kind, field, value in values],
+            ),
+        )
+
+    quantities(
+        "Qto_SlabBaseQuantities",
+        slab,
+        [
+            ("GrossArea", "IfcQuantityArea", "AreaValue", 1200.0),
+            ("GrossVolume", "IfcQuantityVolume", "VolumeValue", 1200.0),
+        ],
+    )
+    quantities("Qto_WallBaseQuantities", wall_s, [("Length", "IfcQuantityLength", "LengthValue", 40.0)])
+
+    # Where it stands: the synthetic map position, in US survey feet.
+    us_foot = fx.conversion("LENGTHUNIT", "US SURVEY FOOT", 1, "IfcLengthMeasure", US_SURVEY_FOOT, "METRE")
+    crs = f.create_entity(
+        "IfcProjectedCRS",
+        Name="Synthetic test CRS",
+        Description="US survey foot, SGVue test fixture, not a real place",
+        MapUnit=us_foot,
+    )
+    k = 1.0 / US_SURVEY_FOOT
+    map_conversion(fx, fx.model, crs, SITE_E * k, SITE_N * k, SITE_H * k, COS, SIN, 1.0)
+    fx.write(2)
+
+
 def main() -> None:
     tiny()
     high_first()
     georef()
+    feet()
 
 
 if __name__ == "__main__":

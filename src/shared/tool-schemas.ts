@@ -625,7 +625,7 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     kind: 'view',
     description:
       'Cut a section at a gridline or level. The gridline cut and the level cut are two independent planes and both can be on at once: kind:"grid" sets the gridline cut and leaves the level cut alone, kind:"level" sets the level cut and leaves the gridline cut alone. Pass kind:null to clear both; pass a kind with name:"" or no name to clear just that cut. name must be one of the model’s own gridline or storey names; a wrong one changes nothing and returns the valid list. ' +
-      `It does what a click in the Section card does. offset is millimetres along the plane normal; flip reverses which side is kept; cut:false shows the plane as a preview without cutting and cut:true cuts. A new plane cuts, and uses the card’s defaults for what is omitted: offset 0 for a gridline (on the gridline itself) and ${LEVEL_DEFAULT_OFFSET_MM} for a level (above the storey), not flipped. ` +
+      `It does what a click in the Section card does. offset is millimetres along the plane normal, whatever unit the card shows it in; flip reverses which side is kept; cut:false shows the plane as a preview without cutting and cut:true cuts. A new plane cuts, and uses the card’s defaults for what is omitted: offset 0 for a gridline (on the gridline itself) and ${LEVEL_DEFAULT_OFFSET_MM} for a level (above the storey), not flipped. ` +
       'To move, flip, preview or cut a plane that is already set, send the same kind and name again with only what should change: an omitted offset, flip or cut keeps the plane’s current state, and the call never clears it. The result says whether the plane cuts or is previewed, and its section names every cut that is on, e.g. "grid C + level L2". A section hides nothing — it clips the drawing — so counts and the filter stack are unaffected. Pair it with set_view for an elevation.',
     input_schema: obj(
       {
@@ -897,7 +897,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
  * validates against the same lists, and a unit test holds them to the store's.
  */
 export const INTERFACE_THEMES = ['dark', 'light'] as const
-export const INTERFACE_UNITS = ['mm', 'm'] as const
+export const INTERFACE_UNITS = ['mm', 'm', 'ft'] as const
 export const INTERFACE_TREE_MODES = ['entity', 'type'] as const
 export const INTERFACE_SIDEBAR = ['open', 'collapsed'] as const
 /** The six cards, and `none` for the card's own ×. */
@@ -950,14 +950,14 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
   {
     /**
      * The app's own settings: the toolbar's theme button and tool buttons, the Markups card's
-     * mm / m, the sidebar's two tree modes, its collapse button and its search box, the six
+     * mm / m / ft (2026-10-09), the sidebar's two tree modes, its collapse button and its search box, the six
      * cards, and the toolbar's Schedules button. None of it is the model, and none of it is
      * what is visible — which is why the description says "only when the user asks".
      */
     name: 'set_interface',
     kind: 'view',
     description:
-      'Change how the app itself is set up — never what is in the model, and never which elements are visible. Use it only when the user asks for one of these settings. Any subset: theme (dark or light); units, what measurements and dimensions are written in (mm or m); treeMode, how the element tree groups (entity, or type for PredefinedType); sidebar (open or collapsed); card, the one card on the stage — project, section, filter, coords (the coordinate system), views (saved viewpoints) or measure (markups) — or none to close whichever is open; tool, what a click on the model does — select, measure (the laser meter) or spot (a spot coordinate), which the user then places by clicking; search, the text in the element tree’s search box, "" to clear it; and schedulesWindow:"open", which opens the Schedules window or brings it to the front. An omitted setting is left alone, one already as asked is reported without changing, and the result reads all of them back.',
+      'Change how the app itself is set up — never what is in the model, and never which elements are visible. Use it only when the user asks for one of these settings. Any subset: theme (dark or light); units, what measurements, dimensions, levels and coordinates are written in (mm, m, or ft for feet and inches); treeMode, how the element tree groups (entity, or type for PredefinedType); sidebar (open or collapsed); card, the one card on the stage — project, section, filter, coords (the coordinate system), views (saved viewpoints) or measure (markups) — or none to close whichever is open; tool, what a click on the model does — select, measure (the laser meter) or spot (a spot coordinate), which the user then places by clicking; search, the text in the element tree’s search box, "" to clear it; and schedulesWindow:"open", which opens the Schedules window or brings it to the front. An omitted setting is left alone, one already as asked is reported without changing, and the result reads all of them back.',
     input_schema: obj({
       theme: { type: 'string', enum: INTERFACE_THEMES },
       units: { type: 'string', enum: INTERFACE_UNITS },
@@ -1020,7 +1020,7 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
     name: 'manage_markups',
     kind: 'view',
     description:
-      'The markups on the model — the Markups card. Laser measurements are M1, M2 …, each with the X, Y and Z lengths its rays read and, under sides, each length split at the point as the card and the 3D view show it: minus to the face on that axis’s − side, plus to the one on its + side, a side that reached no face left out; spot coordinates are C1, C2 …, each with its E, N and Z map coordinates, or its level in the file’s own metres when the model has no base point. op:"list" returns both lists in the card’s current unit (mm or m); "focus" zooms the camera to one, named as the card names it. ' +
+      'The markups on the model — the Markups card. Laser measurements are M1, M2 …, each with the X, Y and Z lengths its rays read and, under sides, each length split at the point as the card and the 3D view show it: minus to the face on that axis’s − side, plus to the one on its + side, a side that reached no face left out; spot coordinates are C1, C2 …, each with its E, N and Z map coordinates, or its level in the file’s own metres when the model has no base point. op:"list" returns the laser lengths in the card’s current unit — whole millimetres, metres, or decimal feet while it shows ft, as units says — and the spot coordinates in metres; "focus" zooms the camera to one, named as the card names it. ' +
       '"place_spot" and "place_measure" place one exactly as the user’s click with the spot tool or the laser meter does, at a point you name: an element (id) and where on its bounding box (at: top, which is the default, centre or base — the middle of the box’s top face, of the box, or of its underside), or point, in the project-frame metres get_element reports a box in. That box is axis-aligned and conservative, not a picked surface: on a sloped or L-shaped element its middle can be off the real surface, so report it as taken on the bounding box. A measurement reads, along each of X, Y and Z, the distance from the point to the nearest visible face on either side; from top or base it does not read into the element, and from centre it usually reads the element’s own faces. A spot tag shows its level alone until show:"full" — on place_spot, or op:"show" with name, or with no name for every spot — gives it its full E, N and Z; "level" puts it back. ' +
       '"delete" asks the user to delete one, and "clear" every laser measurement (kind:"measures") or every spot coordinate (kind:"spots"). The names are positions in the card, so they shift when one is deleted: list before you focus, show or ask to delete. A deleted markup cannot be brought back, so delete and clear never delete: they wait behind an Apply button under your reply, nothing is deleted unless the user clicks it, and you are not told whether they did. Place a markup only when asked: it stays until the user deletes it or reverts your reply, which takes away the markups that reply placed.',
     gate: { by: 'op', asks: { delete: 'apply', clear: 'apply' } },

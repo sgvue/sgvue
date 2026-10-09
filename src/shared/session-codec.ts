@@ -29,6 +29,7 @@
 import { ID_STRIDE } from './federate'
 import type { FilterStep } from './rules'
 import { NO_PLANE, type SecPlane, type Sections } from './sections'
+import { isDisplayUnit, type DisplayUnit } from './units'
 
 /** One loaded model's file, as the session remembers it. */
 export interface SessionFile {
@@ -129,6 +130,13 @@ export interface SessionPayload {
    * restores and the camera does not (`applyRestore`).
    */
   frame?: string
+  /**
+   * The display unit — the Markups card's toggle, which the design keeps in state (`:851`) but
+   * never saved. Written since 2026-10-09, when the app started following the boot model's own
+   * unit (`shared/units.ts`, `displayUnitOf`): a session or a link that states it restores it
+   * over that; one that does not — every payload written before — leaves the boot model's.
+   */
+  units: DisplayUnit
 }
 
 /**
@@ -248,7 +256,8 @@ export function sessionPayload(
     view: s.view,
     coords: s.coords,
     cam,
-    frame
+    frame,
+    units: s.units
   }
 }
 
@@ -265,10 +274,15 @@ export function sessionPayload(
  * `coords` is the one key the design restores (`:1697`) that this does not, since 2026-10-08:
  * the Coordinate-system card is read-only and the base point always comes from the boot file, so
  * a payload's own — typed into a build from before then, or written by this one — is ignored.
+ *
+ * `units` (2026-10-09) is the port's: a payload that states one of the three display units
+ * restores it, and one that does not — anything written before — keeps the live one, which the
+ * boot has just set from the boot model's own unit. A link is pasted text, so a value that is not
+ * one of the three is no unit at all.
  */
 export function sessionPatch(
   p: Partial<SessionPayload>,
-  s: Pick<SessionSource, 'treeMode' | 'grids' | 'levels' | 'sections' | 'hlColor' | 'view' | 'theme'>
+  s: Pick<SessionSource, 'treeMode' | 'grids' | 'levels' | 'sections' | 'hlColor' | 'view' | 'theme' | 'units'>
 ): SessionRestore {
   const pick = <K extends keyof SessionPayload>(k: K, d: SessionPayload[K]): SessionPayload[K] =>
     p[k] === undefined ? d : (p[k] as SessionPayload[K])
@@ -295,7 +309,8 @@ export function sessionPatch(
     // routes it through `setShadows` rather than through the state patch.
     theme: pick('theme', s.theme),
     shadows: pick('shadows', true),
-    uploadNames: pick('uploadNames', {})
+    uploadNames: pick('uploadNames', {}),
+    units: isDisplayUnit(p.units) ? p.units : s.units
   }
 }
 

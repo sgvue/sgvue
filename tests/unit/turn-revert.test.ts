@@ -171,7 +171,8 @@ describe('the review state, cut into parts', () => {
     const snap = turnSnapshot(st(), null)
     const extra = Object.keys(snap.extra)
     expect(extra.sort()).toEqual(
-      ['activeView', 'card', 'colorBy', 'groundGrid', 'panelOpen', 'search', 'selIds', 'tool', 'units'].sort()
+      // The display unit left this list on 2026-10-09: a session saves it now, so it is a payload part.
+      ['activeView', 'card', 'colorBy', 'groundGrid', 'panelOpen', 'search', 'selIds', 'tool'].sort()
     )
     for (const key of extra) expect([key, partsOf(key, 'extra').length]).toEqual([key, 1])
   })

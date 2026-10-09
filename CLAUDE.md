@@ -870,10 +870,39 @@ Anything not on this list is a defect.
   line. A user's message is unchanged; **no new control.** **Measured:** with a one-sentence reply
   the chat panel is pixel-identical to the build before, both themes — the trace's eight states
   and a reply with no tool.
+- **2026-10-09 — the app starts in the boot model's own unit, the unit toggle gains `ft`, and
+  every length, elevation and coordinate the app prints follows it.** Asked for by the owner in
+  these words: *"Why model units not automatically using the units provided by model? in other
+  countries are feets"* — of the options offered, *"auto unit + feet"*: start in the first
+  model's unit, add feet and inches beside mm and m, show coordinates in the file's map unit,
+  *"Singapore mm models look exactly as now"* — and, mid-build, *"and also the laser measurement
+  unit, and review any other similar situation."* **One button is added, nothing else:** `ft`
+  after `mm` and `m` in the Markups card's toggle, the design's own markup and style string a
+  third time; the status bar's unit field reads it. **Every boot** sets the unit from the boot
+  model's `LENGTHUNIT` — shorter than a metre `mm`, a metre or longer `m`, a foot or an inch `ft`,
+  none `mm` — and a later model never changes it; a session or a link writes it and restores it.
+  **One rule** (`shared/units.ts`): in `mm` every readout is what it was, byte for byte; in `m`
+  what printed millimetres prints metres to three decimals; in `ft` a length, a dimension or an
+  elevation is feet and inches to the nearest 1/16" (`12'-6 1/2"`, `0'-3/4"`, U+2212 for a
+  negative), a coordinate decimal feet, an area or a volume the app computes ft² / ft³. It
+  reaches the laser's 3D labels and live reading, the Markups card, the grid and selection
+  dimensions, the level tags, the sidebar's storey elevations, the spot tag, the property card's
+  geometry rows, the Spatial-structure card's site rows, a clash table's volume and the Section
+  card's offset field — which reads and takes metres (±0.5) in `m`, reads feet and inches and
+  takes them or decimal feet (±2'-0") in `ft`, and still holds millimetres. **Not converted:** property and quantity values,
+  which stay as authored — but a quantity total's label is now the file's own unit, `ft²` on a
+  model in feet, where the design's literal read `m²`. **The Coordinate-system card** speaks the
+  file's own **map** unit, not the toggle: `Easting m` as designed, `Easting ft` for the foot,
+  `Easting US ft` for the US survey foot, each value as authored. The Schedules window keeps its
+  own unit system, which already followed the first model's. **Measured** (mock, against HEAD,
+  both themes): in every mm state the chrome is 0 px and every overlay label the same text in the
+  same box, the 3D frame within two HEAD runs' own label antialiasing; the Markups card differs only
+  inside its toggle — the new `ft` button 29.20 × 22 px, the title and the × not moved — and the
+  chat panel not at all. `tests/parity/2026-10-09-units/README.md` has every number.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
-2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's and 2026-10-08's.
+2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's and 2026-10-09's.
 
 ### No visible additions
 
@@ -1109,6 +1138,11 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-08 — **the Coordinate-system card's one-line note** (owner-chosen, *"One-line note on screen"*): `notLinedUp` / `lineUpNote` (`selectors/status.ts`, pure) — a model with no map position while another has one, or one the stream flagged `farPlacement` (`ModelIndexMeta.farPlacementMetres`, recorded only for a model that did not set the offset); a boot model with no map position is named and no distance is. Read off the store's `bootGeoref`; names are the sidebar's file line through `labelText` (moved to `shared/fmt.ts`). `get_model_info` / `get_view_state` report `notLinedUp`.
 - 2026-10-08 — **the Coordinate-system card is read-only** (the owner: *"dont let user change anything"*): no `setCoord`, no `onChange`, no `set_base_point` (13 gated calls), no `basePoint` revert part; the store writes `coords` in `setOffset` alone, from `bootGeoref` — the boot model's georeferencing, kept beside `frame` after any unload, and cleared with it — and the guard pins that. A session's, link's or viewpoint's `coords` is **ignored on restore and still written**, for older builds (`sessionPatch`, `RESTORE_ORDER` without `coords`). `basePointSource` is `file` | `none`; the status bar's chip is the boot file's CRS or the em dash.
 - 2026-10-08 — **a laser measurement reads each side of its point** (owner-requested): `LaserRay` and `MeasureRecord.sides` carry, per axis, `{ minus, plus }` — the distance **along the axis** from the point to the face its − / + ray hit, `null` for none — beside the whole ray, `x` / `y` / `z`, which is kept (the assistant's result and the eval's observation read it) and is now exactly their sum; one label a side at the middle of its half, the live reading and the Markups row from `shared/annotate.ts` (`laserLabelHtml`, `laserLiveHtml`, `laserSideLengths`); a row with a two-sided axis wraps between axes (`MarkupRow.axes`, absent otherwise, so any other row is the design's span); `manage_markups` adds `sides` in the card's unit. No declutter: label overlaps are measured, not moved.
+- 2026-10-09 — **the display unit is `mm | m | ft` (`shared/units.ts`, `DisplayUnit`), set at every boot from the boot model's own `LENGTHUNIT`** (`displayUnitOf`: shorter than a metre `mm`, a metre or longer `m`, an imperial conversion-based unit `ft`, none the design's `mm`; `federation-store.ts` keeps `bootUnits` beside `bootGeoref`) and changed after that only by the toggle, the assistant's `set_interface` and a session or a link: `units` is a payload key now, restored when it is one of the three, and a payload without it — every older one — leaves the boot model's. It is a session part of the per-reply revert, no longer a `TurnExtra`.
+- 2026-10-09 — **one rule for every readout** (`shared/units.ts`): each keeps its own grouping, spacing, decimals and unit position, and only its quantity and unit follow — `mm` byte for byte as before; `m` metres to three decimals where it printed millimetres; `ft` feet and inches to the nearest 1/16" (`ftIn` / `signedFtIn`, the international foot) for a length, dimension or elevation, decimal feet for a coordinate, ft² / ft³ for an area or volume the app computes. The viewer hears it through `viewer.setUnits` (`annotations.ts` re-renders every reading and tag and rebuilds the grid dimensions and level tags, whose boxes are measured once). Authored values are never converted; a quantity total is labelled in the file's own unit (`ChatTable.units`; `unitLabel` writes FOOT / SQUARE FOOT / CUBIC FOOT as `ft` / `ft²` / `ft³`).
+- 2026-10-09 — **the Section card's field speaks the unit and the plane holds millimetres** (`selectors/section.ts`: `offsetText`, `parseOffset`, `parseFeet`, `nudgeOffset`, `nudgeLabel`): in `mm` the design's field exactly; in `m` and `ft` the typed text is kept while the field has focus and the plane moves only when it reads as a number. **The Coordinate-system card speaks the file's map unit** (`mapUnitOf`: `m`, `ft`, `US ft`; `coordsFromGeoref(g, per)` divides before it rounds), not the toggle.
+- 2026-10-09 — **the assistant**: `set_interface`'s `units` takes `ft`; the per-turn view state names `units` only while it is not `mm`; one instruction line (40) — a length, elevation or distance stated to the user is in the display unit, a coordinate in metres or, in `ft`, decimal feet, a quantity as authored; `manage_markups` lists laser lengths in decimal feet while the card shows `ft`. Every other tool input and result keeps its documented unit — `set_section`'s offset is millimetres.
+- 2026-10-09 — **Navisworks Manage 2026 places the georeferencing fixtures in two groups, and SGVue keeps its rule — no "Navisworks mode"**: fixtures a–f and i, appended with IFC reader v4 and Shared Coordinates on, split differently with "include True North" off and on — Navisworks positions as SGVue does (`Scale` ignored, feet honoured) but turns differently (inferred; the angle was not measured); SGVue places all seven as one building, as IfcOpenShell does and as IFC reads `TrueNorth` beside a conversion. For the two to agree, consultants export from Shared Coordinates or Survey Point (the turn in the site placement).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

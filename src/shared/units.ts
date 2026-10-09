@@ -6,12 +6,29 @@
  *  1. **Reading.** SI prefixes and measure kinds, used by `worker/index-builder.ts` to turn
  *     `IfcUnitAssignment` into `Units`. Values stay as authored; only the scale is recorded.
  *  2. **Display.** The design shows lengths in millimetres by default and metres when the
- *     measure card's unit toggle says `m` (`SGVue.dc.html:2060–2063`). Nothing else in the
- *     design is unit-switchable.
+ *     measure card's unit toggle says `m` (`SGVue.dc.html:2060–2063`), and changes only that
+ *     card's list with it. Since 2026-10-09 (owner-requested: *"Why model units not
+ *     automatically using the units provided by model? in other countries are feets"*) the
+ *     toggle has a third unit, `ft`, the app starts in the boot model's own (`displayUnitOf`),
+ *     and every length, elevation, coordinate, area and volume the app itself computes follows
+ *     it — one rule, below, with `mm` byte for byte what every readout printed before.
  *
  * Geometry never passes through here: web-ifc already returns metres.
  */
-import { fixed3, mmv, thin } from './fmt'
+import {
+  f3,
+  FOOT,
+  fixed3,
+  ftIn,
+  mmPlain,
+  mmTxt,
+  mmv,
+  signedF3,
+  signedFtIn,
+  signedMm,
+  thin,
+  THIN_SPACE
+} from './fmt'
 import type { PropValue, Units } from './model-index.types'
 
 /** `IfcSIPrefix` → multiplier. */
@@ -52,8 +69,18 @@ export function siFactor(unitName: string, prefix: string): number {
   return Math.pow(base, prefixPower(unitName))
 }
 
-/** The US survey foot, exactly: 1200 / 3937 m. The international foot is 0.3048 m. */
+/**
+ * The US survey foot, exactly: 1200 / 3937 m. The international foot is 0.3048 m — `FOOT` in
+ * `fmt.ts`, which the `ft` display unit is written in.
+ */
 export const US_SURVEY_FOOT = 1200 / 3937
+
+/**
+ * How near a file's factor has to be to one of the feet above to be that foot, relatively
+ * (2026-10-09). The two feet differ by 2e-6, so 1e-7 still tells them apart, and it takes an
+ * exporter's rounded `0.30480061` for the US survey foot, which 1e-9 did not.
+ */
+export const FOOT_FACTOR_TOLERANCE = 1e-7
 
 /** Length units by label, with every character but a letter taken out. */
 const LENGTH_LABEL: Readonly<Record<string, number>> = {
@@ -186,23 +213,137 @@ export function unitLabel(units: Units, kind: UnitKind): string | null {
     // The prefix is written once and the power stays on the unit: MILLI + SQUARE_METRE is mm².
     return symbol ? symbol + base : null
   }
-  // A conversion-based or derived unit is named by the file; `DEGREE` and `FOOT` are the
-  // common ones and neither has an SI symbol to compose.
-  return entry.name ? entry.name.toLowerCase() : null
+  // A conversion-based or derived unit is named by the file. An imperial length, area or volume
+  // is written with its own symbol (2026-10-09: a model in feet totals in `ft²`, not in
+  // "square foot"); any other name — `DEGREE` among them — as the file wrote it.
+  if (!entry.name) return null
+  return IMPERIAL_SYMBOL[unitWords(entry.name)] ?? entry.name.toLowerCase()
+}
+
+/** A unit's name as words: `SQUARE_FOOT`, `square foot` and `Square-Foot` are `SQUARE FOOT`. */
+const unitWords = (name: string): string =>
+  name
+    .toUpperCase()
+    .replace(/[^A-Z]+/g, ' ')
+    .trim()
+    .replace(/\bFEET\b/g, 'FOOT')
+    .replace(/\bINCHES\b/g, 'INCH')
+
+/** The imperial units an exporter names, by `unitWords`, and the symbol each is written with. */
+const IMPERIAL_SYMBOL: Readonly<Record<string, string>> = {
+  FOOT: 'ft',
+  INCH: 'in',
+  YARD: 'yd',
+  MILE: 'mi',
+  'SQUARE FOOT': 'ft²',
+  'SQUARE INCH': 'in²',
+  'SQUARE YARD': 'yd²',
+  'CUBIC FOOT': 'ft³',
+  'CUBIC INCH': 'in³',
+  'CUBIC YARD': 'yd³'
 }
 
 /* ────────────────────────────── display ────────────────────────────── */
 
-/** The design's unit toggle. Default `mm` (`SGVue.dc.html:851`). */
-export type DisplayUnit = 'mm' | 'm'
+/**
+ * The design's unit toggle — `mm` and `m` (`SGVue.dc.html:851`, `:2060`) — and, since
+ * 2026-10-09 (owner-requested), `ft`: feet and inches. The order is the toggle's.
+ */
+export const DISPLAY_UNITS = ['mm', 'm', 'ft'] as const
+export type DisplayUnit = (typeof DISPLAY_UNITS)[number]
+
+/** The design's own default, `SGVue.dc.html:851` — and what a boot model that names no unit starts in. */
+export const DEFAULT_DISPLAY_UNIT: DisplayUnit = 'mm'
+
+export const isDisplayUnit = (v: unknown): v is DisplayUnit =>
+  (DISPLAY_UNITS as readonly unknown[]).includes(v)
+
+/** Metres per foot, inch, yard and mile — US survey foot included — the lengths that mean `ft`. */
+const IMPERIAL_METRES = [FOOT, US_SURVEY_FOOT, 0.0254, 0.9144, 1609.344]
 
 /**
- * A length in metres, shown the way the design shows it:
- * `mm` → `"2 400 mm"`, `m` → `"2.400 m"` (`SGVue.dc.html:2063`).
+ * The display unit a model's own length unit starts the app in (2026-10-09, owner-requested:
+ * *"Starts in the first model's unit"*): a millimetre or a centimetre — anything shorter than a
+ * metre — `mm`; a metre or longer `m`; a foot or an inch, which IFC writes as an
+ * `IfcConversionBasedUnit`, `ft`. `null` when the file states no length unit that resolves:
+ * the caller then keeps the design's own default.
+ */
+export function displayUnitOf(units: Units): DisplayUnit | null {
+  const lu = units.byType.LENGTHUNIT
+  if (!lu) return null
+  const f = lu.factor
+  if (lu.entity === 'IfcConversionBasedUnit') {
+    // By name — FOOT, INCH, US SURVEY FOOT … — or, for a name nothing here knows, by its factor.
+    if (/\b(FOOT|INCH|YARD|MILE)\b/.test(unitWords(lu.name))) return 'ft'
+    if (f !== undefined && IMPERIAL_METRES.some((m) => Math.abs(f / m - 1) < FOOT_FACTOR_TOLERANCE)) return 'ft'
+  }
+  if (f === undefined || !(f > 0)) return null
+  return f < 1 ? 'mm' : 'm'
+}
+
+/*
+ * **The one rule** (2026-10-09). Every readout keeps its own style — its grouping, its spacing,
+ * its decimals, where it writes the unit — and only its quantity and unit follow the display
+ * unit:
+ *
+ *  · `mm` — exactly what each readout printed before, byte for byte;
+ *  · `m` — what printed millimetres prints metres to three decimals, as the Markups card's `m`
+ *    always did; what already printed metres (a coordinate, the spot tag's level) is unchanged;
+ *  · `ft` — a length, a dimension or an elevation in feet and inches to the nearest 1/16"
+ *    (`ftIn`); a coordinate in decimal feet to three decimals; an area or a volume the app
+ *    computes in ft² / ft³. The international foot, 0.3048 m.
+ *
+ * Values read from the file — a property, a quantity — are never converted: they are as
+ * authored, in the file's own unit.
+ */
+
+/**
+ * A length, plain space before its unit (`viewer-core.js:9`'s `fmtMM`, the property card's
+ * `mmv`): `2 400 mm` · `2.400 m` · `7'-10 1/2"`. The laser's labels, the box's size and height.
  */
 export function formatLength(metres: number, unit: DisplayUnit): string {
-  return unit === 'm' ? fixed3(metres) + ' m' : mmv(metres)
+  return unit === 'ft' ? ftIn(metres) : unit === 'm' ? fixed3(metres) + ' m' : mmv(metres)
 }
+
+/** A dimension label, a **thin** space before its unit (`mmTxt`): grid and selection dimensions. */
+export function formatDim(metres: number, unit: DisplayUnit): string {
+  return unit === 'ft' ? ftIn(metres) : unit === 'm' ? fixed3(metres) + THIN_SPACE + 'm' : mmTxt(metres)
+}
+
+/** A length with no unit (`mmPlain`), where a reading writes its unit once — `lengthSuffix`. */
+export function lengthNumber(metres: number, unit: DisplayUnit): string {
+  return unit === 'ft' ? ftIn(metres) : unit === 'm' ? fixed3(metres) : mmPlain(metres)
+}
+
+/** What follows such numbers: ` mm`, ` m` — and nothing for feet and inches, which say their own. */
+export const lengthSuffix = (unit: DisplayUnit): string => (unit === 'ft' ? '' : ' ' + unit)
+
+/** An elevation with its sign (`signedMm`): `+4 000` · `+4.000` · `+13'-1 1/2"`. */
+export function formatElevation(metres: number, unit: DisplayUnit): string {
+  return unit === 'ft' ? signedFtIn(metres) : unit === 'm' ? signedF3(metres) : signedMm(metres)
+}
+
+/**
+ * A coordinate held in metres, as the number a readout prints: metres in `mm` and `m` — a
+ * coordinate always printed metres — and decimal feet in `ft`.
+ */
+export const coordIn = (metres: number, unit: DisplayUnit): number =>
+  unit === 'ft' ? metres / FOOT : metres
+
+/** The unit a coordinate is printed in: `m`, or `ft`. */
+export const coordUnit = (unit: DisplayUnit): 'm' | 'ft' => (unit === 'ft' ? 'ft' : 'm')
+
+/** An area the app computes, held in m², in the display unit's square: m², or ft². */
+export const areaIn = (m2: number, unit: DisplayUnit): number => (unit === 'ft' ? m2 / (FOOT * FOOT) : m2)
+export const areaUnit = (unit: DisplayUnit): string => (unit === 'ft' ? 'ft²' : 'm²')
+
+/** A volume the app computes, held in m³, in the display unit's cube: m³, or ft³. */
+export const volumeIn = (m3: number, unit: DisplayUnit): number =>
+  unit === 'ft' ? m3 / (FOOT * FOOT * FOOT) : m3
+export const volumeUnit = (unit: DisplayUnit): string => (unit === 'ft' ? 'ft³' : 'm³')
+
+/** `coordIn`, printed as `f3` prints it: thin-space grouped, three decimals. */
+export const coord3 = (metres: number, unit: DisplayUnit): string => f3(coordIn(metres, unit))
 
 /**
  * A property or quantity value for display. Numbers whose measure type resolves to a

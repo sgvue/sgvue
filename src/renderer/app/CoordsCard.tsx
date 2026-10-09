@@ -38,11 +38,16 @@
  * The chip, the caption and the note are read off the store's `bootGeoref` — the declaration
  * that defined the federation's frame — so they describe the frame in use after any unload.
  *
+ * **The fields' unit** (2026-10-09, owner-requested): the file's own map unit
+ * (`shared/georef.ts`, `mapUnitOf`) — `Easting m` as the design has it for a metre CRS or a file
+ * that names none, `Easting ft` for the foot, `Easting US ft` for the US survey foot, each value as
+ * the file authored it. Not the display toggle: this card says what the file states.
+ *
  * Everything else — the copy, the labels, the grid, the closing paragraph — is verbatim.
  */
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
-import { crsChip } from '../../shared/georef'
+import { coordsFromGeoref, crsChip, mapUnitOf } from '../../shared/georef'
 import type { CoordState } from '../state/shell'
 import { s } from './css'
 import { coordsCaption, lineUpNote, notLinedUp } from '../state/selectors/status'
@@ -70,12 +75,20 @@ export default function CoordsCard(): React.JSX.Element | null {
   const detected = caption !== ''
   // 2026-10-08, the owner's: which loaded model could not be lined up, in one line.
   const note = lineUpNote(notLinedUp(st))
+  // 2026-10-09, owner-requested: the base point in the file's own map unit — not the display
+  // toggle. The metre, and a file that names no map unit, read exactly as before; a foot or a US
+  // survey foot reads as the file authored it, its unit in the three labels.
+  const mapUnit = mapUnitOf(st.bootGeoref)
+  const shown: CoordState =
+    mapUnit.label === 'm'
+      ? st.coords
+      : (coordsFromGeoref(st.bootGeoref, mapUnit.metres) ?? { E: null, N: null, Z: null, angle: null })
 
   const field = (k: keyof CoordState, label: string): React.JSX.Element => (
     <label style={s('display:flex;flex-direction:column;gap:4px')}>
       <span style={s(LABEL)}>{label}</span>
       <input
-        value={st.coords[k] == null ? '' : String(st.coords[k])}
+        value={shown[k] == null ? '' : String(shown[k])}
         readOnly
         className="fv-field"
         style={s(FIELD)}
@@ -133,9 +146,9 @@ export default function CoordsCard(): React.JSX.Element | null {
         </span>
       )}
       <div style={s('display:grid;grid-template-columns:1fr 1fr;gap:8px')}>
-        {field('E', 'Easting m')}
-        {field('N', 'Northing m')}
-        {field('Z', 'Elevation m')}
+        {field('E', `Easting ${mapUnit.label}`)}
+        {field('N', `Northing ${mapUnit.label}`)}
+        {field('Z', `Elevation ${mapUnit.label}`)}
         {field('angle', 'True north °')}
       </div>
       <p style={s('margin:0;font-size:12px;line-height:1.5;color:var(--muted)')}>

@@ -316,7 +316,7 @@ const KEYS = pick(
   'activate', 'allStoreys', 'askRemove', 'cancelRemove', 'dropUpload', 'hide', 'openCard',
   'select', 'setCtx', 'setModelColor', 'setSearch', 'setSideSize', 'setTreeMode', 'show',
   'soloStorey', 'toggleAdd', 'toggleGroup', 'toggleModel', 'toggleNative', 'togglePalette',
-  'togglePanel', 'toggleStorey'
+  'togglePanel', 'toggleStorey', 'units'
 )
 
 export default function Sidebar(): React.JSX.Element {
@@ -347,7 +347,8 @@ export default function Sidebar(): React.JSX.Element {
     card,
     visibleCount,
     sideModels,
-    sideStoreys
+    sideStoreys,
+    units
   } = st
 
   // Activate mode scopes every list to one model — `SGVue.dc.html:1786`.
@@ -375,8 +376,8 @@ export default function Sidebar(): React.JSX.Element {
   )
   const addable = useMemo(() => addableRows(library, st.loaded), [library, st.loaded])
   const storeys = useMemo(
-    () => storeyRows({ storeys: federation.storeys, elements: lels, storeyVis, active }),
-    [federation, lels, storeyVis, active]
+    () => storeyRows({ storeys: federation.storeys, elements: lels, storeyVis, active, units }),
+    [federation, lels, storeyVis, active, units]
   )
   /**
    * Above the design's own storey count the sidebar's vertical budget changes — see

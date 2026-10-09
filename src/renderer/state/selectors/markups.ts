@@ -11,7 +11,8 @@
  * own em dash.
  */
 import { laserSideLengths, type LaserSides } from '../../../shared/annotate'
-import { DASH, fixed3, mmPlain } from '../../../shared/fmt'
+import { DASH, fixed3 } from '../../../shared/fmt'
+import { coordIn, lengthNumber, lengthSuffix } from '../../../shared/units'
 import type { MeasureRecord, SpotRecord } from '../../viewer/annotations'
 import type { Units } from '../shell'
 
@@ -37,12 +38,13 @@ const AXES = ['x', 'y', 'z'] as const
 /**
  * One axis of a row. Since 2026-10-08 (owner-requested) its two sides of the point, − side
  * first, joined by ` + ` — `1 200 + 2 300 mm` — or the one side that reached a face, which reads
- * exactly as the design's whole-ray number did (`2 300 mm`). The unit once, after the numbers.
+ * exactly as the design's whole-ray number did (`2 300 mm`). The unit once, after the numbers —
+ * and since 2026-10-09 none in `ft`, whose feet and inches say their own (`7'-6" + 2'-0"`).
  */
 const axisReading = (s: LaserSides, units: Units): string =>
-  units === 'm'
-    ? laserSideLengths(s).map(fixed3).join(' + ') + ' m'
-    : laserSideLengths(s).map(mmPlain).join(' + ') + ' mm'
+  laserSideLengths(s)
+    .map((v) => lengthNumber(v, units))
+    .join(' + ') + lengthSuffix(units)
 
 /** `SGVue.dc.html:2061–2065`. Three spaces between the axis readings, as the design joins them. */
 export function measureRows(
@@ -61,9 +63,12 @@ export function measureRows(
   })
 }
 
-/** `SGVue.dc.html:2066–2069`. */
-export function spotRows(spots: readonly SpotRecord[]): MarkupRow[] {
-  const n = (v: number | null): string => (v == null ? DASH : fixed3(v))
+/**
+ * `SGVue.dc.html:2066–2069`. Coordinates, so since 2026-10-09 metres in `mm` and `m`, as they
+ * always printed, and decimal feet in `ft` (`shared/units.ts`).
+ */
+export function spotRows(spots: readonly SpotRecord[], units: Units = 'mm'): MarkupRow[] {
+  const n = (v: number | null): string => (v == null ? DASH : fixed3(coordIn(v, units)))
   return spots.map((s, i) => ({
     n: 'C' + (i + 1),
     id: s.id,

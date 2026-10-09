@@ -473,7 +473,7 @@ const PANEL_KEYS = pick(
   'applyPending', 'byId', 'cardTop', 'chatBusy', 'chatErr', 'chatH', 'chatInput', 'chatMsgs',
   'chatOpen', 'chatReplyTo', 'chatSuggestOpen', 'chatW', 'copyTable', 'dismissPending',
   'revertTurn', 'sel', 'selIds', 'select', 'setChatInput', 'setChatOpen', 'setChatReplyTo',
-  'setChatSuggestOpen', 'vpW', 'stack', 'hidden', 'loaded', 'library'
+  'setChatSuggestOpen', 'vpW', 'stack', 'hidden', 'loaded', 'library', 'units'
 )
 
 /** A running turn with no trace to draw: everything of the send at rest, the button a stop. */
@@ -659,7 +659,7 @@ export default function ChatPanel(): React.JSX.Element | null {
 
   /** One row of the transcript: a message, or — `message` null — the reply being written. */
   const row = (message: ChatMessage | null, i: number): React.JSX.Element => {
-    const m = message ? chatRow(message, i) : null
+    const m = message ? chatRow(message, i, st.units) : null
     const look = m ?? LIVE_ROW
     const mine = message?.role === 'user'
     /** A turn's reply — written, or being written: the trace's bubble, and a status by the name. */

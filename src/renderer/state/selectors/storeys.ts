@@ -6,11 +6,15 @@
  */
 import type { FederatedElement } from '../../../shared/federate'
 import type { Storey } from '../../../shared/model-index.types'
-import { signedMm } from '../../../shared/fmt'
+import { formatElevation } from '../../../shared/units'
+import type { Units } from '../shell'
 
 export interface StoreyRow {
   name: string
-  /** Signed millimetres, thin-space grouped, U+2212 for negative. `:1790`. */
+  /**
+   * Signed millimetres, thin-space grouped, U+2212 for negative. `:1790`. Since 2026-10-09 in
+   * the display unit: `+4.000` in `m`, `+13'-1 1/2"` in `ft` (`shared/units.ts`).
+   */
   elev: string
   count: number
   vis: boolean
@@ -29,6 +33,8 @@ export interface StoreyInput {
   elements: readonly FederatedElement[]
   storeyVis: Record<string, boolean>
   active: string | null
+  /** The display unit the elevations are written in (2026-10-09); `mm` when not given. */
+  units?: Units
 }
 
 /** The only visible storey's name, or `null` when zero or several are visible. `:1787`. */
@@ -41,7 +47,7 @@ export function soloStoreyName(
 }
 
 export function storeyRows(input: StoreyInput): StoreyRow[] {
-  const { storeys, elements, storeyVis, active } = input
+  const { storeys, elements, storeyVis, active, units = 'mm' } = input
   const soloName = soloStoreyName(storeys, storeyVis)
   const counts = new Map<string, number>()
   for (const e of elements) counts.set(e.storey, (counts.get(e.storey) ?? 0) + 1)
@@ -52,7 +58,7 @@ export function storeyRows(input: StoreyInput): StoreyRow[] {
       const solo = soloName === st.name
       return {
         name: st.name,
-        elev: signedMm(st.elev),
+        elev: formatElevation(st.elev, units),
         count: counts.get(st.name) ?? 0,
         vis,
         hid: !vis,

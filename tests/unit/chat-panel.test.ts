@@ -165,6 +165,36 @@ describe('the table quantity column', () => {
     expect(tableQuantity({ clash: true }, { vol: 0.0009 })).toBe('<0.001 m³')
     expect(tableQuantity({ clash: true }, { vol: 0.001 })).toBe('0.001 m³')
   })
+
+  /**
+   * 2026-10-09 — the owner: "in other countries are feets". A total is the file's own number,
+   * so it carries the file's own unit; a clash overlap is the app's, so it follows the display
+   * unit.
+   */
+  it('labels a total in the file’s own unit, and none where the files settle none', () => {
+    // A metric Revit export: what the design's literals said, exactly.
+    expect(tableQuantity({ units: { area: 'm²', volume: 'm³' } }, { area: 240.06 })).toBe('240.1 m²')
+    expect(tableQuantity({ units: { area: 'm²', volume: 'm³' } }, { volume: 9.128 })).toBe('9.13 m³')
+    // A model in feet totals in square and cubic feet — never relabelled as metric.
+    expect(tableQuantity({ units: { area: 'ft²', volume: 'ft³' } }, { area: 2584.5 })).toBe('2584.5 ft²')
+    expect(tableQuantity({ units: { area: 'ft²', volume: 'ft³' } }, { volume: 12.5 })).toBe('12.50 ft³')
+    // Two models whose units disagree settle none: the number alone, as the reply says.
+    expect(tableQuantity({ units: {} }, { area: 240.06 })).toBe('240.1')
+    expect(tableQuantity({ units: {} }, { volume: 9.128 })).toBe('9.13')
+    // The display unit does not touch a total: it is as authored.
+    expect(tableQuantity({ units: { area: 'm²' } }, { area: 240.06 }, 'ft')).toBe('240.1 m²')
+  })
+
+  it('reports a clash volume in cubic feet while the display unit is ft, and in m³ otherwise', () => {
+    expect(tableQuantity({ clash: true }, { vol: 0.0421 }, 'm')).toBe('0.042 m³')
+    // 0.0421 m³ = 1.48674… ft³.
+    expect(tableQuantity({ clash: true }, { vol: 0.0421 }, 'ft')).toBe('1.487 ft³')
+    // 0.00002 m³ = 0.000706 ft³: below a thousandth in either unit.
+    expect(tableQuantity({ clash: true }, { vol: 0.00002 }, 'ft')).toBe('<0.001 ft³')
+    expect(tableCsv({ groupBy: 'Clash candidates', clash: true, rows: [{ k: 'A ↔ B', n: 1, vol: 0.0421, ids: [] }] }, 'ft').split('\n')[1]).toBe(
+      '"A ↔ B",1,1.4867'
+    )
+  })
 })
 
 /* ────────────────────────────── copy csv (`:2031`) ────────────────────────────── */

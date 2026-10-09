@@ -636,7 +636,8 @@ describe('parity with the user — phase 1', () => {
     expect(ui.input_schema.required).toBeUndefined()
     const p = ui.input_schema.properties
     expect(p.theme.enum).toEqual(['dark', 'light'])
-    expect(p.units.enum).toEqual(['mm', 'm'])
+    // 2026-10-09: feet and inches, the Markups card's third unit.
+    expect(p.units.enum).toEqual(['mm', 'm', 'ft'])
     expect(p.treeMode.enum).toEqual(['entity', 'type'])
     expect(p.sidebar.enum).toEqual(['open', 'collapsed'])
     expect(p.card.enum).toEqual(['project', 'section', 'filter', 'coords', 'views', 'measure', 'none'])
@@ -1000,7 +1001,9 @@ describe('parity with the user — phase 2', () => {
       'Laser measurements are M1, M2 …',
       'spot coordinates are C1, C2 …',
       'or its level in the file’s own metres when the model has no base point',
-      'in the card’s current unit (mm or m)',
+      // 2026-10-09: the laser lengths in the card's unit, ft included; the spots in metres.
+      'returns the laser lengths in the card’s current unit — whole millimetres, metres, or decimal feet while it shows ft',
+      'and the spot coordinates in metres',
       'list before you focus'
     ]) {
       expect([said, d.includes(said)]).toEqual([said, true])

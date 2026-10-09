@@ -97,6 +97,7 @@ import {
 } from '../../shared/session-codec'
 import { frameKey } from '../../shared/georef'
 import { NO_SECTIONS, type SecKind, type SecPlane, type Sections } from '../../shared/sections'
+import type { DisplayUnit } from '../../shared/units'
 import { sphericalOf } from '../../shared/view-angles'
 import {
   mergeUndo,
@@ -148,7 +149,11 @@ export type Theme = 'dark' | 'light'
 export type TreeMode = 'entity' | 'type'
 export type Projection = 'persp' | 'ortho'
 export type CardName = 'project' | 'section' | 'filter' | 'coords' | 'views' | 'measure'
-export type Units = 'mm' | 'm'
+/**
+ * The design's mm / m toggle (`SGVue.dc.html:851`), and since 2026-10-09 `ft` — one type with
+ * every readout that follows it (`shared/units.ts`).
+ */
+export type Units = DisplayUnit
 
 /**
  * The design's one `section` (`SGVue.dc.html:848`) is two planes since 2026-10-01
@@ -481,7 +486,10 @@ export interface ShellState {
    * card. The level plane is never touched by a bubble.
    */
   gridClick: (name: string) => void
-  /** `:2060`. The Markups card's mm / m toggle. */
+  /**
+   * `:2060`. The Markups card's mm / m toggle — and `ft` since 2026-10-09. Also set once at
+   * every boot, to the boot model's own unit (`model/federation-store.ts`).
+   */
   setUnits: (units: Units) => void
   /** `:894`. The viewer's `on.measure` / `on.spot`. */
   setMeasures: (list: readonly MeasureRecord[]) => void
@@ -1438,7 +1446,12 @@ export const useShell = create<ShellState>((set, get) => ({
     )
   },
 
-  setUnits: (units) => set({ units }),
+  // 2026-10-09: the 3D labels follow the unit too, so the viewer is told — the design's toggle
+  // changed the Markups card's list alone.
+  setUnits: (units) => {
+    set({ units })
+    viewer?.setUnits(units)
+  },
 
   setMeasures: (list) => set({ measures: list, measureCount: list.length }),
   setSpots: (list) => set({ spots: list, spotCount: list.length }),
@@ -1514,7 +1527,7 @@ export const useShell = create<ShellState>((set, get) => ({
    * sentence away again, and leaves any other.
    */
   copyTable: async (table) => {
-    const ok = await copyText(tableCsv(table))
+    const ok = await copyText(tableCsv(table, get().units))
     if (!ok) set({ chatErr: CLIPBOARD_REFUSED })
     else if (get().chatErr === CLIPBOARD_REFUSED) set({ chatErr: '' })
     return ok
@@ -1705,7 +1718,6 @@ export const useShell = create<ShellState>((set, get) => ({
 
       const x = plan.extra
       if (x.groundGrid !== undefined && x.groundGrid !== get().groundGrid) get().setGroundGrid(x.groundGrid)
-      if (x.units !== undefined && x.units !== get().units) get().setUnits(x.units)
       if (x.panelOpen !== undefined && x.panelOpen !== get().panelOpen) get().togglePanel()
       if ('card' in x && x.card !== get().card) {
         // `openCard` on a card that is not up opens it; nothing here is asked to toggle one shut.
@@ -1769,6 +1781,8 @@ export const useShell = create<ShellState>((set, get) => ({
     // `setTheme` writes `document.documentElement.dataset.theme` and tells the viewer, which is
     // what the prototype's own `:1033` does — restoring the key alone would change nothing.
     if (n.theme !== s.theme) s.setTheme(n.theme)
+    // 2026-10-09: the display unit, the same way — the viewer's labels print in it.
+    if (n.units !== s.units) s.setUnits(n.units)
     set({
       hidden: n.hidden,
       storeyVis: n.storeyVis,

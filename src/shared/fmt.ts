@@ -20,9 +20,14 @@
  * | `f3`         | `viewer-core.js:410`                   | spot coordinate readout E/N/Z                |
  * | `signedF3`   | (2026-09-28, owner-requested)          | the spot tag's collapsed level               |
  * | `fixed3`     | `SGVue.dc.html:2063`, geometry rows    | measure rows in metres, footprint/volume     |
+ * | `ftIn`       | (2026-10-09, owner-requested)          | every length, in the `ft` display unit       |
+ * | `signedFtIn` | (2026-10-09, owner-requested)          | storey elevations and level tags, in `ft`    |
  *
  * `f3` and `fixed3` are **not** the same function: the coordinate readout groups thousands
  * with a thin space, the measure rows do not. Keeping both is fidelity, not duplication.
+ *
+ * Which of these a readout uses for the display unit it is in — `mm`, `m` or `ft` — is
+ * `shared/units.ts`'s to say; this file only spells numbers.
  */
 
 /** U+2009 THIN SPACE — the design's thousands separator. */
@@ -76,6 +81,52 @@ export const f3 = (v: number): string =>
 export const signedF3 = (v: number): string => {
   const s = f3(Math.abs(v))
   return (v < 0 && s !== '0.000' ? MINUS : '+') + s
+}
+
+/* ────────────────────── feet and inches (2026-10-09, owner-requested) ────────────────────── */
+
+/**
+ * The international foot, in metres — what the `ft` display unit is written in. The US survey
+ * foot is `US_SURVEY_FOOT` in `units.ts`.
+ */
+export const FOOT = 0.3048
+
+/** Sixteenths of an inch in a foot: what feet and inches are rounded in. */
+const SIXTEENTHS_PER_FOOT = 12 * 16
+
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a)
+
+/** `n` sixteenths of an inch, `n ≥ 0`, as `12'-6 1/2"`. */
+function feetInches(n: number): string {
+  const feet = Math.floor(n / SIXTEENTHS_PER_FOOT)
+  const rest = n - feet * SIXTEENTHS_PER_FOOT
+  const inches = Math.floor(rest / 16)
+  const sixteenths = rest - inches * 16
+  const g = gcd(sixteenths, 16)
+  const fraction = sixteenths ? `${sixteenths / g}/${16 / g}` : ''
+  const inch = !fraction ? String(inches) : inches ? `${inches} ${fraction}` : fraction
+  return `${thin(feet)}'-${inch}"`
+}
+
+/** Metres → whole sixteenths of an inch, rounded to the nearest one. */
+const toSixteenths = (metres: number): number => Math.round((Math.abs(metres) / FOOT) * SIXTEENTHS_PER_FOOT)
+
+/**
+ * Metres → feet and inches to the nearest sixteenth of an inch: `12'-6 1/2"`, `0'-3/4"`, `5'-0"`.
+ * The feet are thin-space grouped, as every other number here is (`1 234'-5"`); the fraction is
+ * reduced (`8/16` → `1/2`); 11 15/16" that rounds up carries into the next foot (`1'-0"`). A
+ * negative reads with U+2212, the minus sign the signed readouts already use, because the
+ * hyphen is the separator here; a value that rounds to zero has no sign.
+ */
+export function ftIn(metres: number): string {
+  const n = toSixteenths(metres)
+  return (metres < 0 && n > 0 ? MINUS : '') + feetInches(n)
+}
+
+/** `ftIn` with an explicit sign, as `signedMm` has: `+10'-6"`, `−3'-0"`, and `+0'-0"` for zero. */
+export function signedFtIn(metres: number): string {
+  const n = toSixteenths(metres)
+  return (metres < 0 && n > 0 ? MINUS : '+') + feetInches(n)
 }
 
 /** `2.400` — three decimals, no grouping. Measure rows in metres, box volume. */

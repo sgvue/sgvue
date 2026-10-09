@@ -1522,7 +1522,8 @@ test('a section outlines what it cuts in the accent; hide, preview, clear and th
 /** One block of the Section card: its summary line, its offset field and its own buttons. */
 function sectionBlock(page: Page, label: 'Along a gridline' | 'At a level') {
   const block = page.getByRole('group', { name: label })
-  const summary = block.getByText(/^offset mm · /)
+  // The summary names the field's unit: `mm`, `m` or `ft` since 2026-10-09.
+  const summary = block.getByText(/^offset (mm|m|ft) · /)
   return {
     block,
     summary: (): Promise<string> =>
@@ -1773,6 +1774,8 @@ test('a share link written before there were two planes still restores its one s
         level: { name: '', offset: 0, flip: false, cut: false }
       })
       expect(payload.section).toEqual({ kind: null, name: '', offset: 0, flip: false, cut: false })
+      // 2026-10-09: the fixture is drawn in metres, so the app starts in `m` — and says so.
+      expect(payload.units).toBe('m')
       const old: Record<string, unknown> = { ...payload }
       delete old.sections
       old.section = { kind: 'level', name: 'Level 2', offset: 1500, flip: false, cut: true }
@@ -1793,13 +1796,14 @@ test('a share link written before there were two planes still restores its one s
   try {
     await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
     await expect.poll(() => statusText(page), { timeout: 20_000 }).toContain('6 / 6')
-    // The old section is on the level plane; the gridline plane is untouched.
+    // The old section is on the level plane; the gridline plane is untouched. Its 1 500 mm read
+    // in metres since 2026-10-09: the fixture is drawn in metres, and the app starts in its unit.
     await page.locator('button[data-tip="Section from gridline / level"]').click()
     const grid = sectionBlock(page, 'Along a gridline')
     const level = sectionBlock(page, 'At a level')
-    expect(await level.summary()).toBe('offset mm · level Level 2 · cut')
-    await expect(level.offset).toHaveValue('1500')
-    expect(await grid.summary()).toBe('offset mm · no section')
+    expect(await level.summary()).toBe('offset m · level Level 2 · cut')
+    await expect(level.offset).toHaveValue('1.5')
+    expect(await grid.summary()).toBe('offset m · no section')
     await expect(grid.offset).toHaveValue('0')
     // It really cuts: the plane's outline of the model is on the canvas, in the accent.
     const overlay = page.locator('[data-role="overlay"]')

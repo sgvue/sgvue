@@ -81,8 +81,8 @@ import {
   type Rect,
   type XY
 } from '../../shared/annotate'
-import { mmTxt } from '../../shared/fmt'
 import { toMap, type BasePoint } from '../../shared/georef'
+import { formatDim, type DisplayUnit } from '../../shared/units'
 import type { Materials } from './materials'
 import type { Label, LabelOverlay, ViewerCamera } from './overlay'
 import { toPixels } from './overlay'
@@ -211,6 +211,13 @@ export interface Annotations {
   gridDimsStale(): boolean
   /** `setCoords`, L428: re-render every spot label and re-publish the list. */
   setCoords(c: BasePoint): void
+  /**
+   * 2026-10-09 (owner-requested) — the display unit every label prints in: the grid dimensions,
+   * the level tags, each laser reading and the live one, the spot tags and the selection
+   * dimensions are re-rendered in it (`shared/units.ts`). Nothing moves; `mm` is what was drawn
+   * before.
+   */
+  setUnits(u: DisplayUnit): void
   /** L398. A click with the laser tool. */
   addLaser(p: Vector3, normal: Vector3 | null, selfId: number): void
   /** L413. A click with the spot tool. */
@@ -314,6 +321,8 @@ interface Measurement {
   rays: LaserRay[]
   lines: Line[]
   labels: Label[]
+  /** Each side's reading and the label that prints it — what a change of unit re-renders. */
+  readings: { label: Label; axis: LaserAxis; len: number }[]
 }
 interface Spot {
   id: number
@@ -350,6 +359,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
   let gridKey = ''
   let pad = 0
   let coords: BasePoint = { E: null, N: null, Z: null, angle: null }
+  /** The display unit every label prints in (2026-10-09); the design's own `mm` until told. */
+  let unit: DisplayUnit = 'mm'
 
   const gridRecs: GridRecord[] = []
   let famDirs: XY[] = []
@@ -395,6 +406,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
 
   /** What the live preview last read, for `debug()` — nothing visible depends on it. */
   let preview: ({ axis: LaserAxis; len: number } & LaserSides)[] = []
+  /** The live reading's rays, as last drawn — a change of unit re-renders them (2026-10-09). */
+  let liveRays: readonly LaserRay[] = []
 
   const toPx = (p: Vector3): Vector2 => {
     const { w, h } = host.size()
@@ -514,7 +527,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     const runs = gridDimRuns(gridRecs, gap)
     if (!runs.length) return
     const labels = runs.map((run, k) => {
-      const label = overlay.mkLabel(new Vector3(run.at[0], run.at[1], lineZ), mmTxt(run.spacing), {
+      const label = overlay.mkLabel(new Vector3(run.at[0], run.at[1], lineZ), formatDim(run.spacing, unit), {
         ...overlay.labelBase(),
         color: 'var(--ink)',
         borderColor: 'var(--accent)',
@@ -643,7 +656,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       const anchor = levelTagAnchor(rect)
       const tag = overlay.mkLabel(
         new Vector3(anchor[0], anchor[1], z),
-        levelTagHtml(s.name, s.authored),
+        levelTagHtml(s.name, s.authored, unit),
         overlay.labelBase(),
         LEVEL_TAG_DX,
         0
@@ -799,7 +812,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     const f = filePoint(s.p)
     const m = toMap(coords, f.x, f.y, f.z)
     const tag = s.labels[0]
-    tag.el.innerHTML = s.expanded ? spotGridHtml(f, m) : spotLevelHtml(m ? m.Z : f.z)
+    tag.el.innerHTML = s.expanded ? spotGridHtml(f, m, unit) : spotLevelHtml(m ? m.Z : f.z, unit)
     tag.el.title = s.expanded ? 'Show level only' : 'Show E, N and Z'
     const o = s.expanded ? SPOT_GRID_OFFSET : SPOT_LEVEL_OFFSET
     tag.dx = o.dx
@@ -921,7 +934,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       dimLabels.push(
         overlay.mkLabel(
           r.a.clone().lerp(r.b, c.t),
-          mmTxt(r.v),
+          formatDim(r.v, unit),
           {
             ...overlay.labelBase(),
             color: 'var(--ink)',
@@ -972,6 +985,21 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       publishSpots()
     },
 
+    setUnits: (u) => {
+      if (u === unit) return
+      unit = u
+      // The grid dimensions and the level tags are re-derived — a dimension label's box is
+      // measured once, when it is made, and its text has just changed.
+      rebuild()
+      for (const m of measures) {
+        for (const r of m.readings) r.label.el.innerHTML = laserLabelHtml(r.axis, r.len, unit)
+      }
+      if (liveLabel.on) liveLabel.el.innerHTML = laserLiveHtml(liveRays, unit)
+      for (const s of spots) renderSpot(s)
+      drawDims()
+      host.invalidate()
+    },
+
     addLaser: (p, normal, selfId) => {
       const rays = laserFrom(p, normal, selfId)
       if (!rays.length) return
@@ -980,7 +1008,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
         p: p.clone(),
         rays,
         lines: [],
-        labels: [overlay.mkLabel(p, '', ORIGIN_STYLE)]
+        labels: [overlay.mkLabel(p, '', ORIGIN_STYLE)],
+        readings: []
       }
       for (const r of rays) {
         const line = new Line(
@@ -999,15 +1028,15 @@ export function createAnnotations(host: AnnotationHost): Annotations {
           [r.b, r.plus]
         ] as const) {
           if (len == null) continue
-          m.labels.push(
-            overlay.mkLabel(
-              p.clone().lerp(end, 0.5),
-              laserLabelHtml(r.axis, len),
-              { ...overlay.labelBase(), borderColor: 'var(--accent)' },
-              off.dx,
-              off.dy
-            )
+          const label = overlay.mkLabel(
+            p.clone().lerp(end, 0.5),
+            laserLabelHtml(r.axis, len, unit),
+            { ...overlay.labelBase(), borderColor: 'var(--accent)' },
+            off.dx,
+            off.dy
           )
+          m.labels.push(label)
+          m.readings.push({ label, axis: r.axis, len })
         }
         m.labels.push(overlay.mkLabel(r.a, '', DOT_STYLE), overlay.mkLabel(r.b, '', DOT_STYLE))
       }
@@ -1046,7 +1075,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       fillLaser(rays, p)
       liveLabel.on = rays.length > 0
       liveLabel.pos.copy(p)
-      liveLabel.el.innerHTML = laserLiveHtml(rays)
+      liveRays = rays
+      liveLabel.el.innerHTML = laserLiveHtml(rays, unit)
     },
 
     clearPreview: () => {
@@ -1156,7 +1186,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       spots: spots.length,
       preview,
       dims: { on: dimOn, ids: dimIds.length, avoid: dimAvoid.length, labels: dimLabels.length },
-      coords
+      coords,
+      units: unit
     }),
 
     dispose: () => {

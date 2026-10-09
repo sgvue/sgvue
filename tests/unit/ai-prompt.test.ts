@@ -61,8 +61,9 @@ describe('the system contract', () => {
   it('carries the design’s instruction lines, in the design’s order', () => {
     // 18 of the design's, 6 of 2026-09-20, 4 of 2026-09-28, 1 of 2026-10-01, and 8 of
     // 2026-10-02: two for each of the parity work's four phases. 2026-10-08: the design's reply
-    // line became three (the case below), so 17 of the design's are left.
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(39)
+    // line became three (the case below), so 17 of the design's are left. 2026-10-09: one, the
+    // display unit (the case below).
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(40)
     expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
     expect(DESIGN_SYSTEM_LINES[1]).toContain('strictly read-only with respect to model data')
     // Still the last line, as the design ends.
@@ -112,6 +113,37 @@ describe('the system contract', () => {
         .match(/\b[A-Z]{3,}\b/g)
       expect([line, shouted]).toEqual([line, null])
     }
+  })
+
+  /**
+   * 2026-10-09 — the owner: "Why model units not automatically using the units provided by
+   * model? in other countries are feets". The app prints every length in the display unit, and
+   * the per-turn view state names it when it is not millimetres: one line, sentence case, right
+   * after the quantities line, so a reply speaks the unit the screen does — and a quantity stays
+   * in the file's own.
+   */
+  it('adds the 2026-10-09 line: lengths in the display unit, coordinates as the app prints them, quantities as authored', () => {
+    const at = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('State every length, elevation and distance'))
+    expect(at).toBeGreaterThan(0)
+    expect(DESIGN_SYSTEM_LINES[at - 1]).toMatch(/^Quantities are as authored\./)
+    expect(DESIGN_SYSTEM_LINES[at + 1]).toMatch(/^To act on a set you found/)
+    const line = DESIGN_SYSTEM_LINES[at]
+    for (const said of [
+      'in their display unit',
+      'millimetres, unless the view state names units',
+      'm for metres',
+      'ft for feet and inches',
+      // The app never prints a coordinate in millimetres: metres in mm and m, decimal feet in ft.
+      'a coordinate in metres, or in decimal feet when units is ft',
+      'convert what a tool reports in metres',
+      'keep a property or quantity value in the unit the file authored it in'
+    ]) {
+      expect([said, line.includes(said)]).toEqual([said, true])
+    }
+    expect(line).not.toMatch(/coordinate[^;]*millimetres/)
+    // No shouting, and one line only says it.
+    expect(line.match(/\b[A-Z]{3,}\b/g)).toBeNull()
+    expect(DESIGN_SYSTEM_LINES.filter((l) => /display unit/.test(l))).toEqual([line])
   })
 
   /**
