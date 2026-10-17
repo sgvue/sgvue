@@ -64,5 +64,10 @@
     "vitest": "5.0.0",
     "web-ifc": "0.0.77",
     "zustand": "5.0.15"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

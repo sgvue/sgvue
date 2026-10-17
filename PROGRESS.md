@@ -4,6 +4,26 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-10-17 — two Dependabot alerts closed: `source-map-js` 1.2.2, and exceljs's `uuid` forced to 11.1.1
+
+**Did.** Alert #3 (high), `source-map-js` 1.2.1 under `vite` → `postcss`: `npm update
+source-map-js` to 1.2.2, inside postcss's range — the lockfile's three lines are Dependabot's
+pull request #8's exactly, so one push closes both alerts. Alert #1 (medium,
+GHSA-w5hq-g745-h8pq), `uuid` 8.3.2 under exceljs 4.4.0: Dependabot could not update it, because
+exceljs, at its latest release, declares `^8.3.0`, so `package.json` gains `"overrides": {
+"exceljs": { "uuid": "^11.1.1" } }`. exceljs only ever calls `v4()` with no buffer, so the flaw
+was never reachable. `THIRD_PARTY_NOTICES.md` regenerated: uuid's version on its two lines, and
+nothing else. One row in `docs/DECISIONS.md` and its index line.
+
+**Verified:** the lockfile changes in those two entries only, and `npm ci` installs from it; none
+of the four alerted packages is in the production tree (`npm ls --omit=dev`). `npm run
+typecheck`, `npm test` (2 982 passed / 4 skipped) and `npm run build` pass, and `out/` is
+byte-identical to a build made before the change, all 94 files — the renderer bundles
+exceljs's prebuilt browser build, which carries its own uuid.
+
+**Still open:** `http-cache-semantics` (#2) and `sprintf-js` (#4) have no patched release; both
+are dev-only, under electron-builder.
+
 ## 2026-10-17 — 1.3.0 for Mac: the disk images tested on a Mac and published
 
 **Why:** the owner, 2026-10-17: *"I believe the installer has been built but havent tested and

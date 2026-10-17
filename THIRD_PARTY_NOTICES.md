@@ -134,7 +134,7 @@ The IBM Plex Sans, Mono and Serif fonts (`@fontsource` packages) are licensed un
 | ts-algebra | 2.0.0 | MIT | app.asar: node_modules | 4 |  |
 | util | 0.12.5 | MIT | exceljs's browser build | 4 | the registry's latest on 2026-10-05; the build records no version |
 | util-deprecate | 1.0.2 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
-| uuid | 8.3.2 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
+| uuid | 11.1.1 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
 | vite | 7.3.6 | MIT | app.asar: out (bundler helper code) | 4 | the module-preload helper Vite writes into the bundle |
 | web-ifc | 0.0.77 | MPL-2.0 | app.asar: out (bundled JavaScript) | 23 | used unmodified; web-ifc.wasm ships unpacked beside the archive; source: https://github.com/ThatOpen/engine_web-ifc/tree/0.77 |
 | xmlchars | 2.2.0 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
@@ -359,7 +359,7 @@ util 0.12.5 — LICENSE in https://registry.npmjs.org/util/-/util-0.12.5.tgz
     Copyright Joyent, Inc. and other Node contributors. All rights reserved.
 util-deprecate 1.0.2 — LICENSE
     Copyright (c) 2014 Nathan Rajlich <nathan@tootallnate.net>
-uuid 8.3.2 — LICENSE.md
+uuid 11.1.1 — LICENSE.md
     Copyright (c) 2010-2020 Robert Kieffer and other contributors
 vite 7.3.6 — LICENSE.md, its "Vite core license" section
     Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
