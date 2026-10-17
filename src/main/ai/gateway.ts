@@ -119,53 +119,82 @@ export async function anthropicClient(apiKey: string): Promise<AiClient> {
 
 interface StatusLike {
   status?: number
-  name?: string
   message?: string
+}
+
+/**
+ * The names a thrown value answers to: each class's `constructor.name` along its prototype
+ * chain, and its own `name` when that is a string (a DOMException's `AbortError`, a native
+ * `SyntaxError`). A parent is on the chain too, so an `APIConnectionTimeoutError` also answers
+ * to `APIConnectionError`. Never throws: a Proxy or a throwing getter leaves what was found.
+ */
+function errorNames(error: unknown): Set<string> {
+  const names = new Set<string>()
+  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return names
+  try {
+    const own = (error as { name?: unknown }).name
+    if (typeof own === 'string') names.add(own)
+    let proto: unknown = Object.getPrototypeOf(error)
+    for (let step = 0; step < 16 && proto !== null && proto !== Object.prototype; step++) {
+      const ctor = (proto as { constructor?: unknown }).constructor
+      if (typeof ctor === 'function' && ctor.name) names.add(ctor.name)
+      proto = Object.getPrototypeOf(proto)
+    }
+  } catch {
+    // What was collected before the throw is all there is.
+  }
+  return names
 }
 
 /**
  * Map a thrown error onto the kind the panel shows. Most specific first: the SDK's own
  * classes when they are what was thrown, then the HTTP status, then the message.
  *
+ * The SDK's classes are matched by their names on the prototype chain, not by `instanceof`
+ * and not by `.name`: the SDK sets no `name` on them (every one reads `Error`), and it is
+ * loaded lazily, so this module holds no class to test against. The names survive because
+ * the SDK is not bundled into main.
+ *
  * The SDK already retries 408/409/429/5xx twice on its own, so anything that reaches here
  * has already been retried.
  */
 export function classifyError(error: unknown): { kind: AiErrorKind; message: string } {
   const e = (error ?? {}) as StatusLike
-  const name = e.name ?? ''
+  const names = errorNames(error)
   const status = e.status
   const raw = e.message || String(error)
 
-  if (name === 'AuthenticationError' || status === 401) {
+  if (names.has('AuthenticationError') || status === 401) {
     return { kind: 'auth', message: 'That API key was rejected. Check it in Preferences.' }
   }
-  if (name === 'PermissionDeniedError' || status === 403) {
+  if (names.has('PermissionDeniedError') || status === 403) {
     return { kind: 'auth', message: 'That API key is not allowed to use this model.' }
   }
-  if (name === 'RateLimitError' || status === 429) {
+  if (names.has('RateLimitError') || status === 429) {
     return { kind: 'rate_limit', message: 'Rate limited by the API. Try again in a moment.' }
   }
   if (status === 529 || /overloaded/i.test(raw)) {
     return { kind: 'overloaded', message: 'The API is overloaded. Try again in a moment.' }
   }
-  if (name === 'BadRequestError' || status === 400) {
+  if (names.has('BadRequestError') || status === 400) {
     return { kind: 'bad_request', message: raw }
   }
   // No HTTP status: it never reached the API, or it did not come back. These used to collapse
   // into one "Could not reach the API", which is a lie for four of the five (2026-09-20).
-  if (name === 'APIUserAbortError' || name === 'AbortError' || /\babort/i.test(raw)) {
+  if (names.has('APIUserAbortError') || names.has('AbortError') || /\babort/i.test(raw)) {
     return { kind: 'timeout', message: 'The request was stopped before it finished.' }
   }
-  if (name === 'APIConnectionTimeoutError' || /\btimed? ?out\b/i.test(raw)) {
+  // Before the connection test: a timeout is an `APIConnectionError` on the chain as well.
+  if (names.has('APIConnectionTimeoutError') || /\btimed? ?out\b/i.test(raw)) {
     return {
       kind: 'timeout',
       message: `The API did not answer within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} s.`
     }
   }
-  if (name === 'APIConnectionError') {
+  if (names.has('APIConnectionError')) {
     return { kind: 'connection', message: 'Could not reach the API. Check the network.' }
   }
-  if (name === 'SyntaxError' || /\bJSON\b|Unexpected token|unterminated|malformed/i.test(raw)) {
+  if (names.has('SyntaxError') || /\bJSON\b|Unexpected token|unterminated|malformed/i.test(raw)) {
     return { kind: 'unknown', message: `The reply could not be read: ${raw}` }
   }
   if (status === undefined) {

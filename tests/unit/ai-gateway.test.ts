@@ -9,6 +9,21 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIError,
+  APIUserAbortError,
+  AnthropicError,
+  AuthenticationError,
+  BadRequestError,
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+  PermissionDeniedError,
+  RateLimitError,
+  UnprocessableEntityError
+} from '@anthropic-ai/sdk'
+import {
   AiGateway,
   REQUEST_MAX_RETRIES,
   REQUEST_TIMEOUT_MS,
@@ -300,16 +315,14 @@ describe('error mapping', () => {
     expect(classifyError({ name: 'BadRequestError', status: 400, message: 'bad' }).kind).toBe(
       'bad_request'
     )
-    expect(classifyError({ name: 'APIConnectionError', message: 'socket hang up' }).kind).toBe(
+    expect(classifyError(new APIConnectionError({ message: 'socket hang up' })).kind).toBe(
       'connection'
     )
     expect(classifyError({ status: 500, message: 'server' }).kind).toBe('unknown')
   })
 
   it('turns a thrown connection failure into one event and no transcript', async () => {
-    const h = harness([
-      Object.assign(new Error('socket hang up'), { name: 'APIConnectionError' })
-    ])
+    const h = harness([new APIConnectionError({ message: 'socket hang up' })])
     await h.gateway.run(turn())
     expect(errorOf(h.events).kind).toBe('connection')
     expect(h.gateway.transcriptLength).toBe(0)
@@ -380,9 +393,7 @@ describe('the turn deadline', () => {
               }),
             abort: () => {
               aborted = true
-              rejectStream?.(
-                Object.assign(new Error('Request was aborted.'), { name: 'APIUserAbortError' })
-              )
+              rejectStream?.(new APIUserAbortError())
             }
           }
         }
@@ -422,8 +433,7 @@ describe('the turn deadline', () => {
                 rejectStream = reject
                 inFlight()
               }),
-            abort: () =>
-              rejectStream?.(Object.assign(new Error('aborted'), { name: 'APIUserAbortError' }))
+            abort: () => rejectStream?.(new APIUserAbortError())
           }
         }
       },
@@ -479,20 +489,21 @@ describe('the turn deadline', () => {
 
 describe('classifyError separates the status-less failures', () => {
   it('an abort is not a network failure', () => {
-    expect(classifyError({ name: 'APIUserAbortError', message: 'Request was aborted.' })).toEqual({
+    expect(classifyError(new APIUserAbortError())).toEqual({
       kind: 'timeout',
       message: 'The request was stopped before it finished.'
     })
   })
 
   it('a request timeout says so, with the limit', () => {
-    const out = classifyError({ name: 'APIConnectionTimeoutError', message: 'Request timed out.' })
+    const out = classifyError(new APIConnectionTimeoutError())
     expect(out.kind).toBe('timeout')
     expect(out.message).toContain(String(Math.round(REQUEST_TIMEOUT_MS / 1000)))
   })
 
   it('a genuine connection failure keeps the design’s own sentence', () => {
-    expect(classifyError({ name: 'APIConnectionError', message: 'fetch failed' })).toEqual({
+    const cause = new TypeError('fetch failed')
+    expect(classifyError(new APIConnectionError({ message: undefined, cause }))).toEqual({
       kind: 'connection',
       message: 'Could not reach the API. Check the network.'
     })
@@ -516,5 +527,177 @@ describe('classifyError separates the status-less failures', () => {
     expect(classifyError({ status: 429 }).kind).toBe('rate_limit')
     expect(classifyError({ status: 529 }).kind).toBe('overloaded')
     expect(classifyError({ status: 400, message: 'bad' }).kind).toBe('bad_request')
+  })
+})
+
+/**
+ * The SDK's real classes, built the way the SDK builds them. It sets no `name` on any of them
+ * (each reads `Error`), so `classifyError` matches them by the class names on the prototype
+ * chain; until 2026-10-17 a bare connection error fell through to `unknown`.
+ */
+describe('classifyError and the SDK’s own error classes', () => {
+  const http = (status: number, type: string, message: string): Error =>
+    APIError.generate(status, { type: 'error', error: { type, message } }, undefined, new Headers())
+
+  /** `message: null` is the error's own message, passed through. */
+  const cases: {
+    label: string
+    make: () => Error
+    cls: abstract new (...args: never[]) => Error
+    kind: string
+    message: string | null
+  }[] = [
+    {
+      label: '401',
+      make: () => http(401, 'authentication_error', 'invalid x-api-key'),
+      cls: AuthenticationError,
+      kind: 'auth',
+      message: 'That API key was rejected. Check it in Preferences.'
+    },
+    {
+      label: '403',
+      make: () => http(403, 'permission_error', 'not allowed'),
+      cls: PermissionDeniedError,
+      kind: 'auth',
+      message: 'That API key is not allowed to use this model.'
+    },
+    {
+      label: '429',
+      make: () => http(429, 'rate_limit_error', 'slow down'),
+      cls: RateLimitError,
+      kind: 'rate_limit',
+      message: 'Rate limited by the API. Try again in a moment.'
+    },
+    {
+      label: '529',
+      make: () => http(529, 'overloaded_error', 'Overloaded'),
+      cls: InternalServerError,
+      kind: 'overloaded',
+      message: 'The API is overloaded. Try again in a moment.'
+    },
+    {
+      label: '500',
+      make: () => http(500, 'api_error', 'Internal server error'),
+      cls: InternalServerError,
+      kind: 'unknown',
+      message: null
+    },
+    {
+      label: '400',
+      make: () => http(400, 'invalid_request_error', 'messages: field required'),
+      cls: BadRequestError,
+      kind: 'bad_request',
+      message: null
+    },
+    {
+      label: '404',
+      make: () => http(404, 'not_found_error', 'model: claude-x'),
+      cls: NotFoundError,
+      kind: 'unknown',
+      message: null
+    },
+    {
+      label: '409',
+      make: () => http(409, 'conflict_error', 'conflict'),
+      cls: ConflictError,
+      kind: 'unknown',
+      message: null
+    },
+    {
+      label: '422',
+      make: () => http(422, 'invalid_request_error', 'unprocessable'),
+      cls: UnprocessableEntityError,
+      kind: 'unknown',
+      message: null
+    },
+    {
+      label: '418, a plain APIError',
+      make: () => http(418, 'teapot_error', 'short and stout'),
+      cls: APIError,
+      kind: 'unknown',
+      message: null
+    },
+    {
+      label: 'a user abort',
+      make: () => new APIUserAbortError(),
+      cls: APIUserAbortError,
+      kind: 'timeout',
+      message: 'The request was stopped before it finished.'
+    },
+    {
+      label: 'a request timeout',
+      make: () => new APIConnectionTimeoutError(),
+      cls: APIConnectionTimeoutError,
+      kind: 'timeout',
+      message: `The API did not answer within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} s.`
+    },
+    {
+      // The bug: its default "Connection error." matches no message rule, so only the class
+      // can say what it is.
+      label: 'a bare connection error',
+      make: () => new APIConnectionError({ message: undefined }),
+      cls: APIConnectionError,
+      kind: 'connection',
+      message: 'Could not reach the API. Check the network.'
+    },
+    {
+      // What the SDK's message stream wraps a parse failure into.
+      label: 'an unreadable stream',
+      make: () => new AnthropicError('Unexpected token } in JSON at position 4'),
+      cls: AnthropicError,
+      kind: 'unknown',
+      message: 'The reply could not be read: Unexpected token } in JSON at position 4'
+    }
+  ]
+
+  it.each(cases)('$label', ({ make, cls, kind, message }) => {
+    const error = make()
+    expect(error).toBeInstanceOf(cls)
+    expect(error.constructor).toBe(cls)
+    // The SDK's own fact, and the reason the class is read off the prototype chain.
+    expect(error.name).toBe('Error')
+    expect(classifyError(error)).toEqual({ kind, message: message ?? error.message })
+  })
+
+  it('matches the class alone, with no status or message rule to fall back on', () => {
+    // The SDK always builds these with a status; without one, only the class is left to read.
+    // The abort and the timeout have no status anyway, and their default messages match a
+    // message rule, so they are given one that does not.
+    const bare = { status: undefined as never, headers: undefined as never }
+    const auth = new AuthenticationError(bare.status, undefined, 'x', bare.headers)
+    expect(auth.status).toBeUndefined()
+    expect(classifyError(auth)).toEqual({
+      kind: 'auth',
+      message: 'That API key was rejected. Check it in Preferences.'
+    })
+    expect(
+      classifyError(new PermissionDeniedError(bare.status, undefined, 'x', bare.headers)).kind
+    ).toBe('auth')
+    expect(classifyError(new RateLimitError(bare.status, undefined, 'x', bare.headers)).kind).toBe(
+      'rate_limit'
+    )
+    expect(classifyError(new BadRequestError(bare.status, undefined, 'x', bare.headers))).toEqual({
+      kind: 'bad_request',
+      message: 'x'
+    })
+    expect(classifyError(new APIUserAbortError({ message: 'x' }))).toEqual({
+      kind: 'timeout',
+      message: 'The request was stopped before it finished.'
+    })
+    expect(classifyError(new APIConnectionTimeoutError({ message: 'x' }))).toEqual({
+      kind: 'timeout',
+      message: `The API did not answer within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} s.`
+    })
+  })
+
+  it('reading the names never throws: a Proxy whose getPrototypeOf throws, null, a string', () => {
+    const hostile = new Proxy(new Error('x'), {
+      getPrototypeOf() {
+        throw new Error('trap')
+      }
+    })
+    expect(classifyError(hostile)).toEqual({ kind: 'unknown', message: 'x' })
+    expect(classifyError(null).kind).toBe('unknown')
+    expect(classifyError('boom')).toEqual({ kind: 'unknown', message: 'boom' })
   })
 })

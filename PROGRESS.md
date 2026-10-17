@@ -4,6 +4,27 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-10-17 — the assistant's errors are told apart by the SDK's own classes
+
+**Did.** `classifyError` (`src/main/ai/gateway.ts`) tested `error.name` against the SDK's
+class names — `AuthenticationError`, `RateLimitError`, `APIConnectionError` and four more — but
+the SDK sets no `name` on its classes, so every one reads `Error` and those tests never matched.
+This predates the 0.133 bump. The HTTP status and the message rules carried every case but one:
+a bare connection error, whose message is only `Connection error.`, fell through to `unknown`
+and showed that text. It now shows its own sentence, `Could not reach the API. Check the
+network.` The names are read off the prototype chain (each `constructor.name`, plus the value's
+own `name` for a DOMException `AbortError` and a native `SyntaxError`), not by `instanceof`:
+main loads the SDK lazily and imports only its types, so it holds no class to test against.
+The branch order, every status and message fallback, and every other sentence are unchanged.
+
+**Verified:** `tests/unit/ai-gateway.test.ts` builds the SDK's real classes the way the SDK
+does (`APIError.generate`) and checks the kind and the sentence for each, plus the class alone
+with no status; against the old code the connection and class-only cases fail and every other
+row passes. The name-faked cases became real classes. `npm run typecheck`, `npm test`
+(2 998 passed / 4 skipped) and `npm run build` pass, and `out/main/index.js` still loads the
+SDK with `import("@anthropic-ai/sdk")` rather than inlining it, which is what keeps its class
+names.
+
 ## 2026-10-17 — two Dependabot alerts closed: `source-map-js` 1.2.2, and exceljs's `uuid` forced to 11.1.1
 
 **Did.** Alert #3 (high), `source-map-js` 1.2.1 under `vite` → `postcss`: `npm update
