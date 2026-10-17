@@ -36,8 +36,8 @@ The IBM Plex Sans, Mono and Serif fonts (`@fontsource` packages) are licensed un
 
 | Component | Version | Licence | Ships in | Text | Notes |
 |---|---|---|---|---|---|
-| @anthropic-ai/sdk | 0.125.0 | MIT | app.asar: node_modules | 4 |  |
-| @anthropic-ai/sdk › src/internal/qs | vendored in 0.125.0 | BSD-3-Clause | app.asar: node_modules | 1 | code vendored inside @anthropic-ai/sdk, with its own licence |
+| @anthropic-ai/sdk | 0.133.0 | MIT | app.asar: node_modules | 4 |  |
+| @anthropic-ai/sdk › src/internal/qs | vendored in 0.133.0 | BSD-3-Clause | app.asar: node_modules | 1 | code vendored inside @anthropic-ai/sdk, with its own licence |
 | @babel/runtime | 7.29.7 | MIT | app.asar: node_modules | 4 |  |
 | @electron-toolkit/utils | 4.0.0 | MIT | app.asar: node_modules | 4 |  |
 | @fast-csv/format | 4.3.5 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
@@ -45,7 +45,7 @@ The IBM Plex Sans, Mono and Serif fonts (`@fontsource` packages) are licensed un
 | @fontsource/ibm-plex-mono | 5.3.0 | OFL-1.1 | app.asar: out (font files) | 24 |  |
 | @fontsource/ibm-plex-sans | 5.3.0 | OFL-1.1 | app.asar: out (font files) | 24 |  |
 | @fontsource/ibm-plex-serif | 5.3.0 | OFL-1.1 | app.asar: out (font files) | 24 |  |
-| @rollup/plugin-commonjs | bundled in vite 7.3.6 | MIT | app.asar: out (bundler helper code) | 4 | the CommonJS interop helpers (the `_commonjsHelpers` chunk) |
+| @rollup/plugin-commonjs | bundled in vite 7.3.7 | MIT | app.asar: out (bundler helper code) | 4 | the CommonJS interop helpers (the `_commonjsHelpers` chunk) |
 | @stablelib/base64 | 1.0.1 | MIT | app.asar: node_modules | 5 |  |
 | asn1.js | 5.4.1 | MIT | exceljs's browser build | 4 | the registry's latest on 2026-10-05; the build records no version |
 | base64-js | 1.5.1 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
@@ -135,10 +135,10 @@ The IBM Plex Sans, Mono and Serif fonts (`@fontsource` packages) are licensed un
 | util | 0.12.5 | MIT | exceljs's browser build | 4 | the registry's latest on 2026-10-05; the build records no version |
 | util-deprecate | 1.0.2 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
 | uuid | 11.1.1 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
-| vite | 7.3.6 | MIT | app.asar: out (bundler helper code) | 4 | the module-preload helper Vite writes into the bundle |
+| vite | 7.3.7 | MIT | app.asar: out (bundler helper code) | 4 | the module-preload helper Vite writes into the bundle |
 | web-ifc | 0.0.77 | MPL-2.0 | app.asar: out (bundled JavaScript) | 23 | used unmodified; web-ifc.wasm ships unpacked beside the archive; source: https://github.com/ThatOpen/engine_web-ifc/tree/0.77 |
 | xmlchars | 2.2.0 | MIT | exceljs's browser build | 4 | the copy installed here; the one in the build may be another version |
-| zod | 4.6.4 | MIT | app.asar: node_modules; app.asar: out (bundled JavaScript) | 4 |  |
+| zod | 4.6.5 | MIT | app.asar: node_modules; app.asar: out (bundled JavaScript) | 4 |  |
 | zustand | 5.0.15 | MIT | app.asar: out (bundled JavaScript) | 4 |  |
 
 ## Licence texts
@@ -150,7 +150,7 @@ Each distinct text once, after the components it applies to and their copyright 
 Applies to:
 
 ```text
-@anthropic-ai/sdk › src/internal/qs vendored in 0.125.0 — src/internal/qs/LICENSE.md
+@anthropic-ai/sdk › src/internal/qs vendored in 0.133.0 — src/internal/qs/LICENSE.md
     Copyright (c) 2014, Nathan LaFreniere and other [contributors](https://github.com/puruvj/neoqs/graphs/contributors) All rights reserved.
 ieee754 1.2.1 — LICENSE
     Copyright 2008 Fair Oaks Labs, Inc.
@@ -250,7 +250,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 Applies to:
 
 ```text
-@anthropic-ai/sdk 0.125.0 — LICENSE
+@anthropic-ai/sdk 0.133.0 — LICENSE
     Copyright 2023 Anthropic, PBC.
 @babel/runtime 7.29.7 — LICENSE
     Copyright (c) 2014-present Sebastian McKenzie and other contributors
@@ -260,7 +260,7 @@ Applies to:
     Copyright (c) 2011-2019 C2FO
 @fast-csv/parse 4.3.6 — LICENSE
     Copyright (c) 2011-2019 C2FO
-@rollup/plugin-commonjs bundled in vite 7.3.6 — vite's LICENSE.md, the section for the @rollup plugins it bundles
+@rollup/plugin-commonjs bundled in vite 7.3.7 — vite's LICENSE.md, the section for the @rollup plugins it bundles
     Copyright (c) 2019 RollupJS Plugin Contributors (https://github.com/rollup/plugins/graphs/contributors)
 asn1.js 5.4.1 — LICENSE in https://registry.npmjs.org/asn1.js/-/asn1.js-5.4.1.tgz
     Copyright (c) 2017 Fedor Indutny
@@ -361,11 +361,11 @@ util-deprecate 1.0.2 — LICENSE
     Copyright (c) 2014 Nathan Rajlich <nathan@tootallnate.net>
 uuid 11.1.1 — LICENSE.md
     Copyright (c) 2010-2020 Robert Kieffer and other contributors
-vite 7.3.6 — LICENSE.md, its "Vite core license" section
+vite 7.3.7 — LICENSE.md, its "Vite core license" section
     Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
 xmlchars 2.2.0 — LICENSE
     Copyright Louis-Dominique Dubeau and contributors to xmlchars
-zod 4.6.4 — LICENSE
+zod 4.6.5 — LICENSE
     Copyright (c) 2025 Colin McDonnell
 zustand 5.0.15 — LICENSE
     Copyright (c) 2019 Paul Henschel

@@ -962,7 +962,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - **IFC parser** — web-ifc 0.0.77 in a Web Worker behind a read-only adapter; IfcOpenShell is ground truth in tests.
 - **File access** — `sgvue-file://` read-only protocol with single-use tokens; the parser reads a Blob in chunks.
 - **Power query for AI** — sql.js 1.14 in its own worker, `PRAGMA query_only`, SELECT-only gate, 10 s cap.
-- **AI** — `@anthropic-ai/sdk` 0.125 in main only, `claude-opus-5`, effort `medium`, key in `safeStorage`.
+- **AI** — `@anthropic-ai/sdk` 0.133 in main only, `claude-opus-5`, effort `medium`, key in `safeStorage`.
 - **Persistence** — JSON in `userData`, written by main: settings, sessions, recents.
 - **Share link** — `sgvue://s=<base64url>`, a scheme the app registers.
 - **Packaging** — electron-builder 26: `.dmg` arm64 + x64 (ad-hoc signed), NSIS `.exe` x64 (unsigned), `.wasm` unpacked.

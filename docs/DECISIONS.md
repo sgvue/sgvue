@@ -21,7 +21,7 @@ a full row here.
 | IFC parser | **web-ifc 0.0.77** (MPL-2.0), single-threaded build in a Web Worker, read-only adapter; **IfcOpenShell as ground truth in tests** | Client-side, IFC2X3/IFC4/IFC4X3, metres out. Lighter than bundling IfcOpenShell and far easier to package on Windows. |
 | File access | `sgvue-file://` read-only protocol with single-use tokens + native drag-drop; parser reads a Blob in chunks (`OpenModelFromCallback`) | Main streams and never holds model bytes; no 600 MB IPC copy. |
 | Power query for AI | **sql.js 1.14** in its own worker, `PRAGMA query_only`, SELECT-only gate, 10 s timeout by worker restart | Arbitrary joins for the assistant, no native module, cannot damage the model. |
-| AI | **@anthropic-ai/sdk 0.125** in the Electron main process only, `claude-opus-5`, adaptive thinking, effort `medium`, manual streaming loop, key in `safeStorage` | Per-token text, tool-start narration for the designed busy row, explicit cache breakpoints, abort. Key never reaches the renderer. |
+| AI | **@anthropic-ai/sdk 0.133** in the Electron main process only, `claude-opus-5`, adaptive thinking, effort `medium`, manual streaming loop, key in `safeStorage` | Per-token text, tool-start narration for the designed busy row, explicit cache breakpoints, abort. Key never reaches the renderer. |
 | Persistence | JSON in `userData` via main (settings, sessions, recents); exports via save dialog | Enumerable writers; sessions carry file paths. |
 | Share link | `sgvue://s=<base64url>` registered scheme | Keeps the design's "copy link" affordance and "reopens the exact view" behaviour on desktop. |
 | Packaging | electron-builder 26: macOS `.dmg` (arm64 + x64), Windows NSIS `.exe` (x64), unsigned; `asarUnpack` `.wasm` | Signing/notarisation owed. |
