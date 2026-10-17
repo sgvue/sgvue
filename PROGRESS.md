@@ -4,6 +4,52 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-10-17 — 1.3.0 for Mac: the disk images tested on a Mac and published
+
+**Why:** the owner, 2026-10-17: *"I believe the installer has been built but havent tested and
+officially publish. Please complete that."* The 1.3.0 release had gone out on 2026-10-09 with
+the Windows installer alone, and the product site told Mac visitors "SGVue for Mac is not
+published yet". This run is `docs/RELEASING.md`'s steps 4 to 6 for the two disk images.
+
+**The build.** Not rebuilt: the `sgvue-macos` artifact of run 37911242111 — the tag `v1.3.0`,
+`3240e8b` — downloaded with `gh run download`. Its zip's digest equals the run's,
+`082959481fb1073c48fa91924af76bf0dfb12590641db718d9d1e831dd72b87d`, and
+`gh attestation verify <file> --repo sgvue/sgvue` passes for each disk image: built from
+`refs/tags/v1.3.0` at `3240e8b` by that run. Both images pass `hdiutil verify`; inside, each
+`SGVue.app` is 1.3.0, `com.sgvue.viewer`, `LSMinimumSystemVersion` 13.0, one architecture
+(`arm64` / `x86_64`), ad-hoc signed (`Signature=adhoc`, the build log's `identityName=-`),
+`codesign --verify --deep --strict` clean, and holds `LICENSE`, `NOTICE`,
+`THIRD_PARTY_NOTICES.md`, `LICENSE.electron.txt`, `LICENSES.chromium.html` and the two `.wasm`
+files in `app.asar.unpacked`. Installed size 328 MB and 335 MB, download 127.6 MiB and
+134.5 MiB, as the release notes say. `spctl` rejects both — not notarised — so the first launch
+is **Open Anyway**, as the notes say; that click is the owner's and was not made here.
+
+**Tested** on an M4 Pro, macOS 26.5.1, through `npm run test:packaged` (`scripts/safe-app.cjs`)
+in a checkout of `v1.3.0` with each app in `dist/mac-arm64/SGVue.app`: **2 passed, 1 skipped**
+(the 137.9 MB model needs `samples/`) for each. arm64: 4.4–4.5 s, GPU working set 136 MB, peak
+single process 1 070 MB, `clean:`. x64, under Rosetta: 42.4–42.8 s, every run. The first x64
+run after the copy timed out at 120 s, and two arm64 runs right after a copy took 84 s and
+108 s: the one-time scan of a newly placed bundle and Rosetta's first translation; the same
+build passed on the next run, every time. Timed with `DEBUG=pw:api,pw:browser
+DEBUG_COLORS=0` (clock times — the default `+ms` is per namespace and misleads), the x64 time
+is spread over launch and the page's first work, and quit takes 0.6 s; **1.2.0's published x64
+image, on the same flow, took 51.4 s**, so nothing regressed. An Intel Mac runs it natively.
+
+**Published** with `gh release upload` on `sgvue/releases` `v1.3.0`, which GitHub stores with
+the same SHA-256s. The notes: the sentence that the Mac images would follow is gone, and their
+SHA-256 joins the installer's —
+`177b470765d34910cb230ccc06a6395a7ab0e5bded49d2adf0eb616ec3bbaa9d  SGVue-1.3.0-arm64.dmg`,
+`0b0b50b34b025ba5ebadc6780cda2860e90b58564d8f035ca4564146cd6bca92  SGVue-1.3.0-x64.dmg`.
+`docs/releases/1.3.0.md` is unchanged: its Mac paragraph was worded to stay true either way.
+**Checked:** https://sgvue.github.io/?v=1.3.0 says "You're up to date — SGVue 1.3.0" and, on a
+Mac, offers "Download for Mac (Apple silicon)" with the Mac install steps. The site keeps the
+latest release in `sessionStorage` (`sgvue.latest.v3`), so a tab opened before an upload goes
+on saying "not published yet" until that key is cleared or the tab closed.
+
+**Still owed:** the Mac test fixes of the private `4cc5b05` (multi-select with `ControlOrMeta`,
+no wait for an exit after the last window closes on macOS, the `ifcrise` wait) are not in this
+repository; `packaged.spec.ts`, the one spec run here, does not need them.
+
 ## 2026-10-09 — 1.3.0 prepared: the version, the release notes, a line on the landing page, an installer verified without being run — and two local folders kept out of it
 
 **Why:** the owner, 2026-10-09: *"after you done, tell me how to test, then u can push for
