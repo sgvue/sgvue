@@ -1,0 +1,415 @@
+{
+  "files": {
+    "ifc2x3.ifc": {
+      "elements": {
+        "0000000000000000000008": {
+          "case": "wall, type STANDARD",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "STANDARD",
+            "objectType": "Generic 200",
+            "predefinedType": "STANDARD"
+          },
+          "get_predefined_type": "STANDARD",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": null
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Generic 200",
+            "PredefinedType": "STANDARD",
+            "class": "IfcWallType"
+          }
+        },
+        "000000000000000000000B": {
+          "case": "wall, ObjectType only",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "Feature wall",
+            "objectType": "Feature wall",
+            "predefinedType": ""
+          },
+          "get_predefined_type": "Feature wall",
+          "occurrence": {
+            "ObjectType": "Feature wall",
+            "PredefinedType": null
+          },
+          "type": null
+        },
+        "000000000000000000000C": {
+          "case": "wall, type USERDEFINED with ElementType",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "Retaining wall",
+            "objectType": "Retaining 400",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": "Retaining wall",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": null
+          },
+          "type": {
+            "ElementType": "Retaining wall",
+            "Name": "Retaining 400",
+            "PredefinedType": "USERDEFINED",
+            "class": "IfcWallType"
+          }
+        },
+        "000000000000000000000F": {
+          "case": "wall, nothing",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "",
+            "objectType": "",
+            "predefinedType": ""
+          },
+          "get_predefined_type": null,
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": null
+          },
+          "type": null
+        },
+        "000000000000000000000G": {
+          "case": "beam, type NOTDEFINED",
+          "class": "IfcBeam",
+          "expected": {
+            "effectivePredefinedType": "",
+            "objectType": "Beam 300",
+            "predefinedType": "NOTDEFINED"
+          },
+          "get_predefined_type": null,
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": null
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Beam 300",
+            "PredefinedType": "NOTDEFINED",
+            "class": "IfcBeamType"
+          }
+        },
+        "000000000000000000000J": {
+          "case": "slab FLOOR",
+          "class": "IfcSlab",
+          "expected": {
+            "effectivePredefinedType": "FLOOR",
+            "objectType": "",
+            "predefinedType": "FLOOR"
+          },
+          "get_predefined_type": "FLOOR",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "FLOOR"
+          },
+          "type": null
+        },
+        "000000000000000000000K": {
+          "case": "slab USERDEFINED with ObjectType",
+          "class": "IfcSlab",
+          "expected": {
+            "effectivePredefinedType": "Ramp",
+            "objectType": "Ramp",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": "Ramp",
+          "occurrence": {
+            "ObjectType": "Ramp",
+            "PredefinedType": "USERDEFINED"
+          },
+          "type": null
+        },
+        "000000000000000000000L": {
+          "case": "slab NOTDEFINED, type ROOF",
+          "class": "IfcSlab",
+          "expected": {
+            "effectivePredefinedType": "ROOF",
+            "objectType": "Roof 250",
+            "predefinedType": "ROOF"
+          },
+          "get_predefined_type": "ROOF",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "NOTDEFINED"
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Roof 250",
+            "PredefinedType": "ROOF",
+            "class": "IfcSlabType"
+          }
+        },
+        "000000000000000000000O": {
+          "case": "covering CEILING",
+          "class": "IfcCovering",
+          "expected": {
+            "effectivePredefinedType": "CEILING",
+            "objectType": "",
+            "predefinedType": "CEILING"
+          },
+          "get_predefined_type": "CEILING",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "CEILING"
+          },
+          "type": null
+        },
+        "000000000000000000000P": {
+          "case": "covering USERDEFINED without ObjectType",
+          "class": "IfcCovering",
+          "expected": {
+            "effectivePredefinedType": "",
+            "objectType": "",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": null,
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "USERDEFINED"
+          },
+          "type": null
+        }
+      },
+      "schema": "IFC2X3"
+    },
+    "ifc4.ifc": {
+      "elements": {
+        "0000000000000000000008": {
+          "case": "enum on occurrence",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "SOLIDWALL",
+            "objectType": "",
+            "predefinedType": "SOLIDWALL"
+          },
+          "get_predefined_type": "SOLIDWALL",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "SOLIDWALL"
+          },
+          "type": null
+        },
+        "0000000000000000000009": {
+          "case": "USERDEFINED with ObjectType",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "Acoustic baffle",
+            "objectType": "Acoustic baffle",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": "Acoustic baffle",
+          "occurrence": {
+            "ObjectType": "Acoustic baffle",
+            "PredefinedType": "USERDEFINED"
+          },
+          "type": null
+        },
+        "000000000000000000000A": {
+          "case": "USERDEFINED without ObjectType",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "",
+            "objectType": "",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": null,
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "USERDEFINED"
+          },
+          "type": null
+        },
+        "000000000000000000000B": {
+          "case": "NOTDEFINED",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "NOTDEFINED",
+            "objectType": "",
+            "predefinedType": "NOTDEFINED"
+          },
+          "get_predefined_type": "NOTDEFINED",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "NOTDEFINED"
+          },
+          "type": null
+        },
+        "000000000000000000000C": {
+          "case": "absent",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "",
+            "objectType": "",
+            "predefinedType": ""
+          },
+          "get_predefined_type": null,
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": null
+          },
+          "type": null
+        },
+        "000000000000000000000D": {
+          "case": "ObjectType without PredefinedType",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "Feature wall",
+            "objectType": "Feature wall",
+            "predefinedType": ""
+          },
+          "get_predefined_type": "Feature wall",
+          "occurrence": {
+            "ObjectType": "Feature wall",
+            "PredefinedType": null
+          },
+          "type": null
+        },
+        "000000000000000000000E": {
+          "case": "occurrence NOTDEFINED, type SHEAR",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "SHEAR",
+            "objectType": "Shear wall 300",
+            "predefinedType": "SHEAR"
+          },
+          "get_predefined_type": "SHEAR",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "NOTDEFINED"
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Shear wall 300",
+            "PredefinedType": "SHEAR",
+            "class": "IfcWallType"
+          }
+        },
+        "000000000000000000000H": {
+          "case": "occurrence absent, type JOIST",
+          "class": "IfcBeam",
+          "expected": {
+            "effectivePredefinedType": "JOIST",
+            "objectType": "Joist 200",
+            "predefinedType": "JOIST"
+          },
+          "get_predefined_type": "JOIST",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": null
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Joist 200",
+            "PredefinedType": "JOIST",
+            "class": "IfcBeamType"
+          }
+        },
+        "000000000000000000000K": {
+          "case": "type USERDEFINED with ElementType",
+          "class": "IfcSlab",
+          "expected": {
+            "effectivePredefinedType": "Raft slab",
+            "objectType": "Raft 600",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": "Raft slab",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "NOTDEFINED"
+          },
+          "type": {
+            "ElementType": "Raft slab",
+            "Name": "Raft 600",
+            "PredefinedType": "USERDEFINED",
+            "class": "IfcSlabType"
+          }
+        },
+        "000000000000000000000N": {
+          "case": "type USERDEFINED without ElementType",
+          "class": "IfcSlab",
+          "expected": {
+            "effectivePredefinedType": "Ramp slab",
+            "objectType": "Ramp 250",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": "Ramp slab",
+          "occurrence": {
+            "ObjectType": "Ramp slab",
+            "PredefinedType": "USERDEFINED"
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Ramp 250",
+            "PredefinedType": "USERDEFINED",
+            "class": "IfcSlabType"
+          }
+        },
+        "000000000000000000000Q": {
+          "case": "occurrence USERDEFINED, type PARTITIONING",
+          "class": "IfcWall",
+          "expected": {
+            "effectivePredefinedType": "PARTITIONING",
+            "objectType": "Partition 100",
+            "predefinedType": "USERDEFINED"
+          },
+          "get_predefined_type": "PARTITIONING",
+          "occurrence": {
+            "ObjectType": "Curved wall",
+            "PredefinedType": "USERDEFINED"
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Partition 100",
+            "PredefinedType": "PARTITIONING",
+            "class": "IfcWallType"
+          }
+        },
+        "000000000000000000000T": {
+          "case": "occurrence BEAM, type NOTDEFINED",
+          "class": "IfcBeam",
+          "expected": {
+            "effectivePredefinedType": "BEAM",
+            "objectType": "Beam 400",
+            "predefinedType": "BEAM"
+          },
+          "get_predefined_type": "BEAM",
+          "occurrence": {
+            "ObjectType": null,
+            "PredefinedType": "BEAM"
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Beam 400",
+            "PredefinedType": "NOTDEFINED",
+            "class": "IfcBeamType"
+          }
+        },
+        "000000000000000000000W": {
+          "case": "type Name differs from ObjectType",
+          "class": "IfcColumn",
+          "expected": {
+            "effectivePredefinedType": "COLUMN",
+            "objectType": "Type label",
+            "predefinedType": "COLUMN"
+          },
+          "get_predefined_type": "COLUMN",
+          "occurrence": {
+            "ObjectType": "Occurrence label",
+            "PredefinedType": "COLUMN"
+          },
+          "type": {
+            "ElementType": null,
+            "Name": "Type label",
+            "PredefinedType": "COLUMN",
+            "class": "IfcColumnType"
+          }
+        }
+      },
+      "schema": "IFC4"
+    }
+  },
+  "generatedBy": "IfcOpenShell 0.8.4.post1"
+}

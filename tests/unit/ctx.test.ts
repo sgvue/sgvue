@@ -32,6 +32,7 @@ function element(patch: Partial<FederatedElement>): FederatedElement {
     description: '',
     type: 'IfcWall',
     predefinedType: 'NOTDEFINED',
+    effectivePredefinedType: patch.predefinedType ?? 'NOTDEFINED',
     objectType: 'Basic Wall:EW200',
     typeGuid: '',
     storey: 'L1',

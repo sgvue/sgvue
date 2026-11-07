@@ -148,6 +148,7 @@ export function federationOf(sketches: readonly Sketch[], storeys: readonly stri
     model: e.model,
     type: e.type,
     predefinedType: e.predefinedType ?? '',
+    effectivePredefinedType: e.predefinedType ?? '',
     objectType: e.objectType ?? '',
     storey: e.storey ?? '',
     name: e.name ?? `${e.type} ${i + 1}`,

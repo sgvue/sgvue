@@ -433,7 +433,7 @@ buildingSMART's own validation service uses. The table below is the contract.
 | Files | ISO 10303-21 STEP; header `FILE_DESCRIPTION` (incl. the MVD `ViewDefinition[...]` string), `FILE_NAME`, `FILE_SCHEMA`; SHA-256 recorded |
 | Schemas | IFC2X3 TC1, IFC4 ADD2 TC1, IFC4X3 ADD2 — schema-specific attribute names respected (e.g. `IfcClassificationReference.ItemReference` in 2X3 vs `Identification` in 4) |
 | Identity | `IfcRoot.GlobalId` verbatim (22-char base64 alphabet `0-9A-Za-z_$`, validated, never regenerated); `expressId` kept; `Name`, `Description`, `Tag`, `ObjectType` |
-| Entity typing | Exact `IfcEntity`; `PredefinedType` incl. `USERDEFINED` → `ObjectType` / type's `ElementType`; type object via `IfcRelDefinesByType` (`IfcTypeObject.Name` as the type family) |
+| Entity typing | Exact `IfcEntity`; `PredefinedType` as **two values** (2026-11-07): the code as written — the occurrence's, else its type object's, `USERDEFINED` kept, never `ObjectType` text — and the effective type, IfcOpenShell's `get_predefined_type` (`USERDEFINED` → the type's `ElementType` / the occurrence's `ObjectType`, the type's code first); type object via `IfcRelDefinesByType` (`IfcTypeObject.Name` as the type family) |
 | Spatial structure | `IfcProject › IfcSite › IfcBuilding › IfcBuildingStorey › IfcSpace` by `IfcRelAggregates`; elements by `IfcRelContainedInSpatialStructure`; storey `Elevation`; `IfcSpatialStructureElement.CompositionType` (`COMPLEX`/`ELEMENT`/`PARTIAL`) as authored, absent when the file leaves the optional attribute unset; `IfcZone` and other `IfcGroup`/`IfcSystem` memberships via `IfcRelAssignsToGroup` |
 | Decomposition | `IfcRelAggregates` (assemblies), `IfcRelNests`, `IfcRelVoidsElement` (openings), `IfcRelFillsElement` (doors/windows in openings) |
 | Property sets | `IfcRelDefinesByProperties` → `IfcPropertySet`; value types per `IfcValue`: `IfcPropertySingleValue`, `EnumeratedValue`, `ListValue`, `BoundedValue`, `TableValue`, `ReferenceValue`, `IfcComplexProperty` (nested); values kept **as authored** with their measure type and unit; type-level psets (`IfcTypeObject.HasPropertySets`) inherited and **overridden by occurrence psets**, flagged `inherited`; `Pset_*` (buildingSMART) vs `SGPset_*` (IFC-SG) vs other prefixes distinguished |
@@ -560,7 +560,7 @@ document, never to hide.
 > builds a `ModelIndex` per the table above: header (with the MVD string), schema, units,
 > spatial tree by aggregation, containment, elements (every `IfcElement` subtype except
 > `IfcOpeningElement`, plus `IfcSpace` flagged `isSpace`), GlobalId verbatim and validated,
-> `PredefinedType` with `USERDEFINED` resolved, type objects, property and quantity sets in
+> `PredefinedType` as the code and the effective type, type objects, property and quantity sets in
 > one forward pass (type first, occurrence overriding, each set flagged `inherited` and
 > carrying its source line), materials, classifications, systems, decomposition, grids with
 > their placement chain applied, georeferencing that always names its source, `propKeys` and

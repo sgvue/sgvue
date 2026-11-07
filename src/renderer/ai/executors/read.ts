@@ -54,6 +54,7 @@ import {
   QUERY_SAMPLE_CAP,
   SAMPLE_CAP,
   brief,
+  effectivePdt,
   capped,
   chatMatch,
   labelText,
@@ -409,7 +410,10 @@ export const query_elements: Executor = (input, ctx) => {
   return {
     forModel: {
       message: `${hit.length} match (${perText}). Examples: ${samples
-        .map((e) => `${e.name} (${e.type}/${e.predefinedType}, ${e.storey})`)
+        .map((e) => {
+          const eff = effectivePdt(e).effectivePredefinedType
+          return `${e.name} (${e.type}/${e.predefinedType}${eff !== undefined ? ` → ${eff || '—'}` : ''}, ${e.storey})`
+        })
         .join('; ')}`,
       matched: hit.length,
       groups: per,
@@ -438,6 +442,7 @@ export const get_element: Executor = (input, ctx) => {
       description: e.description,
       type: e.type,
       predefinedType: e.predefinedType,
+      ...effectivePdt(e),
       objectType: e.objectType,
       typeGuid: e.typeGuid,
       storey: e.storey,

@@ -17,6 +17,10 @@
  * is why `isLiveRule` below exists: every other place in the app decides a rule is live by
  * asking whether it carries a value.
  *
+ * One attribute has **two values**: `PredefinedType` (2026-11-07) is the code as written and the
+ * effective type (`IfcElement`), and a rule on it matches when either value satisfies it —
+ * except `!=`, true only when neither equals, and `absent`, true only when both are empty.
+ *
  * `visFn` is a conjunction of independent predicates, so isolate/hide steps give the same
  * visibility in any order. Highlight is where order matters: `applyColors` (Phase 7) walks
  * the stack in order and lets a later step overwrite an earlier one's colour.
@@ -101,7 +105,14 @@ export function matchFn(rules: readonly Rule[] | undefined): Predicate | null {
   if (!rs.length) return null
 
   const test = (el: VisElement, r: Rule): boolean => {
-    const a = attr(el, r.prop)
+    if (r.prop !== 'PredefinedType') return testValue(attr(el, r.prop), r)
+    // Two values (2026-11-07): the code as written and the effective type. A positive operator
+    // matches when either does; `!=` only when neither equals, `absent` only when both are empty.
+    const raw = testValue(el.predefinedType, r)
+    const eff = testValue(el.effectivePredefinedType, r)
+    return r.op === '!=' || r.op === ABSENT_OP ? raw && eff : raw || eff
+  }
+  const testValue = (a: PropValue | undefined, r: Rule): boolean => {
     // Before the `undefined` branch, because "has no value" is exactly what it asks about —
     // and an authored empty string is as absent as a missing key to the person reading it.
     if (r.op === ABSENT_OP) return isAbsentValue(a)

@@ -61,6 +61,7 @@ function element(patch: Partial<FederatedElement>): FederatedElement {
     description: '',
     type: 'IfcWall',
     predefinedType: 'NOTDEFINED',
+    effectivePredefinedType: patch.predefinedType ?? 'NOTDEFINED',
     objectType: '',
     typeGuid: '',
     storey: 'L1',
@@ -109,6 +110,14 @@ describe('tree selectors', () => {
 
   it('falls back to NOTDEFINED for a missing predefined type', () => {
     expect(groupKey(element({ predefinedType: '' }), 'type')).toBe('NOTDEFINED')
+  })
+
+  it('groups by the effective type, shows the code as written, and searches both (2026-11-07)', () => {
+    const baffle = element({ predefinedType: 'USERDEFINED', effectivePredefinedType: 'Acoustic baffle', objectType: '' })
+    expect(groupKey(baffle, 'type')).toBe('Acoustic baffle')
+    expect(rowMeta(baffle, 'entity')).toBe('USERDEFINED · L1')
+    expect(matchesSearch(baffle, 'userdefined')).toBe(true)
+    expect(matchesSearch(baffle, 'baffle')).toBe(true)
   })
 
   it('builds the two-line meta the design specifies, dropping falsy parts and NOTDEFINED', () => {

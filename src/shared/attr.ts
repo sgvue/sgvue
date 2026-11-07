@@ -25,7 +25,10 @@ export const ATTR_KEYS = [
 export interface AttrElement {
   model: string
   type: string
+  /** The code as written — `IfcElement.predefinedType`. */
   predefinedType: string
+  /** IfcOpenShell's `get_predefined_type` — `IfcElement.effectivePredefinedType`. */
+  effectivePredefinedType: string
   objectType: string
   storey: string
   name: string
@@ -41,7 +44,9 @@ export function attr(el: AttrElement, k: string): PropValue | undefined {
     case 'IfcEntity':
       return el.type
     case 'PredefinedType':
-      return el.predefinedType
+      // The effective type, for grouping and colour-by (2026-11-07). A rule tests both values
+      // (`matchFn`), and `attrValues` lists both.
+      return el.effectivePredefinedType
     case 'ObjectType':
       return el.objectType
     case 'Level':
@@ -55,6 +60,20 @@ export function attr(el: AttrElement, k: string): PropValue | undefined {
     for (const p of Object.values(ps)) if (k in p) return p[k]
   }
   return undefined
+}
+
+/**
+ * Every value a rule over `k` can match: `attr`'s one value, except `PredefinedType`, which
+ * has two — the code as written and the effective type (2026-11-07) — listed once each. For a
+ * value list (the Filter card's, the assistant's schema) and SQL's `attribute` rows.
+ */
+export function attrValues(el: AttrElement, k: string): PropValue[] {
+  if (k === 'PredefinedType') {
+    const { predefinedType: raw, effectivePredefinedType: eff } = el
+    return raw === eff ? [eff] : [raw, eff]
+  }
+  const v = attr(el, k)
+  return v === undefined ? [] : [v]
 }
 
 /**

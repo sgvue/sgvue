@@ -143,7 +143,11 @@ export function auditModel(
   }
   push(
     'No PredefinedType',
-    elements.filter((e) => !e.predefinedType || e.predefinedType === 'NOTDEFINED').map((e) => e.id),
+    // The effective type (2026-11-07): a `USERDEFINED` code whose ObjectType says what it is,
+    // or a type object's code, is classified.
+    elements
+      .filter((e) => !e.effectivePredefinedType || e.effectivePredefinedType === 'NOTDEFINED')
+      .map((e) => e.id),
     'Blocks entity-level classification'
   )
   push(

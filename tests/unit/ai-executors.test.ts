@@ -190,7 +190,8 @@ describe('audit_model', () => {
 
   it('reports a finding, with a chip, when data is missing', async () => {
     const elements = full.elements.map((e, i) =>
-      i < 3 ? { ...e, predefinedType: 'NOTDEFINED' } : e
+      // The audit reads the effective type (2026-11-07); a code alone is not enough to be missing.
+      i < 3 ? { ...e, predefinedType: 'NOTDEFINED', effectivePredefinedType: 'NOTDEFINED' } : e
     )
     useShell.setState({ federation: { ...full, elements } })
     const body = await run('audit_model')

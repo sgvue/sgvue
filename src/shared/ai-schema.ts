@@ -36,6 +36,7 @@
  * itself is the viewer's, so the caller hands it in, as it hands in the open schedule. And the
  * per-turn list of hidden models is capped (`MODELS_HIDDEN_CAP`), with a count of the rest.
  */
+import { attrValues } from './attr'
 import type { Federation } from './federate'
 import {
   ABSENT_LABEL,
@@ -96,13 +97,15 @@ const moreKeysLine = (n: number): string => `… ${n} more — use find_properti
  */
 function category(
   elements: readonly VisElement[],
-  of: (e: VisElement) => string | undefined
+  of: (e: VisElement) => string | readonly string[] | undefined
 ): string[] {
   const counts = new Map<string, number>()
   for (const e of elements) {
-    const v = of(e)
-    if (!v) continue
-    counts.set(v, (counts.get(v) ?? 0) + 1)
+    const got = of(e)
+    for (const v of typeof got === 'string' || got === undefined ? [got] : got) {
+      if (!v) continue
+      counts.set(v, (counts.get(v) ?? 0) + 1)
+    }
   }
   const keys = [...counts.keys()].sort()
   const head = keys.slice(0, SCHEMA_VALUE_CAP).map((k) => `${k} (${counts.get(k)})`)
@@ -142,7 +145,9 @@ export function chatSchema(federation: Federation): ChatSchema {
     storeys: federation.storeys.map((s) => s.name),
     grids: federation.grids.map((g) => g.name),
     entities: category(els, (e) => e.type),
-    predefinedTypes: category(els, (e) => e.predefinedType),
+    // Both values (2026-11-07) — the code as written and the effective type — since a rule on
+    // `PredefinedType` matches either; an element counts once under each distinct value.
+    predefinedTypes: category(els, (e) => attrValues(e, 'PredefinedType').map(String)),
     objectTypes: category(els, (e) => e.objectType),
     psetKeys: psetKeyCategory(els, federation.propKeys),
     elementCount: federation.elements.length

@@ -319,14 +319,29 @@ export function chatMatch(
   return fn ? elements.filter(fn) : []
 }
 
+/**
+ * The effective predefined type, for a result that prints an element — only when it differs
+ * from the code as written (2026-11-07), so a result stays as short as it was.
+ */
+export const effectivePdt = (e: FederatedElement): { effectivePredefinedType?: string } =>
+  e.effectivePredefinedType !== e.predefinedType ? { effectivePredefinedType: e.effectivePredefinedType } : {}
+
 /** A short, stable identification of one element, for a sample list. */
 export const brief = (
   e: FederatedElement
-): { id: number; name: string; type: string; predefinedType: string; storey: string } => ({
+): {
+  id: number
+  name: string
+  type: string
+  predefinedType: string
+  effectivePredefinedType?: string
+  storey: string
+} => ({
   id: e.id,
   name: e.name,
   type: e.type,
   predefinedType: e.predefinedType,
+  ...effectivePdt(e),
   storey: e.storey
 })
 

@@ -18,8 +18,9 @@
  *                   ifcTable's `fullType` (type Name, falling back to the occurrence's)
  *   objectType      the same string. ifcTable reads the occurrence's raw `ObjectType`; the
  *                   index keeps only the type-first one (gap)
- *   predefinedType  as indexed, where `USERDEFINED` is already resolved (gap: ifcTable keeps
- *                   the raw token)
+ *   predefinedType  the code as written (`IfcElement.predefinedType`, 2026-11-07): the raw
+ *                   token, `USERDEFINED` kept, as ifcTable keeps it — the occurrence's, or its
+ *                   type object's when the occurrence states none
  *   storey          `storey` (the index's `Name || LongName`; ifcTable reads LongName first)
  *   storeyElevation / building / site   from the model's own spatial tree, by storey name
  *   space           an `IfcSpace`'s own `LongName || Name`; for everything else '' — the

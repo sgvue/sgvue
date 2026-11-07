@@ -109,6 +109,7 @@ describe('colorBy — buckets, order, colours', () => {
         model: 'ARC',
         type: 'IfcWall',
         predefinedType: '',
+        effectivePredefinedType: '',
         objectType: '',
         storey: 'L1',
         name: 'w',
