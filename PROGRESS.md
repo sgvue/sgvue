@@ -4,6 +4,23 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — two audit fixes: the SQL tool's result size, and copy csv's file text
+
+**Did.** A quick security audit (Electron shell and IPC, untrusted files and links, the assistant)
+found nothing high or medium, and two low findings, both fixed. The assistant's `query_sql` capped
+rows but not size: a SELECT the guard passes could build 400 MB cells, and 201 of them would crash
+the SQL worker's process before main's 1 000 000-character cap was ever checked. `runQuery` now
+stops at 500 000 characters of cell values, cuts the cell that crosses the line, and says so
+(`truncated`, `cut: "size"` and a message to the model). The chat panel's `copy csv` now doubles
+quotes in a group key and defuses a leading `=`, `+`, `@` or `-`, the way the Schedules exporter
+already did, so a pasted value cannot become a spreadsheet formula. Ordinary queries and tables are
+unchanged. Recorded, not fixed (each needs a compromised page first): `project:openDropped` trusts
+the path it is given, and `window.open` hands any http(s) URL to the browser.
+
+**Verified.** 8 new test cases (the real sql.js with a printf-built 3 MB cell, a 2 MB blob,
+150 medium rows; quote and formula keys); typecheck, lint, privacy and 3 548 unit tests pass;
+reviewer-deep PASS. Known limit: a single row is still bounded only by sql.js's 2 GB WASM heap.
+
 ## 2026-11-08 — Windows CI: four tests assumed POSIX paths
 
 **Did.** CI run 42396622558 failed four `npm test` cases on windows-latest only. All were tests:

@@ -221,6 +221,35 @@ describe('copy csv', () => {
     })
     expect(csv.split('\n')[1]).toBe('"Duct ↔ Beam",1,0.0123')
   })
+
+  it('doubles a quote in a key and defuses a formula, as the Schedules exporter does', () => {
+    const csv = tableCsv({
+      groupBy: '=Name',
+      rows: [
+        { k: 'Door "A"', n: 2, ids: [] },
+        { k: '=HYPERLINK("http://x","y")', n: 1, ids: [] },
+        { k: '+1', n: 1, ids: [] },
+        { k: '@SUM(A1)', n: 1, ids: [] },
+        { k: '-cmd', n: 1, ids: [] },
+        { k: '-5', n: 1, ids: [] },
+        { k: 'Rain Tree', n: 4, ids: [] }
+      ]
+    })
+    expect(csv.split('\n')).toEqual([
+      "'=Name,count,quantity",
+      '"Door ""A""",2,',
+      `"'=HYPERLINK(""http://x"",""y"")",1,`,
+      `"'+1",1,`,
+      `"'@SUM(A1)",1,`,
+      `"'-cmd",1,`,
+      '"-5",1,',
+      '"Rain Tree",4,'
+    ])
+  })
+
+  it('quotes a grouping only when it has to', () => {
+    expect(tableCsv({ groupBy: 'Fire, rating', rows: [] })).toBe('"Fire, rating",count,quantity')
+  })
 })
 
 /* ────────────────────────────── the reply strip (`:2037`) ────────────────────────────── */

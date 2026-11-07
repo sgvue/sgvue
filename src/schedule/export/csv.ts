@@ -7,7 +7,7 @@ import type { ExportRow } from './rows';
  * and Sheets treat as a formula. A leading apostrophe makes them show the text instead.
  * Negative numbers are left alone — "-5" is a number, not a formula.
  */
-function defuse(s: string): string {
+export function defuse(s: string): string {
   return /^[=+@\t\r]/.test(s) || (/^-/.test(s) && !/^-?[\d.,]+$/.test(s)) ? `'${s}` : s;
 }
 

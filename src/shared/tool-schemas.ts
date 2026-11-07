@@ -881,7 +881,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'query_sql',
     kind: 'read',
     description:
-      'Run one read-only SELECT against the model database for joins the other tools cannot express — properties across psets, quantities by storey, classification coverage. The schema is in your instructions. SELECT and WITH only; anything else is refused. At most 200 rows come back.',
+      'Run one read-only SELECT against the model database for joins the other tools cannot express — properties across psets, quantities by storey, classification coverage. The schema is in your instructions. SELECT and WITH only; anything else is refused. At most 200 rows, and at most 500 000 characters of cell values, come back; truncated says when either cut, and cut:"size" when it was the characters.',
     input_schema: obj({ sql: { type: 'string', description: 'One SELECT or WITH statement' } }, [
       'sql'
     ]),

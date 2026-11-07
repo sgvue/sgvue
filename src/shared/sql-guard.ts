@@ -43,6 +43,15 @@ export const ALLOWED_SQL_HEADS = ['SELECT', 'WITH', 'EXPLAIN'] as const
 export const SQL_ROW_FETCH = 201
 /** Rows returned to the caller when the fetch came back full. */
 export const SQL_ROW_LIMIT = 200
+/**
+ * 2026-11-08 — characters of cell values one result may carry, all rows together. The row cap
+ * alone does not bound a result: `printf('%.*c', 400000000, 'x')` passes the guard and makes
+ * one cell 400 MB, and 201 of them crash the worker's process long before main's
+ * `AI_JSON_MAX_CHARS` (1 000 000, on the whole JSON) is checked. Half of that cap, so the
+ * columns, quotes, commas and ordinary escaping of a result cut here still fit under it and
+ * reach the model. A text or blob cell is cut to what is left, so one row cannot pass it.
+ */
+export const SQL_RESULT_MAX_CHARS = 500_000
 
 export type SqlGuardResult =
   | { ok: true; sql: string; head: (typeof ALLOWED_SQL_HEADS)[number] }

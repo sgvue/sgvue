@@ -379,6 +379,21 @@ describe('the additional read tools', () => {
     const ok = await run('query_sql', { sql: 'SELECT count(*) AS n FROM element' })
     expect(ok).toEqual({ columns: ['n'], rows: [[412]], rowCount: 1, truncated: false, ms: 3 })
 
+    // 2026-11-08: a cut by size says so, and why; a cut by rows alone is as it was.
+    sqlAnswer = async () => ({ columns: ['big'], rows: [['x']], truncated: true, cut: 'size', ms: 4 })
+    const big = await run('query_sql', { sql: 'SELECT big FROM t' })
+    expect(big.truncated).toBe(true)
+    expect(big.cut).toBe('size')
+    expect(big.message).toContain('500000 characters of cell values')
+    sqlAnswer = async () => ({ columns: ['n'], rows: [[1]], truncated: true, ms: 2 })
+    expect(await run('query_sql', { sql: 'SELECT n FROM t' })).toEqual({
+      columns: ['n'],
+      rows: [[1]],
+      rowCount: 1,
+      truncated: true,
+      ms: 2
+    })
+
     sqlAnswer = async () => {
       throw new Error('only SELECT, WITH or EXPLAIN may be run; this begins with DROP')
     }

@@ -30,6 +30,7 @@ import {
   type PlacedBy
 } from '../../../shared/georef'
 import { visFn, type Rule } from '../../../shared/rules'
+import { SQL_RESULT_MAX_CHARS } from '../../../shared/sql-guard'
 import { measureKind, unitLabel, type UnitKind } from '../../../shared/units'
 import type { ShellState } from '../../state/shell'
 import type { Georeference, SpatialNode, Units } from '../../../shared/model-index.types'
@@ -1266,6 +1267,13 @@ export const query_sql: Executor = async (input, ctx) => {
         rows: result.rows,
         rowCount: result.rows.length,
         truncated: result.truncated,
+        // The size cap (2026-11-08) says why it cut, as the row cap's 200 is in the description.
+        ...(result.cut === 'size'
+          ? {
+              cut: 'size',
+              message: `Cut at ${SQL_RESULT_MAX_CHARS} characters of cell values: the rows stop here and the last row's text may be shortened. Select fewer or shorter columns (substr), or fewer rows.`
+            }
+          : {}),
         ms: result.ms
       }
     }

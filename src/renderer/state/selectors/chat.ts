@@ -19,6 +19,7 @@
  */
 import type { ChatTable } from '../../ai/executors/context'
 import { volumeIn, volumeUnit, type DisplayUnit } from '../../../shared/units'
+import { csvCell, defuse } from '../../../schedule/export/csv'
 import type { ChatMessage, ShellState } from '../shell'
 import { chatSuggest, type SuggestInput } from '../../ai/analysis'
 import { plainText } from '../../ai/blocks'
@@ -102,13 +103,19 @@ export function tableQuantity(
 /**
  * `:2031`'s "copy csv", as a string. The header names the grouping the table was built on. A
  * clash volume is the number the table shows, in the display unit's cube (2026-10-09).
+ *
+ * 2026-11-08 — the key and the grouping are file text, so they are written as the Schedules
+ * exporter writes a cell (`schedule/export/csv.ts`): a leading `=`, `+`, `@` or a `-` that is not
+ * a number is defused with an apostrophe, and an inner `"` is doubled. The key stays quoted
+ * always, as the design's line quotes it; the grouping is quoted only when it needs to be, so an
+ * ordinary table copies byte for byte what it did.
  */
 export function tableCsv(table: ChatTable, unit: DisplayUnit = 'mm'): string {
   return [
-    `${table.groupBy},count,quantity`,
+    `${csvCell(table.groupBy)},count,quantity`,
     ...table.rows.map(
       (r) =>
-        `"${r.k}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : ''}`
+        `"${defuse(r.k).replace(/"/g, '""')}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : ''}`
     )
   ].join('\n')
 }
