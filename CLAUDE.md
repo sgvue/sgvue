@@ -392,6 +392,8 @@ Anything not on this list is a defect.
   32 294 / 32 277 in `section-level-L2`, dark / light; with it hidden each of those frames is
   HEAD's — byte-identical in `section-grid-C`, within HEAD's own run-to-run label noise in the
   other two. The preview, `bubble-click-opens-section` and the four states before them draw none.
+  *(Amended 2026-11-07: each model's outline is drawn in its MODELS row's colour, the accent
+  only as a fallback — below.)*
 - **2026-10-01 — undo, redo and the markup counts are an action bar above the status bar, and
   the stage's bottom edge is one row.** Asked for by the owner in these words: *"The footer in
   3D viewport that hold unit, coordinate system and frame per second. When i hide or measure
@@ -989,6 +991,20 @@ Anything not on this list is a defect.
   search and project block stay put. That column is the one new element besides the control;
   while the sidebar fits it is `display:contents` and lays out nothing. The numbers are in
   `docs/DECISIONS.md`.
+- **2026-11-07 — each model's section-cut outline is drawn in the colour its MODELS row shows.**
+  Asked for by the owner in these words: *"Update the section cut lines color on the different
+  models to match with the color code assigned to the model."* 2026-09-28's outline was the
+  theme's accent; each segment is now the swatch of the model its element belongs to — the
+  user's override, else the library entry's swatch, else the slot's colour from the design's
+  model palette (`MC`), one rule (`rowSwatch`) for the row and the cut — whichever way "Original
+  materials" is set, as the row is. The accent is only the fallback for a model the viewer has
+  no colour for (a replacement still streaming in under its own label). **Unchanged:** the
+  2.5 px width, the depth test and its bias, what is outlined, the two-plane trimming, the clip,
+  the cap colour, the plane outline, the preview sheet, and one mesh in one draw. **No new
+  element, no new control.** On the dev mock the cut is ARC `#D8D2C6`, STR `#9AA5A3`, SIT
+  `#8FAE82`, MEP `#8FA3B5` (its library swatches); the production demo building, never in the
+  library, takes `MC[slot]` — its STR `#35C4B6` is the dark theme's accent. **Not yet measured
+  visually**: no window was opened, and the parity capture waits for the owner's yes.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1247,6 +1263,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **the Ask Vee panel is a child window (`main/vee-window.ts`) and a view only**: the conversation, the gate and the trace's facts stay in the main renderer. Over a private `MessagePort` main never reads, the main window sends `update {origin, snap, trace}` once per task (bounded, no element ids), `copy` and `focus`; the window sends 14 strict intents. `apply` is checked against the identities of the message and request it showed before `model/vee-link.ts` calls `applyPending`; copies are made in the Vee window through `copyingIn`. `vee:open {theme}` / `vee:close` drive the window, for the main window only; the new preload imports only `electron` and exposes nothing.
 - 2026-11-07 — **PredefinedType is two values: `predefinedType`, the code as written (the occurrence's, else its type's; `USERDEFINED` kept, never text), and `effectivePredefinedType`, exactly IfcOpenShell's `get_predefined_type`** (`predefinedTypes`, `index-builder.ts`): the tile, "Same PredefinedType", the tree row's meta, Schedules and SQL `predefined_type` show the code; the tree's grouping, `attr()`, the audit and SQL `predefined_type_effective` the effective type; a rule matches either (`!=` neither, `absent` both empty), and value lists, the schema and SQL's `attribute` rows carry both. Pinned by `tests/fixtures/predefined/` (IfcOpenShell's golden) and a 300-case seeded fuzz test.
 - 2026-11-07 — **the sidebar's MODELS section is collapsible and, expanded, always full** (owner-requested; our reading): the header's label is a `<button>` with the tree's chevron (`disclosure`, `selectors/tree.ts`), the store's `modelsOpen` (session-only, default `true`, `toggleModels` puts the section's popovers away; `askRemove`, `toggleAdd` and `addUpload` expand it); the MODELS handle, `sideModels` and the models scroll tail are gone (`setSideStoreys` replaces `setSideSize`); when full MODELS + STOREYS' floor + the tree's floor exceed the aside (`sidebarTight`, measured from natural sizes and floors only), the column under the MODELS header — `display:contents` otherwise — scrolls, and the tree's floor becomes its flex basis with three rows kept (`tightTree`).
+- 2026-11-07 — **each model's cut outline is its MODELS row's swatch** (owner-requested): `rowSwatch` / `modelSwatches` (`selectors/models.ts`) are the row's one rule, pushed by `shell.ts` as `viewer.setCutColors(byModelKey)` on hand-in and when `federation`, `library` or `modelColors` change (only when the map changed); `sectionCut` tags each segment with its model (`CutResult.models`, `modelOf`), `cutColours` makes `instanceColorStart` / `instanceColorEnd` (stride 6), and `Line2NodeMaterial` takes `vertexColors: true` with a white `color`; still one mesh, one draw; the accent is the fallback, re-read on a theme change; "Original materials" changes nothing. Headless timing unchanged within noise.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

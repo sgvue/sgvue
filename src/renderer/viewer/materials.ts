@@ -280,7 +280,10 @@ export interface Materials {
   groundVeil: MeshStandardMaterial
   section: LineBasicNodeMaterial
   sectionSheet: MeshBasicMaterial
-  /** The cut outline: the accent, `CUT_LINE_PX` wide, opaque, depth-tested with a small bias. */
+  /**
+   * The cut outline: white, tinted per segment by its model's colour; `CUT_LINE_PX` wide,
+   * opaque, depth-tested with a small bias.
+   */
   sectionCut: Line2NodeMaterial
   /**
    * The annotation line materials — `viewer-core.js` L170–171, L363–364 and L432–433. None of
@@ -556,9 +559,15 @@ export function createMaterials(themeName: ThemeName, parts: PartState): Materia
    * It depth-tests like any solid, so from the kept side the
    * model hides it; the polygon offset pulls it a few depth steps toward the camera, so a face
    * lying in the plane, or the kept face it runs along, does not fight it.
+   *
+   * 2026-11-07 (owner-requested): each segment is drawn in its own model's colour — the
+   * per-instance `instanceColorStart` / `instanceColorEnd` pair, which `vertexColors` multiplies
+   * into this colour — so the colour here is white, and the accent is `viewer-core.ts`'s
+   * fallback for a model with none.
    */
   const sectionCut = new Line2NodeMaterial({
-    color: T.accent,
+    color: 0xffffff,
+    vertexColors: true,
     linewidth: CUT_LINE_PX,
     polygonOffset: true,
     polygonOffsetFactor: -1,
@@ -623,7 +632,6 @@ export function createMaterials(themeName: ThemeName, parts: PartState): Materia
       selEdge.color.set(T.accent)
       section.color.set(T.accent)
       sectionSheet.color.set(T.accent)
-      sectionCut.color.set(T.accent)
       gridLine.color.set(T.gridline)
       levelLine.color.set(T.level)
       for (const m of [laser, laserPreview, dim, dimBox]) m.color.set(T.accent)

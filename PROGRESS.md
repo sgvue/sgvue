@@ -81,6 +81,19 @@ handle test reads one handle, and a new e2e test toggles MODELS by mouse and key
 4 skipped), and the flex arithmetic on a box model of the aside in headless Chromium (the
 numbers are in `docs/DECISIONS.md`). **Not run:** the e2e suite and the app itself — the two
 e2e tests and a look at the sidebar with many models and twelve storeys are owed.
+## 2026-11-07 — the section cut outline in each model's own colour
+
+**Did.** The owner: *"Update the section cut lines color on the different models to match with
+the color code assigned to the model."* Each segment of the cut outline is now drawn in the
+swatch its model's MODELS row shows (override, else library swatch, else `MC[slot]`), the accent
+only as a fallback. `sectionCut` tags every segment with its model; `section.ts` carries a
+per-instance colour pair in the same single instanced mesh; the store pushes the row colours
+by model key (`setCutColors`) whenever the federation, the library or an override changes.
+
+**Verified** headless only: `npm run typecheck`, `npm test` (3 004 passed / 4 skipped),
+`npm run build`; a synthetic 5.63 M-triangle store times the cut the same before and after
+(level 29.7 → 29.4 ms, grid 26.1 → 25.7, both 52.9 → 54.4, within noise). **Not checked in a
+window**: the parity capture of the section states, both themes, waits for the owner's yes.
 
 ## 2026-11-07 — 21 Dependabot security alerts cleared, six Dependabot PRs folded in
 

@@ -15,7 +15,8 @@
  *
  * 2026-09-28 (owner-requested): a third object, the **cut outline** — where the plane meets
  * every visible element, in the accent, ~2.5 px wide. `section-cut.ts` computes the segments
- * and `viewer-core.ts` hands them to `setCut`; this file only draws them.
+ * and `viewer-core.ts` hands them to `setCut`; this file only draws them. 2026-11-07
+ * (owner-requested): each segment in its own model's colour, a per-instance colour pair.
  *
  * 2026-10-01 (owner-requested: *"add the section cut along gridline as another cut also"*):
  * **two planes** — the gridline cut and the level cut — set together by `apply({ grid, level })`
@@ -106,10 +107,11 @@ export interface SectionVisuals {
   /** Re-apply the current configuration — the box or the grid set has changed. */
   refresh(): void
   /**
-   * Replace the cut outline: `count` segments, six floats each, or none. The previous
-   * geometry is disposed here, every time.
+   * Replace the cut outline: `count` segments, six floats each, or none, and with them six
+   * floats of colour a segment — its start's rgb and its end's, in the working colour space
+   * (`cutColours`). The previous geometry is disposed here, every time.
    */
-  setCut(segments: Float32Array | null, count: number): void
+  setCut(segments: Float32Array | null, count: number, colours?: Float32Array | null): void
   dispose(): void
 }
 
@@ -152,7 +154,11 @@ function quadFor(
  * `Line2NodeMaterial` expands to a screen-space ribbon with round caps. It is written out here
  * rather than imported because that example imports the classic `three` entry.
  */
-function cutGeometry(segments: Float32Array | null, count: number): InstancedBufferGeometry {
+function cutGeometry(
+  segments: Float32Array | null,
+  count: number,
+  colours: Float32Array | null = null
+): InstancedBufferGeometry {
   const g = new InstancedBufferGeometry()
   g.setIndex([0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5])
   g.setAttribute(
@@ -164,6 +170,13 @@ function cutGeometry(segments: Float32Array | null, count: number): InstancedBuf
     const buf = new InstancedInterleavedBuffer(segments, 6, 1)
     g.setAttribute('instanceStart', new InterleavedBufferAttribute(buf, 3, 0))
     g.setAttribute('instanceEnd', new InterleavedBufferAttribute(buf, 3, 3))
+    // `LineSegmentsGeometry.setColors`' layout: one rgb pair a segment, which
+    // `Line2NodeMaterial` multiplies into its colour when `vertexColors` is on.
+    if (colours && colours.length >= count * 6) {
+      const col = new InstancedInterleavedBuffer(colours, 6, 1)
+      g.setAttribute('instanceColorStart', new InterleavedBufferAttribute(col, 3, 0))
+      g.setAttribute('instanceColorEnd', new InterleavedBufferAttribute(col, 3, 3))
+    }
   }
   g.instanceCount = segments ? count : 0
   return g
@@ -302,9 +315,9 @@ export function createSection(
     // The same configuration against a new box: pass it as its own predecessor so nothing
     // "moved" and a model arriving does not steal the camera.
     refresh: () => apply(current, current),
-    setCut: (segments, count) => {
+    setCut: (segments, count, colours) => {
       const old = cut.geometry
-      cut.geometry = cutGeometry(segments, count)
+      cut.geometry = cutGeometry(segments, count, colours)
       old.dispose()
       cut.visible = !!segments && count > 0
     },

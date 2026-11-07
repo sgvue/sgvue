@@ -62,6 +62,36 @@ export function baseSwatch(
   return library.find((f) => f.key === key)?.swatch ?? MC[slot % MC.length]
 }
 
+/**
+ * The swatch a model's row shows: the user's override, else `baseSwatch`. The one rule for that
+ * colour — the row reads it, and so does the section cut (`modelSwatches`). It does not depend
+ * on "Original materials": the row shows the colour either way.
+ */
+export function rowSwatch(
+  key: string,
+  slot: number,
+  library: readonly LibraryFile[],
+  modelColors: Record<string, string>
+): string {
+  return modelColors[key] || baseSwatch(key, slot, library)
+}
+
+/**
+ * Every loaded model's row swatch, by model key (2026-11-07, owner-requested): what the viewer
+ * draws each model's section-cut outline in (`viewer.setCutColors`).
+ */
+export function modelSwatches(
+  federation: Pick<Federation, 'models'>,
+  library: readonly LibraryFile[],
+  modelColors: Record<string, string>
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const m of federation.models) {
+    out[m.meta.modelKey] = rowSwatch(m.meta.modelKey, m.slot, library, modelColors)
+  }
+  return out
+}
+
 const stem = (file: string): string => file.replace(/\.[^.]+$/, '')
 
 /**
@@ -122,7 +152,7 @@ export function modelRows(input: ModelInput): ModelRow[] {
       actFg: act ? 'var(--sel-ink)' : 'var(--faint)',
       actDot: act ? 'currentColor' : 'none',
       active: act,
-      swatch: ov || baseSwatch(key, m.slot, library),
+      swatch: rowSwatch(key, m.slot, library, modelColors),
       swatchRing: live ? '0 0 0 1.5px var(--accent)' : 'none',
       paletteOpen: input.palette === key,
       confirmOpen: input.confirmRemove === key,
