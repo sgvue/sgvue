@@ -25,6 +25,8 @@ it up, ask **Vee**, the built-in assistant, about the model in plain language. S
   to Excel and CSV.
 - **Views** — saved viewpoints, colour by any property, and `sgvue://` links that reopen the
   same view when the same files are at hand.
+- **Project files** — save a review as a `.sgvue` project (File › Save Project) and open it
+  again, by double-click too; it names the IFC files and never contains or changes them.
 - **Ask Vee (optional)** — an AI assistant that answers questions and works the view for you,
   using your own Anthropic API key. It cannot change your model, and it asks before anything
   that cannot be undone.

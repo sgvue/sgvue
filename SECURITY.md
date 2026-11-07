@@ -23,8 +23,10 @@ fixes.
   runs code, or gets past the size and archive limits is in scope.
 - **The `sgvue-file://` protocol and path admission**: a file is readable only after the user
   admitted it — through the native Open dialog, a drop on the window, the Recent list, a stored
-  session or a share link — and then only through a single-use token. Reaching a file that was
+  session, a share link, a project file or Locate… — and then only through a single-use token. Reaching a file that was
   not admitted, or a network (UNC) path the user did not open themselves, is in scope.
+- **`.sgvue` project files**: a project from someone else is untrusted input; each model it names
+  goes through the same admission as an opened file.
 - **`sgvue://` share links**: a link carries a view and the files it names, which go through the
   same admission.
 - **The renderer's isolation**: the Content-Security-Policy, the sandbox, context isolation, the

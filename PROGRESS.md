@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — 1.4.0 prepared: the version and the release notes
+
+**Did.** `docs/RELEASING.md` step 1, the part before any build: version **1.4.0** in
+`package.json` and both root entries of `package-lock.json` (nothing else). `CHANGELOG.md`:
+`[1.4.0] - 2026-11-08` in Added / Changed / Fixed / Security, from `git log v1.3.0..HEAD`, with a
+fresh `[Unreleased]`. `docs/releases/1.4.0.md` in 1.3.0's order: what's new, fixes, security, what
+works differently after updating, known limits, 1.3.0's system requirements and install notes.
+`docs/SYSTEM_SPEC.md`'s version line, the bug-report template, README's features (project files)
+and SECURITY.md's scope (project files, Locate…) follow.
+
+**Verified.** typecheck and lint clean; `npm test` 3 548 passed / 3 skipped; privacy PASS;
+reviewer PASS. **Owed before the tag:** the full e2e suite (never run since Vee's window, origin to
+origin, the grid defaults and MODELS), CI green, a real `.sgvue` double-click; then the tag, the
+release build, the owner's tests and publishing.
+
 ## 2026-11-08 — the packaged checks run: `.sgvue` declared and opened, on a buildingSMART model
 
 **Did.** Built both Mac installers (`dist/SGVue-1.3.0-arm64.dmg`, `-x64.dmg`) and ran
