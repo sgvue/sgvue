@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the known traps are lint errors
+
+**Did.** Step 3 of the lint hardening: seven `no-restricted-syntax` entries (`TRAPS`, `eslint.config.mjs`), each naming its trap and pointing at `docs/TRAPS.md` (the clipboard one at `docs/DECISIONS.md`): `BatchedMesh`, `GetLine` flatten `true`, `getSpatialStructure`, `COORDINATE_TO_ORIGIN: true`, `.raycast(`, `intersectObject(s)`, `navigator.clipboard`. Overrides: `viewer/cube.ts` (`intersectObjects` on the cube's own meshes) and `renderer/clipboard.ts` (the sanctioned copier). No violation in `src/`.
+
+**Verified.** A throwaway probe fired all 14 expected errors and none of six near-misses; each override drops exactly its one entry. Lint clean, typecheck clean, build ok, tests 3 123 passed / 4 skipped.
+
 ## 2026-11-07 — ESLint with type-aware parsing, rules-of-hooks on
 
 **Did.** Step 2 of the lint hardening: `eslint.config.mjs` (flat, `projectService: true`) over `src/**/*.{ts,tsx}`; `eslint` 10.13.0, `typescript-eslint` 8.72.0, `eslint-plugin-react-hooks` 7.1.1, exact pins, devDependencies only. `npm run lint`, and a CI step after typecheck. `rules-of-hooks` found 0 errors in 228 files; `exhaustive-deps` (not enabled) would warn twice (`ChatPanel.tsx:148`, `ContextMenu.tsx:50`). `eslint.config.mjs` would have shipped in `app.asar` (measured) — excluded in `electron-builder.yml`.
