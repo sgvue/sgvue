@@ -10,7 +10,9 @@ Usage:
     python3 scripts/expected-from-ifcopenshell.py "samples/Sample Ifc Model.ifc"
     python3 scripts/expected-from-ifcopenshell.py            # every .ifc in samples/
 
-Writes tests/fixtures/<file-stem>.expected.json. Requires the system python3 to have
+Writes tests/fixtures/<file-stem>.expected.json — since 2026-11-07 with `identities`, every
+indexed element's PredefinedType code as written, `get_predefined_type` and ObjectType by GlobalId,
+which the test compares element by element (an older file lacks it, and that case skips). Requires the system python3 to have
 IfcOpenShell installed (0.8.4 was used to write this). This is a development script and
 lives outside src/ on purpose: only settings.ts and sessions.ts may write to disk inside
 the app.
@@ -191,6 +193,33 @@ def world_geometry(element, site_placement, site_rotation_deg: float) -> dict | 
     }
 
 
+def predefined_code(element) -> str:
+    """`IfcElement.predefinedType`, the code as written (2026-11-07): the occurrence's own
+    `PredefinedType` when it states one other than NOTDEFINED (USERDEFINED stays USERDEFINED),
+    else the type object's when it states one other than NOTDEFINED, else the NOTDEFINED either
+    wrote, else "". Never ObjectType, ElementType or Name text."""
+    type_object = ifcopenshell.util.element.get_type(element)
+    occurrence = getattr(element, "PredefinedType", None) or ""
+    of_type = (getattr(type_object, "PredefinedType", None) or "") if type_object else ""
+    stated = lambda v: v not in ("", "NOTDEFINED")  # noqa: E731
+    return occurrence if stated(occurrence) else of_type if stated(of_type) else occurrence or of_type
+
+
+def identity(element) -> dict:
+    """The identity fields the index builder must agree on for *every* element (2026-11-07)."""
+    type_object = ifcopenshell.util.element.get_type(element)
+    return {
+        "expressId": element.id(),
+        "type": element.is_a(),
+        "predefinedType": predefined_code(element),
+        # IfcOpenShell's own reading — `IfcElement.effectivePredefinedType`.
+        "effectivePredefinedType": ifcopenshell.util.element.get_predefined_type(element) or "",
+        "objectType": (type_object.Name if type_object else None)
+        or getattr(element, "ObjectType", None)
+        or "",
+    }
+
+
 def sample_element(model, ifc_class: str, length_to_m: float, georef: dict) -> dict | None:
     """The first element of a class by expressId — deterministic across runs."""
     candidates = [e for e in model.by_type(ifc_class) if e.is_a() == ifc_class]
@@ -209,10 +238,7 @@ def sample_element(model, ifc_class: str, length_to_m: float, georef: dict) -> d
         "type": element.is_a(),
         "name": element.Name or "",
         "tag": getattr(element, "Tag", None) or "",
-        "predefinedType": getattr(element, "PredefinedType", None) or "",
-        "objectType": (type_object.Name if type_object else None)
-        or getattr(element, "ObjectType", None)
-        or "",
+        **identity(element),
         "typeGuid": type_object.GlobalId if type_object else "",
         "storey": (storey.Name or storey.LongName or "") if storey else "",
         "material": material_name(element),
@@ -401,6 +427,11 @@ def build(path: Path) -> dict:
         if sample is not None:
             samples[ifc_class] = sample
 
+    # Every element the app indexes — IfcElement less openings, and IfcSpace — by GlobalId.
+    indexed = [e for e in model.by_type("IfcElement") if e.id() not in openings]
+    indexed += model.by_type("IfcSpace")
+    identities = {e.GlobalId: identity(e) for e in indexed}
+
     return {
         "generatedBy": f"IfcOpenShell {ifcopenshell.version}",
         "file": path.name,
@@ -432,6 +463,7 @@ def build(path: Path) -> dict:
         "composition": composition,
         "georeference": geo,
         "samples": samples,
+        "identities": identities,
     }
 
 

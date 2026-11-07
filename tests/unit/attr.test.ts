@@ -4,12 +4,13 @@
  * attributes, then psets in insertion order, then qtos, then `undefined`.
  */
 import { describe, expect, it } from 'vitest'
-import { ATTR_KEYS, attr, collectPropKeys, type AttrElement } from '../../src/shared/attr'
+import { ATTR_KEYS, attr, attrValues, collectPropKeys, type AttrElement } from '../../src/shared/attr'
 
 const element = (over: Partial<AttrElement> = {}): AttrElement => ({
   model: 'ARC',
   type: 'IfcWall',
   predefinedType: 'SOLIDWALL',
+  effectivePredefinedType: over.predefinedType ?? 'SOLIDWALL',
   objectType: 'EW 200 Brick',
   storey: 'L2',
   name: 'Ext Wall S A-B L2',
@@ -17,6 +18,21 @@ const element = (over: Partial<AttrElement> = {}): AttrElement => ({
   psets: { Pset_WallCommon: { Reference: 'EW200', IsExternal: true, FireRating: '1 HR' } },
   qto: { Qto_WallBaseQuantities: { Length: 5600, Width: 200 } },
   ...over
+})
+
+describe('PredefinedType, two values (2026-11-07)', () => {
+  const baffle = element({ predefinedType: 'USERDEFINED', effectivePredefinedType: 'Acoustic baffle' })
+
+  it('answers the effective type, for grouping and colour-by', () => {
+    expect(attr(baffle, 'PredefinedType')).toBe('Acoustic baffle')
+  })
+
+  it('lists both values, once each, for value lists and SQL', () => {
+    expect(attrValues(baffle, 'PredefinedType')).toEqual(['USERDEFINED', 'Acoustic baffle'])
+    expect(attrValues(element(), 'PredefinedType')).toEqual(['SOLIDWALL'])
+    expect(attrValues(baffle, 'ObjectType')).toEqual(['EW 200 Brick'])
+    expect(attrValues(baffle, 'NoSuchKey')).toEqual([])
+  })
 })
 
 describe('attr', () => {

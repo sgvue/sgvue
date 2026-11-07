@@ -30,6 +30,7 @@ interface ExpectedSample {
   name: string
   tag: string
   predefinedType: string
+  effectivePredefinedType?: string
   objectType: string
   typeGuid: string
   storey: string
@@ -67,6 +68,14 @@ interface Expected {
   composition?: { IfcSite: string; IfcBuilding: string }
   georeference: Record<string, unknown>
   samples: Record<string, ExpectedSample>
+  /**
+   * Every indexed element's identity, by GlobalId (2026-11-07): the code as written, IfcOpenShell's
+   * `get_predefined_type` and the type family. Absent from a fixture written before that date.
+   */
+  identities?: Record<
+    string,
+    { expressId: number; type: string; predefinedType: string; effectivePredefinedType: string; objectType: string }
+  >
 }
 
 /** Every `<stem>.expected.json` whose `samples/<stem>.ifc` is actually present. */
@@ -266,6 +275,31 @@ for (const { ifc, expected } of FOUND) {
       )
     })
 
+    // Every element, not the first of each class (2026-11-07): the first wall of the reference
+    // model states its code outright, so a USERDEFINED wall whose ObjectType had replaced its
+    // PredefinedType was never compared.
+    it.skipIf(!expected.identities)('agrees on every element\'s PredefinedType, effective type and ObjectType', async () => {
+      await ready
+      const byGuid = new Map(index.elements.map((e) => [e.guid, e]))
+      const identities = Object.entries(expected.identities ?? {})
+      // By GlobalId on both sides, so a file that repeats one counts it once on both.
+      expect(byGuid.size).toBe(identities.length)
+      for (const [guid, want] of identities) {
+        const got = byGuid.get(guid)
+        expect(got, `${guid} missing from the index`).toBeDefined()
+        expect(
+          {
+            expressId: got!.expressId,
+            type: got!.type,
+            predefinedType: got!.predefinedType,
+            effectivePredefinedType: got!.effectivePredefinedType,
+            objectType: got!.objectType
+          },
+          guid
+        ).toEqual(want)
+      }
+    })
+
     for (const [ifcClass, want] of Object.entries(expected.samples)) {
       it(`agrees on the first ${ifcClass}: identity, type, material, classification`, async () => {
         await ready
@@ -277,6 +311,8 @@ for (const { ifc, expected } of FOUND) {
         expect(got!.name).toBe(want.name)
         expect(got!.tag).toBe(want.tag)
         expect(got!.predefinedType).toBe(want.predefinedType)
+        if (want.effectivePredefinedType !== undefined)
+          expect(got!.effectivePredefinedType).toBe(want.effectivePredefinedType)
         expect(got!.objectType).toBe(want.objectType)
         expect(got!.typeGuid).toBe(want.typeGuid)
         expect(got!.storey).toBe(want.storey)

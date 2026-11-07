@@ -141,6 +141,7 @@ const el = (id: number, bbox?: [number, number, number, number, number, number])
     description: '',
     type: 'IfcWall',
     predefinedType: '',
+    effectivePredefinedType: '',
     objectType: '',
     typeGuid: '',
     storey: 'L1',

@@ -369,8 +369,25 @@ export interface IfcElement {
   description: string
   /** Exact IFC entity, e.g. `IfcWall`. */
   type: string
-  /** `USERDEFINED` resolved to `ObjectType` / the type object's `ElementType`. */
+  /**
+   * The `PredefinedType` **code as written** (2026-11-07): the occurrence's own token when it
+   * states one other than `NOTDEFINED` — so `USERDEFINED` stays `USERDEFINED` — else the type
+   * object's when it states one other than `NOTDEFINED`, else the `NOTDEFINED` either of them
+   * wrote, else `''`. Never `ObjectType`, `ElementType` or `Name` text. The property card's tile,
+   * "Same PredefinedType", the tree row's meta line, the Schedules window and SQL's
+   * `predefined_type` read it.
+   */
   predefinedType: string
+  /**
+   * The **effective** predefined type, exactly IfcOpenShell 0.8.4's
+   * `ifcopenshell.util.element.get_predefined_type` (and IDS's reading): the type object's
+   * `PredefinedType` — its `ElementType` when that is `USERDEFINED` or empty — when it is
+   * neither empty nor `NOTDEFINED`; else the occurrence's `PredefinedType`, its `ObjectType`
+   * when that is `USERDEFINED` or empty; `''` for none. The tree's PredefinedType grouping,
+   * `attr(…, 'PredefinedType')` (grouping, colour-by, value lists), the audit and SQL's
+   * `predefined_type_effective` read it; a `PredefinedType` rule matches either value.
+   */
+  effectivePredefinedType: string
   /** Type family: `IfcTypeObject.Name`, falling back to the occurrence's `ObjectType`. */
   objectType: string
   /** `IfcTypeObject.GlobalId`, when the element has a type object. */

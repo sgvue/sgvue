@@ -165,6 +165,9 @@ export function mockModelIndex(key: string, options?: MockOptions): ModelIndex {
       description: '',
       type: e.type,
       predefinedType: e.predefinedType,
+      // The design's mock states every code outright — no USERDEFINED, no type objects — so
+      // the effective type is the code (2026-11-07).
+      effectivePredefinedType: e.predefinedType,
       objectType: e.objectType,
       typeGuid: '',
       storey: e.storey,

@@ -18,6 +18,37 @@ old panel-size code is removed. Seven e2e specs now drive the new window.
 reviewer-deep PASS, then a second review round PASS on its follow-up fixes.
 **Owed:** an e2e run of the seven specs (needs the owner's yes), and the parity harness's chat
 states (`scripts/screenshot.cjs` `fmt-*` / `trace-*`) reworked for the new window.
+## 2026-11-07 — PredefinedType is two values: the code as written and the effective type
+
+**Did.** The owner: *"investigate why my ifcObjectType sometimes shown in Predefinetype on the
+properties panel. The database and how it shown on the app is critical important thing to our
+app. Please design determistic test or simulation to prevent bugs like this."* — then *"Yes, both
++ tests"*. **Cause:** `index-builder.ts` replaced a `USERDEFINED` code with the occurrence's
+`ObjectType` (else the type's `ElementType`) in `IfcElement.predefinedType`, the one field the
+tile, the tree, the rules, SQL, the schema and the Schedules window all read; the type object's
+own `PredefinedType` was never read; and the conformance test compared only the first element of
+each class against IfcOpenShell's raw value, and only with `samples/`. **Now** an element carries
+`predefinedType`, the code as written (the occurrence's unless empty or NOTDEFINED, else the
+type's, else the NOTDEFINED either wrote — never text), and `effectivePredefinedType`, exactly
+IfcOpenShell 0.8.4's `get_predefined_type` (`predefinedTypes`, `index-builder.ts`). The tile,
+"Same PredefinedType", the tree row's meta and the Schedules column show the code; the tree's
+grouping, `attr()` (colour-by, grouping, `list_values`), the audit read the effective type; a
+`PredefinedType` rule matches either value (`!=` neither, `absent` both empty); the Filter card's
+value list, the assistant's schema and SQL's `attribute` rows carry both; SQL gains
+`element.predefined_type_effective`; `get_element` and the query samples add the effective type
+only when it differs. **Tests:** `scripts/make-predefined-fixtures.py` writes
+`tests/fixtures/predefined/` (IFC4, 13 cases; IFC2X3, 10; `golden.json`, IfcOpenShell's reading),
+byte-identical on a rerun; `predefined-type.pipeline.test.ts` takes each through web-ifc, the
+index, SQL, the property card and the rules; `predefined-type.fuzz.test.ts` writes 300 seeded
+combinations into one IFC4 file in memory and holds every element to the invariants;
+`expected-from-ifcopenshell.py` now writes every element's identity and the samples test
+compares them all. With the old rule put back, 14 of the 31 new cases fail.
+
+**Verified.** `npm run typecheck` exit 0; `npm test` 3 036 passed / 4 skipped (was 2 998 / 4);
+the fixture script rerun gives the same SHA-256 for all three files. **Owed:** the widened
+`samples/` comparison has not run (no samples here) — regenerate each
+`tests/fixtures/<stem>.expected.json` with `expected-from-ifcopenshell.py` first; no window was
+opened.
 
 ## 2026-11-07 — gridlines and the canvas grid off by default
 
@@ -1923,61 +1954,26 @@ again. **Not done:** no real-model run (no
 which planes are on, not their offset, side or cut — part of the wider audit the owner's
 direction asks for.
 
-## 2026-10-01 — the landing page says when a newer version is out, and the app asks GitHub once at every start
-
-**Did:** the owner's request — *"Can you show updates with link if there are one automatically
-on the upload page?"* — and, of the ways offered, their choice **"Check at every start"**: one
-small request to GitHub when the app opens, a notice with a link if a newer version exists,
-silence when offline or blocked; no Preferences switch. This is the app's first network call
-of its own (CLAUDE.md deviation, a row in `docs/DECISIONS.md`; the 2026-09-25 and 2026-09-28
-"no network call by the app" records are amended). **`src/shared/version.ts`** (pure):
-`parseVersion` — `1.2.3` / `v1.2.3`, optional pre-release and build metadata, refused over 64
-characters before any pattern runs — and `isNewer`, semver precedence. **`src/main/updates.ts`**:
-`latestVersion(fetchFn)` is one `GET` to `LATEST_RELEASE_URL` (a hard-coded https constant on
-`api.github.com`) through `net.fetch` — `Accept` and nothing else of ours, `credentials:'omit'`,
-`cache:'no-store'`, `redirect:'error'`, 5 s — status 200, the body read up to 256 kB, `tag_name`
-through `parseVersion`; every failure is `null` and at most one `console.warn` line.
-`checkForUpdate(current)` keeps its promise (one request per run) and, in a development build,
-makes **no request at all**: `SGVUE_UPDATE_LATEST` stands in for the tag there, through the same
-checks. **IPC:** `update:check` → `{ latest } | null` and `update:open` →
-`shell.openExternal(updatesUrl(__APP_VERSION__))`, both without a payload, both answered for the
-main window only; preload keys `checkUpdate` and `openUpdatePage`; the renderer never supplies a
-URL. **`Landing.tsx`** asks once on mount and, only with an answer, draws
-`[data-role="update-notice"]` between the introduction and the drop zone (above the warning
-banner when both show): the warning banner's box in the accent tokens, `SGVue <latest> is
-available — you have <current>.` and the text button `get the update →`. `scripts/screenshot.cjs`
-answers `update:check` itself (`SGVUE_UPDATE_LATEST`), since it is its own main process.
-**Measured** (`tests/parity/2026-10-01-update-notice/README.md`; `#mock&landing`, 1280 × 820,
-both themes): with nothing newer the landing capture is byte-identical to `2893aff`'s (two
-captures of one build differ by up to 19 px, each by one level) and the page's `outerHTML` is
-the same 7 922 bytes; the notice is `[330, 241.2, 620, 44.75]`, 22 px from the introduction and
-from the drop zone. The centred column grows by 66.75 px, so what is above the notice stands
-33.4 px higher and what is below 33.4 px lower, as with the designed banner; at the real default
-window (1 264 × 755 inside) with two rows of Recent pills the page is 34 px taller than the
-window and scrolls. **Live:** the app's own `latestVersion()`, bundled alone and run once in a
-guarded Electron main process with the default `net.fetch`: 200, `1.1.0`, 2.8 s for that first
-request.
-**Verified** (with the ground change below, on the final tree): `npm run typecheck` exit 0;
-`npm test` **123 files passed / 2 skipped, 2 014 tests passed / 3 skipped** (was 120 / 1 906:
-+61 `version.test.ts`, +35 `updates.test.ts`, +1 guard case, +11 `ground-level.test.ts`);
-`npm run build` exit 0; `npm run test:e2e` **47 passed, 6 skipped** (was 45 / 6: the notice
-case — copy, box, tokens in both themes, the URL the button opens, no notice for the same, an
-older or no version, the notice above the banner — and the ground case), peak working set
-252 MB one process / 778 MB all, GPU dedicated 254 MB, `clean:`. Every capture and measuring
-run went through `safe-run.cjs`; nothing survived.
-**Not verified here:** a packaged build's launch request end to end — `dist/` holds the 1.1.0
-package, built before this. Once repackaged, `npm run test:packaged` makes that one request per
-launch.
-
 ## Earlier work
 
-Compressed: the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-10-01 update-notice entry on 2026-11-07 (PredefinedType's two values), the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the update notice at `40c8a1d:PROGRESS.md`, the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-10-01 — the landing page says when a newer version is out, and the app asks GitHub once
+at every start.** The owner's request, and of the options their choice *"Check at every start"*:
+the app's first network call of its own. `shared/version.ts` (`parseVersion`, `isNewer`, semver
+precedence); `main/updates.ts`: one `GET` to `LATEST_RELEASE_URL` through `net.fetch`, `Accept`
+only, no credentials, no cache, no redirects, 5 s, ≤ 256 kB, every failure `null`; one request a
+run, none in a development build (`SGVUE_UPDATE_LATEST` stands in). `update:check` /
+`update:open`, main window only, no payload; the landing page's `[data-role="update-notice"]`
+in the accent tokens with `get the update →`. With nothing newer the landing capture is
+byte-identical; the notice adds 66.75 px to the centred column. Live: 200, `1.1.0`, 2.8 s.
+`npm test` 2 014 passed; `npm run test:e2e` 47 passed.
 
 **2026-10-01 — the canvas grid stands at the file's zero, not at the first part streamed.** The
 owner's report: a Tekla model opened alone hung under the canvas grid. The whole-metre offset's

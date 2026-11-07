@@ -16,7 +16,7 @@
  * this file stays runnable in both.
  */
 import type { Database, SqlJsStatic, Statement } from 'sql.js'
-import { ATTR_KEYS, attr } from '../shared/attr'
+import { ATTR_KEYS, attrValues } from '../shared/attr'
 import type { FederatedElement, FederatedModel } from '../shared/federate'
 import type { PropValue } from '../shared/model-index.types'
 
@@ -62,7 +62,11 @@ CREATE TABLE element (
   name            TEXT,
   description     TEXT,
   type            TEXT,    -- exact IFC entity, e.g. IfcWall
-  predefined_type TEXT,    -- USERDEFINED already resolved to the authored string
+  predefined_type TEXT,    -- the PredefinedType code as written: the occurrence's, else its type's
+                           -- (USERDEFINED stays USERDEFINED; never ObjectType text)
+  predefined_type_effective TEXT, -- IfcOpenShell get_predefined_type: the type's code (its
+                           -- ElementType when USERDEFINED), else the occurrence's (its ObjectType
+                           -- when USERDEFINED or empty). Group or count by this one
   object_type     TEXT,    -- type family: IfcTypeObject.Name, else ObjectType
   tag             TEXT,
   storey          TEXT,    -- IfcBuildingStorey.Name of the containing storey
@@ -71,7 +75,8 @@ CREATE TABLE element (
 );
 
 -- The seven attributes the UI filters and groups by, one row each, so a rule over
--- "Level" or "Material" is the same join as a rule over a property.
+-- "Level" or "Material" is the same join as a rule over a property. PredefinedType has a
+-- second row when the effective type differs from the code as written, as a rule matches either.
 CREATE TABLE attribute (
   element INTEGER,
   key     TEXT, -- Model | IfcEntity | PredefinedType | ObjectType | Level | Name | Material
@@ -230,7 +235,7 @@ function fill(db: Database, payload: SqlPayload, prepare: (sql: string) => State
     'INSERT INTO spatial (model, express_id, guid, type, name, long_name, elevation, parent_express_id) VALUES (?,?,?,?,?,?,?,?)'
   )
   const elementStmt = prepare(
-    'INSERT INTO element (id, model, local_id, express_id, guid, name, description, type, predefined_type, object_type, tag, storey, material, is_space) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    'INSERT INTO element (id, model, local_id, express_id, guid, name, description, type, predefined_type, predefined_type_effective, object_type, tag, storey, material, is_space) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
   )
   const attributeStmt = prepare('INSERT INTO attribute (element, key, value) VALUES (?,?,?)')
   const psetStmt = prepare(
@@ -304,6 +309,7 @@ function fill(db: Database, payload: SqlPayload, prepare: (sql: string) => State
       element.description,
       element.type,
       element.predefinedType,
+      element.effectivePredefinedType,
       element.objectType,
       element.tag,
       element.storey,
@@ -313,8 +319,7 @@ function fill(db: Database, payload: SqlPayload, prepare: (sql: string) => State
 
     // One resolver for attributes, filter rules and colour-by — the design's own note.
     for (const key of ATTR_KEYS) {
-      const value = attr(element, key)
-      if (value !== undefined) attributeStmt.run([element.id, key, valueColumns(value).text])
+      for (const value of attrValues(element, key)) attributeStmt.run([element.id, key, valueColumns(value).text])
     }
 
     if (element.objectType || element.typeGuid) {

@@ -41,6 +41,7 @@ function element(id: number, type = 'IfcWall'): IfcElement {
     description: '',
     type,
     predefinedType: '',
+    effectivePredefinedType: '',
     objectType: '',
     typeGuid: '',
     storey: 'L1',

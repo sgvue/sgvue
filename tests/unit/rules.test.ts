@@ -22,6 +22,7 @@ const el = (over: Partial<VisElement> = {}): VisElement => ({
   model: 'ARC',
   type: 'IfcWall',
   predefinedType: 'SOLIDWALL',
+  effectivePredefinedType: over.predefinedType ?? 'SOLIDWALL',
   objectType: 'EW 200 Brick',
   storey: 'L2',
   name: 'Ext Wall S',
@@ -300,5 +301,37 @@ describe('absent', () => {
     const noType = matchFn([rule('PredefinedType', 'absent', '')])!
     expect(noType(el({ predefinedType: '' }))).toBe(true)
     expect(noType(el({ predefinedType: 'SOLIDWALL' }))).toBe(false)
+  })
+})
+
+describe('PredefinedType has two values (2026-11-07)', () => {
+  // A USERDEFINED wall whose ObjectType says what it is: the code as written, and the effective type.
+  const wall = el({ predefinedType: 'USERDEFINED', effectivePredefinedType: 'Acoustic baffle' })
+  const is = (op: Rule['op'], val: Rule['val']): boolean => matchFn([rule('PredefinedType', op, val)])!(wall)
+
+  it('matches a positive operator on either value', () => {
+    expect(is('=', 'USERDEFINED')).toBe(true)
+    expect(is('=', 'acoustic baffle')).toBe(true)
+    expect(is('~', 'baffle')).toBe(true)
+    expect(is('~', 'USER')).toBe(true)
+    expect(is('=', 'SOLIDWALL')).toBe(false)
+  })
+
+  it('is != only when neither value equals', () => {
+    expect(is('!=', 'USERDEFINED')).toBe(false)
+    expect(is('!=', 'Acoustic baffle')).toBe(false)
+    expect(is('!=', 'SOLIDWALL')).toBe(true)
+  })
+
+  it('is absent only when both values are empty', () => {
+    expect(is('absent', '')).toBe(false)
+    const half = el({ predefinedType: 'USERDEFINED', effectivePredefinedType: '' })
+    expect(matchFn([rule('PredefinedType', 'absent', '')])!(half)).toBe(false)
+    const none = el({ predefinedType: '', effectivePredefinedType: '' })
+    expect(matchFn([rule('PredefinedType', 'absent', '')])!(none)).toBe(true)
+  })
+
+  it('leaves every other attribute to its one value', () => {
+    expect(matchFn([rule('ObjectType', '=', 'Acoustic baffle')])!(wall)).toBe(false)
   })
 })

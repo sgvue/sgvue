@@ -407,6 +407,9 @@ export function buildModelIndex(
     expressId: number
     guid: string
     name: string
+    /** `IfcTypeObject` subtype's own `PredefinedType` token, `''` when it states none. */
+    predefinedType: string
+    /** `ElementType` — or, on a type that declares none, `ProcessType`, as IfcOpenShell reads it. */
     elementType: string
     psetIds: number[]
   }
@@ -429,7 +432,8 @@ export function buildModelIndex(
           expressId: typeId,
           guid: text(row.GlobalId),
           name: text(row.Name),
-          elementType: text(row.ElementType),
+          predefinedType: text(row.PredefinedType),
+          elementType: text(row.ElementType !== undefined ? row.ElementType : row.ProcessType),
           psetIds: refs(row.HasPropertySets)
         }
       : null
@@ -597,10 +601,11 @@ export function buildModelIndex(
     const typeId = typeOfElement.get(id) ?? 0
     const info = typeId ? typeInfo(typeId) : null
     const occurrenceObjectType = text(row.ObjectType)
-    let predefinedType = text(row.PredefinedType)
-    if (predefinedType === 'USERDEFINED') {
-      predefinedType = occurrenceObjectType || info?.elementType || 'USERDEFINED'
-    }
+    const { predefinedType, effectivePredefinedType } = predefinedTypes(
+      text(row.PredefinedType),
+      occurrenceObjectType,
+      info
+    )
 
     const guid = text(row.GlobalId)
     const mats = materialsOf.get(id) ?? []
@@ -624,6 +629,7 @@ export function buildModelIndex(
       description: text(row.Description),
       type,
       predefinedType,
+      effectivePredefinedType,
       objectType: info?.name || occurrenceObjectType,
       typeGuid: info?.guid ?? '',
       storey: storeyNameById.get(storeyOf.get(id) ?? 0) ?? '',
@@ -686,6 +692,36 @@ export function buildModelIndex(
     counts,
     elements
   }
+}
+
+/* ────────────────────────────── predefined type ────────────────────────────── */
+
+/**
+ * The two predefined-type values of one element (2026-11-07) — `IfcElement` documents both.
+ *
+ * `USERDEFINED` means "see `ObjectType`" (or the type's `ElementType`); it used to be replaced
+ * by that text in the one field the PredefinedType tile shows, so a user's ObjectType read as a
+ * PredefinedType. Now the code as written and the effective type are kept apart.
+ *
+ * `occurrence` is the occurrence's own token (`''` when it has none — an IFC2X3 `IfcWall` has
+ * no such attribute at all, its type does), `objectType` its own `ObjectType`.
+ */
+export function predefinedTypes(
+  occurrence: string,
+  objectType: string,
+  type: { predefinedType: string; elementType: string } | null
+): { predefinedType: string; effectivePredefinedType: string } {
+  const typeCode = type?.predefinedType ?? ''
+  const stated = (v: string): boolean => v !== '' && v !== 'NOTDEFINED'
+  const predefinedType = stated(occurrence) ? occurrence : stated(typeCode) ? typeCode : occurrence || typeCode
+
+  // `ifcopenshell.util.element.get_predefined_type`, 0.8.4, line for line.
+  if (type) {
+    const t = typeCode === 'USERDEFINED' || !typeCode ? type.elementType : typeCode
+    if (stated(t)) return { predefinedType, effectivePredefinedType: t }
+  }
+  const p = occurrence === 'USERDEFINED' || !occurrence ? objectType : occurrence
+  return { predefinedType, effectivePredefinedType: p }
 }
 
 /* ────────────────────────────── header ────────────────────────────── */

@@ -12,7 +12,7 @@
  *   where two highlight steps overlap the element takes the *later* step's colour. Visibility
  *   is a conjunction and therefore order-independent; colour is not.
  */
-import { attr, type AttrElement } from '../../../shared/attr'
+import { attrValues, type AttrElement } from '../../../shared/attr'
 import { FIXED_INK, HL, type ColorByState } from '../../../shared/colors'
 import { stepLabel } from '../../../shared/filter-stack'
 import { ABSENT_OP, matchFn, type FilterStep, type Predicate, type Rule, type VisElement } from '../../../shared/rules'
@@ -70,13 +70,13 @@ export function stackRows(
 /**
  * The distinct values of one property across the federation, sorted and capped.
  * `SGVue.dc.html:1879` — default (lexicographic) sort, `String()` of whatever `attr` answers,
- * `undefined` dropped, first 60 kept.
+ * `undefined` dropped, first 60 kept. `PredefinedType` lists both its values (`attrValues`,
+ * 2026-11-07), since a rule on it matches either.
  */
 export function valueOptions(elements: readonly AttrElement[], prop: string): string[] {
   const seen = new Set<string>()
   for (const e of elements) {
-    const v = attr(e, prop)
-    if (v !== undefined) seen.add(String(v))
+    for (const v of attrValues(e, prop)) seen.add(String(v))
   }
   return [...seen].sort().slice(0, VALUE_LIST_CAP)
 }

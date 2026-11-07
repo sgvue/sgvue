@@ -8,7 +8,11 @@
  */
 import type { FederatedElement } from '../../../shared/federate'
 
-/** Search matches a case-insensitive substring of any of these five fields. `:1817`. */
+/**
+ * Search matches a case-insensitive substring of any of these five fields. `:1817`. The
+ * predefined type is either of its two values (2026-11-07): the code the row shows, or the
+ * effective type its group is keyed by.
+ */
 export function matchesSearch(e: FederatedElement, q: string): boolean {
   if (!q) return true
   return (
@@ -16,6 +20,7 @@ export function matchesSearch(e: FederatedElement, q: string): boolean {
     e.type.toLowerCase().includes(q) ||
     e.objectType.toLowerCase().includes(q) ||
     (e.predefinedType || '').toLowerCase().includes(q) ||
+    (e.effectivePredefinedType || '').toLowerCase().includes(q) ||
     e.storey.toLowerCase().includes(q)
   )
 }
@@ -34,9 +39,13 @@ export function rowMeta(e: FederatedElement, treeMode: 'entity' | 'type'): strin
   return meta.filter(Boolean).join(' · ')
 }
 
-/** A group's key: the IFC entity, or the predefined type falling back to `NOTDEFINED`. `:1818`. */
+/**
+ * A group's key: the IFC entity, or the predefined type falling back to `NOTDEFINED`. `:1818`.
+ * The predefined type is the effective one (2026-11-07), so a `USERDEFINED` wall groups under
+ * what its `ObjectType` says, as IfcOpenShell reads it; its row still shows the code as written.
+ */
 export const groupKey = (e: FederatedElement, treeMode: 'entity' | 'type'): string =>
-  treeMode === 'entity' ? e.type : e.predefinedType || 'NOTDEFINED'
+  treeMode === 'entity' ? e.type : e.effectivePredefinedType || 'NOTDEFINED'
 
 /**
  * The slice of a long row list that has to be in the DOM: everything the scroller can see,

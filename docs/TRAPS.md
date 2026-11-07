@@ -132,6 +132,11 @@ named so each trap can be traced to its original write-up.
 - **Never use `getSpatialStructure`** — it dumps every element under each storey. Walk
   `IfcRelAggregates` for the tree and `IfcRelContainedInSpatialStructure` for contents.
   — plan §3.3, matching Aquila's `structure.js`
+- **PredefinedType `USERDEFINED` means "see ObjectType"; never store the ObjectType text in
+  the PredefinedType field** — keep the code as written and the effective type apart
+  (`IfcElement.predefinedType` / `effectivePredefinedType`, IfcOpenShell's `get_predefined_type`);
+  an IFC2X3 occurrence often has no PredefinedType, its type does. Replacing the code with the
+  text put a user's ObjectType on the PredefinedType tile. — 2026-11-07
 
 **Streaming, workers and progress**
 
