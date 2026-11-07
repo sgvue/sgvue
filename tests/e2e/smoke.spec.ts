@@ -1284,6 +1284,19 @@ test('a viewpoint is renamed by double-click: Enter keeps it, Esc cancels', asyn
     await expect(name).toBeVisible()
     // The row itself, held by handle: the name's text is gone while it is being edited.
     const row = (await name.locator('xpath=../..').elementHandle())!
+    // The card fades in (`fadein .15s`, from `translateY(3px)`), so wait for it to end first. A
+    // box read during it is up to 3 px low, and a double-click on a target that is not yet
+    // stable is retried by Playwright with a forced `scrollIntoView({block:'start',
+    // inline:'start'})` on its 4th attempt, which scrolls the stage itself (`overflow:hidden` is
+    // still a scroll container) and moves the whole card.
+    await row.evaluate((r) =>
+      Promise.all(
+        r.parentElement!.parentElement!
+          .getAnimations({ subtree: true })
+          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+          .map((a) => a.finished)
+      )
+    )
     const before = (await row.boundingBox())!
 
     await name.dblclick()
