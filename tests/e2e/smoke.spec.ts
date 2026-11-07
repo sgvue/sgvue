@@ -1494,6 +1494,10 @@ test('a section outlines what it cuts in the accent; hide, preview, clear and th
   const { app, page } = await launch(dir)
   try {
     await openDemo(page)
+    // The outline counts were measured with the canvas grid on, off by default since 2026-11-07;
+    // with it off the ground veil is not drawn, so below-grade outline shows and the slab is a
+    // smaller share.
+    await page.locator('button[data-tip="canvas grid"]').click()
     const overlay = page.locator('[data-role="overlay"]')
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
     // Right of the Section card (12 + 300 px), clear of the toolbar, the cube and the status bar.
