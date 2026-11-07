@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the eval graders are checked offline on every push
+
+**Did.** Core protection, plan item 11. `tests/unit/ai-eval-offline.test.ts` runs all 65 eval cases twice under Node — the oracle's ideal calls and reply, and an agent that does nothing — through the real store and executors (`runToolOnce`, `runTurnOnce`), the mock federation (and the hostile one), the worker's SQL schema and query function under sql.js, and the real camera rig, then grades them with the unchanged `gradeCase`: the oracle must pass every case and the null agent none. The runner's pure half (truth probes, templates, the two turns, the observation) moved unchanged from `scripts/ai-eval.cjs` into `scripts/eval/observe.cjs`, which both runners use; the worker's `runQuery` moved into `src/worker/sql-query.ts`. The case count is pinned at 65. `npm run eval:offline` and a CI step after `npm test`; `docs/COMMANDS.md` has the row and `docs/AI_EVAL.md` a line.
+
+**Verified.** Oracle 65 / 65, null 0 / 65, ~0.5 s. It catches a grader that lets the null agent pass a whole case or fails the oracle on one; a lenient sub-check the null agent still fails elsewhere is left to `ai-eval-graders.test.ts`. Probes in `graders.cjs`, reverted: facts always true with view and tool checks off → the null agent passed 56 of 65 and the step failed; `mentionsNumber` always false → the oracle failed 27 of 65, each case named with its reason. The Electron runner was not run (it needs a window); its edit is the moved code, checked by `node --check` and the field-list test. typecheck, lint, `npm test`, build, privacy clean.
+
 ## 2026-11-07 — Float64 at 32.5 km is a test
 
 **Did.** Core protection, plan item 8. `tests/unit/float64-far-origin.test.ts` generates a tiny IFC4 model on the synthetic site whose building, storey and two cubes are placed 32.5 km from the origin (every written number outside the privacy scan's coordinate band), streams it through web-ifc under Node and `streamGeometry`, and checks that each cube's centre as drawn — the Float32 `matrix16` times its own vertices — is within 0.1 mm of the value worked out in Float64 from the file, with the offset the streamer picks and with a shared origin handed in. A fourth test passes web-ifc's placements through a `Float32Array` first and requires the miss to exceed 0.1 mm, so the check is shown able to fail.

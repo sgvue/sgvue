@@ -29,6 +29,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "privacy": "node scripts/privacy.cjs",
+    "eval:offline": "vitest run tests/unit/ai-eval-offline.test.ts",
     "test:e2e": "node scripts/safe-e2e.cjs",
     "test:packaged": "node scripts/safe-app.cjs",
     "dist:mac": "npm run build && electron-builder --mac",

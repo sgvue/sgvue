@@ -14,20 +14,15 @@
  * — owns the bytes. After a timeout kill there is then something to rebuild from without
  * re-reading the model.
  */
-import initSqlJs, { type Database, type SqlJsStatic, type SqlValue } from 'sql.js'
+import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
-import { SQL_ROW_FETCH, SQL_ROW_LIMIT, guardSql } from '../shared/sql-guard'
 import { buildDatabase, type SqlPayload } from './sql-schema'
+import { runQuery, type SqlQueryResult } from './sql-query'
 
 /* ────────────────────────────── protocol ────────────────────────────── */
 
-export interface SqlQueryResult {
-  columns: readonly string[]
-  rows: readonly (readonly SqlValue[])[]
-  /** True when the query had more rows than the cap; `rows` then holds the first 200. */
-  truncated: boolean
-  ms: number
-}
+/** One query's answer (`sql-query.ts`, where `runQuery` is). */
+export type { SqlQueryResult }
 
 export type SqlRequest =
   | { type: 'build'; payload: SqlPayload }
@@ -53,30 +48,6 @@ const sql = (): Promise<SqlJsStatic> => {
 }
 
 let db: Database | null = null
-
-/* ────────────────────────────── query ────────────────────────────── */
-
-function runQuery(database: Database, request: string): SqlQueryResult {
-  const guard = guardSql(request)
-  if (!guard.ok) throw new Error(guard.reason)
-
-  const started = Date.now()
-  const statement = database.prepare(guard.sql)
-  try {
-    const rows: SqlValue[][] = []
-    while (rows.length < SQL_ROW_FETCH && statement.step()) rows.push(statement.get())
-    const columns = statement.getColumnNames()
-    const truncated = rows.length >= SQL_ROW_FETCH
-    return {
-      columns,
-      rows: truncated ? rows.slice(0, SQL_ROW_LIMIT) : rows,
-      truncated,
-      ms: Date.now() - started
-    }
-  } finally {
-    statement.free()
-  }
-}
 
 /* ────────────────────────────── message loop ────────────────────────────── */
 

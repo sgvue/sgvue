@@ -81,6 +81,7 @@ const { CASES, PILOT_IDS, selectCases } = require('./eval/cases.cjs')
 const { capabilityTags, missingCapabilities } = require('./eval/capabilities.cjs')
 const { TRANSIENT_KINDS, failureClass, gradeCase } = require('./eval/graders.cjs')
 const { money, runCost, turnCost } = require('./eval/cost.cjs')
+const { collectTruth, nullTurn, observation, oracleTurn, scriptedCalls } = require('./eval/observe.cjs')
 
 /* ────────────────────────────── arguments ────────────────────────────── */
 
@@ -459,69 +460,15 @@ const readView = (js) => jsonOf(js, VIEW_EXPR)
 
 /* ────────────────────────────── ground truth ────────────────────────────── */
 
-/** A dot path, `len:<path>` or `max:<path>.<field>` into a tool's `forModel`. */
-function pickFrom(result, expr) {
-  const dot = (obj, path) => String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj)
-  if (expr.startsWith('len:')) {
-    const v = dot(result, expr.slice(4))
-    return Array.isArray(v) ? v.length : null
-  }
-  if (expr.startsWith('max:')) {
-    const rest = expr.slice(4)
-    const cut = rest.lastIndexOf('.')
-    const list = dot(result, rest.slice(0, cut))
-    const field = rest.slice(cut + 1)
-    if (!Array.isArray(list) || !list.length) return null
-    return Math.max(...list.map((x) => Number(x[field])).filter((n) => Number.isFinite(n)))
-  }
-  const v = dot(result, expr)
-  return v === undefined ? null : v
-}
-
 /**
- * Every probe a case declares, run **after** its setup and **before** its turn, so a case with
- * a pre-existing selection or filter is graded against the state it was actually given.
+ * The window's answers to a case's probes: a SELECT through the app's own SQL worker, a read
+ * through the real executor. `collectTruth` itself is in `eval/observe.cjs`, shared with the
+ * headless runner (2026-11-07).
  */
-async function collectTruth(js, kase) {
-  const truth = {}
-  for (const [name, probe] of Object.entries(kase.truth || {})) {
-    if (probe.sql) {
-      const r = await jsonOf(js, `window.__sgvueDev.sql(${JSON.stringify(probe.sql)})`)
-      const rows = r.rows || []
-      truth[name] =
-        probe.shape === 'pairs'
-          ? rows.map((row) => [row[0], row[1]])
-          : probe.shape === 'column'
-            ? rows.map((row) => row[0])
-            : probe.shape === 'rows'
-              ? rows
-              : rows.length
-                ? rows[0][0]
-                : null
-    } else if (probe.tool) {
-      const r = await jsonOf(
-        js,
-        `window.__sgvueDev.tool(${JSON.stringify(probe.tool)}, ${JSON.stringify(probe.input || {})})`
-      )
-      truth[name] = probe.pick ? pickFrom(r, probe.pick) : r
-    }
-  }
-  return truth
-}
-
-/** `{key}` in an oracle's reply or tool input, filled from the probes. */
-function fillTemplate(value, truth) {
-  if (typeof value === 'string') {
-    const whole = /^\{([A-Za-z0-9_]+)\}$/.exec(value)
-    if (whole) return truth[whole[1]]
-    return value.replace(/\{([A-Za-z0-9_]+)\}/g, (m, k) => (k in truth ? String(truth[k]) : m))
-  }
-  if (Array.isArray(value)) return value.map((v) => fillTemplate(v, truth))
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fillTemplate(v, truth)]))
-  }
-  return value
-}
+const probesIn = (js) => ({
+  sql: (statement) => jsonOf(js, `window.__sgvueDev.sql(${JSON.stringify(statement)})`),
+  tool: (name, input) => jsonOf(js, `window.__sgvueDev.tool(${JSON.stringify(name)}, ${JSON.stringify(input || {})})`)
+})
 
 /* ────────────────────────────── running one case ────────────────────────────── */
 
@@ -532,26 +479,16 @@ const lastAssistant = `(() => {
 })()`
 
 async function runTurn(js, kase, truth) {
-  if (ARGS.mode === 'null') {
-    return { reply: '', calls: [], outcome: { type: 'done', rounds: 0 }, usage: null, model: null, index: -1 }
-  }
+  if (ARGS.mode === 'null') return nullTurn()
   if (ARGS.mode === 'oracle') {
-    const calls = (kase.oracle.calls || []).map((c) => ({ name: c.name, input: fillTemplate(c.input || {}, truth) }))
-    const reply = fillTemplate(kase.oracle.reply || '', truth)
+    const { calls, reply } = oracleTurn(kase, truth)
     const out = await jsonOf(
       js,
       `window.__sgvueDev.chat.turn(${JSON.stringify(kase.prompt)}, ${JSON.stringify(calls)}, ${JSON.stringify(reply)})`
     )
     return {
       reply,
-      calls: out.results.map((r, i) => ({
-        name: r.name,
-        input: calls[i] ? calls[i].input : {},
-        ok: r.ok,
-        ms: r.ms,
-        result: r.forModel,
-        error: r.error
-      })),
+      calls: scriptedCalls(calls, out.results),
       outcome: { type: 'done', rounds: out.results.length ? 1 : 0 },
       usage: null,
       model: null,
@@ -604,33 +541,17 @@ async function runCase(kase, rep, caps, settings) {
         `window.__sgvueDev.tool(${JSON.stringify(step.tool)}, ${JSON.stringify(step.input || {})})`
       )
     }
-    const truth = await collectTruth(js, kase)
+    const truth = await collectTruth(kase, probesIn(js))
     const before = await readView(js)
     const turn = await runTurn(js, kase, truth)
     const after = await readView(js)
 
     const message =
       turn.index >= 0 ? await jsonOf(js, `window.__sgvueDev.chat.messages()[${turn.index}]`) : null
-    const store = {
-      ...after.store,
-      table: message ? message.table || null : null,
-      pending: message ? message.pending || null : null,
-      chips: message && message.chips ? message.chips.map((c) => ({ label: c.label, n: c.ids.length })) : []
-    }
-
-    const obs = {
-      reply: turn.reply,
-      calls: turn.calls,
-      outcome: turn.outcome,
-      usage: turn.usage,
-      view: after.view,
-      viewBefore: before.view,
-      store,
-      storeBefore: before.store
-    }
+    const obs = observation(turn, before, after, message)
 
     // The scope guard's Apply button, clicked only where the case says the user would.
-    if (kase.applyPending && store.pending && turn.index >= 0) {
+    if (kase.applyPending && obs.store.pending && turn.index >= 0) {
       await js(`window.__sgvueDev.chat.apply(${turn.index})`)
       const applied = await readView(js)
       obs.afterApply = { view: applied.view, store: applied.store }
