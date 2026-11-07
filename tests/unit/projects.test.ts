@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Real paths, as `admit()` gives them: on macOS the temporary folder is a link into /private, and
-// on Windows it can be an 8.3 short name (`C:\Users\RUNNER~1\…`) that only the native realpath —
+// on Windows it can be an 8.3 short name (`C:\Users\<name>~1\…`) that only the native realpath —
 // the one `fs/promises` and so `admit()` use — spells out; `realpathSync` alone keeps it.
 const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'sgvue-projects-')))
 const docs = join(root, 'Documents')
@@ -473,8 +473,8 @@ describe('relPaths from Windows paths — /-separated on every host, so a projec
     (JSON.parse(text) as { models: { relPath: string | null }[] }).models.map((m) => m.relPath)
 
   it('a drive path: beside, below and above the project, without case', () => {
-    const text = winProject(['C:\\Users\\Jo\\review\\models\\ARC.ifc', 'c:\\users\\JO\\shared\\STR.ifc'])
-    expect(relPaths(finaliseProject(text, 'C:\\Users\\Jo\\review\\review.sgvue'))).toEqual([
+    const text = winProject(['C:\\Users\\jane\\review\\models\\ARC.ifc', 'c:\\users\\JANE\\shared\\STR.ifc'])
+    expect(relPaths(finaliseProject(text, 'C:\\Users\\jane\\review\\review.sgvue'))).toEqual([
       'models/ARC.ifc',
       '../shared/STR.ifc'
     ])

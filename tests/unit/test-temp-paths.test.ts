@@ -1,7 +1,7 @@
 /**
  * A test's temporary folder is resolved with the **native** realpath, the one `fs/promises` — and
  * so `admit()` and the project writer — use. On Windows the temporary folder can be an 8.3 short
- * name (`C:\Users\RUNNER~1\…`); `realpathSync` keeps it and only the native call spells it out, so
+ * name (`C:\Users\<name>~1\…`); `realpathSync` keeps it and only the native call spells it out, so
  * a test that resolved its folder with `realpathSync` expected paths the app never hands back
  * (Windows CI, 2026-11-07). macOS cannot show that, so this reads the tests for the call instead.
  */
