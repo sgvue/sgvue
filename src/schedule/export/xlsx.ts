@@ -123,7 +123,7 @@ function numFmt(col: Column, shown?: { decimals: number; unit: string }): string
     + lit(f.suffix ?? '');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- exceljs Worksheet
+// `ws` is an exceljs Worksheet, typed loosely (exceljs is loaded as a lazy chunk).
 function writeSheet(ws: any, sheet: Sheet): void {
   const { res, note } = sheet;
   const rows = toRows(res, true);

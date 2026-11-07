@@ -497,6 +497,7 @@ function liveIdsOf(
   }
   const out: number[] = []
   for (const [from, to] of slots) {
+    // eslint-disable-next-line no-restricted-syntax -- an older build's id, numbered by the design's stride, has no decoder in federate.ts; fitsLocalId and fedId check the result
     const local = saved - from * LEGACY_ID_STRIDE
     if (!fitsLocalId(local)) continue
     const id = fedId(to, local)

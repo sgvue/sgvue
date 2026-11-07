@@ -1,0 +1,25 @@
+adcfba9fff089c865ee127a97910a0dff250b703311206689a152eeee370d646  design-reference/BUILD_PLAN.md
+46766ee400cb9db1280a6f6b72f913d016fe537ec577a1beb5bd660087497480  design-reference/README.md
+6b6a8e237e8d22b6d9def96281c458921cca69cb40d58a4783f184e330132d2b  design-reference/ask-vee/Ask Vee Mascot Sheet.dc.html
+76f3fc22acf24434b064bae87bed475f325b0b6e4f51736e1635530135c441d4  design-reference/ask-vee/Ask Vee Thinking.dc.html
+440d737ee7feea2ae2f0bcd960c59dbef000a0a3fad5b318331287fac9a11a3a  design-reference/ask-vee/README.md
+fb8f73df54014294aab1d921d8e5b38b766d16b790e31eb5aed140048c5cdab9  design-reference/ask-vee/ask-thinking-hex.jsx
+47752b3c3d2b0c682ea46bd55fc3975dbfb5e014af5c4e5aa83442f639971456  design-reference/ask-vee/fonts/OFL.txt
+08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7  design-reference/ask-vee/fonts/ibm-plex-mono-latin-400-normal.woff2
+01d285447409c8a588692162439a038b8cbd7871309ee20267b0d2d91c6e8e22  design-reference/ask-vee/fonts/ibm-plex-mono-latin-500-normal.woff2
+3b646991d30055a93a4ecc499713d4347953a74a947ecab435ab72070cbdab0e  design-reference/ask-vee/fonts/ibm-plex-sans-latin-400-normal.woff2
+0717336fb31fcdcde4b8deb3675bb4a0f7f6d484864afcd6751ac29975962203  design-reference/ask-vee/fonts/ibm-plex-sans-latin-500-normal.woff2
+8960851d691c054ed38e259bdcf1a6190d157b4203ed5bb32c632a863fb8ec2f  design-reference/ask-vee/fonts/ibm-plex-sans-latin-600-normal.woff2
+e279e4f8baa0d4634d98868092f2198ae0dcd9e142c935822c385b9843352a9b  design-reference/ask-vee/fonts/ibm-plex-serif-latin-600-normal.woff2
+1afc2cd585beccc40a509bcebd988b61673446f618d365554be1d117fd6217b7  design-reference/ask-vee/img/ask.webp
+b20fbfd749b91a5b95434335ed54e29629bdc149203e6d51c0c1528ed34da6d4  design-reference/ask-vee/screenshots/01-at-rest-typing.jpg
+58240160bd8ab076a20b1b463091fe7cdcb5c8cf1dcf07550466fdacbf6918c9  design-reference/ask-vee/screenshots/02-send-lift.jpg
+ac85014d98ebd067d963a3f39083350fcd047c45a818d2bdbcac173ff5a089f6  design-reference/ask-vee/screenshots/04-reading.jpg
+66be3bcc10cbc262b1ea4d6b13a7d6810af3339c10478a7a24156d713caf3538  design-reference/ask-vee/screenshots/05-filtering.jpg
+a7e413099d42ca22e856e569f86d5b4b31218ccfb1ebd4b9e4e61deecd98621d  design-reference/ask-vee/screenshots/06-checking-found.jpg
+9bc6c24ccec514fdbc928555e256632700c9a3ac6efed40d6683e2dba8b6a950  design-reference/ask-vee/screenshots/07-answer.jpg
+d62fcfd7e4131b2787203108eb7da0a1109578f30e967abeadc059e87ddd3ae5  design-reference/ask-vee/screenshots/08-done.jpg
+3af76840a8482b37980342857362e1f5eb972db453a0d54cb4ec63a883bf779f  design-reference/ask-vee/screenshots/09-vee-states.jpg
+6d05e39acfd57e94a0974baf1a3541e87972e176c038607aa8813b1c528d5507  design-reference/design/SGVue.dc.html
+2e798fbc8524eb97c08919129748cd2ae63160852bd88c56eb77a38458981d6f  design-reference/design/sample-model.js
+48c7d56c572f4cc5da72574f656289dad316797c1f46b4e5e0a6c888a2e72aba  design-reference/design/viewer-core.js

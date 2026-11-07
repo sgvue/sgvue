@@ -65,14 +65,14 @@ describe('projectArgs — the .sgvue paths in an argv', () => {
   it('reads Windows paths by Windows rules — a drive, a relative path, UNC — and takes off one pair of quotes', () => {
     const argv = [
       'C:\\Program Files\\SGVue\\SGVue.exe',
-      '"C:\\Users\\yy\\Documents\\Tower A.sgvue"',
+      '"C:\\Users\\jane\\Documents\\Tower A.sgvue"',
       'review\\b.sgvue',
       '\\\\server\\share\\c.sgvue',
       '--type=renderer'
     ]
-    expect(projectArgs(argv, 'C:\\Users\\yy', 'win32')).toEqual([
-      'C:\\Users\\yy\\Documents\\Tower A.sgvue',
-      'C:\\Users\\yy\\review\\b.sgvue',
+    expect(projectArgs(argv, 'C:\\Users\\jane', 'win32')).toEqual([
+      'C:\\Users\\jane\\Documents\\Tower A.sgvue',
+      'C:\\Users\\jane\\review\\b.sgvue',
       '\\\\server\\share\\c.sgvue'
     ])
   })

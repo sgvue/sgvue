@@ -218,6 +218,26 @@ function assignSlots(
 
 /* ────────────────────────────── the merge ────────────────────────────── */
 
+/**
+ * Two model keys in code-unit order, never locale order — which can differ by machine. The one
+ * order the storey and grid ladders are unioned in: here for the shell, and in the viewer for
+ * what it draws and cuts (`viewer/viewer-core.ts`), so the two cannot disagree.
+ */
+export const compareModelKeys = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/**
+ * The models in key order (`compareModelKeys`) — the order the storey and grid ladders are
+ * unioned in (core protection #6, 2026-11-07). Where two files disagree about one
+ * level or one grid — a level named `L1` in one and `Level L1` in another at the same elevation,
+ * the same GUID under two names, a grid that is a `UAxes` entry in one and a `VAxes` entry in
+ * the other — the kept record and the order of a tie were the **first-opened** file's, so the
+ * STOREYS list and the Section card's chips changed with the order the files were opened in.
+ * Unioned by key, they are a function of the set of files open, as the 2026-11-07 decisions
+ * require of everything visible. A federation whose files agree draws the same ladders as before.
+ */
+const byKey = (models: readonly FederatedModel[]): FederatedModel[] =>
+  [...models].sort((a, b) => compareModelKeys(a.meta.modelKey, b.meta.modelKey))
+
 const fileOf = (meta: ModelIndexMeta): FederationFile => ({
   key: meta.modelKey,
   name: meta.project?.name ?? '',
@@ -238,7 +258,7 @@ const fileOf = (meta: ModelIndexMeta): FederationFile => ({
 function unionStoreys(models: readonly FederatedModel[]): Storey[] {
   const out: Storey[] = []
   const byGuid = new Map<string, Storey>()
-  for (const model of models) {
+  for (const model of byKey(models)) {
     for (const storey of model.meta.storeys) {
       if (storey.guid && byGuid.has(storey.guid)) continue
       const sameLevel = out.some(
@@ -308,7 +328,7 @@ export function compareGridNames(a: string, b: string): number {
  */
 function unionGrids(models: readonly FederatedModel[]): GridAxisRecord[] {
   const byName = new Map<string, GridAxisRecord>()
-  for (const model of models) {
+  for (const model of byKey(models)) {
     for (const grid of model.meta.grids) if (!byName.has(grid.name)) byName.set(grid.name, grid)
   }
   return orderGrids([...byName.values()])

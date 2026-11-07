@@ -10,8 +10,12 @@
  * the building on its side — which looks like a plausible building until you notice the
  * storeys stack sideways. All three show up as a number in a Node harness and nowhere else.
  *
- * `samples/` is git-ignored — real project models never enter the repository — so with no
- * model present this reports itself as skipped rather than failing.
+ * It runs on two kinds of model. **`tests/fixtures/reference.ifc`** — the synthetic reference
+ * model `scripts/make-reference-ifc.py` writes, ~26 km out on the repository's synthetic shared
+ * origin, with its committed `reference.expected.json` — runs everywhere, CI included, and a
+ * missing file fails the test (2026-11-07). A **real model** in `samples/` runs only where one is
+ * present: `samples/` is git-ignored — real project models never enter the repository — so with
+ * none that part reports itself as skipped rather than failing.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -25,9 +29,13 @@ import { buildModelIndex } from '../../src/worker/index-builder'
 import { checkGeometryChunks } from './geometry-contract'
 
 const ROOT = join(__dirname, '..', '..')
+const FIXTURES = join(ROOT, 'tests', 'fixtures')
+/** The synthetic reference model and its IfcOpenShell ground truth — both committed. */
+const REFERENCE = join(FIXTURES, 'reference.ifc')
+const REFERENCE_EXPECTED = join(FIXTURES, 'reference.expected.json')
+/** A real model, git-ignored, and its ground truth for the same file when it has been generated. */
 const MODEL = join(ROOT, 'samples', 'Sample Ifc Model.ifc')
-/** The IfcOpenShell ground truth for the same file, when it has been generated. */
-const EXPECTED = join(ROOT, 'tests', 'fixtures', 'Sample Ifc Model.expected.json')
+const EXPECTED = join(FIXTURES, 'Sample Ifc Model.expected.json')
 
 interface ExpectedSample {
   expressId: number
@@ -42,21 +50,32 @@ interface ExpectedSample {
   qtos?: Record<string, Record<string, number>>
 }
 
+// Streaming a 138 MB model takes about five seconds; the default 5 s per test is not it.
+vi.setConfig({ testTimeout: 120_000 })
+
+suite(REFERENCE, REFERENCE_EXPECTED, true)
+
 if (!existsSync(MODEL)) {
   // vitest's default reporter swallows `console` from passing tests, and `samples/` is
   // git-ignored, so this notice is the only sign the check did not actually run.
   process.stderr.write(
     `[geometry] skipped: no model at ${MODEL} — drop an .ifc there to run the streamer ` +
-      'against a real file. samples/ is git-ignored on purpose.\n'
+      'against a real file. samples/ is git-ignored on purpose. The synthetic reference model still ran.\n'
   )
-  describe('geometry streamer', () => {
+  describe('geometry streamer — a real model', () => {
     it.skip('skipped: no model in samples/', () => {})
   })
 } else {
-  // Streaming a 138 MB model takes about five seconds; the default 5 s per test is not it.
-  vi.setConfig({ testTimeout: 120_000 })
+  suite(MODEL, EXPECTED, false)
+}
 
-  describe(`geometry streamer — ${basename(MODEL)}`, () => {
+/**
+ * The whole check for one model. `reference`: the committed synthetic model, whose ground truth
+ * must exist and whose authored values are known; a real model without an expected.json skips
+ * just the IfcOpenShell box comparison.
+ */
+function suite(model: string, expectedPath: string, reference: boolean): void {
+  describe(`geometry streamer — ${basename(model)}`, () => {
     const chunks: GeometryChunk[] = []
     let summary: GeometrySummary
     let storeys: readonly Storey[] = []
@@ -65,13 +84,15 @@ if (!existsSync(MODEL)) {
     let bytes = 0
     /** Every element the index carries, by its model-local id — the key a part is joined on. */
     let elementIds: ReadonlySet<number> = new Set()
+    /** Each element's IFC class, by its model-local id. */
+    let typeOf: ReadonlyMap<number, string> = new Map()
     /** Streamed part ids the index does not carry, counted by IFC entity. */
     let offIndex: Record<string, number> = {}
 
     // One parse and one stream for the whole file; both are measured in seconds.
     const ready = (async () => {
-      const file = readFileSync(MODEL)
-      bytes = statSync(MODEL).size
+      const file = readFileSync(model)
+      bytes = statSync(model).size
       const src = await createReadOnlyIfcSource()
       const openedAt = Date.now()
       const modelID = src.openFromBuffer(new Uint8Array(file))
@@ -80,12 +101,13 @@ if (!existsSync(MODEL)) {
       // goes into the stream; the model is drawn at its file's own coordinates).
       const index = buildModelIndex(src, modelID, {
         modelKey: 'FIXTURE',
-        fileName: basename(MODEL),
+        fileName: basename(model),
         sha256: ''
       })
       storeys = index.storeys
       grids = index.grids
       elementIds = new Set(index.elements.map((e) => e.id))
+      typeOf = new Map(index.elements.map((e) => [e.id, e.type]))
       summary = streamGeometry(src, modelID, {
         modelKey: 'FIXTURE',
         offset: null,
@@ -103,7 +125,7 @@ if (!existsSync(MODEL)) {
       src.close(modelID)
       src.dispose()
       process.stderr.write(
-        `[geometry] ${basename(MODEL)} ${(bytes / 1048576).toFixed(1)} MB · open ${openMs} ms · ` +
+        `[geometry] ${basename(model)} ${(bytes / 1048576).toFixed(1)} MB · open ${openMs} ms · ` +
           `stream ${summary.ms} ms · ${summary.chunks} chunks · ` +
           `${summary.geometries.toLocaleString('en-US')} geometries / ` +
           `${summary.parts.toLocaleString('en-US')} parts · ` +
@@ -120,7 +142,7 @@ if (!existsSync(MODEL)) {
 
     const size = (b: readonly number[]): number[] => [b[3] - b[0], b[4] - b[1], b[5] - b[2]]
     const samples = (): Record<string, ExpectedSample> =>
-      JSON.parse(readFileSync(EXPECTED, 'utf8')).samples
+      JSON.parse(readFileSync(expectedPath, 'utf8')).samples
     /**
      * Every part of one element, unioned, with the offset added back: the app's own box.
      * This is the shipped function — `renderer/model/element-boxes.ts`, the one that fills
@@ -281,7 +303,8 @@ if (!existsSync(MODEL)) {
 
     it('agrees with IfcOpenShell on an element’s box in the file’s world coordinates', async () => {
       await ready
-      if (!existsSync(EXPECTED)) {
+      if (!existsSync(expectedPath)) {
+        expect(reference, `${expectedPath} is committed and must exist`).toBe(false)
         process.stderr.write('[geometry] no expected.json — world-box check skipped\n')
         return
       }
@@ -305,6 +328,20 @@ if (!existsSync(MODEL)) {
         }
       }
       expect(checked).toBeGreaterThan(0)
+    })
+
+    it('carries a surface style’s transparency into the part’s alpha', async () => {
+      await ready
+      // The trap: transparency is not in the placed colour's alpha, so a reader that does not
+      // walk IfcStyledItem draws every window opaque.
+      const parts = chunks.flatMap((c) => c.parts)
+      expect(parts.some((p) => p.rgba[3] < 1)).toBe(true)
+      if (!reference) return
+      // The reference model's only see-through parts are its windows, styled Transparency 0.7.
+      for (const p of parts) {
+        const glass = typeOf.get(p.elementId) === 'IfcWindow'
+        expect(p.rgba[3], `${typeOf.get(p.elementId)} #${p.elementId}`).toBeCloseTo(glass ? 0.3 : 1, 6)
+      }
     })
 
     it('includes IfcSpace, which StreamAllMeshes leaves out', async () => {

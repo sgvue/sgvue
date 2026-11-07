@@ -253,7 +253,7 @@ describe('the property card and the context menu — Phase 4 state', () => {
     vi.stubGlobal('navigator', {
       clipboard: { writeText: (v: string) => (written.push(v), Promise.resolve()) }
     })
-    useShell.getState().copyGuid('3Kd8sT0WD0qxL1Hrz0Vabc')
+    void useShell.getState().copyGuid('3Kd8sT0WD0qxL1Hrz0Vabc')
     // The flash fires from the clipboard promise's own microtask — never from a timer, so
     // draining the microtask queue is enough and the fake clock stays where it is.
     await Promise.resolve()

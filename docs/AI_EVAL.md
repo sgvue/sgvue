@@ -80,6 +80,8 @@ table*, below). A run is resumable, so a variant directory recorded
 by an older build has to be deleted before the newly-scorable cases will run — the runner says
 so by name rather than silently skipping them.
 
+`npm run eval:offline` (2026-11-07, also a CI step and part of `npm test`) runs both proofs on every case under Node, with no key, no window and no network — the real store, executors and SQL schema on the mock federation, graded by the same `gradeCase` — and fails unless the oracle scores 100 % and the null agent 0 %; its two stand-ins for the window are the viewer's markup commit (`ai-parity-4`'s, a laser reading 2 m each way) and the unload confirmation read through the Sidebar's `modelRows` rather than the DOM (`tests/unit/ai-eval-offline.test.ts`).
+
 | Flag | What it does |
 |---|---|
 | `--pilot` | the five cases in `PILOT_IDS`, one per group |

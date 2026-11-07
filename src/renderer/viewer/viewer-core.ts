@@ -44,7 +44,7 @@ import type { GeometryChunk } from '../../shared/geometry-contract.types'
 import type { Annotations, MeasureRecord, SpotRecord, SpotShown } from './annotations'
 import { createAnnotations } from './annotations'
 import type { DimRect, LaserDirection } from '../../shared/annotate'
-import { fedId } from '../../shared/federate'
+import { compareModelKeys, fedId } from '../../shared/federate'
 import { turnXY } from '../../shared/plan-rotation'
 import { viewOn } from '../../shared/view-angles'
 import type { DisplayUnit } from '../../shared/units'
@@ -464,6 +464,12 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
    * removal — the same union `shared/federate.ts` does for the shell, for the same reason: a
    * grid named `C` exists in every discipline file, so drawing them all overprints, and
    * unloading one model must not take the survivors' copy with it.
+   *
+   * In **model-key order** (`compareModelKeys`, 2026-11-07, core protection #6), as the shell's
+   * ladders are: where two files disagree about a grid or a level of one name, the gridline, its
+   * bubbles, the level ring and the plane a section cuts at (`section.ts` finds them here by
+   * name) are the same file's the Section card's chips and the STOREYS list show — whatever the
+   * order the files were opened in.
    */
   const gridsByModel = new Map<string, GridSegment[]>()
   /** `elev` is the scene height the ring is drawn at; `authored` is what the tag prints. */
@@ -472,12 +478,14 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
   let grids: GridSegment[] = []
   let storeys: StoreyLine[] = []
 
+  const inKeyOrder = <T>(byModel: Map<string, T[]>): T[][] =>
+    [...byModel.keys()].sort(compareModelKeys).map((key) => byModel.get(key)!)
   const unionGridsAndStoreys = (): void => {
     const g = new Map<string, GridSegment>()
-    for (const list of gridsByModel.values()) for (const x of list) if (!g.has(x.name)) g.set(x.name, x)
+    for (const list of inKeyOrder(gridsByModel)) for (const x of list) if (!g.has(x.name)) g.set(x.name, x)
     grids = [...g.values()]
     const s = new Map<string, StoreyLine>()
-    for (const list of storeysByModel.values()) for (const x of list) if (!s.has(x.name)) s.set(x.name, x)
+    for (const list of inKeyOrder(storeysByModel)) for (const x of list) if (!s.has(x.name)) s.set(x.name, x)
     storeys = [...s.values()].sort((a, b) => a.elev - b.elev)
   }
 
