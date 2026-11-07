@@ -7,6 +7,9 @@ samples/*
 # metadata (file name, storey names, GUIDs, site latitude/longitude, element property
 # sets). Regenerate it locally with scripts/expected-from-ifcopenshell.py.
 tests/fixtures/*.expected.json
+# The one exception: the synthetic reference model's truth (2026-11-07). Its model is generated
+# by scripts/make-reference-ifc.py from nothing, so it carries no project data.
+!tests/fixtures/reference.expected.json
 # Parity captures are large (24 MB for Phase 2a alone) and are regenerated on demand by
 # scripts/screenshot.cjs and scripts/parity-prototype.cjs. tests/parity/<phase>/README.md
 # carries the commands and the measured differences, and that is what belongs in the repo.

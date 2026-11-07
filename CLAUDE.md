@@ -1299,6 +1299,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **a review is saved as a `.sgvue` project file** (owner-approved, `docs/plans/project-file.md`): it names the IFC files (relative path, absolute fallback, SHA-256) and never contains them; elements by (model id, GlobalId); everything but Preferences, theme, sizes, selection and the chat; changed models open with a warning, missing ones get Locate…; colours live in it. Not `.sgv` — StarOffice's and CCTV's.
 - 2026-11-07 — **a fourth disk writer, `src/main/projects.ts`**: the project file only, to a path the user picked in Save As or a `.sgvue` they opened this run (⌘S re-saves it without a dialog), atomic, ≤ 16 MB.
 - 2026-11-07 — **the core is protected by headless CI checks** (owner-approved, `docs/plans/core-protection.md`, Tier 1); visual baselines, a performance budget and the full e2e run on the owner's yes before a release.
+- 2026-11-07 — **a synthetic reference model and its IfcOpenShell truth are committed** (`tests/fixtures/reference.ifc` from `scripts/make-reference-ifc.py`, byte-identical on every run; `reference.expected.json`, the one expected.json `.gitignore` lets through): both conformance tests always run on it, in CI too, and on a `samples/` model beside it when one is present.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

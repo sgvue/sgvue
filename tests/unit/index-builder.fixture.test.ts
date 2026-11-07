@@ -7,8 +7,11 @@
  * web-ifc under Node and compares. A divergence is a defect to fix or to document
  * (SYSTEM_SPEC §5), never to hide.
  *
- * `samples/` is git-ignored, so on a machine without the model this test reports itself as
- * skipped rather than failing.
+ * Two kinds of model run here. **`tests/fixtures/reference.ifc`** — the synthetic reference
+ * model `scripts/make-reference-ifc.py` writes, and its committed `reference.expected.json` —
+ * runs everywhere, CI included, and a missing file fails the test (2026-11-07). A **real model**
+ * in `samples/` runs only where one is present: `samples/` and its expected.json are git-ignored,
+ * so without one that part reports itself as skipped rather than failing.
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -78,20 +81,27 @@ interface Expected {
   >
 }
 
-/** Every `<stem>.expected.json` whose `samples/<stem>.ifc` is actually present. */
-function fixtures(): { ifc: string; expected: Expected }[] {
+/** The synthetic reference model, committed with its ground truth: always run, never skipped. */
+const REFERENCE = 'reference'
+
+function load(stem: string): Expected {
+  return JSON.parse(readFileSync(join(FIXTURES, `${stem}.expected.json`), 'utf8')) as Expected
+}
+
+/** Every other `<stem>.expected.json` whose `samples/<stem>.ifc` is actually present. */
+function samples(): { ifc: string; expected: Expected }[] {
   if (!existsSync(FIXTURES) || !existsSync(SAMPLES)) return []
   return readdirSync(FIXTURES)
-    .filter((name) => name.endsWith('.expected.json'))
+    .filter((name) => name.endsWith('.expected.json') && name !== `${REFERENCE}.expected.json`)
     .map((name) => {
       const stem = name.slice(0, -'.expected.json'.length)
-      const expected = JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as Expected
+      const expected = load(stem)
       return { ifc: join(SAMPLES, expected.file || `${stem}.ifc`), expected }
     })
     .filter(({ ifc }) => existsSync(ifc))
 }
 
-const FOUND = fixtures()
+const FOUND = samples()
 
 if (FOUND.length === 0) {
   // Written straight to stderr because vitest's default reporter swallows `console` output
@@ -101,14 +111,19 @@ if (FOUND.length === 0) {
     '[fixture] skipped: no fixture — put a model in samples/ and run ' +
       'scripts/expected-from-ifcopenshell.py to write tests/fixtures/<stem>.expected.json. ' +
       'Both are git-ignored: the model is a real project file and the expected.json carries ' +
-      'its metadata, so neither ships in the repository.\n'
+      'its metadata, so neither ships in the repository. The synthetic reference model still ran.\n'
   )
-  describe('IFC conformance fixture', () => {
+  describe('IFC conformance fixture — a real model', () => {
     it.skip('skipped: no fixture in samples/', () => {})
   })
 }
 
-for (const { ifc, expected } of FOUND) {
+const ALL = [
+  { ifc: join(FIXTURES, `${REFERENCE}.ifc`), expected: load(REFERENCE) },
+  ...FOUND
+]
+
+for (const { ifc, expected } of ALL) {
   describe(`IFC conformance — ${basename(ifc)} vs ${expected.generatedBy}`, () => {
     let index: ModelIndex
     let sha256: string

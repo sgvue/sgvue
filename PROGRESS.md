@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — a synthetic reference model; the conformance tests run in CI
+
+**Did.** Core protection, plan item 1. `scripts/make-reference-ifc.py` (on `make-tiny-ifc.py`'s `Fixture`) writes `tests/fixtures/reference.ifc`: ten storeys, 1 845 elements + 252 spaces, millimetres, the site placement at the synthetic shared origin with its −43.4103° turn, a `1`–`8` / `A`–`E` grid, type sets overridden by an occurrence set of the same name, quantities, a layer-set usage, a classification, `USERDEFINED` + `ObjectType`, type-only PredefinedTypes, mapped doors in openings, glass transparent only by its surface style. `expected-from-ifcopenshell.py` (unchanged) wrote `reference.expected.json`; `.gitignore` lets that one file through. `index-builder.fixture.test.ts` and `geometry-streamer.fixture.test.ts` run it unconditionally and a `samples/` model beside it when present (skip notice kept); one new geometry check: the windows' alpha is the style's 0.3, every other part's 1.
+
+**Verified.** The generator twice: the same SHA-256 (`107fab9d…`), and the truth twice the same (`76a11099…`). With `samples/` holding only its README: 29 passed, 2 skipped (the real-model parts), in under 0.5 s; `npm test` 3 166 passed / 4 skipped, typecheck and lint clean. Probes, reverted: the type's set winning in `index-builder.ts` failed the wall's and the door's set checks (`REI 120` vs `REI 90`, `FD30` vs `FD60`); an edited effective PredefinedType and a world box 10 mm larger each failed with the GlobalId or the axis.
+
 ## 2026-11-07 — the rest of the "Object has been destroyed" class
 
 **Did.** A share link (`deep-link.ts`) and Preferences… (`menu.ts`) post to the main page through `mainContents()` — a link that finds no live page is parked and sent on the next page's load — and the assistant's turn-start `fail` (`ai/session.ts`) checks its sender first. Every other page call in `src/main/` checked: safe.
