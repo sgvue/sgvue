@@ -4,6 +4,19 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — a real file's MODELS row takes its Recent pill's colour
+
+**Did.** A loaded model's library entry is now found by its file path (`libraryEntry`, `pathOf`,
+`selectors/models.ts`), not by model key, which for a real file never matched — so its row, its
+section-cut outline and its Spatial-structure card showed the slot colour, not its pill's. The path
+reaches the row, the cut push (`setModelFiles` in `shell.ts`) and `spatialCards`. A model with no
+file (the demo) falls back to the key, as before. The library's own colours are unchanged — by
+position, as designed; a "colour by path hash" variant was built and dropped (owner's D12 in
+`docs/plans/project-file.md`: colours will be stored in the `.sgvue` project).
+
+**Verified.** `tests/unit/library-swatch.test.ts` (fails on key matching); typecheck, lint, 3 143
+unit tests pass; reviewer PASS. The e2e outline-colour test was not run (needs a window).
+
 ## 2026-11-07 — the rest of the "Object has been destroyed" class
 
 **Did.** A share link (`deep-link.ts`) and Preferences… (`menu.ts`) post to the main page through `mainContents()` — a link that finds no live page is parked and sent on the next page's load — and the assistant's turn-start `fail` (`ai/session.ts`) checks its sender first. Every other page call in `src/main/` checked: safe.

@@ -24,7 +24,7 @@ import type { FederationOffset, GeometryChunk } from '../../shared/geometry-cont
 import type { ModelIndex, Units } from '../../shared/model-index.types'
 import { DEFAULT_DISPLAY_UNIT, displayUnitOf } from '../../shared/units'
 import type { SessionFile } from '../../shared/session-codec'
-import { planRotationOf, useShell, setViewer } from '../state/shell'
+import { planRotationOf, useShell, setModelFiles, setViewer } from '../state/shell'
 import type { ModelMeta, Viewer } from '../viewer/viewer-core'
 import { elementBoxes } from './element-boxes'
 import { deepFreeze } from './store'
@@ -681,3 +681,5 @@ export const afterPaint = (): Promise<void> =>
  * spawned on first use, so importing this costs nothing.
  */
 export const federation = new FederationController()
+// The cut colours' route from a loaded model to its library entry (`shell.ts` `setModelFiles`).
+setModelFiles(() => federation.sessionFiles())

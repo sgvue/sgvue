@@ -7,6 +7,7 @@
  * (`--abar`, `selectors/lanes.ts` — `0px` while that bar is not drawn).
  */
 import { useMemo } from 'react'
+import { federation as fed } from '../model/federation-store'
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
 import { spatialCards } from '../state/selectors/spatial'
@@ -22,6 +23,9 @@ export default function ProjectCard(): React.JSX.Element | null {
     () =>
       spatialCards({
         federation: st.federation,
+        // Each loaded model's file, read with the federation it belongs to (as the Sidebar's
+        // MODELS rows read it): how a real file finds its library entry, keyed by its path.
+        files: fed.sessionFiles(),
         library: st.library,
         coords: st.coords,
         uploadNames: st.uploadNames,

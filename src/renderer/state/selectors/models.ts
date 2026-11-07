@@ -42,7 +42,7 @@ export interface ModelRow {
 export interface ModelInput {
   federation: Federation
   /** Each loaded model's file, by model key — `federation-store.ts`'s `sessionFiles()`. */
-  files: readonly { key: string; path: string }[]
+  files: ModelFiles
   library: readonly LibraryFile[]
   modelVis: Record<string, boolean>
   modelColors: Record<string, string>
@@ -53,13 +53,36 @@ export interface ModelInput {
   confirmRemove: string | null
 }
 
+/** Each loaded model's file, by model key — `federation-store.ts`'s `sessionFiles()`. */
+export type ModelFiles = readonly { key: string; path: string }[]
+
+/**
+ * The library entry a loaded model came from. A real entry is a recent (`upload-pipeline.ts`
+ * `libraryOf`), keyed by the file's **path**, while the model is keyed by `modelKeyOf(name)` —
+ * so a model with a file behind it is matched by the path the federation holds for it
+ * (`sessionFiles()`), as `modelRows`' `path` is, and never by its name. The design's own
+ * entries (`#mock`'s `SAMPLE_FILES`) have no path and their key is the model key.
+ */
+export function libraryEntry(
+  key: string,
+  path: string | undefined,
+  library: readonly LibraryFile[]
+): LibraryFile | undefined {
+  return (path ? library.find((f) => f.path === path) : undefined) ?? library.find((f) => f.key === key)
+}
+
+/** The path the federation holds for a model, `undefined` for one with no file behind it. */
+export const pathOf = (key: string, files: ModelFiles): string | undefined =>
+  files.find((f) => f.key === key)?.path
+
 /** The swatch a model shows before any override: its library colour, else `MC[slot]`. */
 export function baseSwatch(
   key: string,
   slot: number,
-  library: readonly LibraryFile[]
+  library: readonly LibraryFile[],
+  path?: string
 ): string {
-  return library.find((f) => f.key === key)?.swatch ?? MC[slot % MC.length]
+  return libraryEntry(key, path, library)?.swatch ?? MC[slot % MC.length]
 }
 
 /**
@@ -71,9 +94,10 @@ export function rowSwatch(
   key: string,
   slot: number,
   library: readonly LibraryFile[],
-  modelColors: Record<string, string>
+  modelColors: Record<string, string>,
+  path?: string
 ): string {
-  return modelColors[key] || baseSwatch(key, slot, library)
+  return modelColors[key] || baseSwatch(key, slot, library, path)
 }
 
 /**
@@ -88,10 +112,11 @@ export function cutSwatch(
   key: string,
   slot: number,
   library: readonly LibraryFile[],
-  modelColors: Record<string, string>
+  modelColors: Record<string, string>,
+  path?: string
 ): string | null {
   if (modelColors[key]) return modelColors[key]
-  const lib = library.find((f) => f.key === key)?.swatch
+  const lib = libraryEntry(key, path, library)?.swatch
   if (lib) return lib
   const i = slot % MC.length
   return i === 0 ? null : MC[i]
@@ -106,12 +131,14 @@ export function cutSwatch(
 export function modelSwatches(
   federation: Pick<Federation, 'models'>,
   library: readonly LibraryFile[],
-  modelColors: Record<string, string>
+  modelColors: Record<string, string>,
+  files: ModelFiles = []
 ): Record<string, string> {
   const out: Record<string, string> = {}
   for (const m of federation.models) {
-    const c = cutSwatch(m.meta.modelKey, m.slot, library, modelColors)
-    if (c) out[m.meta.modelKey] = c
+    const key = m.meta.modelKey
+    const c = cutSwatch(key, m.slot, library, modelColors, pathOf(key, files))
+    if (c) out[key] = c
   }
   return out
 }
@@ -161,11 +188,12 @@ export function modelRows(input: ModelInput): ModelRow[] {
     const live = !!ov && !nativeMats
     const act = input.active === key
     const up = uploadNames[key]
+    const path = pathOf(key, files)
     return {
       key,
       name: modelLabel(key, m.meta.fileName, library, up),
       file: modelFile(key, m.meta.fileName, library, up),
-      path: files.find((f) => f.key === key)?.path ?? '',
+      path: path ?? '',
       count: counts.get(key) ?? 0,
       vis: modelVis[key] !== false,
       hid: modelVis[key] === false,
@@ -176,7 +204,7 @@ export function modelRows(input: ModelInput): ModelRow[] {
       actFg: act ? 'var(--sel-ink)' : 'var(--faint)',
       actDot: act ? 'currentColor' : 'none',
       active: act,
-      swatch: rowSwatch(key, m.slot, library, modelColors),
+      swatch: rowSwatch(key, m.slot, library, modelColors, path),
       swatchRing: live ? '0 0 0 1.5px var(--accent)' : 'none',
       paletteOpen: input.palette === key,
       confirmOpen: input.confirmRemove === key,

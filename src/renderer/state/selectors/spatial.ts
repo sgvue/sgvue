@@ -17,7 +17,7 @@ import type { Federation } from '../../../shared/federate'
 import type { Units } from '../../../shared/model-index.types'
 import { coordIn, coordUnit, formatLength, type DisplayUnit } from '../../../shared/units'
 import type { CoordState, LibraryFile } from '../shell'
-import { baseSwatch, modelLabel } from './models'
+import { baseSwatch, libraryEntry, modelLabel, pathOf, type ModelFiles } from './models'
 
 /** What the design prints when a value is absent (`SGVue.dc.html:1765`). */
 export { DASH }
@@ -38,6 +38,12 @@ export interface SpatialCard {
 export interface SpatialInput {
   federation: Federation
   library: readonly LibraryFile[]
+  /**
+   * Each loaded model's file, by model key (`sessionFiles()`): how a real file finds its library
+   * entry, which is keyed by its path (`libraryEntry`). Absent, only the design's own entries —
+   * keyed by model key — are found.
+   */
+  files?: ModelFiles
   coords: CoordState
   uploadNames: Record<string, string>
   /**
@@ -62,7 +68,7 @@ export function unitsLine(units: Units): string {
 const or = (v: string | undefined | null): string => (v ? v : DASH)
 
 export function spatialCards(input: SpatialInput): SpatialCard[] {
-  const { federation: m, library, coords: co, uploadNames, units = 'mm' } = input
+  const { federation: m, library, files = [], coords: co, uploadNames, units = 'mm' } = input
   /** A coordinate, comma-grouped to three decimals as the design's own `f3` here (`:1749`). */
   const xyz = (v: number): string => group3(coordIn(v, units))
   const cu = coordUnit(units)
@@ -76,13 +82,14 @@ export function spatialCards(input: SpatialInput): SpatialCard[] {
   // Each loaded file carries its own IfcProject; site and building are the shared parents.
   const projects: SpatialCard[] = m.models.map((x) => {
     const key = x.meta.modelKey
-    const lib = library.find((f) => f.key === key)
+    const path = pathOf(key, files)
+    const lib = libraryEntry(key, path, library)
     const fileName = uploadNames[key] || (lib?.file ?? x.meta.fileName)
     const label = modelLabel(key, x.meta.fileName, library, uploadNames[key])
     return {
       type: 'IfcProject',
       name: label,
-      swatch: baseSwatch(key, x.slot, library),
+      swatch: baseSwatch(key, x.slot, library, path),
       rows: [
         { k: 'Name', v: `${p.name} — ${label}` },
         { k: 'GlobalId', v: or(x.meta.project?.guid) },

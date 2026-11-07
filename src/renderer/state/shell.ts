@@ -126,7 +126,7 @@ import {
 } from './selectors/views'
 import { askAboutText } from './selectors/props'
 import { tableCsv } from './selectors/chat'
-import { modelSwatches, pickableFor } from './selectors/models'
+import { modelSwatches, pickableFor, type ModelFiles } from './selectors/models'
 import { el } from '../dom'
 import { copyText } from '../clipboard'
 import {
@@ -692,13 +692,25 @@ export const setViewer = (v: Viewer | null): void => {
 let lastCutColors = ''
 function pushCutColors(force = false): void {
   const s = useShell.getState()
-  const map = modelSwatches(s.federation, s.library, s.modelColors)
+  const map = modelSwatches(s.federation, s.library, s.modelColors, modelFiles())
   const k = JSON.stringify(map)
   if (!force && k === lastCutColors) return
   lastCutColors = k
   viewer?.setCutColors(map)
 }
 export const getViewer = (): Viewer | null => viewer
+
+/**
+ * Each loaded model's file, by model key — the federation's `sessionFiles()`, handed in by
+ * `model/federation-store.ts` as the viewer handle is (`model/` imports this module, so the
+ * store cannot import it back). A real library entry is keyed by its path, so this is how the
+ * cut colours find a loaded file's entry (`libraryEntry`). A file is recorded before the commit
+ * that changes `federation`, so the push that commit triggers reads the files that go with it.
+ */
+let modelFiles: () => ModelFiles = () => []
+export const setModelFiles = (fn: () => ModelFiles): void => {
+  modelFiles = fn
+}
 
 /**
  * The two gated actions the store cannot perform by itself (2026-10-02, the consent gate): they

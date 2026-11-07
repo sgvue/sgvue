@@ -1963,10 +1963,11 @@ test('a share link written before there were two planes still restores its one s
     expect(await grid.summary()).toBe('offset m · no section')
     await expect(grid.offset).toHaveValue('0')
     // It really cuts: the plane's outline of the model is on the canvas, in the model's colour.
-    // Since 2026-11-07 that is what its MODELS row shows. A real file's row starts in the design's
-    // grey (`MC[0]`) — and is then cut in the accent, no colour of its own — so the row is given one of
-    // the palette's colours first — with "Original materials" on, the faces keep the file's own —
-    // and the outline is counted in the colour the row then shows.
+    // Since 2026-11-07 that is what its MODELS row shows. Once admitted, a real file's row shows its
+    // Recent pill's colour, which is set by the file's place in the Recent list — so it depends on
+    // what that list holds (and the row is the grey `MC[0]`, cut in the accent, until the list
+    // arrives). So the row is given one of the palette's colours first — with "Original materials"
+    // on, the faces keep the file's own — and the outline is counted in the colour the row then shows.
     await page.locator('aside button[title="Override this model\'s colour"]').click()
     const pick = page.locator('aside button[title^="#"]').last()
     const picked = parseInt((await pick.getAttribute('title'))!.slice(1), 16)
