@@ -1794,7 +1794,8 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       rig.dispose()
       materials.dispose()
       partState.dispose()
-      renderer.dispose()
+      // three 0.186's `Renderer.dispose` is async (it awaits the backend's); nothing else catches it.
+      renderer.dispose().catch((error: unknown) => console.error('[sgvue] the 3D renderer could not be disposed —', error))
     }
   }
 }

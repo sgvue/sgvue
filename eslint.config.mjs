@@ -1,4 +1,4 @@
-// ESLint (2026-11-07, lint hardening steps 2–5). Flat config, type-aware parsing, and one rule a
+// ESLint (2026-11-07, lint hardening steps 2–6). Flat config, type-aware parsing, and one rule a
 // step: nothing from a recommended set is on, so each rule is added — and measured — on its own.
 //
 // What is linted: the app's own TypeScript, `src/**/*.{ts,tsx}`. Not linted:
@@ -132,7 +132,7 @@ export default [
       // Registered for two reasons: two ported lines carry a directive naming one of its rules
       // (`src/schedule/export/xlsx.ts`, `src/shared/model-index.types.ts`), and a directive for
       // a rule ESLint does not know is an error; and its rules are turned on one a step — step 5
-      // turned on `switch-exhaustiveness-check`, below.
+      // turned on `switch-exhaustiveness-check`, step 6 the two promise rules, below.
       '@typescript-eslint': tseslint.plugin,
       'react-hooks': reactHooks,
       'no-unsanitized': noUnsanitized
@@ -163,6 +163,39 @@ export default [
           // A switch over an open set (`string`, `number`) has no member to forget, and its
           // fall-through is often the point (`attr`'s property lookup after its seven names).
           requireDefaultForNonUnion: false
+        }
+      ],
+      // Step 6: a promise is never dropped. Every promise is awaited, returned, ends in a
+      // `.catch` (or a `.then` with a rejection handler), or is marked `void` — and `void` is
+      // only for a call that already handles its own failure (or whose rejection the runtime
+      // reports as unhandled, which is the case `void` states on purpose).
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          // `void p` is the one marker for "fire and forget, on purpose". Counting it as a
+          // finding (`false`) would make every one of the 65 marked calls a `.catch` that logs
+          // what Chromium and Electron already report as an unhandled rejection.
+          ignoreVoid: true,
+          // An async IIFE is a promise like any other.
+          ignoreIIFE: false
+        }
+      ],
+      // Step 6: an async function is never passed where its promise is thrown away — an
+      // `onClick`, an event listener, a `forEach`, an `ipcMain.on` — nor tested as a condition
+      // (a promise is always truthy) or spread. Every sub-option is on; measured, none fires.
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        {
+          checksConditionals: true,
+          checksSpreads: true,
+          checksVoidReturn: {
+            arguments: true,
+            attributes: true,
+            inheritedMethods: true,
+            properties: true,
+            returns: true,
+            variables: true
+          }
         }
       ]
     }

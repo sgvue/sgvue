@@ -409,7 +409,8 @@ export async function createViewCube(options: ViewCubeOptions): Promise<ViewCube
       tnTickMat.dispose()
       tnSprite.material.map?.dispose()
       tnSprite.material.dispose()
-      renderer.dispose()
+      // three 0.186's `Renderer.dispose` is async (it awaits the backend's); nothing else catches it.
+      renderer.dispose().catch((error: unknown) => console.error('[sgvue] the view cube renderer could not be disposed —', error))
     }
   }
 }

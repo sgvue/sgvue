@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — promises are never dropped
+
+**Did.** Step 6 of the lint hardening, the last: `@typescript-eslint/no-floating-promises` (`ignoreVoid: true`, `ignoreIIFE: false`) and `@typescript-eslint/no-misused-promises` (`checksConditionals`, `checksSpreads` and all six `checksVoidReturn` sub-options) as errors. Measured first: 2 floating findings (67 with `ignoreVoid: false`, the 65 extra already marked `void`), 0 misused under every sub-option. Both findings were three 0.186's `async` `Renderer.dispose()` dropped in the viewer's and the view cube's `dispose`; each now ends in a `.catch` that logs through `console.error('[sgvue] … —', error)`. The 65 existing `void` sites are not audited — a possible follow-up (`shell.openExternal`, `win.loadURL` / `loadFile`, the launch GPU-info log and the GPU guard's poll chain have no handler of their own; the runtime still reports a rejection).
+
+**Verified.** Lint clean, typecheck clean, build ok; `npm test` twice, 3 131 passed / 4 skipped. Throwaway probes showed each check fire: a bare call, a bare async IIFE, a promise in an `if`, an async listener, a spread promise and an `onClick={async …}`.
+
 ## 2026-11-07 — switches over a union name every member
 
 **Did.** Step 5 of the lint hardening: `@typescript-eslint/switch-exhaustiveness-check` as an error, with `considerDefaultExhaustiveForUnions: false`, `allowDefaultCaseForExhaustiveSwitch: true` and `requireDefaultForNonUnion: false`. Five option sets measured over `src/` (3, 1, 4, 4 and 5 findings; counting a default as exhaustive would have missed two of the three). The three fixed by listing the members with the behaviour they already had: the GPU guard's `wait` / `none` as `break`; `manage_schedules`' `done` answer for `delete` / `print` / `open_file` beside the `default:` they reached; `alignForCalc`'s `default:` → `case 'number':`.
