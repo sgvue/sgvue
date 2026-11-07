@@ -4,6 +4,17 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — the project e2e runs, and passes
+
+**Did.** Ran `tests/e2e/project.spec.ts` through the guard, on the owner's yes. The Locate… test
+passed first time. The save / quit / reopen test failed at its own setup: it placed a spot by
+clicking the viewport centre after hiding Level 2, and on the hollow `tiny.ifc` frame that ray
+passes through only the hidden storey's wall — the spot tool rightly places nothing. The test now
+places the spot before hiding the storey, and tries points around the centre until one hits.
+
+**Verified.** Second guarded run: 2 of 2 passed (26 s); peak footprint 1 307 MB; no process
+survived. Test-only change, so no review round.
+
 ## 2026-11-08 — `.sgvue` project file, phase 5: double-click and drop
 
 **Did.** `.sgvue` is registered in both installers (per-user on Windows, removed on uninstall).

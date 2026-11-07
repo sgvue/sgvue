@@ -58,6 +58,36 @@ async function clickAt(page: Page, x: number, y: number): Promise<void> {
   await page.mouse.click(x, y)
 }
 
+/**
+ * Place one spot coordinate with the spot tool, the way a hand does: a click on a visible surface.
+ * The two fixtures are a hollow 6 × 4 m frame — two slabs and two walls a storey, two columns and
+ * a roof strip — so the view's centre can fall on air; this tries the centre, then points around
+ * it, until one click has placed a spot. A click on air places nothing, so at most one lands.
+ */
+async function placeSpot(page: Page): Promise<void> {
+  const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
+  const [cx, cy] = [vp.x + vp.width / 2, vp.y + vp.height / 2]
+  await page.locator('button[data-tip="Spot coordinate (C)"]').click()
+  const steps = [0, 40, -40, 80, -80, 120, -120]
+  for (const dy of steps) {
+    for (const dx of steps) {
+      await clickAt(page, cx + dx, cy + dy)
+      const placed = await expect
+        .poll(() => actionText(page), { timeout: 1500 })
+        .toContain('1 spots')
+        .then(
+          () => true,
+          () => false
+        )
+      if (placed) {
+        await page.locator('button[data-tip^="Select (Esc)"]').click()
+        return
+      }
+    }
+  }
+  throw new Error('no point near the centre of the view is on a visible surface')
+}
+
 /** The MODELS row swatch of a file, as `rgb(…)`. */
 const swatchOf = (page: Page, file: string): Promise<string> =>
   page
@@ -87,21 +117,21 @@ test('Save Project, quit, Open Project: the models, a colour and a hidden storey
       await page.locator('aside button[title^="#"]').last().click()
       colour = await swatchOf(page, 'tiny.ifc')
 
+      // Phase 3: a spot coordinate on the model — placed while every storey shows, because the
+      // spot tool takes only a visible surface, and with Level 2 hidden the centre of this view
+      // looks through the frame onto nothing.
+      await placeSpot(page)
+
       // A storey hidden, through its row.
       const shown = await shownOf(page)
       await page.locator('button[title="Show / hide storey"]').nth(1).click()
       await expect.poll(() => shownOf(page), { timeout: 20_000 }).not.toBe(shown)
 
-      // Phase 3: a saved viewpoint, and a spot coordinate on the model.
+      // Phase 3: a saved viewpoint.
       await page.locator('button[data-tip="Saved viewpoints"]').click()
       await page.getByRole('button', { name: 'Save current view' }).click()
       await expect(page.getByText('Viewpoint 1', { exact: true })).toBeVisible()
       await page.locator('button[data-tip="Saved viewpoints"]').click()
-      const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
-      await page.locator('button[data-tip="Spot coordinate (C)"]').click()
-      await clickAt(page, vp.x + vp.width / 2, vp.y + vp.height / 2)
-      await expect.poll(() => actionText(page)).toContain('1 spots')
-      await page.locator('button[data-tip^="Select (Esc)"]').click()
 
       // No project yet: the title is the app's own.
       expect(await windowTitle(app, page)).toBe('SGVue')
