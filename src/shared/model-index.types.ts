@@ -21,8 +21,7 @@
  */
 export type DeepReadonly<T> = T extends ArrayBuffer | ArrayBufferView
   ? T
-  : // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-    T extends Function
+  : T extends Function
     ? T
     : T extends (infer R)[]
       ? readonly DeepReadonly<R>[]

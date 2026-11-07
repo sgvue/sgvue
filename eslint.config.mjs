@@ -1,9 +1,9 @@
 // ESLint (2026-11-07, lint hardening steps 2–6). Flat config, type-aware parsing, and one rule a
 // step: nothing from a recommended set is on, so each rule is added — and measured — on its own.
 //
-// What is linted: the app's own TypeScript, `src/**/*.{ts,tsx}`. Not linted:
-//  - `tests/` — the rules planned are about traps in app code; tests are still type-checked by
-//    `tsconfig.node.json`, so a later step can add them with no new parser setup.
+// What is linted: the app's own TypeScript, `src/**/*.{ts,tsx}`, and since core protection #9
+// the tests' TypeScript, `tests/**/*.{ts,tsx}` (in `tsconfig.node.json`), under the same rules but for
+// the trap exceptions listed with the tests' block below. Not linted:
 //  - `scripts/` — CommonJS dev utilities in no tsconfig, so a type-aware rule cannot run there.
 //  - `design-reference/` (the read-only specification), build output, and
 //    `src/renderer/dev/sample-model.js`, the design's own mock copied verbatim.
@@ -50,6 +50,55 @@ const TRAPS = {
   clipboard: {
     selector: "MemberExpression[property.name='clipboard'][object.name='navigator'], MemberExpression[property.name='clipboard'][object.property.name='navigator'], VariableDeclarator[init.name='navigator'] > ObjectPattern > Property[key.name='clipboard']",
     message: 'navigator.clipboard is refused in this app, always (no clipboard permission is granted); copy through copyText in src/renderer/clipboard.ts, the one sanctioned copier. See docs/DECISIONS.md (2026-10-02, the clipboard).'
+  },
+  // Core protection #9 (2026-11-07): the rest of docs/TRAPS.md that syntax can see.
+  idStride: {
+    // Any arithmetic with either stride: `slot * ID_STRIDE + local`, `id / ID_STRIDE`,
+    // `id - … * LEGACY_ID_STRIDE`, `x += ID_STRIDE`. A comparison (`idStride === ID_STRIDE`) and
+    // a plain read (`idStride: ID_STRIDE`) are not arithmetic and stay allowed.
+    selector: [
+      "BinaryExpression[operator=/^[-+*/%]$/] > Identifier[name=/^(LEGACY_)?ID_STRIDE$/]",
+      "AssignmentExpression[operator=/^[-+*/%]=$/] > Identifier.right[name=/^(LEGACY_)?ID_STRIDE$/]"
+    ].join(', '),
+    message: `A federation id is composed only by fedId and decoded only by slotOfId / localOfId (src/shared/federate.ts), which refuse an id that would overflow its stride; do no arithmetic with ID_STRIDE elsewhere. See ${TRAP} (rendering at real sizes) and docs/DECISIONS.md (2026-10-09).`
+  },
+  heapView: {
+    // `api.GetVertexArray(…)` / `api.GetIndexArray(…)` must be the object of a called `.slice`
+    // — `api.GetVertexArray(…).slice()`, as worker/ifc-source.ts writes it.
+    selector: "CallExpression[callee.property.name=/^Get(Vertex|Index)Array$/]:not(CallExpression > MemberExpression.callee[property.name='slice'] > CallExpression.object)",
+    message: `GetVertexArray / GetIndexArray return views into the WASM heap, which the next allocation moves or overwrites; call .slice() on the result at once. See ${TRAP} (geometry and units).`
+  },
+  propertySetsInLoop: {
+    // A call by method or by bare name, anywhere inside a loop statement or inside a function
+    // handed to an array iteration method.
+    selector: [
+      ":matches(ForStatement, ForInStatement, ForOfStatement, WhileStatement, DoWhileStatement) CallExpression:matches([callee.property.name='getPropertySets'], [callee.name='getPropertySets'])",
+      "CallExpression[callee.property.name=/^(forEach|map|flatMap|filter|reduce|reduceRight|some|every|find|findIndex|findLast|findLastIndex)$/] > :function.arguments CallExpression:matches([callee.property.name='getPropertySets'], [callee.name='getPropertySets'])"
+    ].join(', '),
+    message: `getPropertySets inside a loop is O(N×M) — ~3.1 billion visits and a permanent freeze on a real model; index properties in one forward pass over the relations (worker/index-builder.ts). See ${TRAP} (properties).`
+  },
+  opacityNode: {
+    // Setting it: an assignment or a property of an object literal (a material's parameters).
+    // A type's member (`{ opacityNode: unknown }`) is not a setting.
+    selector: "AssignmentExpression > MemberExpression.left[property.name='opacityNode'], ObjectExpression > Property[key.name='opacityNode']",
+    message: `opacityNode does not reach the shadow pass (the shadow material takes only colorNode.a, alphaTest, depthNode and positions); discard per fragment with maskNode, which three 0.186 emits into the shadow pass too. See ${TRAP} (three.js 0.186).`
+  },
+  depthNode: {
+    selector: "AssignmentExpression > MemberExpression.left[property.name='depthNode'], ObjectExpression > Property[key.name='depthNode']",
+    message: `material.depthNode renders the scene black under an orthographic camera. See ${TRAP} (three.js 0.186).`
+  },
+  pcfSoftShadowMap: {
+    selector: "Identifier[name='PCFSoftShadowMap']:not(ImportSpecifier > Identifier.local)",
+    message: `PCFSoftShadowMap was removed in three 0.186; both backends warn and fall back to PCFShadowMap, so name PCFShadowMap. See ${TRAP} (three.js 0.186).`
+  },
+  negativeQuarterTurnX: {
+    // `x.rotation.x = -Math.PI / 2` in any spelling with a minus and a `PI` (`-(Math.PI / 2)`,
+    // `Math.PI / -2`), and `rotateX(…)` the same way.
+    selector: [
+      "AssignmentExpression[left.object.property.name='rotation'][left.property.name='x']:has(UnaryExpression[operator='-']):has(MemberExpression[property.name='PI'])",
+      "CallExpression[callee.property.name='rotateX']:has(UnaryExpression[operator='-']):has(MemberExpression[property.name='PI'])"
+    ].join(', '),
+    message: `Turning by −π/2 about X double-rotates: web-ifc's flatTransformation already swaps IFC's Z-up for Y-up, so this lays the building on its side. See ${TRAP} (geometry and units).`
   },
   // Step 4: markup. no-unsanitized (below) covers the DOM's own HTML sinks; React's is this.
   dangerouslySetInnerHTML: {
@@ -112,13 +161,12 @@ export default [
       'test-results/',
       'playwright-report/',
       '.claude/',
-      'tests/',
       'scripts/',
       'src/renderer/dev/sample-model.js'
     ]
   },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -129,18 +177,16 @@ export default [
       }
     },
     plugins: {
-      // Registered for two reasons: two ported lines carry a directive naming one of its rules
-      // (`src/schedule/export/xlsx.ts`, `src/shared/model-index.types.ts`), and a directive for
-      // a rule ESLint does not know is an error; and its rules are turned on one a step — step 5
-      // turned on `switch-exhaustiveness-check`, step 6 the two promise rules, below.
+      // Its rules are turned on one a step — step 5 turned on `switch-exhaustiveness-check`,
+      // step 6 the two promise rules, below.
       '@typescript-eslint': tseslint.plugin,
       'react-hooks': reactHooks,
       'no-unsanitized': noUnsanitized
     },
     linterOptions: {
-      // Off while those two directives name rules that are not on, which would report them as
-      // unused. Turn it on once every rule a directive names is enabled.
-      reportUnusedDisableDirectives: 'off'
+      // A directive that disables nothing — its rule is off, or the line no longer breaks it —
+      // is an error, so an exception cannot outlive its reason (core protection #9).
+      reportUnusedDisableDirectives: 'error'
     },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
@@ -216,5 +262,22 @@ export default [
     // Where `esc` is declared.
     files: ['src/shared/html.ts'],
     rules: { 'no-restricted-syntax': trapsBut('escName') }
+  },
+  {
+    // Where the stride is defined, and fedId / slotOfId / localOfId — its only arithmetic.
+    files: ['src/shared/federate.ts'],
+    rules: { 'no-restricted-syntax': trapsBut('idStride') }
+  },
+  {
+    // The family materials set `opacityNode` on purpose: it is the drawn opacity under the
+    // section gate (clipify, the reference's L66; familyify), and familyify's discard is `maskNode`.
+    files: ['src/renderer/viewer/materials.ts'],
+    rules: { 'no-restricted-syntax': trapsBut('opacityNode') }
+  },
+  {
+    // Tests write expected ids by the documented formula, `slot * ID_STRIDE + local` (and the
+    // design's legacy stride), as an oracle independent of the fedId / slotOfId under test.
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': trapsBut('idStride') }
   }
 ]
