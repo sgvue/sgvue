@@ -25,7 +25,7 @@ import { app, BrowserWindow, MessageChannelMain, shell, type Rectangle } from 'e
 import { join } from 'path'
 import { CH_VEE_PORT } from '../shared/ipc-channels'
 import type { VeeTheme } from '../shared/ipc-contract'
-import { lockNavigation, mainWindow } from './window'
+import { lockNavigation, mainContents, mainWindow } from './window'
 
 /** The panel's design size (`SGVue.dc.html:850`, 330 × 420 px), as the window's content. */
 export const VEE_SIZE = { width: 330, height: 420 } as const
@@ -98,6 +98,9 @@ const closing = new WeakSet<BrowserWindow>()
 
 const alive = (win: BrowserWindow | null | undefined): win is BrowserWindow =>
   !!win && !win.isDestroyed() && !closing.has(win)
+/** The window is open and its page still exists: something can be posted to it. */
+const reachable = (win: BrowserWindow | null | undefined): win is BrowserWindow =>
+  alive(win) && !win.webContents.isDestroyed()
 
 /** The Ask Vee window, while it exists. */
 export const veeWindow = (): BrowserWindow | undefined => (alive(vee) ? vee : undefined)
@@ -128,16 +131,17 @@ export function openVee(theme: VeeTheme = 'dark'): void {
   win.webContents.on('did-finish-load', () => connectVee())
   win.on('close', () => {
     closing.add(win)
+    // The main window may be tearing down (it closes this one with it): only a live one has bounds.
     const now = mainWindow()
-    if (now) left = relativeTo(win.getContentBounds(), now.getContentBounds())
+    if (now && mainContents()) left = relativeTo(win.getContentBounds(), now.getContentBounds())
   })
   win.on('closed', () => {
     // A window opened since is the panel now: its port and the panel's state are not this one's.
     if (vee !== win) return
     vee = null
     // No port: the main window drops its end, and its panel is closed.
-    const now = mainWindow()
-    if (now) now.webContents.postMessage(CH_VEE_PORT, null, [])
+    // During the main window's own teardown its page is already gone: nothing to tell.
+    mainContents()?.postMessage(CH_VEE_PORT, null, [])
   })
 
   // The page sets its first `data-theme` from the hash (`renderer/vee/main.tsx`).
@@ -154,10 +158,10 @@ export function openVee(theme: VeeTheme = 'dark'): void {
  * loads last connects them (`connectSchedules` has the measurement behind that).
  */
 export function connectVee(): void {
-  const main = mainWindow()
-  if (!main || !alive(vee)) return
+  const main = mainContents()
+  if (!main || !reachable(vee)) return
   const { port1, port2 } = new MessageChannelMain()
-  main.webContents.postMessage(CH_VEE_PORT, null, [port1])
+  main.postMessage(CH_VEE_PORT, null, [port1])
   vee.webContents.postMessage(CH_VEE_PORT, null, [port2])
 }
 

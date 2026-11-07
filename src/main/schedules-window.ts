@@ -21,7 +21,7 @@
 import { app, BrowserWindow, MessageChannelMain, shell } from 'electron'
 import { join } from 'path'
 import { CH_SCHEDULE_PORT } from '../shared/ipc-channels'
-import { lockNavigation, mainWindow } from './window'
+import { lockNavigation, mainContents, mainWindow } from './window'
 
 let schedules: BrowserWindow | null = null
 
@@ -67,8 +67,8 @@ export function openSchedules(): void {
   win.on('closed', () => {
     schedules = null
     // No port: the main window drops its end and stops building snapshots.
-    const main = mainWindow()
-    if (main) main.webContents.postMessage(CH_SCHEDULE_PORT, null, [])
+    // During the main window's own teardown its page is already gone: nothing to tell.
+    mainContents()?.postMessage(CH_SCHEDULE_PORT, null, [])
   })
 
   // A run under a guard script (`SGVUE_GUARDED=1`, set by safe-run / safe-e2e / safe-app) asks
@@ -92,10 +92,10 @@ export function openSchedules(): void {
  * loading is simply replaced by the next one, when that page's own load finishes.
  */
 export function connectSchedules(): void {
-  const main = mainWindow()
-  if (!main || !alive(schedules)) return
+  const main = mainContents()
+  if (!main || !alive(schedules) || schedules.webContents.isDestroyed()) return
   const { port1, port2 } = new MessageChannelMain()
-  main.webContents.postMessage(CH_SCHEDULE_PORT, null, [port1])
+  main.postMessage(CH_SCHEDULE_PORT, null, [port1])
   schedules.webContents.postMessage(CH_SCHEDULE_PORT, null, [port2])
 }
 

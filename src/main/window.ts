@@ -30,6 +30,17 @@ export const mainWindow = (): BrowserWindow | undefined =>
   main && !main.isDestroyed() ? main : undefined
 
 /**
+ * The main window's page, while both it and the window exist. A child window's `close` and
+ * `closed` fire during the main window's own teardown — after its page is destroyed and before
+ * the window is — so a post to `mainWindow().webContents` there threw `Object has been destroyed`
+ * (2026-11-07). Anything that posts to the main page goes through this.
+ */
+export const mainContents = (): WebContents | undefined => {
+  const win = mainWindow()
+  return win && !win.webContents.isDestroyed() ? win.webContents : undefined
+}
+
+/**
  * The window a menu item acts on: always the main window, even while Schedules has focus —
  * Preferences and About belong to it, and Schedules has no surface for either.
  */

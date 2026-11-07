@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CH_VEE_CLOSE, CH_VEE_OPEN, CH_VEE_PORT } from '../../src/shared/ipc-channels'
+import { CH_SCHEDULE_PORT, CH_VEE_CLOSE, CH_VEE_OPEN, CH_VEE_PORT } from '../../src/shared/ipc-channels'
 import { VeeCloseRequest, VeeOpenRequest } from '../../src/shared/ipc-contract'
 
 interface Box {
@@ -34,6 +34,8 @@ class FakeWindow {
   posted: { channel: string; ports: unknown[] }[] = []
   bounds: Box = { x: 0, y: 0, width: 0, height: 0 }
   destroyed = false
+  /** The page alone is gone: a parent window's teardown, before the window itself is destroyed. */
+  contentsDestroyed = false
   focused = 0
   loaded = ''
   loadOptions: unknown = undefined
@@ -43,7 +45,12 @@ class FakeWindow {
     on: (name: string, fn: unknown) => void this.contentsHandlers.set(name, fn),
     setWindowOpenHandler: (fn: unknown) => void (this.openHandler = fn),
     getURL: () => 'file:///app/out/renderer/vee.html',
-    postMessage: (channel: string, _msg: unknown, ports: unknown[]) => void this.posted.push({ channel, ports })
+    isDestroyed: (): boolean => this.destroyed || this.contentsDestroyed,
+    // As Electron's: a post to a destroyed page throws.
+    postMessage: (channel: string, _msg: unknown, ports: unknown[]): void => {
+      if (this.webContents.isDestroyed()) throw new TypeError('Object has been destroyed')
+      this.posted.push({ channel, ports })
+    }
   }
   constructor(readonly options: Record<string, unknown>) {
     FakeWindow.made.push(this)
@@ -92,6 +99,8 @@ const { closeVee, openVee, veePlacement, veeWindow, VEE_BACKGROUND, VEE_MIN, VEE
   '../../src/main/vee-window'
 )
 
+const { closeSchedules, connectSchedules, openSchedules } = await import('../../src/main/schedules-window')
+
 const ROOT = join(__dirname, '../..')
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8')
 
@@ -99,6 +108,7 @@ let main: FakeWindow
 
 beforeEach(() => {
   closeVee()
+  closeSchedules()
   FakeWindow.made = []
   main = new FakeWindow({})
   main.bounds = { x: 100, y: 50, width: 1264, height: 755 }
@@ -220,6 +230,69 @@ describe('main/vee-window.ts — the window', () => {
     setMainWindow(null)
     openVee()
     expect(FakeWindow.made).toHaveLength(0)
+  })
+})
+
+/**
+ * 2026-11-07: closing the main window closes its child Vee window during the main window's own
+ * teardown — its page already destroyed, the window not yet — and the `closed` handler's post
+ * threw `TypeError: Object has been destroyed` in main.
+ */
+describe('the main window going away while a child window is open', () => {
+  for (const [what, gone] of [
+    ['its page is destroyed, the window not yet', (): void => void (main.contentsDestroyed = true)],
+    ['the window is destroyed', (): void => void (main.destroyed = true)]
+  ] as const) {
+    it(`Vee: ${what} — close and closed throw nothing and post nothing`, () => {
+      openVee()
+      const w = FakeWindow.made[0]
+      ;(w.contentsHandlers.get('did-finish-load') as () => void)()
+      main.posted = []
+      gone()
+      expect(() => closeVee()).not.toThrow()
+      expect(main.posted).toEqual([])
+      expect(veeWindow()).toBeUndefined()
+    })
+
+    it(`Vee: ${what} — a late did-finish-load connects nothing`, () => {
+      openVee()
+      const w = FakeWindow.made[0]
+      main.posted = []
+      gone()
+      expect(() => (w.contentsHandlers.get('did-finish-load') as () => void)()).not.toThrow()
+      expect(main.posted).toEqual([])
+      expect(w.posted).toEqual([])
+    })
+
+    it(`Schedules: ${what} — closed throws nothing and posts nothing`, () => {
+      openSchedules()
+      const w = FakeWindow.made[0]
+      main.posted = []
+      gone()
+      expect(() => connectSchedules()).not.toThrow()
+      expect(() => closeSchedules()).not.toThrow()
+      expect(main.posted).toEqual([])
+      expect(w.posted).toEqual([])
+    })
+  }
+
+  it('a child window whose own page is gone is not connected', () => {
+    openVee()
+    openSchedules()
+    const [v, s] = FakeWindow.made
+    v.contentsDestroyed = true
+    s.contentsDestroyed = true
+    main.posted = []
+    expect(() => (v.contentsHandlers.get('did-finish-load') as () => void)()).not.toThrow()
+    expect(() => connectSchedules()).not.toThrow()
+    expect(main.posted).toEqual([])
+  })
+
+  it('Schedules: with the main window whole, its close still tells it', () => {
+    openSchedules()
+    main.posted = []
+    closeSchedules()
+    expect(main.posted.map((p) => [p.channel, p.ports.length])).toEqual([[CH_SCHEDULE_PORT, 0]])
   })
 })
 
