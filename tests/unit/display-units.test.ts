@@ -338,6 +338,7 @@ describe('the Markups card', () => {
 describe('the property card’s geometry rows', () => {
   // A wall 2.4 × 0.2 × 3 m, its base 1.2 m below the file's zero, at a base point.
   const box = { min: { x: 0, y: 0, z: -1.2 }, max: { x: 2.4, y: 0.2, z: 1.8 } }
+  // A file states a base point; since 2026-11-07 the centroid prints world coordinates.
   const coords = { E: 100, N: 200, Z: 10, angle: 0 }
   const rows = (u: 'mm' | 'm' | 'ft'): string[] => geoRows(box, 1, coords, [0, 0, 0], u).map((r) => `${r.k}: ${r.v}`)
 
@@ -348,7 +349,7 @@ describe('the property card’s geometry rows', () => {
       'Footprint: 0.48 m²',
       'Box volume: 1.440 m³',
       `Base / top: -1${T}200 mm → 1${T}800 mm`,
-      'Centroid: 101.200 E · 200.100 N · 10.300 Z'
+      'Centroid: 1.200 E · 0.100 N · 0.300 Z'
     ])
   })
 
@@ -358,7 +359,7 @@ describe('the property card’s geometry rows', () => {
       'Footprint: 0.48 m²',
       'Box volume: 1.440 m³',
       'Base / top: -1.200 m → 1.800 m',
-      'Centroid: 101.200 E · 200.100 N · 10.300 Z'
+      'Centroid: 1.200 E · 0.100 N · 0.300 Z'
     ])
   })
 
@@ -368,7 +369,7 @@ describe('the property card’s geometry rows', () => {
       'Footprint: 5.17 ft²',
       'Box volume: 50.853 ft³',
       `Base / top: ${MINUS}3'-11 1/4" → 5'-10 7/8"`,
-      'Centroid: 332.021 E · 656.496 N · 33.793 Z'
+      'Centroid: 3.937 E · 0.328 N · 0.984 Z'
     ])
   })
 })
@@ -652,8 +653,7 @@ describe('the boot starts in the boot model’s unit', () => {
   const item = (key: string, length: UnitEntry | null): BatchItem => ({
     index: { ...mockModelIndex(key), units: withLength(length) },
     chunks: mockGeometryChunks(key),
-    offset: [0, 0, 0],
-    frame: null
+    offset: [0, 0, 0]
   })
   const FT = conv('FOOT', 0.3048)
   const M = si('METRE', '', 1)

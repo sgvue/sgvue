@@ -241,3 +241,48 @@ describe('a laser measurement, split at its point', () => {
     ])
   })
 })
+
+/**
+ * 2026-11-07 — the plan rotation (`shared/plan-rotation.ts`). Every model is drawn at its file's
+ * own coordinates, so a building can stand turned in the scene; the laser's X and Y are the plan's,
+ * turned by ρ, so a reading still runs from wall to wall rather than across the room on the slant.
+ */
+describe('a laser measurement on a turned plan', () => {
+  const RHO = (30 * Math.PI) / 180
+  const c = Math.cos(RHO)
+  const s = Math.sin(RHO)
+  /** Scene → plan: turned by −ρ. */
+  const toPlan = (v: Vector3): Vector3 => new Vector3(v.x * c + v.y * s, -v.x * s + v.y * c, v.z)
+
+  it('fires along the plan’s axes and reads the room’s own widths', () => {
+    labels = []
+    published = []
+    const host: AnnotationHost = {
+      ...stubHost(),
+      plan: () => RHO,
+      // The same room, its walls square with the plan: a ray is read in the plan frame.
+      ray: (origin, dir, far, near) => {
+        const o = toPlan(origin)
+        const d = toPlan(dir)
+        const axis = (['X', 'Y', 'Z'] as const).find((a) => Math.abs(d.getComponent(AXIS_INDEX[a])) > 1e-9)!
+        const sign = d.getComponent(AXIS_INDEX[axis]) > 0 ? '+' : '-'
+        const at = faces[sign + axis]
+        if (at === undefined) return null
+        const distance = (at - o.getComponent(AXIS_INDEX[axis])) / d.getComponent(AXIS_INDEX[axis])
+        if (distance < near || distance > far) return null
+        return { id: 7, point: origin.clone().addScaledVector(dir, distance), distance }
+      }
+    }
+    const turned = createAnnotations(host)
+    // A point on the wall facing the plan's −Y, its normal turned into the scene.
+    turned.addLaser(new Vector3(0, 0, 0), new Vector3(s, -c, 0), -1)
+    const [m] = published
+    expect(m.sides.x!.minus).toBeCloseTo(1.2, 9)
+    expect(m.sides.x!.plus).toBeCloseTo(2.3, 9)
+    expect(m.x).toBeCloseTo(3.5, 9)
+    // The ray into the wall is not fired: only the plan's −Y side, 4 m off.
+    expect(m.sides.y!.plus).toBeNull()
+    expect(m.sides.y!.minus).toBeCloseTo(4, 9)
+    expect(m.sides.z).toEqual({ minus: 0.9, plus: 1.8 })
+  })
+})

@@ -1288,7 +1288,8 @@ const ROTATION_EPSILON_DEG = 1e-9
 
 /**
  * The 3D `Model` `IfcGeometricRepresentationContext` — not a 2D `Plan` one. It is the engineering
- * frame the geometry is in, so its map conversion is the one that places the model (2026-10-08).
+ * frame the geometry is in, so its map conversion is the one that states the model's map position
+ * (2026-10-08; read and reported only since 2026-11-07, when models are drawn origin to origin).
  * A sub-context of it is the same frame, and `IfcCoordinateReferenceSystemSelect` allows either
  * as a conversion's `SourceCRS`, so a sub-context is judged by its `ParentContext`, one hop up.
  */
@@ -1374,8 +1375,8 @@ function readMapUnit(
  * invented: a file with no georeferencing reports `'none'`, not a default origin.
  *
  * `method` — which of them is actually *in force* — is `shared/georef.ts`'s `detectMethod`
- * over what this reads, so the card's caption, the assistant's readout and the frame the
- * geometry is streamed in cannot disagree about what the file does.
+ * over what this reads, so the card's caption and the assistant's readout cannot disagree about
+ * what the file does.
  */
 function readGeoreference(
   src: ReadOnlyIfcSource,

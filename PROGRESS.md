@@ -4,6 +4,30 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — models line up origin to origin, and only the camera turns to square the grids
+
+**Did.** The owner: *"I think we can leave geo referenced, and only focus on the internal origin
+of the model like how Naviswork do"* → *"go with your recommendation. Any solution for the side
+effect? I dont want my gridlines to be place diagonally relative to my building."* **Placement:**
+every model is drawn at its file's own world coordinates (web-ifc's `flatTransformation`, IfcSite
+placement included); no map conversion, `WorldCoordinateSystem` or `TrueNorth` moves or turns a
+model, and nothing visible depends on load order (`federationFrame`, `modelFrame`, `frameKey`,
+`farPlacement`, the store's `frame` / `bootGeoref` and `GEOREF_NOTE` are gone; the frame key is
+always `identity`). Georeferencing is still read and reported: the Coordinate-system card shows
+the file `georefSourceOf` picks (most elements, ties by key), readouts print world coordinates
+(`readoutCoords`), the compass points at world +Y, and the card's note names a model whose own
+map position is more than 1 m or 0.1° from where its file puts it (`mapShift`; fixtures b–k, not
+a). **Plan rotation** (`shared/plan-rotation.ts`): a canonically sorted, length-weighted 4θ mean
+of every model's grid directions, else the majority site turn, else 0; Plan, the six views, the
+cube, the framing box (`fitFrame`, from vertices), the grid extent and bubbles, the level rings,
+the ground grid and the laser's X / Y follow it. Only the camera turns.
+
+**Verified.** `npm run typecheck`; `npm test` (3 022 passed / 4 skipped); `npm run build`;
+reviewer-deep PASS. **Owed** (each opens a window — needs the owner's yes): `npm run test:e2e`
+(`smoke`, `assistant-markups`, `feet`, `big-model` with `SGVUE_IFC`), `scripts/shell-sanity.cjs`
+on the reference model, a confirming parity run on the mock (expected unchanged), and real-model
+parity captures (`tests/parity/phase8/README.md` still mentions the georef note).
+
 ## 2026-11-07 — gridlines and the canvas grid off by default
 
 **Did.** The owner: *"Make gridlines and canvas off by default."* `DISPLAY_DEFAULTS` now has
@@ -1621,348 +1645,23 @@ The per-turn ↺ still appears on turns that only toggled a display switch and r
 there — the audit's finding, phase 2's, because widening it changes a designed control.
 `scripts/ai-audit.cjs`'s hand-written tool matrix was not extended. `dist/` was not rebuilt, so
 the packaged spec ran against the existing package.
-
-## 2026-10-01 — Vee, step 2 of 2: the thinking trace, the stop button, `You` on the left
-
-**Did:** the second half of the owner's "Ask Vee" handoff (`design-reference/ask-vee/`). The
-design's busy row is gone: while a turn runs the transcript's next row is the assistant's reply
-being written, drawn from the turn's real events and the federation's real data — `Thinking`
-beside the name, then a bubble with a one-line ticker over the element matrix (Read, Filter,
-Check, each with its own count), then the answer word by word, its status and one row per
-storey that holds a match (CLAUDE.md deviation; eight rows in `docs/DECISIONS.md`).
-**Architecture, as briefed:** a pure core — `ai/trace-facts.ts`, the facts of a tool call;
-`ai/trace.ts`, `traceReduce` / `traceCues` / `traceFrame(timeline, T, layout)` / `traceSend` —
-a small store outside the shell store with an injectable clock (`ai/trace-store.ts`), and a
-thin view (`app/Trace.tsx`, `app/ChatPanel.tsx`): one `requestAnimationFrame` loop, one
-painter, one canvas for the cells, the beam and the rings. `ai/bridge.ts` feeds it where it
-already handles the turn, and `executeTool` tells it each call after `resolveNames`. **The rest
-of the motion:** the lift, the press, the send button as a stop (`abortChat`), `You` on the
-left, the shimmer, the ticker's roll, the rings, both themes, reduced motion. **Step 1's three
-changes:** one sprite size for every slot (`max(1, round(devicePixelRatio))`), the sprite clock
-asleep between changes (`veeNextWake`), and the wording "no two of the first seven replies".
-**The defect step 1 found:** the log's horizontal scrollbar was an invisible tooltip — fixed at
-its cause, in `styles/vee.css`. **Removed:** `BrandBusy`, the `ifctrace` / `ifcbreathe` /
-`ifcdot` keyframes, `chatStage`, `FIRST_STAGE`, `stageFor`. **Harness:**
-`window.__sgvueDev.trace` (`pin`, `cues`, `frame`, `loop`), `chat.step` (a turn a step at a
-time, which `chat.turn` now runs through), `vee.cell` and `vee.wakes`; `screenshot.cjs` gains
-`trace-01-typing` … `trace-08-done` and a panel crop; `frame-triggers.cjs` steps a turn and
-counts both loops; `parity-states.cjs` holds `chat-busy` still.
-
-**Not as briefed, on purpose.** (1) **The e2e does not use the dev harness**: the suite runs
-the production bundle, which has none. It replaces main's two turn handlers and sends a turn's
-events itself over the real channels, so what is tested is the app's own `sendChat`,
-`handleEvent` and executor; the dev harness got `chat.step` and `trace.pin` for the captures.
-(2) **A Filter only when the scope really narrows**: with an OR group that has no scope rule
-the scope is everything, and "Filtering IfcWall · 412 walls" would be false. (3) **Row hover
-`hv-card`, not `hv-step`**: the bubble is `--step-bg`, so `hv-step` would change nothing.
-(4) **Whole device pixels cost the demo building its one-to-one grid at 100 %**: 2 px cells
-need 3 px columns, so its 412 elements are two to a cell there (206 cells, 167 px wide); one
-each from 125 %. With the reference's unrounded pitch the app's 282 px would not hold 103
-columns either. (5) **Every cell flashes in the wave** — the reference spares its 86 future
-walls, which only a script can know. (6) **More than fifteen flying cells share 0.7 s of
-stagger**, so a reply is settled 1.95 s after its answer whatever it found. (7) **Every sprite
-state but `idle` plays from its own first frame**, so a half-second `found` is the hop itself.
-(8) The status's seconds are rounded to the nearest. (9) `find_properties` and `find_nearby`
-got stage phrases — they had none. (10) `ifctrace` and `ifcbreathe` went with `ifcdot`: only
-`BrandBusy` used them. (11) **Three things beyond the brief, each because a test or a
-measurement asked for it:** a reply the trace leaves is finished at once (sending the next
-question while the last answer was still arriving froze it part of the way — found, fixed, and
-an e2e fails without the fix); the trace is narration (`narrated()`, and a `try` round the
-painter, which runs in a layout effect of a renderer with no error boundary); and the lift is
-laid out for the *unscaled* bubble, so the line cannot re-wrap as its bubble grows from 0.94.
-
-**Measured** (mock, 1280 × 820, ratio 1, both themes alike;
-`tests/parity/2026-10-01-vee/README.md` § 5). The panel `[938, 348, 330, 420]`, unmoved. The
-log: `scrollWidth` = `clientWidth`, 328 and then 320 once it scrolls (348 against 320 before).
-A user's bubble `[951, 499.75, 261.44, 54.75]`, its text and the lifting line at x 962. The live
-reply's label row `[951, 563.5, 87.58, 10]` — 10 px, as every label row. The trace bubble
-`[951, 577.5, 304, 52]`; the read grid 206 cells of 2 px in 53 columns; the filter grid 80 of
-5 px, 2 × 40; the beam 1.7 s across. The answer `[951, 490.5, 296, 148.05]`:
-`checked 80 walls · 8s`, five rows of 17.33 px, 24 cells of 7 px. The stop square
-`[1235, 735, 8, 8]`. *Sprites, one size:* 16, 16, 32, 32, 32, 48 and 48 device px at 1, 1.25,
-1.5, 1.75, 2, 2.5 and 3, all three alike, 0 captured pixels differing from the backing store at
-any of them in either theme. *The sprite clock:* 4 wakes in 7 s for the pill alone, 12 for
-three idle sprites (56 ticks before), 8 a second while one thinks or reads, 26 in 7 s with one
-`done`. *The two loops* (`frame-triggers.cjs`): about 410 (one per display frame) trace
-frames and 0 scene renders in the 6.8 s a turn ran, 119 and 0 in the 2.2 s of its answer, 0 and
-0 in the 2 s after.
-
-**Tested:** **129 files passed / 2 skipped, 2 183 tests passed / 3 skipped** (was 125 /
-2 096): `trace.test.ts` (new, 40 — the port against the handoff's own code at 330 instants,
-over 20 000 cell comparisons; the cues from real events; `done` mid-step; a turn with no tool;
-100 000 elements; whole pixels at seven ratios; reduced motion; the palette; a reply at rest),
-`trace-facts.test.ts` (new, 16), `marks.test.ts` (new, 12), `trace-wiring.test.ts` (new, 14 — a
-real `sendChat`, main's events, a tool through the real executor, a trace that fails),
-`vee-grid.test.ts` (21, was 18 — the one-size table, the sprite's frame, the wake rule), the
-chat selectors, and the store without `chatStage`. Typecheck and build green. e2e **55 passed,
-6 skipped** (was 50 / 6; 6.4 min): `vee-trace.spec.ts` (new, 5) — a turn drawn as it happens,
-the row that commits being the row that was live, a row's click, the log's width and its
-tooltip; the stop button; a turn with no tool; reduced motion; the next turn sent a tenth of a
-second after an answer. Run three times over, 15 of 15 — after one fix **in the test**: reading
-a canvas back moves it from the GPU to the CPU, which rounds a 7 px square's corners
-differently, so the same 24 `roundRect` calls were two byte-different pictures; a picture is now
-compared by which pixels are there and in which colours. Evaluation suite through its own
-runner, no API, into a scratch folder: **oracle 36 / 36, null 0 / 36**. `frame-triggers.cjs`
-28 / 28 and the trace's block above. Guarded runs only; none tripped, and nothing survived any
-of them.
-
-**After review** (one must-fix, three small items). *The mark splitter was quadratic on the
-answer path:* an opening looked past every later mark that could not close it, so
-`**a **a **a …` cost the square of its marks — 44 s for 200 kB, measured, twice over (`done`
-counts the words before it commits the reply, then the bubble renders them). An opening now
-has one candidate, the next mark of its kind: 200 kB splits in 4 ms, and three unit tests hold
-it under 100 ms; `**a ** b**` now prints as written. *A double-click on Stop* could send the
-draft, or stop twice: the button ignores clicks for 300 ms after a stop (`sendClick`, unit-
-tested; the e2e's stop is now a double-click, and fails with the guard off). *`Words` is
-memoised on the text*, so a reply is not split again at every keystroke. *The trace's frame
-count* is written as "about 410 (one per display frame)": it is a rAF count, 409 in one run
-and 410 in the next. `vee-trace.spec.ts` 5 of 5 again.
-
-**Not done, and limits.** `dist/` was not rebuilt, so the packaged spec ran against the package
-from before Vee. No live assistant run — no API key was used anywhere — so a real model's
-pacing (how often its calls carry rules, how long its rounds take) is untried: the trace's rules
-are tested on scripted turns. Not run on macOS. The trace was captured at ratios 1 and 1.5; the
-other ratios are covered by the lattice's unit test alone. When an answer makes the transcript
-taller than the panel, the log's scrollbar arrives during the glide and the transcript narrows
-by its 8 px: the design has no scrollbar gutter, and adding one would move every bubble. The
-phase-9 parity numbers no longer describe the panel (`tests/parity/phase9/README.md` now says
-so).
-
-## 2026-10-01 — Vee, step 1 of 2: the assistant's name and its pixel mascot — and the bottom row's lane
-
-**Did:** the owner's request — *"Can you help me update the ai assistant name and animations?"* —
-with their design handoff, "Ask Vee", now kept unchanged in `design-reference/ask-vee/` as the
-specification for the assistant's name, its mascot and its thinking motion (CLAUDE.md deviation;
-two rows in `docs/DECISIONS.md`). This step is the **name** and the **mascot at rest**; the
-thinking trace and its motion are step 2, and the busy row is untouched. **Scale:** the
-handoff's "screenshot ÷ 1.2" is wrong — its screenshot was taken at 150 % — so
-`ask-thinking-hex.jsx` px ÷ 1.5 = app px, and every existing panel element keeps its style
-string. **Name:** one constant behind `authorOf` (`selectors/chat.ts`) — a reply's label, the
-reply strip and the quote sent with a reply (`ai/bridge.ts`) say `Vee`; the title and the pill
-read `Ask Vee`; the Schedules toasts `Schedule from Ask Vee` / `Schedule changed by Ask Vee`;
-one added prompt line tells the model its name (28 → 29 lines). "SGVue" stays the app's name.
-**Sprite:** `app/vee-grid.ts` — pure: `veeGrid` is the handoff's `hexGrid` verbatim, all five
-states; the palette as roles; `veeCell` / `veeBox`, whole device pixels to a cell; the clock's
-rule — and `app/Vee.tsx`: the canvas, one shared 8 fps clock that sets no React state, the theme
-and ratio listeners, the dev pin. It stands in 21 / 19 / 16 px slots with negative margins beside
-the title, in front of each reply's label and on the pill; `Sparkle` is gone. Light palette,
-chosen: the visor `--ink`, the top facet `#CBD8D5`, the highlight `#35C4B6`. **Bottom row:**
-the pill is 88.9 px wide (66.6), and the row now declares its height as a lane — `--brow`
-(`browFrom`, the store's `brow`) — which the chat panel (`bottom`, `max-height`,
-`clampChatSize`) and the property card (`max-height`) subtract: the gap the row's own entry
-left open. **Two leftovers of the section-cut review:** `planeOf` reads a name longer than 200
-characters as no plane; `legacySection` gives an older build the plane that is cutting when only
-one of the two is. **Harness:** `screenshot.cjs` gains `vee-closed`, `vee-open`, `vee-lane`,
-`vee-sheet` and an 8× crop of every sprite; `parity-states.cjs` finds the pill by either label
-and quotes the assistant by each side's own name.
-
-**Not as briefed, on purpose.** (1) Under reduced motion "each sprite holds frame 0 of its
-state" is built as the **clock's** frame 0, each sprite still adding its own offset: `idle` at
-frame 0 is the blink, and a mascot held with its eyes shut is not at rest. (2) A reply's label is
-offset `11 + 4 ×` its index, not 11 for every one: the brief asks that no label blink in unison,
-and the reference has only one. (3) The legacy-key rule is stated in four records, not the two
-named: the CLAUDE.md deviation sentence and `SYSTEM_SPEC.md`'s `last.json` row are corrected
-too. (4) Captures are at `SGVUE_DPR=1`: under device emulation `capturePage` hands back a 1×
-down-sample, so the harness's default 2 cannot show a sprite's pixels; the other ratios were
-measured for real, through page zoom.
-
-**Measured** (mock, 1280 × 820, both themes alike; `tests/parity/2026-10-01-vee/README.md`).
-*Nothing existing moved:* the header `[939, 349, 328, 47]` and its title
-`[974, 366.5, 249, 11]` before and after; a reply's label row 10 px tall before and after; its
-bubble unmoved; the pill `[1201.42, 774, 66.58, 32]` → `[1179.09, 774, 88.91, 32]`, wider by
-its label and nothing else. Against the build before, `vee-open` differs by 0 px in the status
-bar, the bubble, the composer, the close button, the sidebar and the toolbar; 844 / 848 px in
-the panel — the two sprites, the title's text and the name. *Whole pixels:* at real ratios 1,
-1.25, 1.5, 1.75, 2 and 2.5, in both themes, every sprite's captured pixels equal its backing
-store — 0 differing; at 150 % all three are 32 device px. *The clock:* 4 repaints in 7 s for
-the pill alone (two blinks), 12 for three sprites, 0 in 5 s minimised, 0 pinned.
-*The row:* no two of its five pieces intersect at 1280 × 820, 1264 × 755, 900 × 700 or
-760 × 700 in the three states measured; the status bar is where it was in all twelve; at 900 px
-the centre now stands above the bars (180 px left beside them; the reset pill needs 183).
-*The lane:* with a selection, the panel open, the laser's hint and a storey hidden, `--brow` is
-`43px`, the panel `[606, 305, 330, 420]` and the card `[948, 184, 320, 537]`, the panel 6.7 px
-above the pill; nothing of the row meets either at any of the four sizes, where 1, 2, 4 and 5
-pairs did. With `0px` the computed styles are the strings they were.
-
-**Tested:** **125 files passed / 2 skipped, 2 096 tests passed / 3 skipped** (was 124 / 2 069):
-`vee-grid.test.ts` (new, 18 — the port against the handoff's own code for 5 states × 672
-frames, each state's drawing, the palette through `design.css`, the pixel rule, the offsets,
-the clock's rule), the chat selectors (`authorOf`, `hasSprite`, the quote `sendChat` sends, the
-clamp with a lane), `browFrom`, the two codec cases each way, the prompt's 29 lines. Typecheck
-and build green. e2e **50 passed, 6 skipped** (was 49 / 6; 5.7 min): the title, the pill and a
-reply's label by their copy with a painted sprite in each; the bottom-row case with the four
-things that used to meet; and a new case on the real clock — two pictures a sprite in four
-seconds, never two shut together, recoloured by a theme switch, one picture each under an
-emulated `prefers-reduced-motion`. That case failed once in its first eight repeats — the
-test read a sprite in the frame before the page had heard the emulated change — and was fixed
-in the test: **15 of 15** since, and the other two touched cases 8 of 8. Evaluation suite
-through its own runner, no API, into a scratch folder: **oracle 36 / 36, null 0 / 36**.
-`frame-triggers.cjs` 28 / 28 and 0 scene renders in 2 s at rest. Guarded runs only; none
-tripped, and nothing survived any of them.
-
-**Found, not touched:** the chat log shows a horizontal scrollbar as soon as it scrolls
-vertically (`scrollWidth` 348 against `clientWidth` 320 with the parity transcript) — on the
-base commit's build too, the same numbers. **Not solved, by scope:** the colour legend does not
-take the lane, and with the row one line the panel in the card's lane still lies 6 px across
-the end of a full action bar at the default window, as before. **Not done:** `dist/` was not
-rebuilt, so the packaged spec ran against the package from before the name; no real-model run
-(no `samples/` model on this machine).
-
-## 2026-10-01 — two section cuts at once: one along a gridline, one at a level
-
-**Did:** the owner's request — *"Can you add the section cut along gridline as another cut
-also? same, i need offset, cut / flip, clear. and since we have multi plane section cut now, add
-a clear all somewhere. Can you also add divider on the gridlines under section panel for along x
-or y side, for example gridline 1 to 10 one section, Gridline A to E one section."* — and, asked
-how many cuts at once, their choice **"Two: gridline + level"**: the two become independent,
-each with its own offset, cut, flip side and Clear, plus one Clear all, the gridline chips split
-by a divider into their two directions (CLAUDE.md deviation; five rows in `docs/DECISIONS.md`).
-**State:** `sections: { grid, level }` replaces `section`, each a `SecPlane { name, offset, flip,
-cut }` (`src/shared/sections.ts`, new); `setSec(kind, patch, open?)` patches one plane,
-`clearSections()` both, `gridClick` only the gridline plane. **Viewer:** `setSections({ grid,
-level })` replaces `setSection`; `section.ts` is two slots, each with its own outline quad and
-preview sheet; `materials.ts` has a second clip uniform pair and keeps a fragment both planes
-keep; the pick and laser rays are clamped by every cutting plane (`clipSpan`, the brute-force
-reference included) and the snap refuses a candidate either cut away; each plane's cut outline
-is trimmed to the other's kept side (`section-cut.ts`), still one instanced mesh and one
-recompute a frame; the re-aim is the design's rule per plane, once at the gridline plane when a
-restore brings both. **Card:** the owner's layout from the design's own pieces — `Clear all` in
-the header, the gridline chips one row per grid family with a 1 px rule between, and each block
-with its own offset row, its summary and its own `cut` · `flip side` · `Clear`. **The summary
-has a line of its own**, the one place the design's two rows were re-arranged: beside its three
-buttons it had about 75 px and read `offset mm …`, the plane's name clipped away, and with two
-planes that line is the only place `grid C · cut · flipped` is read. `max-height` +
-`overflow:auto` because the card is 114 px taller; the toolbar button lit while either plane is
-set. **Persistence:** a session, a share link and a viewpoint write `sections` and the old
-single `section` beside it (the gridline plane, else the level plane, else "none"), and one
-normaliser, `sectionsOf` (`shared/session-codec.ts`), reads either and coerces every field.
-**Assistant:** `set_section`'s `kind:"grid"` / `"level"` sets that cut and leaves the other
-alone, a `kind` with no name clears just that cut, `kind:null` clears both; `section` in its
-result and in the view state is one string, `grid C + level L2`. **And it does what the user's
-click does** — the owner, asked whether an assistant-made section should actually cut: *"yes.
-assistant should possess everything user can do on the app. that would be the best case
-scenario."* Setting a plane is the chip's own patch (cutting, at the kind's default offset);
-the same kind and name again changes only what the call passes — an omitted `offset`, `flip`
-or `cut` keeps what the plane has, so a previewed plane that is moved is still a preview — and
-never clears it; one new input, `cut` (`false` previews, `true` cuts, and a new plane cuts when
-it is omitted); the clears are the card's `Clear` and `Clear all`. That direction — the assistant can do whatever the user can, within the
-viewer-only rule — is recorded for the whole catalogue; only `set_section` was changed.
-**Records correction (asked for with this task):** the update-notice entry in `CLAUDE.md` and
-the Network row of `docs/SYSTEM_SPEC.md` now say that Chromium's standard headers include a user
-agent which, in a packaged build, names the app and its version.
-
-**Not as briefed, on purpose:** the brief listed the label-occlusion ray with the pick and laser
-rays to be clamped by both planes. It was never clamped by the one plane — the design tests
-occlusion against the raw pick list (`viewer-core.js` L720–721) and the port kept that — so it is
-left unclamped; clamping it would have changed which labels are hidden in every one-plane frame.
-
-**Measured.** *One plane is the build before:* the phase-6 chain on the mock, 1440 × 860, the
-base commit `60ec62b` captured three times (and six more in light for four states), this build
-three times — **all 84 canvas-only frames (14 states × 2 themes × 3 runs) are identical, pixel
-for pixel, to a base capture**; the base's own captures agree except `levels-iso`, one pixel by
-one level. Whole window: the label readback is identical in all 28 state / themes and the card
-is `[312, 66, 300, 330]` → `[312, 66, 300, 444]`. *Two planes* (mock, grid C flipped + level
-L2): 378 outline segments on 63 elements (grid alone 220 on 47, level alone 568 on 74), 25 draw
-calls. *Cut recompute* on 2026-09-28's 5.58 M-triangle synthetic model: **6.2–7.2 ms with both
-planes cutting**; one plane 5.6–7.5 ms (base 5.6–7.3), 8.9–9.3 ms worst case (base 8.7–9.4).
-`frame-triggers.cjs`: **28 / 28** (the second plane's set, offset, flip and clear added), 0
-renders at rest. Every capture and measurement was taken again after the summary line and the
-`cut` input were added, on a dev-tools build byte-identical, all 95 files, to one rebuilt from
-that tree. The last change of the day — an omitted `cut` keeps a set plane's state — touched
-only the `set_section` executor and its description; the unit suite, the build and the
-evaluation were run again after it, the captures and the e2e suite (which does not exercise
-that executor) were not. `tests/parity/2026-10-01-two-sections/README.md` has the tables.
-
-**Tested:** **124 files passed / 2 skipped, 2 069 tests passed / 3 skipped** (was 2 014): the
-normaliser and codec, an old viewpoint, `section-planes.test.ts` (new — the clips per slot and
-every re-aim case), picking and the pick grid with two planes against brute force, the snap, the
-trimmed cut outline, the selectors, the executors (the default cut, both default offsets,
-`cut:false`, a preview moved and still a preview until `cut:true`, a plane re-sent changing only
-`cut`, only `flip`, only `offset`) and the catalogue.
-Typecheck and build green. e2e **49 passed, 6 skipped, twice in a row** (was 47 / 6): the card's
-layout with each summary whole on its own line, both cuts through the card, their offsets
-independent, flip one, preview one, a viewpoint named `grid C + level L2`, Clear one, Clear all,
-and a share link in the pre-2026-10-01 shape restoring its section. Guarded runs only, nothing
-survived.
-
-**Two harness fixes that came with it.** (1) `smoke.spec.ts` "the bottom edge is one row" was
-flaky — **3 failures in 10 on the base commit's own build**: its `resize()` read the row in the
-frame before `BottomRow` re-places its centre zone (at 760 px, the hint 62.5 px wide against the
-200 px floor). The test, not the product, was fixed: it now reads the row until two consecutive
-reads 100 ms apart agree (`settledBottomBoxes`). **15 of 15 in a row, twice**, and in every full
-run since. (2) `scripts/ai-eval.cjs` could not run on Windows, on the base commit either: it is
-without a window between its probe and its first case and between any two cases, and the real
-main quits on `window-all-closed` everywhere but macOS — the run ended before its first case and
-exited 0. It now keeps one hidden, empty window open for the run on Windows and Linux, and none
-on macOS; the documented commands are unchanged. Through the runner itself, `ANTHROPIC_API_KEY`
-unset: **oracle 36 / 36, null 0 / 36**.
-
-**Guard trips, none of them memory or time:** `shell-sanity.cjs` on the mock once, on an output
-directory that did not exist (peak GPU 370 MB); and one batch of capture runs, seven in a row
-inside about a minute, the five whose last lines were kept each reporting `unhandled rejection`
-at 117–119 MB. Their output was not kept; the same runs passed straight after with full logs,
-and a round of card captures a few minutes earlier had come back at 0–2 fps, so the cause was
-most likely the desktop in use over the windows. Those captures were thrown away and taken
-again. **Not done:** no real-model run (no
-`samples/` model on this machine); `dist/` was not rebuilt; and the view state still names only
-which planes are on, not their offset, side or cut — part of the wider audit the owner's
-direction asks for.
-
-## 2026-10-01 — the landing page says when a newer version is out, and the app asks GitHub once at every start
-
-**Did:** the owner's request — *"Can you show updates with link if there are one automatically
-on the upload page?"* — and, of the ways offered, their choice **"Check at every start"**: one
-small request to GitHub when the app opens, a notice with a link if a newer version exists,
-silence when offline or blocked; no Preferences switch. This is the app's first network call
-of its own (CLAUDE.md deviation, a row in `docs/DECISIONS.md`; the 2026-09-25 and 2026-09-28
-"no network call by the app" records are amended). **`src/shared/version.ts`** (pure):
-`parseVersion` — `1.2.3` / `v1.2.3`, optional pre-release and build metadata, refused over 64
-characters before any pattern runs — and `isNewer`, semver precedence. **`src/main/updates.ts`**:
-`latestVersion(fetchFn)` is one `GET` to `LATEST_RELEASE_URL` (a hard-coded https constant on
-`api.github.com`) through `net.fetch` — `Accept` and nothing else of ours, `credentials:'omit'`,
-`cache:'no-store'`, `redirect:'error'`, 5 s — status 200, the body read up to 256 kB, `tag_name`
-through `parseVersion`; every failure is `null` and at most one `console.warn` line.
-`checkForUpdate(current)` keeps its promise (one request per run) and, in a development build,
-makes **no request at all**: `SGVUE_UPDATE_LATEST` stands in for the tag there, through the same
-checks. **IPC:** `update:check` → `{ latest } | null` and `update:open` →
-`shell.openExternal(updatesUrl(__APP_VERSION__))`, both without a payload, both answered for the
-main window only; preload keys `checkUpdate` and `openUpdatePage`; the renderer never supplies a
-URL. **`Landing.tsx`** asks once on mount and, only with an answer, draws
-`[data-role="update-notice"]` between the introduction and the drop zone (above the warning
-banner when both show): the warning banner's box in the accent tokens, `SGVue <latest> is
-available — you have <current>.` and the text button `get the update →`. `scripts/screenshot.cjs`
-answers `update:check` itself (`SGVUE_UPDATE_LATEST`), since it is its own main process.
-**Measured** (`tests/parity/2026-10-01-update-notice/README.md`; `#mock&landing`, 1280 × 820,
-both themes): with nothing newer the landing capture is byte-identical to `2893aff`'s (two
-captures of one build differ by up to 19 px, each by one level) and the page's `outerHTML` is
-the same 7 922 bytes; the notice is `[330, 241.2, 620, 44.75]`, 22 px from the introduction and
-from the drop zone. The centred column grows by 66.75 px, so what is above the notice stands
-33.4 px higher and what is below 33.4 px lower, as with the designed banner; at the real default
-window (1 264 × 755 inside) with two rows of Recent pills the page is 34 px taller than the
-window and scrolls. **Live:** the app's own `latestVersion()`, bundled alone and run once in a
-guarded Electron main process with the default `net.fetch`: 200, `1.1.0`, 2.8 s for that first
-request.
-**Verified** (with the ground change below, on the final tree): `npm run typecheck` exit 0;
-`npm test` **123 files passed / 2 skipped, 2 014 tests passed / 3 skipped** (was 120 / 1 906:
-+61 `version.test.ts`, +35 `updates.test.ts`, +1 guard case, +11 `ground-level.test.ts`);
-`npm run build` exit 0; `npm run test:e2e` **47 passed, 6 skipped** (was 45 / 6: the notice
-case — copy, box, tokens in both themes, the URL the button opens, no notice for the same, an
-older or no version, the notice above the banner — and the ground case), peak working set
-252 MB one process / 778 MB all, GPU dedicated 254 MB, `clean:`. Every capture and measuring
-run went through `safe-run.cjs`; nothing survived.
-**Not verified here:** a packaged build's launch request end to end — `dist/` holds the 1.1.0
-package, built before this. Once repackaged, `npm run test:packaged` makes that one request per
-launch.
-
 ## Earlier work
 
-Compressed: the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the four 2026-10-01 entries (Vee steps 1 and 2, two section cuts, the update notice) on 2026-11-07 (origin to origin), the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (the four 2026-10-01 entries at `40c8a1d:PROGRESS.md`, the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-10-01 — Vee, step 2 of 2: the thinking trace, the stop button, `You` on the left.** The assistant's reply is drawn while its turn runs from the turn's real events and data — `Thinking`, a ticker over the element matrix (Read, Filter, Check), the answer word by word, its status and a row per storey — on a pure core (`ai/trace-facts.ts`, `ai/trace.ts`) and one painter; the send button stops a turn; `You` stands on the left. 2 183 tests passed / 3 skipped.
+
+**2026-10-01 — Vee, step 1 of 2: the assistant's name and its pixel mascot — and the bottom row's lane.** The assistant is Vee (`Ask Vee`), its 16 × 16 Hex sprite on a shared 8 fps clock that sleeps between changes, one cell size per display ratio; the handoff's px ÷ 1.5 = app px; the bottom row declares `--brow`, which the chat panel and property card clear. 2 096 tests passed / 3 skipped.
+
+**2026-10-01 — two section cuts at once: one along a gridline, one at a level.** The owner's "Two: gridline + level": each with its own offset, cut, flip side and Clear, plus Clear all; grid chips split by family; the clip is the intersection of the kept sides; every outline trimmed to the other plane's kept side; with one plane set, the 84 canvas-only phase-6 frames are pixel-identical to the build before. 2 069 tests passed / 3 skipped.
+
+**2026-10-01 — the landing page says when a newer version is out, and the app asks GitHub once at every start.** The owner's "Check at every start": one `GET` to GitHub's latest release in a packaged build, silent on any failure; a notice with `get the update →` when newer; the app's first network call of its own. 2 014 tests passed / 3 skipped.
 
 **2026-10-01 — the canvas grid stands at the file's zero, not at the first part streamed.** The
 owner's report: a Tekla model opened alone hung under the canvas grid. The whole-metre offset's

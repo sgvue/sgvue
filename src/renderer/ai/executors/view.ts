@@ -82,7 +82,7 @@ import { visFn, type FilterStep, type Rule, type StepAction } from '../../../sha
 import { NO_PLANE, sectionsLabel, type SecKind } from '../../../shared/sections'
 import type { ColorByState } from '../../../shared/colors'
 import { planePatch } from '../../state/selectors/section'
-import { getViewer, peekHistory, restoredVis } from '../../state/shell'
+import { getViewer, peekHistory, planRotationRad, restoredVis, useShell } from '../../state/shell'
 import type { ShellState } from '../../state/shell'
 import {
   CHIP_CAP,
@@ -1211,7 +1211,8 @@ export const activate_model: Executor = (input, ctx) => {
  */
 export function cameraNow(): CameraBrief | null {
   const cam = getViewer()?.getCamera()
-  return cam ? cameraBrief(cam) : null
+  // Said against project north — the plan rotation's +Y (2026-11-07).
+  return cam ? cameraBrief({ ...cam, rho: planRotationRad(useShell.getState()) }) : null
 }
 
 /**

@@ -21,7 +21,7 @@
  */
 import { DASH, fixed2, fixed3, fmtV } from '../../../shared/fmt'
 import type { FederatedElement, Federation } from '../../../shared/federate'
-import { toMap } from '../../../shared/georef'
+import { readoutCoords, toMap } from '../../../shared/georef'
 import { areaIn, areaUnit, coordIn, formatLength, volumeIn, volumeUnit } from '../../../shared/units'
 import type { CoordState, Units } from '../shell'
 
@@ -189,10 +189,10 @@ export function geoRows(
   const sz = { x: mx.x - mn.x, y: mx.y - mn.y, z: mx.z - mn.z }
   const c = { x: (mn.x + mx.x) / 2, y: (mn.y + mx.y) / 2, z: (mn.z + mx.z) / 2 }
   // `shared/georef.ts`'s `toMap` is the design's own L409 expression, shared with the spot
-  // coordinate labels so the two readouts cannot drift. `IfcMapConversion.XAxisAbscissa` /
-  // `XAxisOrdinate` are optional; a file that omits them states no rotation, so the angle is
-  // 0 — never defaulted when the file does state one.
-  const map = toMap(coords, c.x, c.y, c.z)
+  // coordinate labels so the two readouts cannot drift. Since 2026-11-07 the scene is the files'
+  // own world coordinates, so the centroid is printed as those (`readoutCoords`) — and as the
+  // em dash while no loaded file states a base point.
+  const map = toMap(readoutCoords(coords), c.x, c.y, c.z)
   const len = (v: number): string => formatLength(v, units)
   const xyz = (v: number): string => fixed3(coordIn(v, units))
   return [

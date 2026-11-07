@@ -53,7 +53,8 @@
  *
  *   · `set_view` gains `fit` (frame the building or the selection without turning — a
  *     double-click on empty space, and F), `azimuth` and `elevation` (any direction, in degrees
- *     in the project frame — `shared/view-angles.ts` — which reaches every one of the view
+ *     in the model's plan frame, project north being the plan's +Y — `shared/view-angles.ts`,
+ *     `shared/plan-rotation.ts` — which reaches every one of the view
  *     cube's 26 and anything between) and `zoom` (a factor on the fit);
  *   · `manage_filters` gains the op `update` — one step's action, rules or highlight colour
  *     changed in place, which until now meant rebuilding the stack and losing its step ids, the
@@ -104,7 +105,7 @@
  *     deletion and before its print dialog is opened, its native Open dialog — and so does a
  *     save or a duplicate that would forget a saved setup;
  *   · `manage_markups` gains `place_spot`, `place_measure` and `show`: the click with the spot
- *     tool or the laser meter, at a point that is named — an element's box, or a project-frame
+ *     tool or the laser meter, at a point that is named — an element's box, or a world
  *     point — and committed by the viewer's own function for that click.
  *
  * 37 tools. Deliberately left out (`docs/DECISIONS.md` has each reason): a schedule's column
@@ -401,7 +402,7 @@ export const MARKUP_PLACES = ['top', 'centre', 'base'] as const
 export const SPOT_SHOWS = ['level', 'full'] as const
 /** The most markups of one kind the assistant will add to: past it, it says so. */
 export const MARKUPS_PLACE_CAP = 50
-/** A point further out than this is not one: project-frame metres. */
+/** A point further out than this is not one: world metres. */
 export const MARKUP_POINT_MAX = 1e7
 
 /* ────────────────────────────── the design's fifteen ────────────────────────────── */
@@ -437,7 +438,7 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     name: 'clash_check',
     kind: 'read',
     description:
-      'Bounding-box interference candidates between two loaded models, swept over every currently visible element of each. Read-only. modelA and modelB must both be loaded and different. tolerance is metres of allowed overlap before a pair counts. This is an axis-aligned box test in the project frame, not solid geometry, so it over-reports for anything rotated or diagonal — always describe the results as candidates for review, never as clashes. At most 25 pairs come back, largest overlap first.',
+      'Bounding-box interference candidates between two loaded models, swept over every currently visible element of each. Read-only. modelA and modelB must both be loaded and different. tolerance is metres of allowed overlap before a pair counts. This is an axis-aligned box test in the files’ own world coordinates, not solid geometry, so it over-reports for anything rotated or diagonal — always describe the results as candidates for review, never as clashes. At most 25 pairs come back, largest overlap first.',
     input_schema: obj(
       {
         modelA: { type: 'string' },
@@ -604,7 +605,7 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     // own camera can do — any direction, a fit that does not turn, a zoom.
     description:
       'Move the camera to a named view and/or change projection. Use it after a section or an isolate so the user is looking at what you just set up: an elevation with ortho for a section, iso with persp to return to the default. It changes nothing about what is visible or selected. Either argument may be given alone. ' +
-      'Instead of a named view, azimuth and elevation turn the camera to any direction, in degrees in the model’s project frame: azimuth is the compass bearing the camera looks towards, clockwise from project north — 0 looks north, 90 east, 180 south, 270 west; project north is the model’s own +Y, not true north — and elevation is how far it looks down from level: 0 level, 90 straight down, −90 straight up. ' +
+      'Instead of a named view, azimuth and elevation turn the camera to any direction, in degrees in the model’s plan frame: azimuth is the compass bearing the camera looks towards, clockwise from project north — 0 looks north, 90 east, 180 south, 270 west; project north is the plan’s +Y, which the app turns square with the loaded models’ gridlines (or, with none, their site’s rotation), not true north — and elevation is how far it looks down from level: 0 level, 90 straight down, −90 straight up. ' +
       `In these terms ${Object.entries(VIEW_DIRECTIONS)
         .map(([name, [az, el]]) => `view:"${name}" is ${az} / ${el}`)
         .join(', ')}. ` +
@@ -818,7 +819,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'get_model_info',
     kind: 'read',
     description:
-      'Per loaded file: the ISO-10303-21 header including the MVD, the IFC schema, the unit assignment, georeferencing with the source it was read from — which declaration placed the model in the federation’s map space (placedBy), in which map unit, and whether it lines up with the others (notLinedUp) — and a CORENET X / IFC-SG readout for Singapore models, entity and element counts, and the SHA-256 of the bytes. Read-only.',
+      'Per loaded file: the ISO-10303-21 header including the MVD, the IFC schema, the unit assignment, georeferencing with the source it was read from — which declaration states the model’s map position (placedBy) and in which map unit; every model is drawn at its own file coordinates, origin to origin, so georeferencing moves nothing, and notLinedUp says when a model’s map position is not where its file coordinates put it, by how far and how much turned — and a CORENET X / IFC-SG readout for Singapore models, entity and element counts, and the SHA-256 of the bytes. Read-only.',
     input_schema: obj({
       model: { type: 'string', description: 'Model key; omit for every loaded model' }
     }),
@@ -828,7 +829,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'get_view_state',
     kind: 'read',
     description:
-      'What is currently shown: the filter stack step by step with live counts, visible and total elements, hidden elements, storey and model visibility, the active model, camera view, projection, section, colour scheme and selection. It also reads back, in full, what the per-turn view state mentions only when it is not at its default: every display switch (display), both section planes with their offset in millimetres, side and whether they cut (sectionPlanes), whether anything can be undone or redone (history), each model’s visibility, colour override and active state (models), and the interface — theme, units, tree mode, sidebar, open card, armed tool, tree search and whether the Schedules window is open. And where the camera stands (camera): the named view it is on, or null once it has been turned or orbited off one, its projection, and its direction as azimuth and elevation in set_view’s own terms; each highlight step’s colour in the filter stack; and the user’s saved viewpoints by name (viewpoints, the first 20). And the project base point every E / N / Z read-out is computed with (basePoint): E, N and Z in metres, angle the true-north rotation in degrees, and source — file when the four are what the file states, none when there is no base point; it comes from the file the federation was opened with, and nothing in the app can change it. And which loaded models could not be lined up with the others (notLinedUp): each one’s model key, why — it has no map position, or it sits far from the others — and how far, in kilometres. Read-only.',
+      'What is currently shown: the filter stack step by step with live counts, visible and total elements, hidden elements, storey and model visibility, the active model, camera view, projection, section, colour scheme and selection. It also reads back, in full, what the per-turn view state mentions only when it is not at its default: every display switch (display), both section planes with their offset in millimetres, side and whether they cut (sectionPlanes), whether anything can be undone or redone (history), each model’s visibility, colour override and active state (models), and the interface — theme, units, tree mode, sidebar, open card, armed tool, tree search and whether the Schedules window is open. And where the camera stands (camera): the named view it is on, or null once it has been turned or orbited off one, its projection, and its direction as azimuth and elevation in set_view’s own terms; each highlight step’s colour in the filter stack; and the user’s saved viewpoints by name (viewpoints, the first 20). And the project base point the Coordinate-system card shows (basePoint): E, N and Z in metres, angle the true-north rotation in degrees, source — file when the four are what a file states, none when there is no base point — and model, the loaded model they are read from: of the models that state one, the one with the most elements, whatever the order they were opened in; nothing in the app can change it, and no model is placed by it — every E / N / Z read-out is the file’s own world coordinates. And which loaded models’ own map position is not where their file coordinates put them (notLinedUp): each one’s model key, how far in kilometres and how much turned in degrees. Read-only.',
     input_schema: obj({}),
     strict: true
   },
@@ -856,7 +857,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'find_nearby',
     kind: 'read',
     description:
-      'Every element whose bounding box comes within a distance of one element’s box, or of a short list of them, nearest first. Read-only. distance is metres and 0 means "touching or overlapping". This is axis-aligned box arithmetic in the project frame, not solid geometry — exactly what measure_between reports — so describe the results as neighbours to check, not as contacts. IfcSpace is left out unless spaces:true, because a space overlaps everything inside it. The elements asked about are never their own neighbours.',
+      'Every element whose bounding box comes within a distance of one element’s box, or of a short list of them, nearest first. Read-only. distance is metres and 0 means "touching or overlapping". This is axis-aligned box arithmetic in the files’ own world coordinates, not solid geometry — exactly what measure_between reports — so describe the results as neighbours to check, not as contacts. IfcSpace is left out unless spaces:true, because a space overlaps everything inside it. The elements asked about are never their own neighbours.',
     input_schema: obj(
       {
         id: { type: 'number', description: 'Federation element id to search around' },
@@ -1021,7 +1022,7 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
     kind: 'view',
     description:
       'The markups on the model — the Markups card. Laser measurements are M1, M2 …, each with the X, Y and Z lengths its rays read and, under sides, each length split at the point as the card and the 3D view show it: minus to the face on that axis’s − side, plus to the one on its + side, a side that reached no face left out; spot coordinates are C1, C2 …, each with its E, N and Z map coordinates, or its level in the file’s own metres when the model has no base point. op:"list" returns the laser lengths in the card’s current unit — whole millimetres, metres, or decimal feet while it shows ft, as units says — and the spot coordinates in metres; "focus" zooms the camera to one, named as the card names it. ' +
-      '"place_spot" and "place_measure" place one exactly as the user’s click with the spot tool or the laser meter does, at a point you name: an element (id) and where on its bounding box (at: top, which is the default, centre or base — the middle of the box’s top face, of the box, or of its underside), or point, in the project-frame metres get_element reports a box in. That box is axis-aligned and conservative, not a picked surface: on a sloped or L-shaped element its middle can be off the real surface, so report it as taken on the bounding box. A measurement reads, along each of X, Y and Z, the distance from the point to the nearest visible face on either side; from top or base it does not read into the element, and from centre it usually reads the element’s own faces. A spot tag shows its level alone until show:"full" — on place_spot, or op:"show" with name, or with no name for every spot — gives it its full E, N and Z; "level" puts it back. ' +
+      '"place_spot" and "place_measure" place one exactly as the user’s click with the spot tool or the laser meter does, at a point you name: an element (id) and where on its bounding box (at: top, which is the default, centre or base — the middle of the box’s top face, of the box, or of its underside), or point, in the world metres get_element reports a box in. That box is axis-aligned and conservative, not a picked surface: on a sloped or L-shaped element its middle can be off the real surface, so report it as taken on the bounding box. A measurement reads, along each of X, Y and Z, the distance from the point to the nearest visible face on either side; from top or base it does not read into the element, and from centre it usually reads the element’s own faces. A spot tag shows its level alone until show:"full" — on place_spot, or op:"show" with name, or with no name for every spot — gives it its full E, N and Z; "level" puts it back. ' +
       '"delete" asks the user to delete one, and "clear" every laser measurement (kind:"measures") or every spot coordinate (kind:"spots"). The names are positions in the card, so they shift when one is deleted: list before you focus, show or ask to delete. A deleted markup cannot be brought back, so delete and clear never delete: they wait behind an Apply button under your reply, nothing is deleted unless the user clicks it, and you are not told whether they did. Place a markup only when asked: it stays until the user deletes it or reverts your reply, which takes away the markups that reply placed.',
     gate: { by: 'op', asks: { delete: 'apply', clear: 'apply' } },
     input_schema: obj(
@@ -1047,7 +1048,7 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
         },
         point: {
           type: 'object',
-          description: 'For place_spot and place_measure, instead of id: a point in project-frame metres, Z up.',
+          description: 'For place_spot and place_measure, instead of id: a point in world metres — the files’ own coordinates — Z up.',
           properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } },
           required: ['x', 'y', 'z'],
           additionalProperties: false

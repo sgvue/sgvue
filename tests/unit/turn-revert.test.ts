@@ -1175,7 +1175,7 @@ describe('a revert after the federation changed keeps the rules a session restor
     expect(changedBy(at)).toEqual(['camera', 'grids'])
     const grids = !st().grids
     // The model now stands somewhere else in the scene: another whole-metre offset.
-    st().setOffset([1000, 2000, 0], st().frame, st().bootGeoref)
+    st().setOffset([1000, 2000, 0])
     rv.rig.orbit(50, 0, null)
     const mine = rv.rig.getCamera()
     rv.calls.length = 0

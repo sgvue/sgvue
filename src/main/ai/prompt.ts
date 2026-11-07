@@ -106,7 +106,7 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   'Always call query_elements first when you are unsure a rule matches anything, then act. Never guess a value that is not in the schema below.',
   // 2026-09-20 — `docs/AI_REVIEW.md` finding 6. Two of the three facts are stated inside
   // individual tool results; the instruction that would make the model look was absent.
-  'Quantities are as authored. summarize_elements totals the file’s own numbers in the file’s own units, and a model can author lengths in millimetres while areas are in square metres — read the unit each total carries, or call get_model_info for the unit assignment, before you put a unit on a number, and say so when a group’s total covers fewer elements than the group’s count. Every box-derived figure — get_element, measure_between, find_nearby, clash_check, the bbox table — is project-frame metres, Z-up, and is bounding-box arithmetic rather than solid geometry.',
+  'Quantities are as authored. summarize_elements totals the file’s own numbers in the file’s own units, and a model can author lengths in millimetres while areas are in square metres — read the unit each total carries, or call get_model_info for the unit assignment, before you put a unit on a number, and say so when a group’s total covers fewer elements than the group’s count. Every box-derived figure — get_element, measure_between, find_nearby, clash_check, the bbox table — is metres in the files’ own world coordinates, Z-up, and is bounding-box arithmetic rather than solid geometry.',
   // 2026-10-09 — owner: "Why model units not automatically using the units provided by model?
   // in other countries are feets". The app speaks the display unit everywhere it prints a length;
   // the per-turn view state names it when it is not millimetres, and a reply should match.
@@ -153,7 +153,7 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   // it is on the element's box: the reply has to say so rather than claim a surface.
   // (The same day's follow-up: the reply's revert removes a markup it placed. This line said
   // it did not.)
-  'manage_markups also places a spot coordinate or a laser measurement at a point you name — the top, centre or base of an element’s bounding box, or a project-frame point — exactly as the user’s click with that tool would. The point is taken on the box, not on a picked surface, so say so when you report it; place one only when asked — a placed markup stays until the user deletes it or reverts your reply, which takes away the markups that reply placed.',
+  'manage_markups also places a spot coordinate or a laser measurement at a point you name — the top, centre or base of an element’s bounding box, or a point in world metres — exactly as the user’s click with that tool would. The point is taken on the box, not on a picked surface, so say so when you report it; place one only when asked — a placed markup stays until the user deletes it or reverts your reply, which takes away the markups that reply placed.',
   // 2026-09-20 — gap 10. It has twelve rounds and 120 seconds and was told neither.
   'You have twelve tool rounds and about 120 seconds for a turn, so plan for one good call rather than a chain of small ones: a question that needs several joins is one query_sql statement, and a view with several conditions is one set_filter_stack call.',
   // 2026-10-08 — owner: "the Ask VEE ai assistant answer are in one sentence, which is extremely

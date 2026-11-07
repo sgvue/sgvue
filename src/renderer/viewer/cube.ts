@@ -105,6 +105,13 @@ export interface ViewCube {
   setTheme(name: ThemeName): void
   /** `setCoords({ angle })`: true north, clockwise from project north, in degrees (L672). */
   setCompass(angleDeg: number): void
+  /**
+   * 2026-11-07 — the plan rotation ρ, radians: the cube — its 26 zones, seams and face labels —
+   * turns with the plan frame, so its N face is project north, and a click looks from the zone's
+   * direction in that frame. The compass ring and its kite stay on world +Y: north, turned
+   * against the cube by ρ.
+   */
+  setPlanRotation(rad: number): void
   dispose(): void
 }
 
@@ -123,6 +130,7 @@ export async function createViewCube(options: ViewCubeOptions): Promise<ViewCube
   const { canvas, onView } = options
   let T: Theme = THEMES[options.theme]
   let angle = 0
+  let planRho = 0
 
   const renderer = new WebGPURenderer({
     canvas,
@@ -303,7 +311,7 @@ export async function createViewCube(options: ViewCubeOptions): Promise<ViewCube
   const onClick = (e: MouseEvent): void => {
     const z = pickZone(e)
     if (!z) return
-    onView(z.dir)
+    onView(planRho === 0 ? z.dir : z.dir.clone().applyAxisAngle(Z_AXIS, planRho))
   }
   canvas.addEventListener('pointermove', onMove)
   canvas.addEventListener('pointerleave', onLeave)
@@ -364,6 +372,11 @@ export async function createViewCube(options: ViewCubeOptions): Promise<ViewCube
       for (const z of zones) (z.mesh.material as MeshBasicMaterial).color.set(T.card)
       hovered = null
       buildFaceLabels()
+    },
+
+    setPlanRotation: (rad) => {
+      planRho = rad
+      group.rotation.z = rad
     },
 
     setCompass: (angleDeg) => {

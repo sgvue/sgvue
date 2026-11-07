@@ -16,7 +16,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { projectFrame, toProject, type ProjectFrame } from '../../src/shared/georef'
 import type { GeometryChunk, GeometrySummary } from '../../src/shared/geometry-contract.types'
 import type { GridAxisRecord, Storey } from '../../src/shared/model-index.types'
 import { elementBoxes, type ElementGeometry } from '../../src/renderer/model/element-boxes'
@@ -33,9 +32,12 @@ const EXPECTED = join(ROOT, 'tests', 'fixtures', 'Sample Ifc Model.expected.json
 interface ExpectedSample {
   expressId: number
   type: string
-  /** IfcOpenShell's own tessellation, axis-aligned, in the file's world coordinates. */
+  /**
+   * IfcOpenShell's own tessellation, axis-aligned, in the file's world coordinates — what the
+   * app's element box must read since 2026-11-07 (the scene is the file's own coordinates).
+   */
   worldBox?: number[]
-  /** The same vertices in the project frame — what the app's element box must read. */
+  /** The same vertices in the project frame — what the app's box read until then. */
   projectBox?: number[]
   qtos?: Record<string, Record<string, number>>
 }
@@ -59,7 +61,6 @@ if (!existsSync(MODEL)) {
     let summary: GeometrySummary
     let storeys: readonly Storey[] = []
     let grids: readonly GridAxisRecord[] = []
-    let frame: ProjectFrame | null = null
     let openMs = 0
     let bytes = 0
     /** Every element the index carries, by its model-local id — the key a part is joined on. */
@@ -75,8 +76,8 @@ if (!existsSync(MODEL)) {
       const openedAt = Date.now()
       const modelID = src.openFromBuffer(new Uint8Array(file))
       openMs = Date.now() - openedAt
-      // The index comes first now, because the project frame is read from it — exactly as the
-      // app does it: parse, take the frame off the georeferencing, then stream the geometry.
+      // The index first, then the geometry — the app's order (2026-11-07: nothing of the index
+      // goes into the stream; the model is drawn at its file's own coordinates).
       const index = buildModelIndex(src, modelID, {
         modelKey: 'FIXTURE',
         fileName: basename(MODEL),
@@ -85,11 +86,9 @@ if (!existsSync(MODEL)) {
       storeys = index.storeys
       grids = index.grids
       elementIds = new Set(index.elements.map((e) => e.id))
-      frame = projectFrame(index.georef)
       summary = streamGeometry(src, modelID, {
         modelKey: 'FIXTURE',
         offset: null,
-        frame,
         onChunk: (chunk) => chunks.push(chunk)
       })
       // `StreamAllMeshes` walks every product with a representation, which is a wider set than
@@ -112,8 +111,7 @@ if (!existsSync(MODEL)) {
           `${summary.triangles.toLocaleString('en-US')} triangles · ` +
           `${summary.edgeSegments.toLocaleString('en-US')} edge segments · ` +
           `method ${index.georef.method} · ` +
-          `frame ${frame ? `[${frame.origin.map((v) => v.toFixed(3)).join(', ')}] ${frame.rotationDeg.toFixed(4)}°` : 'identity'} · ` +
-          `offset [${summary.offset.join(', ')}] (project, Z-up) · ` +
+          `offset [${summary.offset.join(', ')}] (world, Z-up) · ` +
           `bbox ${summary.bbox6 ? summary.bbox6.map((v) => v.toFixed(1)).join(', ') : 'empty'} · ` +
           `storeys ${storeys.length} ${storeys[0]?.elev.toFixed(2)}…${storeys[storeys.length - 1]?.elev.toFixed(2)} m · ` +
           `warnings ${summary.warnings.map((w) => w.kind).join(', ') || 'none'}\n`
@@ -189,35 +187,32 @@ if (!existsSync(MODEL)) {
       }
     })
 
-    it('stands the model square with its own grid', async () => {
+    it('draws the grid where the file puts it: two families square to each other', async () => {
       await ready
       // The reference model's grid runs at 46.59° and 136.59° in the file's world coordinates,
-      // because the site placement carries the project's rotation to true north. Put through
-      // the project frame the two families must come back to the building's own axes — which
-      // is what makes level rings, dimension lines and the N/S/E/W views mean anything.
+      // because the site placement carries the project's rotation to true north. Since 2026-11-07
+      // the scene is those coordinates, so the grid stays there — still two families at 90°.
       expect(grids.length).toBeGreaterThan(1)
       const deg = grids.map((g) => {
-        const a = toProject(frame, g.start[0], g.start[1], 0)
-        const b = toProject(frame, g.end[0], g.end[1], 0)
-        const d = ((((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI) % 180) + 180) % 180
+        const d = ((((Math.atan2(g.end[1] - g.start[1], g.end[0] - g.start[0]) * 180) / Math.PI) % 180) + 180) % 180
         return d > 179.99 ? d - 180 : d
       })
-      const off = deg.map((d) => Math.min(Math.abs(d), Math.abs(d - 90)))
+      const first = deg[0]
+      const off = deg.map((d) => {
+        const r = (((d - first) % 90) + 90) % 90
+        return Math.min(r, 90 - r)
+      })
       expect(Math.max(...off)).toBeLessThan(0.01)
       // Both families are present — this is not one family read twice.
-      expect(deg.some((d) => Math.abs(d) < 0.01)).toBe(true)
-      expect(deg.some((d) => Math.abs(d - 90) < 0.01)).toBe(true)
+      expect(deg.some((d) => Math.abs(Math.abs(d - first) - 90) < 0.01)).toBe(true)
     })
 
     it('puts every storey floor inside the geometry it belongs to', async () => {
       await ready
       const box = summary.bbox6!
       expect(storeys.every((s) => !!s.placement)).toBe(true)
-      // The level ring's height: the storey's own placement, through the frame, less the
-      // offset. `Elevation` alone is short by the site's own 5.05 m on this file.
-      const rings = storeys.map(
-        (s) => toProject(frame, s.placement![0], s.placement![1], s.placement![2])[2] - summary.offset[2]
-      )
+      // The level ring's height: the storey's own placement less the offset.
+      const rings = storeys.map((s) => s.placement![2] - summary.offset[2])
       expect(Math.min(...rings)).toBeGreaterThan(box[2] - 1)
       expect(Math.max(...rings)).toBeLessThan(box[5] + 1)
     })
@@ -226,11 +221,9 @@ if (!existsSync(MODEL)) {
       await ready
       const box = summary.bbox6!
       expect(storeys.length).toBeGreaterThan(1)
-      // Storey floors in the project frame; the offset is the only thing between them and
-      // the scene, and it is stated in the same Z-up project frame.
-      const elev = storeys.map(
-        (s) => toProject(frame, s.placement![0], s.placement![1], s.placement![2])[2] - summary.offset[2]
-      )
+      // Storey floors in world coordinates; the offset is the only thing between them and the
+      // scene, and it is stated in the same Z-up world coordinates.
+      const elev = storeys.map((s) => s.placement![2] - summary.offset[2])
       const lo = Math.min(...elev)
       const hi = Math.max(...elev)
       // Every storey sits within the geometry's z span (a slab hangs below the lowest one,
@@ -286,54 +279,32 @@ if (!existsSync(MODEL)) {
       )
     })
 
-    it('agrees with IfcOpenShell on an element’s box in the project frame', async () => {
+    it('agrees with IfcOpenShell on an element’s box in the file’s world coordinates', async () => {
       await ready
       if (!existsSync(EXPECTED)) {
-        process.stderr.write('[geometry] no expected.json — project-box check skipped\n')
+        process.stderr.write('[geometry] no expected.json — world-box check skipped\n')
         return
       }
       let checked = 0
       for (const [ifcClass, want] of Object.entries(samples())) {
-        if (!want.projectBox) continue
+        if (!want.worldBox) continue
         const got = boxOf(want.expressId)
         if (!got) continue
         checked++
         process.stderr.write(
-          `[geometry] ${ifcClass} #${want.expressId} project size ` +
+          `[geometry] ${ifcClass} #${want.expressId} world size ` +
             `${size(got).map((v) => v.toFixed(3)).join(' × ')} m · IfcOpenShell ` +
-            `${size(want.projectBox).map((v) => v.toFixed(3)).join(' × ')} m · world ` +
-            `${size(want.worldBox!).map((v) => v.toFixed(3)).join(' × ')} m\n`
+            `${size(want.worldBox).map((v) => v.toFixed(3)).join(' × ')} m\n`
         )
         for (let i = 0; i < 6; i++) {
           // A part's box is the AABB of its transformed local AABB (conservative for a part
           // whose own outline is not axis-aligned), so the app's box CONTAINS IfcOpenShell's.
-          const slack = i < 3 ? want.projectBox[i] - got[i] : got[i] - want.projectBox[i]
+          const slack = i < 3 ? want.worldBox[i] - got[i] : got[i] - want.worldBox[i]
           expect(slack, `${ifcClass}[${i}] contains`).toBeGreaterThan(-0.002)
           expect(slack, `${ifcClass}[${i}] slack`).toBeLessThan(0.05)
         }
       }
       expect(checked).toBeGreaterThan(0)
-    })
-
-    it('matches the file’s own base quantities once the frame is undone', async () => {
-      await ready
-      if (!existsSync(EXPECTED)) return
-      const wall = samples().IfcWall
-      const qto = Object.values(wall?.qtos ?? {}).find((q) => q.Length != null)
-      const got = wall ? boxOf(wall.expressId) : null
-      if (!got || !qto) return
-      // The wall's world box is 87.5 × 82.8 m, because the file's world axes are map axes and
-      // the wall runs at 43° to them. In the project frame it is the wall the file describes:
-      // Qto_WallBaseQuantities Length 120 150 mm, Width 300 mm, Height 1 000 mm.
-      const [dx, dy, dz] = size(got)
-      process.stderr.write(
-        `[geometry] IfcWall project ${dx.toFixed(3)} × ${dy.toFixed(3)} × ${dz.toFixed(3)} m · ` +
-          `Qto ${((qto.Length as number) / 1000).toFixed(3)} × ${((qto.Width as number) / 1000).toFixed(3)} ` +
-          `× ${((qto.Height as number) / 1000).toFixed(3)} m\n`
-      )
-      expect(dx).toBeCloseTo((qto.Length as number) / 1000, 2)
-      expect(dy).toBeCloseTo((qto.Width as number) / 1000, 2)
-      expect(dz).toBeCloseTo((qto.Height as number) / 1000, 2)
     })
 
     it('includes IfcSpace, which StreamAllMeshes leaves out', async () => {

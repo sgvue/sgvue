@@ -336,11 +336,16 @@ export interface ViewStateSource extends VisState, DisplaySource {
 
 /* ────────────────────────────── the camera ────────────────────────────── */
 
-/** What the viewer's camera offers a read-back: the rig's two angles and its projection. */
+/**
+ * What the viewer's camera offers a read-back: the rig's two angles and its projection — and,
+ * since 2026-11-07, the plan rotation ρ in radians (`shared/plan-rotation.ts`) the angles are said
+ * against: project north is the plan frame's +Y. Absent is 0.
+ */
 export interface CameraPose {
   theta: number
   phi: number
   proj: string
+  rho?: number
 }
 
 /**
@@ -356,9 +361,9 @@ export interface CameraBrief {
 }
 
 export const cameraBrief = (cam: CameraPose): CameraBrief => ({
-  view: viewOn(cam.theta, cam.phi),
+  view: viewOn(cam.theta, cam.phi, cam.rho ?? 0),
   projection: cam.proj,
-  ...roundedAngles(cam.theta, cam.phi)
+  ...roundedAngles(cam.theta, cam.phi, cam.rho ?? 0)
 })
 
 /** Hidden models the per-turn view state names before it counts the rest. */

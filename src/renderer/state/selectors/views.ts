@@ -18,7 +18,7 @@
  * `restoreView` reads either through `sectionsOf`. The sub-line names both planes.
  */
 import { ID_STRIDE } from '../../../shared/federate'
-import { frameKey, type ProjectFrame } from '../../../shared/georef'
+import { IDENTITY_FRAME_KEY } from '../../../shared/georef'
 import type { FilterStep } from '../../../shared/rules'
 import { sectionsLabel, type Sections } from '../../../shared/sections'
 import {
@@ -50,11 +50,11 @@ export interface Viewpoint {
   grids: boolean
   levels: boolean
   /**
-   * Which project frame `cam` was recorded in (`shared/georef.ts`'s `frameKey`). A camera is
-   * scene coordinates, and the scene is the project frame minus the federation offset — so a
-   * viewpoint saved against a different boot model, or before the frame existed at all,
-   * points somewhere else entirely. Absent means "written before this was recorded", which is
-   * treated as a mismatch.
+   * Which frame `cam` was recorded in (`shared/georef.ts`'s `IDENTITY_FRAME_KEY`). A camera is
+   * scene coordinates, and since 2026-11-07 the scene is every file's own world coordinates
+   * minus the federation offset — `identity`, the only key this build writes. A viewpoint saved
+   * before then against a boot model with a project frame (`x,y,z@angle`), or before the frame
+   * was recorded at all (absent), points somewhere else entirely: a mismatch.
    */
   frame?: string
   /**
@@ -76,8 +76,6 @@ export interface ViewpointInput {
   grids: boolean
   levels: boolean
   view: string | null
-  /** The live federation's project frame, which the camera is recorded against. */
-  frame?: ProjectFrame | null
 }
 
 /**
@@ -116,7 +114,7 @@ export function viewpointOf(
     active: s.active,
     grids: s.grids,
     levels: s.levels,
-    frame: frameKey(s.frame),
+    frame: IDENTITY_FRAME_KEY,
     idStride: ID_STRIDE
   }
 }
@@ -141,10 +139,7 @@ export function viewpointHidden(
 }
 
 /** True when a saved viewpoint's camera still means what it meant. */
-export const viewpointFrameMatches = (
-  v: Viewpoint,
-  frame: ProjectFrame | null | undefined
-): boolean => v.frame === frameKey(frame)
+export const viewpointFrameMatches = (v: Viewpoint): boolean => v.frame === IDENTITY_FRAME_KEY
 
 export interface ViewRow {
   id: number

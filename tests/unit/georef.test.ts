@@ -17,29 +17,43 @@ import {
   coordsFromGeoref,
   crsChip,
   detectMethod,
-  federationFrame,
-  frameKey,
+  georefSourceOf,
+  IDENTITY_FRAME_KEY,
   invertFrame,
   isIdentityMapConversion,
   isIdentitySitePlacement,
   isIdentityWcs,
   isLocated,
   isSvy21,
+  MAP_SHIFT_METRES,
+  MAP_TURN_DEGREES,
+  mapMisplaced,
   mapPlacement,
   mapRotationDeg,
-  modelFrame,
+  mapShift,
   normaliseDeg,
   projectFrame,
   toMap,
   toProject,
+  readoutCoords,
   toWorld,
-  worldToProjectMatrix,
   type ProjectFrame
 } from '../../src/shared/georef'
 import type { Georeference } from '../../src/shared/model-index.types'
 import { lengthUnitFromLabel, US_SURVEY_FOOT } from '../../src/shared/units'
 
 const none: Georeference = { source: 'none', sources: ['none'], method: 'none' }
+
+/**
+ * M ∘ Site — what a file declares its project frame to be on the map: its map operation over its
+ * site placement, project → map. `coordsFromGeoref` reads the base point off it. Until 2026-11-07
+ * this was the federation's frame P for the boot model; no model is placed by it since.
+ */
+const declaredFrame = (g: Georeference | null | undefined): ProjectFrame | null =>
+  composeFrames(mapPlacement(g).operation, projectFrame(g))
+/** A frame to a millimetre and 1e-4° — how two declarations are said to agree here. */
+const frameText = (f: ProjectFrame | null | undefined): string =>
+  f ? `${f.origin.map((v) => v.toFixed(3)).join(',')}@${f.rotationDeg.toFixed(4)}` : 'identity'
 
 /** The reference model's own header: `IFCPROJECTEDCRS('EPSG:3414','SVY21 / Singapore TM','SVY21',…)`. */
 const svy21Crs = {
@@ -132,22 +146,12 @@ describe('the project frame', () => {
     expect(tilted.rotationDeg).toBe(0)
   })
 
-  it('round-trips a point and matches the matrix the streamer composes', () => {
+  it('round-trips a point', () => {
     const f = projectFrame(sample)!
     const p: [number, number, number] = [12.5, -7.25, 3]
     const w = toWorld(f, ...p)
     const back = toProject(f, ...w)
     back.forEach((v, i) => expect(v).toBeCloseTo(p[i], 9))
-
-    const m = worldToProjectMatrix(f)!
-    const [x, y, z] = w
-    const mx = m[0] * x + m[4] * y + m[8] * z + m[12]
-    const my = m[1] * x + m[5] * y + m[9] * z + m[13]
-    const mz = m[2] * x + m[6] * y + m[10] * z + m[14]
-    expect(mx).toBeCloseTo(p[0], 9)
-    expect(my).toBeCloseTo(p[1], 9)
-    expect(mz).toBeCloseTo(p[2], 9)
-    expect(worldToProjectMatrix(null)).toBeNull()
   })
 
   it('turns a world direction back onto the building’s own axes', () => {
@@ -166,14 +170,10 @@ describe('the project frame', () => {
     expect(dir(136.58972222222264)).toBeCloseTo(0, 9)
   })
 
-  it('marks a payload with the frame its camera was recorded in', () => {
-    expect(frameKey(null)).toBe('identity')
-    expect(frameKey(projectFrame(sample))).toBe('12345.457,23456.766,5.050@-43.4103')
-    // Two runs over the same file agree; a different site does not.
-    expect(frameKey(projectFrame(sample))).toBe(frameKey(projectFrame({ ...sample })))
-    expect(frameKey(projectFrame({ ...sample, site: { placement: [1, 2, 3] } }))).not.toBe(
-      frameKey(projectFrame(sample))
-    )
+  it('marks every payload with one frame key: the scene is the files’ own coordinates (2026-11-07)', () => {
+    // A key recorded before then for a boot model with a project frame — `x,y,z@angle` — is not
+    // this one, so its camera falls back (`applyRestore`); one recorded as `identity` restores.
+    expect(IDENTITY_FRAME_KEY).toBe('identity')
   })
 
   it('normalises degrees into (−180, 180]', () => {
@@ -617,8 +617,8 @@ describe('mapPlacement — one model’s own world → map operation (2026-10-08
     expect(
       mapPlacement({ ...revit, xAxisAbscissa: undefined, xAxisOrdinate: undefined }).operation
     ).toBeNull()
-    // …and with the shared coordinates on its site, P is that site placement, untouched.
-    expect(federationFrame({ ...revit, site: bySite.site })).toEqual(projectFrame(bySite))
+    // …and with the shared coordinates on its site, the declared frame is that site placement, untouched.
+    expect(declaredFrame({ ...revit, site: bySite.site })).toEqual(projectFrame(bySite))
   })
 
   it('never stacks TrueNorth on a conversion, and places nothing by it alone', () => {
@@ -626,23 +626,23 @@ describe('mapPlacement — one model’s own world → map operation (2026-10-08
     expect(mapPlacement(byConversion({ trueNorth: north })).operation).toEqual(
       mapPlacement(byConversion()).operation
     )
-    expect(federationFrame(byConversion({ trueNorth: north }))).toEqual(federationFrame(byConversion()))
+    expect(declaredFrame(byConversion({ trueNorth: north }))).toEqual(declaredFrame(byConversion()))
     const onlyNorth: Georeference = { ...none, trueNorth: [0.5, Math.sqrt(3) / 2] }
     expect(mapPlacement(onlyNorth).operation).toBeNull()
-    expect(federationFrame(onlyNorth)).toBeNull()
+    expect(declaredFrame(onlyNorth)).toBeNull()
   })
 })
 
-describe('P, the federation frame, and each model’s frame M_i⁻¹ ∘ P (2026-10-08)', () => {
-  it('is the boot model’s site frame itself when its map operation is the identity — frameKey unchanged', () => {
-    // The reference model and every Revit "Shared Coordinates" export: exactly today's key.
-    expect(federationFrame(sample)).toEqual(projectFrame(sample))
-    expect(frameKey(federationFrame(sample))).toBe('12345.457,23456.766,5.050@-43.4103')
-    expect(frameKey(federationFrame(bySite))).toBe(frameKey(projectFrame(bySite)))
+describe('the declared frame M ∘ Site — what the base point is read off (2026-10-08; it places nothing since 2026-11-07)', () => {
+  it('is the site frame itself when the map operation is the identity', () => {
+    // The reference model and every Revit "Shared Coordinates" export.
+    expect(declaredFrame(sample)).toEqual(projectFrame(sample))
+    expect(frameText(declaredFrame(sample))).toBe('12345.457,23456.766,5.050@-43.4103')
+    expect(frameText(declaredFrame(bySite))).toBe(frameText(projectFrame(bySite)))
     // The design's mock and every file that states nothing: the identity.
-    expect(federationFrame(none)).toBeNull()
-    expect(frameKey(federationFrame(none))).toBe('identity')
-    expect(frameKey(federationFrame(null))).toBe('identity')
+    expect(declaredFrame(none)).toBeNull()
+    expect(frameText(declaredFrame(none))).toBe('identity')
+    expect(frameText(declaredFrame(null))).toBe('identity')
   })
 
   it('composes the map conversion over the site placement', () => {
@@ -657,72 +657,16 @@ describe('P, the federation frame, and each model’s frame M_i⁻¹ ∘ P (2026
       xAxisOrdinate: 1,
       site: { placement: [30, 40, 5], rotationDeg: 45 }
     }
-    const P = federationFrame(both)!
+    const P = declaredFrame(both)!
     // The map conversion turns by +90°, so the site's (30, 40) lands on (−40, 30).
     near(P.origin, [960, 2030, 15])
     expect(P.rotationDeg).toBeCloseTo(135, 9)
   })
 
-  it('gives a model placed by its site and one placed by IfcMapConversion the same P', () => {
+  it('reads a model placed by its site and one placed by IfcMapConversion as one map position', () => {
     for (const g of [byConversion(), byConversion({ scale: undefined }), bySurveyPoint, inFeet()]) {
-      sameOp(federationFrame(g), federationFrame(bySite))
-      expect(frameKey(federationFrame(g))).toBe(SITE_KEY)
-    }
-  })
-
-  it('gives a boot model placed by a map conversion a new frameKey — its camera then falls back', () => {
-    // Its own stream is unchanged (its frame is its site frame, below); only the key moves, from
-    // the site frame it used to record to P.
-    expect(frameKey(projectFrame(byConversion()))).toBe('identity')
-    expect(frameKey(federationFrame(byConversion()))).toBe(SITE_KEY)
-    expect(frameKey(projectFrame(bySurveyPoint))).toBe('-8.000,3.000,0.000@-43.4103')
-    expect(frameKey(federationFrame(bySurveyPoint))).toBe(SITE_KEY)
-  })
-
-  it('is the boot model’s site frame, exactly, for every model placed the way the boot is', () => {
-    expect(modelFrame(bySite, bySite)).toEqual(projectFrame(bySite))
-    expect(modelFrame(sample, none)).toEqual(projectFrame(sample))
-    expect(modelFrame(sample, bySite)).toEqual(projectFrame(sample))
-    expect(modelFrame(byConversion(), byConversion())).toEqual(projectFrame(byConversion()))
-    // `Scale` is no part of the operation, so a different one is the same placement.
-    expect(modelFrame(byConversion(), byConversion({ scale: 1000 }))).toBeNull()
-    expect(modelFrame(bySurveyPoint, bySurveyPoint)).toEqual(projectFrame(bySurveyPoint))
-    expect(modelFrame(null, null)).toBeNull()
-  })
-
-  it('round-trips: world → project through frame_i, then P, lands where the model’s own declaration puts it', () => {
-    const models = [bySite, sample, byConversion(), inFeet(), bySurveyPoint, none]
-    const world: [number, number, number][] = [
-      [0, 0, 0],
-      [20, 12, 4],
-      [-3.5, 7.25, -1],
-      [12346, 23457, 6]
-    ]
-    for (const boot of models) {
-      const P = federationFrame(boot)
-      for (const m of models) {
-        const frame = modelFrame(boot, m)
-        const matrix = worldToProjectMatrix(frame)
-        const own = mapPlacement(m).operation
-        for (const w of world) {
-          const p = toProject(frame, ...w)
-          // Through P onto the map: exactly where model m's own operation puts its world point.
-          near(toWorld(P, ...p), toWorld(own, ...w), 1e-6)
-          // Back again, and the matrix the streamer composes agrees.
-          near(toWorld(frame, ...p), w, 1e-6)
-          if (!matrix) continue
-          const [x, y, z] = w
-          near(
-            [
-              matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
-              matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
-              matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]
-            ],
-            p,
-            1e-6
-          )
-        }
-      }
+      sameOp(declaredFrame(g), declaredFrame(bySite))
+      expect(frameText(declaredFrame(g))).toBe(SITE_KEY)
     }
   })
 
@@ -741,7 +685,7 @@ describe('P, the federation frame, and each model’s frame M_i⁻¹ ∘ P (2026
     near(toWorld(composeFrames(f, g), 1, 2, 3), toWorld(f, ...toWorld(g, 1, 2, 3)), 1e-9)
   })
 
-  it('reads the base point off P, the map unit included', () => {
+  it('reads the base point off it, the map unit included', () => {
     const want = { E: O[0], N: O[1], Z: O[2], angle: A }
     expect(coordsFromGeoref(inFeet())).toEqual(want)
     expect(coordsFromGeoref(byConversion())).toEqual(want)
@@ -828,8 +772,8 @@ describe('rule 4 — the WorldCoordinateSystem places a model that has no map co
   it('composes the site placement under it: an internal origin off the base point lands on the same map', () => {
     const g = withSiteOffset()
     expect(detectMethod(g)).toBe('WorldCoordinateSystem + IfcSite placement')
-    sameOp(federationFrame(g), federationFrame(bySite))
-    expect(frameKey(federationFrame(g))).toBe(SITE_KEY)
+    sameOp(declaredFrame(g), declaredFrame(bySite))
+    expect(frameText(declaredFrame(g))).toBe(SITE_KEY)
     // The site's offset is turned by TrueNorth before the base point is added — not after.
     expect(mapPlacement(g).trueNorthDeg!).toBeCloseTo(A, 12)
   })
@@ -851,7 +795,7 @@ describe('rule 4 — the WorldCoordinateSystem places a model that has no map co
     expect(m.wcs).toEqual({ origin: [5, 2, 1], rotationDeg: 0, readAs: 'undone before the conversion' })
     // map = C ∘ WCS⁻¹: the WCS's own origin lands where the conversion's E / N / H are.
     near(toWorld(m.operation, ...w), [g.eastings!, g.northings!, g.orthogonalHeight!], 1e-9)
-    sameOp(federationFrame(g), federationFrame(bySite))
+    sameOp(declaredFrame(g), declaredFrame(bySite))
     expect(detectMethod(g)).toBe('IfcMapConversion')
     // Read with the WCS left out, the building would stand |w| from where it is.
     const ignored = mapPlacement({ ...g, wcs: undefined }).operation!
@@ -889,7 +833,7 @@ describe('rule 4 — the WorldCoordinateSystem places a model that has no map co
     // then counts it as a model with no map position, which it is.
     expect(mapPlacement(tilted)).toMatchObject({ operation: null, placedBy: 'none', wcs: null, trueNorthDeg: null })
     expect(detectMethod(tilted)).toBe('none')
-    expect(federationFrame(tilted)).toBeNull()
+    expect(declaredFrame(tilted)).toBeNull()
     // Moved as well, it is the map position — read as no turn, and TrueNorth is still not added
     // beside it: a tilt is a turn the file states.
     const movedTilted = byWcs({ wcs: { origin: [O[0], O[1], O[2]], pureZRotation: false } })
@@ -900,7 +844,7 @@ describe('rule 4 — the WorldCoordinateSystem places a model that has no map co
     })
   })
 
-  it('names the method after the conversion’s pattern, and reads the base point off P', () => {
+  it('names the method after the conversion’s pattern, and reads the base point off the declared frame', () => {
     expect(detectMethod(byWcs())).toBe('WorldCoordinateSystem')
     expect(detectMethod({ ...byWcs(), wcs: undefined })).toBe('none')
     const want = { E: O[0], N: O[1], Z: O[2], angle: A }
@@ -909,17 +853,80 @@ describe('rule 4 — the WorldCoordinateSystem places a model that has no map co
     // No turn stated anywhere: the three coordinates, and no angle — never a claimed north.
     expect(coordsFromGeoref(byWcs({ trueNorth: undefined }))).toEqual({ ...want, angle: null })
   })
+})
 
-  it('lands a WCS model where its own declaration puts it, whichever model boots', () => {
-    const models = [bySite, byConversion(), byWcs(), withSiteOffset()]
-    for (const boot of models) {
-      const P = federationFrame(boot)
-      for (const m of models) {
-        const frame = modelFrame(boot, m)
-        for (const w of [[0, 0, 0], [20, 12, 4], [-3.5, 7.25, -1]] as [number, number, number][]) {
-          near(toWorld(P, ...toProject(frame, ...w)), toWorld(mapPlacement(m).operation, ...w), 1e-6)
-        }
-      }
-    }
+/* ─────────────────── 2026-11-07: origin to origin, and what is still read ─────────────────── */
+
+describe('mapShift — how far a file’s own map position is from where its coordinates put it', () => {
+  /** Where each is drawn: the building's centre, in the file's own world coordinates. */
+  const local = [10, 6, 2] as const
+  const atMap = (): readonly [number, number, number] => toWorld(projectFrame(bySite), ...local)
+
+  it('is nothing for a file whose coordinates are its map position, or that states none', () => {
+    for (const g of [bySite, sample, none, null]) expect(mapShift(g, atMap())).toEqual({ metres: 0, degrees: 0 })
+  })
+
+  it('is the whole map position for a conversion over a site at the file’s zero, and its turn', () => {
+    const shift = mapShift(byConversion(), local)
+    near([shift.metres], [Math.hypot(...toWorld(mapPlacement(byConversion()).operation, ...local).map((v, i) => v - local[i]))])
+    expect(shift.metres).toBeGreaterThan(26_000)
+    expect(shift.degrees).toBeCloseTo(-A, 9)
+    // `Scale` moves nothing here either, and the foot is the foot.
+    expect(mapShift(byConversion({ scale: 1000 }), local)).toEqual(shift)
+    near([mapShift(inFeet(), local).metres], [shift.metres], 1e-6)
+    expect(mapShift(byWcs(), local).metres).toBeGreaterThan(26_000)
+  })
+
+  it('turns about the file’s own zero: a turn alone moves a building that stands off it', () => {
+    const turned: Georeference = { ...byConversion(), eastings: 0, northings: 0, orthogonalHeight: 0, xAxisAbscissa: 0, xAxisOrdinate: 1 }
+    expect(mapShift(turned, [0, 0, 5])).toEqual({ metres: 0, degrees: 90 })
+    near([mapShift(turned, [100, 0, 0]).metres], [100 * Math.SQRT2], 1e-9)
+  })
+
+  it('says misplaced only past a metre or a tenth of a degree', () => {
+    expect([MAP_SHIFT_METRES, MAP_TURN_DEGREES]).toEqual([1, 0.1])
+    expect(mapMisplaced({ metres: 1, degrees: 0.1 })).toBe(false)
+    expect(mapMisplaced({ metres: 1.0001, degrees: 0 })).toBe(true)
+    expect(mapMisplaced({ metres: 0, degrees: 0.1001 })).toBe(true)
+    // Revit's zero conversion with its 6.12e-17 ordinate is nothing at all.
+    expect(mapMisplaced(mapShift(sample, atMap()))).toBe(false)
+  })
+})
+
+describe('georefSourceOf — whose base point the card shows, whatever the load order', () => {
+  const m = (modelKey: string, georef: Georeference, elements: number) => ({ modelKey, georef, counts: { elements } })
+  const all = [
+    m('PLAIN', none, 9000),
+    m('SITE', bySite, 500),
+    m('CONV', byConversion(), 500),
+    m('NORTH', { ...none, trueNorth: [0.5, Math.sqrt(3) / 2] }, 800)
+  ]
+  const orders = (list: typeof all): (typeof all)[] =>
+    list.length <= 1
+      ? [list]
+      : list.flatMap((x, i) => orders([...list.slice(0, i), ...list.slice(i + 1)]).map((rest) => [x, ...rest]))
+
+  it('takes a model that states a method, the one with the most elements, ties by key — in all 24 orders', () => {
+    const picked = new Set(orders(all).map((o) => georefSourceOf(o)!.modelKey))
+    // SITE and CONV tie on 500 elements; CONV sorts first. PLAIN and NORTH state no method.
+    expect([...picked]).toEqual(['CONV'])
+    expect(georefSourceOf([...all, m('BIG', bySite, 501)])!.modelKey).toBe('BIG')
+  })
+
+  it('falls back to a model that states anything — a north, a height, a CRS — and is null for none', () => {
+    expect(georefSourceOf([all[0], all[3]])!.modelKey).toBe('NORTH')
+    expect(georefSourceOf([m('CRS', { ...none, crs: svy21Crs }, 1), all[0]])!.modelKey).toBe('CRS')
+    expect(georefSourceOf([all[0]])).toBeNull()
+    expect(georefSourceOf([])).toBeNull()
+  })
+})
+
+describe('readoutCoords — every map readout prints world coordinates', () => {
+  it('is the world’s own base point while a file states where it is, else blank', () => {
+    expect(readoutCoords(coordsFromGeoref(bySite)!)).toEqual({ E: 0, N: 0, Z: 0, angle: 0 })
+    expect(toMap(readoutCoords(coordsFromGeoref(byConversion())!), 1, 2, 3)).toEqual({ E: 1, N: 2, Z: 3 })
+    // A north alone is not a position: the readouts stay the design's em dash.
+    expect(readoutCoords({ E: null, N: null, Z: null, angle: 30 })).toEqual({ E: null, N: null, Z: null, angle: null })
+    expect(toMap(readoutCoords({ E: null, N: null, Z: null, angle: null }), 1, 2, 3)).toBeNull()
   })
 })

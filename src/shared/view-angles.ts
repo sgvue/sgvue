@@ -15,10 +15,12 @@
  *   · **elevation** — how far it looks **down** from horizontal: 0 level, 90 straight down,
  *     −90 straight up.
  *
- * Both are in the **project frame** — the scene's own axes, +Y north and +X east, which is the
- * frame the six named views and the view cube's faces are in (`viewer/cube.ts`, `FACE_DEFS`).
- * It is *project* north, not true north: the compass ring under the cube is turned by the base
- * point's angle, and nothing here is.
+ * Both are in the **plan frame**, +Y project north and +X east, which is the frame the six named
+ * views and the view cube's faces are in (`viewer/cube.ts`, `FACE_DEFS`). Since 2026-11-07 the
+ * scene is the files' own world coordinates (origin to origin), and the plan frame stands at the
+ * plan rotation ρ in it (`shared/plan-rotation.ts`): turned so the grids run square. Every
+ * function below takes ρ in radians — 0, the default, is the plan frame and the world as one,
+ * and gives exactly the numbers it always gave. A rig θ is the world's; θ − ρ is the plan's.
  *
  * So the named views read: `south` 0 / 0 (it stands south and looks north), `west` 90 / 0,
  * `north` 180 / 0, `east` 270 / 0, `top` 0 / 90 with north up the screen, and `iso` 315 / 29.8.
@@ -55,7 +57,7 @@ export interface Spherical {
   phi: number
 }
 
-/** The same direction as it is said: degrees, in the project frame. */
+/** The same direction as it is said: degrees, in the plan frame. */
 export interface ViewAngles {
   azimuthDeg: number
   elevationDeg: number
@@ -78,16 +80,16 @@ export function wrapPi(a: number): number {
  * clear of both poles. At a pole the azimuth is what is up the screen: 0 / 90 is the plan view
  * with north up.
  */
-export function sphericalOf(azimuthDeg: number, elevationDeg: number): Spherical {
+export function sphericalOf(azimuthDeg: number, elevationDeg: number, rho = 0): Spherical {
   return {
-    theta: wrapPi(-Math.PI / 2 - azimuthDeg * DEG),
+    theta: wrapPi(-Math.PI / 2 - azimuthDeg * DEG + rho),
     phi: Math.min(Math.PI - POLE_PHI, Math.max(POLE_PHI, Math.PI / 2 - elevationDeg * DEG))
   }
 }
 
 /** The rig's θ and φ → azimuth in [0, 360) and elevation in [−90, 90]. Not rounded. */
-export function anglesOf(theta: number, phi: number): ViewAngles {
-  const az = ((-Math.PI / 2 - theta) / DEG) % 360
+export function anglesOf(theta: number, phi: number, rho = 0): ViewAngles {
+  const az = ((-Math.PI / 2 - (theta - rho)) / DEG) % 360
   return { azimuthDeg: az < 0 ? az + 360 : az, elevationDeg: 90 - phi / DEG }
 }
 
@@ -95,8 +97,8 @@ export function anglesOf(theta: number, phi: number): ViewAngles {
  * The same, as it is reported: one decimal, which is finer than a person can orbit to and short
  * enough to ride in a tool result. An azimuth that rounds up to a whole turn is 0.
  */
-export function roundedAngles(theta: number, phi: number): ViewAngles {
-  const a = anglesOf(theta, phi)
+export function roundedAngles(theta: number, phi: number, rho = 0): ViewAngles {
+  const a = anglesOf(theta, phi, rho)
   const r = (v: number): number => Math.round(v * 10) / 10 + 0
   const az = r(a.azimuthDeg)
   return { azimuthDeg: az >= 360 ? 0 : az, elevationDeg: r(a.elevationDeg) }
@@ -110,11 +112,17 @@ export const ON_VIEW_TOLERANCE = 1e-3
  * with east up the screen is not `top`. An orbit by hand cannot reach a pole (the rig stops it
  * 0.03 rad short), so `top` is only ever read back for a camera that was put there.
  */
-export function viewOn(theta: number, phi: number): string | null {
+export function viewOn(theta: number, phi: number, rho = 0): string | null {
   for (const [name, [t, p]] of Object.entries(VIEWS)) {
-    if (Math.abs(wrapPi(theta - t)) < ON_VIEW_TOLERANCE && Math.abs(phi - p) < ON_VIEW_TOLERANCE) {
+    if (Math.abs(wrapPi(theta - rho - t)) < ON_VIEW_TOLERANCE && Math.abs(phi - p) < ON_VIEW_TOLERANCE) {
       return name
     }
   }
   return null
+}
+
+/** A named view's rig θ in the world, standing at plan rotation ρ: the table's θ plus ρ. */
+export const viewTheta = (name: string, rho = 0): number | null => {
+  const v = VIEWS[name]
+  return v ? v[0] + rho : null
 }

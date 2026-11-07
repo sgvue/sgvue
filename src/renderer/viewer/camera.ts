@@ -112,6 +112,12 @@ export interface CameraRigOptions {
    * `scale`, which is the whole model's, so nothing drawn is ever clipped.
    */
   nearScale?: () => number
+  /**
+   * 2026-11-07 — the plan rotation ρ, radians (`shared/plan-rotation.ts`), live: the named views,
+   * a view straight down or up, and the starting iso stand at the table's θ plus ρ, so in Plan
+   * the grids run square on screen. Absent is 0, the design's own table.
+   */
+  planRotation?: () => number
   /** True under `prefers-reduced-motion`: flights are instant, as in the reference (L307). */
   reduceMotion?: boolean
   /** Called after the projection swaps, as `on.projection` in the reference. */
@@ -161,6 +167,7 @@ export interface CameraRig {
 export function createCameraRig(options: CameraRigOptions): CameraRig {
   const { scale, bbox, reduceMotion = false, onProjection } = options
   const s = scale
+  const rho = (): number => options.planRotation?.() ?? 0
   const ns = (): number => Math.max(options.nearScale?.() ?? scale, scale / 4)
 
   const persp = new PerspectiveCamera(FOV, 1, 0.1 * s, 3000 * s)
@@ -171,7 +178,7 @@ export function createCameraRig(options: CameraRigOptions): CameraRig {
   let projection: Projection = 'persp'
 
   const centre = bbox.getCenter(new Vector3())
-  const goal: Spherical = { theta: -Math.PI / 4, phi: 1.05, dist: 60 * s, half: 12 * s, target: centre.clone() }
+  const goal: Spherical = { theta: -Math.PI / 4 + rho(), phi: 1.05, dist: 60 * s, half: 12 * s, target: centre.clone() }
   const cur: Spherical = { theta: goal.theta, phi: goal.phi, dist: goal.dist, half: goal.half, target: centre.clone() }
 
   const tmpA = new Vector3()
@@ -189,7 +196,12 @@ export function createCameraRig(options: CameraRigOptions): CameraRig {
     camera.position.copy(cur.target).addScaledVector(tmpA, projection === 'persp' ? cur.dist : 400 * s)
     const f = tmpA.negate()
     let r = tmpB.crossVectors(f, Z_AXIS)
-    if (r.lengthSq() < 1e-6) r = tmpB.crossVectors(f, new Vector3(0, 1, 0))
+    // Straight down or up the screen's up is project north — the plan's +Y, turned by the plan
+    // rotation since 2026-11-07; the design's world +Y while that is 0.
+    if (r.lengthSq() < 1e-6) {
+      const p = rho()
+      r = tmpB.crossVectors(f, p === 0 ? new Vector3(0, 1, 0) : new Vector3(-Math.sin(p), Math.cos(p), 0))
+    }
     r.normalize()
     const u = tmpC.crossVectors(r, f).normalize()
     tmpM.makeBasis(r, u, f.clone().negate())
@@ -264,7 +276,8 @@ export function createCameraRig(options: CameraRigOptions): CameraRig {
   function viewDir(d: Vector3): void {
     const dd = d.clone().normalize()
     goal.phi = Math.acos(Math.min(1, Math.max(-1, dd.z)))
-    if (Math.abs(dd.x) < 1e-6 && Math.abs(dd.y) < 1e-6) goal.theta = -Math.PI / 2
+    // Straight down or up: the plan's north up the screen (2026-11-07: the plan rotation's).
+    if (Math.abs(dd.x) < 1e-6 && Math.abs(dd.y) < 1e-6) goal.theta = -Math.PI / 2 + rho()
     else goal.theta = Math.atan2(dd.y, dd.x)
     goal.phi = Math.min(Math.PI - 0.0001, Math.max(0.0001, goal.phi))
     cur.theta = wrapNear(cur.theta, goal.theta)
@@ -279,7 +292,7 @@ export function createCameraRig(options: CameraRigOptions): CameraRig {
   function setView(name: string): void {
     const v = VIEWS[name]
     if (!v) return
-    goal.theta = v[0]
+    goal.theta = v[0] + rho()
     goal.phi = v[1]
     cur.theta = wrapNear(cur.theta, goal.theta)
     fly()

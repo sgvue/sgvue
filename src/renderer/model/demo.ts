@@ -29,7 +29,5 @@ export const demoLoader =
   async (key: string): Promise<BatchItem> => ({
     index: mockModelIndex(key, options),
     chunks: mockGeometryChunks(key),
-    offset: [0, 0, 0],
-    // Authored at the origin with no site placement: the project frame is the identity.
-    frame: null
+    offset: [0, 0, 0]
   })

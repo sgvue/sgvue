@@ -28,7 +28,7 @@
  * loaded models could not be lined up, as the card's note does.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { federate } from '../../src/shared/federate'
+import { federate, type FederatedModel, type Federation } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { setViewer, useShell, type ShellState } from '../../src/renderer/state/shell'
 import { executeTool, newTurnState, type ToolContext } from '../../src/renderer/ai/executors'
@@ -72,6 +72,15 @@ import { memoryStorage, resetShell } from './stub-viewer'
 
 const KEYS = ['ARC', 'STR', 'SIT', 'MEP'] as const
 const full = federate(KEYS.map((k) => mockModelIndex(k)))
+
+/**
+ * `full`, with some of its models' files stating georeferencing (and, as a streamed model does,
+ * where each was drawn) — committed, so the store reads the base point the way the app does.
+ */
+const withGeoref = (patches: Record<number, Partial<FederatedModel['meta']>>): Federation => ({
+  ...full,
+  models: full.models.map((m, i) => (patches[i] ? { ...m, meta: { ...m.meta, ...patches[i] } } : m))
+})
 
 /** A file that states a base point — the repository's synthetic set, never a real site's. */
 const STATES_ONE: Georeference = {
@@ -482,9 +491,10 @@ describe('get_view_state covers the session’s own list of review state', () =>
     /**
      * Phase 3 (2026-10-02) — excluded until then, the last one. Every coordinate read-out follows
      * the base point, so the assistant has to see what it is. Since 2026-10-08 the one thing that
-     * moves it is the boot file's own georeferencing, fixed with the federation's frame.
+     * moves it is a loaded file's own georeferencing — since 2026-11-07 the one `georefSourceOf`
+     * picks, at every commit.
      */
-    coords: { change: () => st().setOffset([0, 0, 0], null, STATES_ONE) },
+    coords: { change: () => st().commitModels(withGeoref({ 0: { georef: STATES_ONE } })) },
     /**
      * 2026-10-09 — the display unit joined the session when the app began to start in the boot
      * model's own (a session or a link that states one restores it). `get_view_state` reads it
@@ -530,43 +540,60 @@ describe('get_view_state covers the session’s own list of review state', () =>
 
   it('reads the base point back: the four fields, and that they are the file’s', async () => {
     // The mock states no georeferencing: every field blank, and it says so rather than zero.
-    expect((await run('get_view_state')).basePoint).toEqual({ E: null, N: null, Z: null, angle: null, source: 'none' })
-    // A boot file that states one (the repository's synthetic set, never a real site's): the four
+    expect((await run('get_view_state')).basePoint).toEqual({
+      E: null,
+      N: null,
+      Z: null,
+      angle: null,
+      source: 'none',
+      model: null
+    })
+    // A file that states one (the repository's synthetic set, never a real site's): the four
     // fields are the file's, and since 2026-10-08 nothing else can make them anything else.
-    st().setOffset([0, 0, 0], null, STATES_ONE)
+    // Since 2026-11-07 it is the model `georefSourceOf` picks, named by its key: here the second
+    // model, which is not the first one loaded.
+    st().commitModels(withGeoref({ 1: { georef: STATES_ONE } }))
     const fromFile = coordsFromGeoref(STATES_ONE)!
-    expect((await run('get_view_state')).basePoint).toEqual({ ...fromFile, source: 'file' })
+    expect((await run('get_view_state')).basePoint).toEqual({ ...fromFile, source: 'file', model: KEYS[1] })
     expect(basePointSource(STATES_ONE)).toBe('file')
     expect(basePointSource(null)).toBe('none')
-    // Numbers and one of two words: nothing a file authored reaches the model through it.
-    expect(Object.keys((await run('get_view_state')).basePoint as object)).toEqual(['E', 'N', 'Z', 'angle', 'source'])
+    // Numbers, one of two words and a model key: nothing else a file authored reaches the model.
+    expect(Object.keys((await run('get_view_state')).basePoint as object)).toEqual([
+      'E',
+      'N',
+      'Z',
+      'angle',
+      'source',
+      'model'
+    ])
     // On demand only: the per-turn state does not carry it.
     expect(Object.keys(perTurn())).toEqual(CORE_KEYS)
   })
 
-  it('reads back which loaded models could not be lined up, as the Coordinate-system card’s note says', async () => {
-    // The mock's four models state no map position, and none landed far: nothing to say.
+  it('reads back which loaded models’ map position is not where they are drawn, as the Coordinate-system card’s note says', async () => {
+    // The mock's four models state no map position: nothing to say.
     expect((await run('get_view_state')).notLinedUp).toEqual([])
-    // One of them is placed by a map conversion, and the others are not: they have no map position.
-    const placed = {
-      ...full,
-      models: full.models.map((m, i) =>
-        i === 0 ? { ...m, meta: { ...m.meta, georef: STATES_ONE } } : i === 1 ? { ...m, meta: { ...m.meta, farPlacementMetres: 12_345 } } : m
-      )
-    }
-    useShell.setState({ federation: placed })
-    st().setOffset([0, 0, 0], null, STATES_ONE)
+    // 2026-11-07 — every model is drawn at its own file coordinates. The first states a map
+    // conversion that moves it 26.5 km; the second states nothing; the third a conversion that
+    // only turns it, 30° about the file's origin, where it is drawn.
+    const turned: Georeference = { ...STATES_ONE, eastings: 0, northings: 0, orthogonalHeight: 0, rotationDeg: 30 }
+    st().commitModels(
+      withGeoref({
+        0: { georef: STATES_ONE, drawnCentre: [10, 6, 2] },
+        1: { drawnCentre: [10, 6, 2] },
+        2: { georef: turned, drawnCentre: [0, 0, 0] }
+      })
+    )
     expect((await run('get_view_state')).notLinedUp).toEqual([
-      { model: 'STR', reason: 'it has no map position', km: null },
-      { model: 'SIT', reason: 'it has no map position', km: null },
-      { model: 'MEP', reason: 'it has no map position', km: null }
+      { model: KEYS[0], reason: 'its map position is not where its file places it', km: 26.5, turnedDeg: 0 },
+      { model: KEYS[2], reason: 'its map position is not where its file places it', km: 0, turnedDeg: 30 }
     ])
     const info = (await run('get_model_info')).models as { model: string; georeferencing: { notLinedUp: unknown } }[]
     expect(info.map((m) => [m.model, m.georeferencing.notLinedUp])).toEqual([
-      ['ARC', null],
-      ['STR', { reason: 'it has no map position', km: null }],
-      ['SIT', { reason: 'it has no map position', km: null }],
-      ['MEP', { reason: 'it has no map position', km: null }]
+      [KEYS[0], { reason: 'its map position is not where its file places it', km: 26.5, turnedDeg: 0 }],
+      [KEYS[1], null],
+      [KEYS[2], { reason: 'its map position is not where its file places it', km: 0, turnedDeg: 30 }],
+      [KEYS[3], null]
     ])
   })
 })

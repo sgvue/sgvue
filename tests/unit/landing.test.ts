@@ -6,7 +6,6 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { EMPTY_FEDERATION } from '../../src/shared/federate'
-import { GEOREF_NOTE } from '../../src/shared/upload'
 import { bootFailed } from '../../src/renderer/model/upload-pipeline'
 import { uploadRows } from '../../src/renderer/state/selectors/uploads'
 import { useShell } from '../../src/renderer/state/shell'
@@ -122,27 +121,13 @@ describe('failure routing — never leave the user on a broken viewer', () => {
   })
 })
 
-describe('the georeferencing note — 2026-10-09, owner-requested', () => {
+describe('no georeferencing note — 2026-11-07', () => {
   const page = readFileSync(join(__dirname, '..', '..', 'src', 'renderer', 'app', 'Landing.tsx'), 'utf8')
-  /** The drop zone's own `.ifc · .ifcxml · .ifczip` caption: the style string the note reuses. */
-  const CAPTION = "s('font:400 12px/1.4 var(--mono);color:var(--faint)')"
 
-  it('says the first model opened is the reference, in the recorded words', () => {
-    expect(GEOREF_NOTE).toBe(
-      'Georeferencing is taken from the first model you open: its base point and north are the ' +
-        'reference, and the other models are placed relative to it.'
-    )
-  })
-
-  it('is drawn once, between the drop zone and the "or" divider, in the caption’s own style', () => {
-    const at = page.indexOf('data-role="georef-note"')
-    expect(page.split('data-role="georef-note"')).toHaveLength(2)
-    expect(at).toBeGreaterThan(page.indexOf('</label>'))
-    expect(at).toBeLessThan(page.indexOf('>or</span>'))
-    const element = page.slice(at, page.indexOf('</span>', at))
-    expect(element).toContain(CAPTION)
-    expect(element).toContain('{GEOREF_NOTE}')
-    // No new style: that string is the drop zone caption's, and the note's — nothing else's.
-    expect(page.split(CAPTION)).toHaveLength(3)
+  it('is gone: models line up origin to origin, so which model is opened first changes nothing', () => {
+    expect(page).not.toContain('georef-note')
+    expect(page).not.toContain('GEOREF_NOTE')
+    // The drop zone caption's style string is its own again.
+    expect(page.split("s('font:400 12px/1.4 var(--mono);color:var(--faint)')")).toHaveLength(2)
   })
 })

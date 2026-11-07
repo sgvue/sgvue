@@ -1211,14 +1211,9 @@ describe('a held patch is visibility and nothing else', () => {
     st().addStep('hide', [is('IfcEntity', 'IfcWindow')])
     st().saveFilterSet('No windows')
     st().clearStack()
-    // A base point the file states (2026-10-08: the only way there is one).
-    st().setOffset([0, 0, 0], null, {
-      source: 'IfcMapConversion',
-      sources: ['IfcMapConversion'],
-      method: 'IfcMapConversion',
-      eastings: 12345.457,
-      northings: 23456.766
-    })
+    // A base point a file states (2026-10-08: the only way there is one) — as `commitModels`
+    // writes it from the file the card shows.
+    useShell.setState({ coords: { E: 12345.457, N: 23456.766, Z: null, angle: null } })
     const kept = st()
     const before = st().chatBegin('q', null)
     const smuggled = {

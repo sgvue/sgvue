@@ -217,11 +217,11 @@ describe('a model whose ids would not fit is refused at load, in its own row', (
     const offsets: unknown[] = []
     const parse = {
       load: async (_blob: Blob, key: string) => ({ ...index, modelKey: key }),
-      geometry: async (key: string, offset: unknown, frame: unknown, onChunk: (c: GeometryChunk) => void) => {
+      geometry: async (key: string, offset: unknown, onChunk: (c: GeometryChunk) => void) => {
         streamed.push(key)
         offsets.push(offset)
         for (const chunk of chunks) onChunk({ ...chunk, header: { ...chunk.header, modelKey: key } })
-        return { offset: [10, 20, 0], offsetFromThisModel: offset === null, frame, chunks: chunks.length, warnings: [] }
+        return { offset: [10, 20, 0], offsetFromThisModel: offset === null, chunks: chunks.length, warnings: [] }
       },
       close: (key: string) => void closed.push(key),
       cancel: () => {}

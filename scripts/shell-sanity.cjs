@@ -275,8 +275,8 @@ const ANN_GRIDS = `(async () => {
   const fed = D.federation();
   // These are the INDEX's grids, in the file's own world coordinates, so on a
   // shared-coordinates export they read 46.59° / 136.59° — the file's truth, kept. What the
-  // viewer actually draws is \`annotations.gridFamilyDeg\` in the same blob below, which is the
-  // project frame and reads 0° / 90°.
+  // viewer actually draws is \`annotations.gridFamilyDeg\` in the same blob below: since
+  // 2026-11-07 the file's angle too, and 0° / 90° only against the plan rotation (FRAME block).
   const axes = fed.grids.map((g) => {
     const a = (Math.atan2(g.end[1] - g.start[1], g.end[0] - g.start[0]) * 180) / Math.PI;
     return { name: g.name, axis: g.axis, deg: +(((a % 180) + 180) % 180).toFixed(2) };
@@ -409,7 +409,15 @@ const FRAME = (reference) => `(async () => {
   const grids0 = dbg().annotations;
   if (!grids0.grids) { click(tbBtn('Gridlines (G)')); await sleep(500); }
   await frame(); await frame();
-  const gridFamilyDeg = dbg().annotations.gridFamilyDeg;
+  // 2026-11-07: the scene is the file's own coordinates, so the families are drawn at the
+  // file's angle (46.59° / 136.59° on the reference model); the camera's plan stands at the plan
+  // rotation, and in that plan — what Plan shows on screen — they must read 0° / 90° again.
+  const sceneFamilyDeg = dbg().annotations.gridFamilyDeg;
+  const planRotationDeg = dbg().planRotationDeg || 0;
+  const gridFamilyDeg = sceneFamilyDeg.map((d) => {
+    const p = ((((d - planRotationDeg) % 180) + 180) % 180);
+    return +(p > 179.99 ? p - 180 : p).toFixed(2);
+  });
 
   /* 2. Level rings against the floor geometry of the storey they name. */
   if (!dbg().annotations.levels) { click(tbBtn('Levels (L)')); await sleep(600); }
@@ -533,8 +541,8 @@ const FRAME = (reference) => `(async () => {
 
   return JSON.stringify({
     method: REF && REF.georeference ? REF.georeference.source : null,
-    frame: dbg().frame, offset: dbg().offset,
-    gridFamilyDeg, rings, chip, caption, fields, fitDark, fitLight, wall, vertex, views
+    planRotationDeg, offset: dbg().offset,
+    sceneFamilyDeg, gridFamilyDeg, rings, chip, caption, fields, fitDark, fitLight, wall, vertex, views
   });
 })()`
 
@@ -1301,8 +1309,9 @@ app.whenReady().then(async () => {
     await js(`window.__sgvueDev.select(null)`)
     await wait(300)
     const f = JSON.parse(await js(FRAME(REFERENCE)))
-    console.log('frame   ', JSON.stringify({ frame: f.frame, offset: f.offset }))
-    console.log('  grid families', JSON.stringify(f.gridFamilyDeg), '(project degrees, mod 180)')
+    console.log('frame   ', JSON.stringify({ planRotationDeg: f.planRotationDeg, offset: f.offset }))
+    console.log('  grid families', JSON.stringify(f.sceneFamilyDeg), '(scene degrees, mod 180)')
+    console.log('  grid families', JSON.stringify(f.gridFamilyDeg), '(plan degrees, mod 180: 0 / 90)')
     for (const r of f.rings) console.log('  ring', JSON.stringify(r))
     console.log('  card chip   ', JSON.stringify(f.chip))
     console.log('  card caption', JSON.stringify(f.caption))

@@ -41,11 +41,11 @@ const ready = (async () => {
   const modelID = src.openFromBuffer(new Uint8Array(readFileSync(FILE)))
   const index = buildModelIndex(src, modelID, { modelKey: 'feet', fileName: 'feet.ifc', sha256: '' })
   const chunks: GeometryChunk[] = []
-  const summary = streamGeometry(src, modelID, { modelKey: 'feet', offset: null, frame: null, onChunk: (c) => chunks.push(c) })
+  const summary = streamGeometry(src, modelID, { modelKey: 'feet', offset: null, onChunk: (c) => chunks.push(c) })
   return { index, chunks, offset: summary.offset }
 })()
 
-/** Each element's box in the project frame, metres, by name — the app's own union. */
+/** Each element's box in the file's world coordinates, metres, by name — the app's own union. */
 async function boxes(): Promise<Map<string, readonly number[]>> {
   const { index, chunks, offset } = await ready
   const name = new Map(index.elements.map((e) => [e.id, e.name]))
@@ -163,8 +163,8 @@ describe('booting it', () => {
     const heard: string[] = []
     fed.attach(stubViewer({ setUnits: (u: string) => heard.push(u), debug: () => ({}), elementIds: () => [] }))
     const { index, chunks, offset } = await ready
-    // The parsed model, as `prepare` hands it over: its frame is the boot's.
-    await fed.addBatch([{ index, chunks, offset, frame: null }])
+    // The parsed model, as `prepare` hands it over.
+    await fed.addBatch([{ index, chunks, offset }])
     expect(useShell.getState().units).toBe('ft')
     expect(heard).toEqual(['ft'])
     // And every elevation the sidebar prints is in feet and inches.

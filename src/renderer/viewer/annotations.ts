@@ -82,6 +82,7 @@ import {
   type XY
 } from '../../shared/annotate'
 import { toMap, type BasePoint } from '../../shared/georef'
+import { turnXY } from '../../shared/plan-rotation'
 import { formatDim, type DisplayUnit } from '../../shared/units'
 import type { Materials } from './materials'
 import type { Label, LabelOverlay, ViewerCamera } from './overlay'
@@ -152,8 +153,17 @@ export interface AnnotationHost {
    * The **building** box (2026-09-24): every element's box but the site's (`shared/site.ts`),
    * or the whole box when nothing else is left. Live. The level rings, the bubbles' gap and
    * lift, and the grid fallback are sized from it, so a large site cannot push them away.
+   * Since 2026-11-07 it is **in the plan frame** — the scene turned by −`plan()` — so its
+   * footprint is the building's own rectangle, square with the grids.
    */
   frame: Box3
+  /**
+   * 2026-11-07 — the plan rotation ρ, radians (`shared/plan-rotation.ts`). Every rectangle
+   * here — the grid extent the lines are clipped to and the bubbles sit at, the level rings — is
+   * taken in the plan frame and turned back by ρ, and the laser fires along the plan's X and Y.
+   * 0 — or absent — is the scene's own axes, exactly as before.
+   */
+  plan?(): number
   /** `scale()` for `frame`. */
   frameScale(): number
   /** Z of the ground plane; the reference's literal z = 0. */
@@ -343,6 +353,15 @@ const AXIS_VECTORS: Record<LaserAxis, Vector3> = {
   Z: new Vector3(0, 0, 1)
 }
 const Z_UP = new Vector3(0, 0, 1)
+const _along = new Vector3()
+
+/** The laser's three axes in the scene, X and Y turned by the plan rotation (2026-11-07). */
+function laserAxes(rho: number): Record<LaserAxis, Vector3> {
+  if (rho === 0) return AXIS_VECTORS
+  const [xx, xy] = turnXY([1, 0], rho)
+  const [yx, yy] = turnXY([0, 1], rho)
+  return { X: new Vector3(xx, xy, 0), Y: new Vector3(yx, yy, 0), Z: AXIS_VECTORS.Z }
+}
 
 export function createAnnotations(host: AnnotationHost): Annotations {
   const { overlay, materials } = host
@@ -448,17 +467,25 @@ export function createAnnotations(host: AnnotationHost): Annotations {
   }
 
   const buildGrids = (rect: Rect, lineZ: number, stemTop: number, gap: number): void => {
+    const rho = (host.plan?.() ?? 0)
     const segments = host.grids()
-    const dirs = segments.map((g) => canonicalDir(g.p0, g.p1))
+    // Each grid's sense is decided in the plan frame (2026-11-07), so which end a family's
+    // dimensions stand at is the plan's, whatever the turn.
+    const dirs = segments.map((g) =>
+      rho === 0 ? canonicalDir(g.p0, g.p1) : turnXY(canonicalDir(turnXY(g.p0, -rho), turnXY(g.p1, -rho)), rho)
+    )
     const grouped = gridFamilies(dirs)
     famDirs = grouped.dirs
 
     segments.forEach((g, i) => {
       const dir = dirs[i]
       if (dir[0] === 0 && dir[1] === 0) return
-      const span = clipLineToRect(g.p0, dir, rect)
+      // Clipped in the plan frame (2026-11-07), where `rect` is square with the grids, and the
+      // ends turned back into the scene.
+      const span = clipLineToRect(turnXY(g.p0, -rho), turnXY(dir, -rho), rect)
       if (!span) return
-      const [a, b] = span
+      const a: XY = turnXY(span[0], rho)
+      const b: XY = turnXY(span[1], rho)
       // Drawn on to each bubble's centre (2026-09-24), so the line meets the bubble's edge at
       // every zoom; the bubble's opaque card covers the part inside it. `p0` / `p1` below stay
       // the clipped ends, which is what every rule that reads them means.
@@ -524,7 +551,16 @@ export function createAnnotations(host: AnnotationHost): Annotations {
   const buildGridDims = (lineZ: number, gap: number): void => {
     gridZ = lineZ
     gridGap = gap
-    const runs = gridDimRuns(gridRecs, gap)
+    // Taken in the plan frame and turned back (2026-11-07), so the runs stand at the plan's
+    // start end of each family, square with the grids, whatever the turn.
+    const rho = host.plan?.() ?? 0
+    const runs =
+      rho === 0
+        ? gridDimRuns(gridRecs, gap)
+        : gridDimRuns(
+            gridRecs.map((r) => ({ ...r, p0: turnXY(r.p0, -rho), p1: turnXY(r.p1, -rho) })),
+            gap
+          ).map((run) => ({ ...run, at: turnXY(run.at, rho), span: turnXY(run.span, rho), dir: turnXY(run.dir, rho) }))
     if (!runs.length) return
     const labels = runs.map((run, k) => {
       const label = overlay.mkLabel(new Vector3(run.at[0], run.at[1], lineZ), formatDim(run.spacing, unit), {
@@ -639,21 +675,27 @@ export function createAnnotations(host: AnnotationHost): Annotations {
   const gridDimsStale = (): boolean => gridDims.some((d, k) => dimDrawnNow(d) !== dimDrawn[k])
 
   const buildLevels = (rect: Rect): void => {
+    // The ring is the plan-frame rectangle turned back into the scene (2026-11-07).
+    const rho = (host.plan?.() ?? 0)
+    const at = (x: number, y: number, z: number): Vector3 => {
+      const [px, py] = turnXY([x, y], rho)
+      return new Vector3(px, py, z)
+    }
     for (const s of host.storeys()) {
       const z = s.elev
       const ring = new Line(
         new BufferGeometry().setFromPoints([
-          new Vector3(rect.minX, rect.minY, z),
-          new Vector3(rect.maxX, rect.minY, z),
-          new Vector3(rect.maxX, rect.maxY, z),
-          new Vector3(rect.minX, rect.maxY, z),
-          new Vector3(rect.minX, rect.minY, z)
+          at(rect.minX, rect.minY, z),
+          at(rect.maxX, rect.minY, z),
+          at(rect.maxX, rect.maxY, z),
+          at(rect.minX, rect.maxY, z),
+          at(rect.minX, rect.minY, z)
         ]),
         materials.levelLine
       )
       levelGroup.add(ring)
       levelLines.push(ring)
-      const anchor = levelTagAnchor(rect)
+      const anchor = turnXY(levelTagAnchor(rect), rho)
       const tag = overlay.mkLabel(
         new Vector3(anchor[0], anchor[1], z),
         levelTagHtml(s.name, s.authored, unit),
@@ -683,7 +725,10 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     const frame = host.frame
     const fs = host.frameScale()
     const footprint: Rect = { minX: frame.min.x, minY: frame.min.y, maxX: frame.max.x, maxY: frame.max.y }
-    const grid = padRect(gridExtentRect(host.grids()) ?? footprint)
+    // 2026-11-07: the grids' extent in the plan frame, where it is square with them.
+    const rho = (host.plan?.() ?? 0)
+    const planGrids = rho === 0 ? host.grids() : host.grids().map((g) => ({ p0: turnXY(g.p0, -rho), p1: turnXY(g.p1, -rho) }))
+    const grid = padRect(gridExtentRect(planGrids) ?? footprint)
     pad = grid.pad
     const lineZ = host.groundZ() + 0.01 * s
     buildGrids(grid.rect, lineZ, frame.max.z + pad - STEM_DROP * fs, BUBBLE_GAP * fs)
@@ -734,8 +779,13 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     _origin.copy(p).addScaledVector(normal ?? Z_UP, LASER_LIFT)
     const n = normal ? ([normal.x, normal.y, normal.z] as [number, number, number]) : null
     const ends = new Map<LaserAxis, (Vector3 | null)[]>()
-    for (const { axis, sign } of laserDirections(n)) {
-      _dir.copy(AXIS_VECTORS[axis]).multiplyScalar(sign)
+    // 2026-11-07: X and Y are the plan's, turned by ρ, so a reading runs square with the grids;
+    // the normal is read in the same frame to decide which rays point into the surface.
+    const rho = (host.plan?.() ?? 0)
+    const nPlan = n && rho !== 0 ? ([...turnXY([n[0], n[1]], -rho), n[2]] as [number, number, number]) : n
+    const axes = laserAxes(rho)
+    for (const { axis, sign } of laserDirections(nPlan)) {
+      _dir.copy(axes[axis]).multiplyScalar(sign)
       let hit = host.ray(_origin, _dir, far, LASER_MIN_DISTANCE)
       // L378's `!(x.object === self && x.distance < 0.05)`: step past the surface we are on.
       if (hit && hit.id === selfId && hit.distance < LASER_SELF_DISTANCE) {
@@ -746,7 +796,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       slot[sign > 0 ? 0 : 1] = hit ? hit.point.clone() : null
     }
     const out: LaserRay[] = []
-    LASER_AXES.forEach((axis, i) => {
+    LASER_AXES.forEach((axis) => {
       const slot = ends.get(axis)
       if (!slot || (!slot[0] && !slot[1])) return
       const a = slot[1] ?? p.clone()
@@ -756,7 +806,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       // design's `a.distanceTo(b)` (L383) read a one-sided axis across a face as the hypotenuse
       // of it. The whole ray is the sum of the two sides, exactly.
       const along = (hit: Vector3 | null): number | null =>
-        hit ? Math.abs(hit.getComponent(i) - p.getComponent(i)) : null
+        hit ? Math.abs(_along.subVectors(hit, p).dot(axes[axis])) : null
       const minus = along(slot[1])
       const plus = along(slot[0])
       out.push({ axis, a, b, len: (minus ?? 0) + (plus ?? 0), minus, plus })

@@ -30,7 +30,7 @@ import {
   sessionPayload,
   type SessionPayload
 } from '../../shared/session-codec'
-import { frameKey } from '../../shared/georef'
+import { IDENTITY_FRAME_KEY } from '../../shared/georef'
 import type { RefusedFile } from '../../shared/ipc-contract'
 import { getViewer, useShell } from '../state/shell'
 import { sessionSource } from '../state/selectors/snapshot'
@@ -54,7 +54,7 @@ export function currentPayload(): SessionPayload {
     s.loaded,
     fed.sessionFiles(),
     getViewer()?.getCamera() ?? null,
-    frameKey(s.frame)
+    IDENTITY_FRAME_KEY
   )
 }
 

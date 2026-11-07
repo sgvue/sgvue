@@ -22,7 +22,6 @@
  */
 import { createSHA256 } from 'hash-wasm'
 import wasmUrl from 'web-ifc/web-ifc.wasm?url'
-import type { ProjectFrame } from '../shared/georef'
 import type {
   FederationOffset,
   GeometryChunk,
@@ -53,15 +52,12 @@ export type ParseRequest =
   /**
    * Stream this model's geometry. `offset` is the federation offset already in force, or
    * `null` for the first model — then the first mesh defines it and `geometryDone` reports
-   * what it turned out to be. `frame` is this model's own frame against the federation's
-   * (M_i⁻¹ ∘ P, `shared/georef.ts`'s `modelFrame`), which the caller always knows: it read this
-   * model's index before asking for its geometry.
+   * what it turned out to be.
    */
   | {
       type: 'geometry'
       modelKey: string
       offset: FederationOffset | null
-      frame: ProjectFrame | null
     }
 
 export type ParseResponse =
@@ -281,7 +277,6 @@ ctx.onmessage = (event: MessageEvent<ParseRequest>): void => {
           const summary = streamGeometry(src, modelID, {
             modelKey: request.modelKey,
             offset: request.offset,
-            frame: request.frame,
             onChunk: (chunk, transfer) =>
               post({ type: 'geometryChunk', modelKey: request.modelKey, chunk }, transfer)
           })

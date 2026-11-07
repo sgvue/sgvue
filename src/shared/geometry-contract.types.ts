@@ -103,36 +103,24 @@ export const EDGE_THRESHOLD_DEGREES = 20
  */
 export type FederationOffset = readonly [number, number, number]
 
-/**
- * **The scene is the project frame, minus the offset.**
- *
- * A file's world coordinates need not be the frame the building was drawn in: the CORENET X
- * convention puts the position *and* the rotation to true north on the spatial-root
- * `IfcSite.ObjectPlacement`, so the reference model's world axes are map axes and its building
- * stands at 43° to them. Everything the app draws axis-aligned — level rings, grid-bubble
- * clipping, laser axes, dimension lines, the bounding box's Length and Width, the N/S/E/W
- * views — is then wrong by that angle.
- *
- * So `geometry-streamer.ts` composes the inverse of that placement on the left, once, next to
- * the Y-up → Z-up rotation it already composes: `frame⁻¹ × R × flatTransformation`, in Float64.
- * The federation's frame P is a **federation constant**, exactly like the offset — the boot
- * model's project frame in map coordinates, chosen once — and since 2026-10-08 each model is
- * streamed through its own frame against it, M_i⁻¹ ∘ P (`shared/georef.ts`'s `modelFrame`), so
- * models federate by their **map** coordinates: one placed by its site placement and one placed
- * by `IfcMapConversion` land together. `null` is the identity, which is every file that leaves
- * its site at the origin and states no map conversion, and the design's own mock federation.
- *
- * Shape and semantics live in `shared/georef.ts` (`ProjectFrame`, `projectFrame`, `toProject`,
- * `toWorld`, `frameKey`); this is the re-export the contract is stated in.
+/*
+ * **The scene is the files' own world coordinates, minus the offset** (2026-11-07). Every model
+ * is drawn where web-ifc's `flatTransformation` puts it, `IfcSite` placement included; nothing a
+ * file declares about the map moves or turns it, so models line up origin to origin and nothing
+ * depends on load order. From 2026-09-20 to then the scene was a project frame composed in the
+ * worker — the boot model's, and from 2026-10-08 each model's map position against it.
  */
-export type { ProjectFrame } from './georef'
 
 export interface GeometryWarning {
-  /** `farPlacement`: bbox centre > 5 km from the offset. `precision`: local coordinates > 10 km from the file's own origin. */
-  kind: 'farPlacement' | 'precision'
+  /**
+   * `precision`: local coordinates > 10 km from the file's own origin. (`farPlacement`, a box
+   * centre > 5 km from the offset, went on 2026-11-07: it measured against whichever model was
+   * opened first, and the Coordinate-system card's note no longer reads it.)
+   */
+  kind: 'precision'
   /** A real number, not a percentage — the distance that triggered it. */
   detail: string
-  /** That distance, in metres (2026-10-08: the Coordinate-system card's note reads it). */
+  /** That distance, in metres. */
   metres: number
 }
 
@@ -143,8 +131,6 @@ export interface GeometrySummary {
   offset: FederationOffset
   /** True when this model defined the offset (the request carried `null`). */
   offsetFromThisModel: boolean
-  /** The frame this model was streamed in — its own, M_i⁻¹ ∘ P — echoed back with the offset. */
-  frame: import('./georef').ProjectFrame | null
   warnings: readonly GeometryWarning[]
   /** `GetCoordinationMatrix`, for the record. Identity while `COORDINATE_TO_ORIGIN` is false. */
   coordinationMatrix: readonly number[]

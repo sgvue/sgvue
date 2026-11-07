@@ -127,21 +127,22 @@ export interface SessionPayload {
   view: string | null
   /**
    * The base point — **written, never read back** since 2026-10-08, when the owner made the
-   * Coordinate-system card read-only: the base point always comes from the boot file
-   * (`sessionPatch` leaves it out). It is still written, as the boot file states it, for a build
-   * from before then, which restores it over its own reading of the same file — the same numbers
-   * for every file that build can read, and the base point of the frame the camera was saved in
-   * for one it cannot (a Revit export placed by its `WorldCoordinateSystem`).
+   * Coordinate-system card read-only: the base point always comes from a loaded file
+   * (`sessionPatch` leaves it out). It is still written — since 2026-11-07 as the file the card
+   * shows states it (`shared/georef.ts`'s `georefSourceOf`) — for a build from before then, which
+   * restores it over its own reading.
    */
   coords: SessionCoords
   cam: SessionCamera | null
   /**
-   * Which project frame `cam` was recorded in — `shared/georef.ts`'s `frameKey`.
+   * Which frame `cam` was recorded in — `shared/georef.ts`'s `IDENTITY_FRAME_KEY`.
    *
-   * The camera is scene coordinates, and the scene is the federation's project frame minus
-   * its offset. A payload written against a different boot model, or by a build from before
-   * the frame existed, describes a camera pose in someone else's coordinates: everything else
-   * restores and the camera does not (`applyRestore`).
+   * The camera is scene coordinates. Since 2026-11-07 the scene is every file's own world
+   * coordinates minus the offset, `identity` for every federation; before then it was the boot
+   * model's project frame, `x,y,z@angle` for a boot model whose site placement or map position
+   * moved it. A payload whose key is not `identity`, or that has none (written before the frame
+   * existed), describes a camera pose in other coordinates: everything else restores and the
+   * camera does not (`applyRestore`).
    */
   frame?: string
   /**
@@ -386,7 +387,7 @@ export interface RestoreTarget {
  * `SGVue.dc.html:1699–1707`. `shadows` and `camera` are conditional there and stay conditional
  * here — a payload with no camera must not move the one the boot framing just chose.
  *
- * `liveFrame` is the federation's project frame as `frameKey` spells it. A payload whose own
+ * `liveFrame` is the scene's frame key — `IDENTITY_FRAME_KEY` since 2026-11-07. A payload whose own
  * marker differs — or which has none, because it was written before the frame existed — keeps
  * every other key and frames the extents rather than pointing the camera with numbers that
  * meant something else.

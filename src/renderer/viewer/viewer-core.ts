@@ -39,12 +39,14 @@
  */
 import type { Object3D } from 'three/webgpu'
 import { Box3, Vector2, Vector3 } from 'three/webgpu'
-import type { BasePoint, ProjectFrame } from '../../shared/georef'
+import type { BasePoint } from '../../shared/georef'
 import type { GeometryChunk } from '../../shared/geometry-contract.types'
 import type { Annotations, MeasureRecord, SpotRecord, SpotShown } from './annotations'
 import { createAnnotations } from './annotations'
 import type { DimRect } from '../../shared/annotate'
 import { fedId } from '../../shared/federate'
+import { turnXY } from '../../shared/plan-rotation'
+import { viewOn } from '../../shared/view-angles'
 import type { DisplayUnit } from '../../shared/units'
 import type { BatchStore, ElementRecord } from './batches'
 import { createBatchStore } from './batches'
@@ -131,7 +133,8 @@ export interface ViewerCallbacks {
 export type Tool = 'select' | 'measure' | 'spot'
 
 /**
- * Grids and storeys in the **project frame**; `offset` is what puts them in the scene.
+ * Grids and storeys in the file's own **world** coordinates; `offset` is what puts them in the
+ * scene.
  *
  * The caller has already put both through the model's own frame — the same transform the
  * geometry went through in the worker (`renderer/model/federation-store.ts`'s `metaOf`) — so
@@ -141,14 +144,63 @@ export type Tool = 'select' | 'measure' | 'spot'
  * curve and the reference model's grid runs at ~43° in the file's own world coordinates
  * (`shared/annotate.ts`).
  */
+/**
+ * 2026-11-07 — the building box in the plan frame: every vertex of every slot but the site's
+ * (`buildingOnly`), turned by −ρ about the scene's origin. One pass over the merged buffers, run
+ * only while ρ is not 0, when a model joins or leaves and when ρ changes.
+ */
+function planBoxOf(
+  store: BatchStore,
+  siteByModel: ReadonlyMap<string, ReadonlySet<number>>,
+  buildingOnly: boolean,
+  rho: number
+): Box3 {
+  const c = Math.cos(-rho)
+  const s = Math.sin(-rho)
+  const siteParts = new Set<number>()
+  if (buildingOnly) {
+    for (const rec of store.elements.values()) {
+      if (siteByModel.get(rec.modelKey)?.has(rec.id)) for (const p of rec.partOf) siteParts.add(p)
+    }
+  }
+  let x0 = Infinity
+  let y0 = Infinity
+  let z0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  let z1 = -Infinity
+  for (const slot of store.slots) {
+    if (slot.removed) continue
+    const pos = slot.geometry.getAttribute('position')?.array as ArrayLike<number> | undefined
+    const part = slot.geometry.getAttribute('partIndex')?.array as ArrayLike<number> | undefined
+    if (!pos || !part) continue
+    let skip: Uint8Array | null = null
+    if (siteParts.size) {
+      skip = new Uint8Array(slot.count)
+      for (let i = 0; i < slot.count; i++) if (siteParts.has(slot.firstPart + i)) skip[i] = 1
+    }
+    for (let v = 0, n = pos.length / 3; v < n; v++) {
+      if (skip && skip[part[v] - slot.firstPart]) continue
+      const x = pos[v * 3]
+      const y = pos[v * 3 + 1]
+      const px = x * c - y * s
+      const py = x * s + y * c
+      const z = pos[v * 3 + 2]
+      if (px < x0) x0 = px
+      if (px > x1) x1 = px
+      if (py < y0) y0 = py
+      if (py > y1) y1 = py
+      if (z < z0) z0 = z
+      if (z > z1) z1 = z
+    }
+  }
+  const box = new Box3()
+  if (x0 <= x1) box.set(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1))
+  return box
+}
+
 export interface ModelMeta {
   offset?: readonly [number, number, number]
-  /**
-   * The frame this model's coordinates were brought into the project frame with — its own,
-   * project → its world (M_i⁻¹ ∘ P since 2026-10-08) — carried beside the offset so anything
-   * converting scene ↔ project ↔ world has both. `null`/absent is the identity.
-   */
-  frame?: ProjectFrame | null
   grids?: readonly {
     name: string
     start: readonly [number, number]
@@ -156,7 +208,7 @@ export interface ModelMeta {
   }[]
   storeys?: readonly {
     name: string
-    /** The storey's floor in the project frame, metres; the viewer subtracts the offset. */
+    /** The storey's floor in world coordinates, metres; the viewer subtracts the offset. */
     elev: number
     /**
      * `IfcBuildingStorey.Elevation` as authored, metres — what the sidebar ladder shows and
@@ -291,6 +343,14 @@ export interface Viewer {
   setSections(cfg: SectionsConfig): void
   setCoords(c: Partial<BasePoint>): void
   /**
+   * 2026-11-07 — the plan rotation ρ, degrees anticlockwise (`shared/plan-rotation.ts`): the
+   * angle the camera's plan frame stands at in the world, so the grids run square on screen.
+   * The named views, the view cube, the framing box, the grid extent and its bubbles, the level
+   * rings, the ground grid and the laser's X and Y turn with it; no model moves and no readout
+   * changes. A camera standing on a named view is put back on it; a free camera stays put.
+   */
+  setPlanRotation(deg: number): void
+  /**
    * The display unit the labels print in (2026-10-09): the laser's readings, the spot tags, the
    * grid and selection dimensions and the level tags (`annotations.ts`). `mm` until told.
    */
@@ -380,11 +440,10 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
   let coords: BasePoint = { E: null, N: null, Z: null, angle: null }
   /**
    * Whole metres the geometry pipeline subtracted; the spot readouts add them back to reach
-   * the **project** frame, which is the frame the design's `toMap` takes its input in.
+   * the files' own world coordinates (2026-11-07: the scene is those, origin to origin), which
+   * is what the design's `toMap` is handed.
    */
   let offset: readonly [number, number, number] = [0, 0, 0]
-  /** The project frame those coordinates are in, carried beside the offset. */
-  let projFrame: ProjectFrame | null = null
 
   /**
    * Grids and storeys in scene coordinates, kept per model and re-unioned on every add and
@@ -421,30 +480,66 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
   const frameBox = new Box3()
   /** Federation ids of every model's site elements. */
   const siteByModel = new Map<string, Set<number>>()
+  /**
+   * 2026-11-07 — the plan rotation ρ, radians: the camera's plan frame turned so the grids run
+   * square (`shared/plan-rotation.ts`). 0 until told, and while it is 0 the two boxes below are
+   * `frameBox` itself, so an axis-aligned federation frames exactly as it did.
+   */
+  let planRho = 0
+  /**
+   * The building box **in the plan frame** — the scene turned by −ρ about its origin — from the
+   * building's own vertices, because the box of a turned building's world boxes is far larger
+   * than the building (a 120 m wall at 43° has an 88 × 82 m world box). The grid extent's
+   * fallback, the level rings and the bubbles' lift read it (`annotations.ts`).
+   */
+  const planBox = new Box3()
+  /**
+   * What the camera frames: the plan box's centre, back in the scene, with the plan box's size.
+   * `fitBox` reads only a box's centre and diagonal, so this frames the building as tightly at
+   * any ρ as `frameBox` does at 0 — which it is, then.
+   */
+  const fitFrame = new Box3()
   let frameScale = sceneScale(frameBox)
+  /** True while the building box left the site out — `frameBox` is not the whole box. */
+  let frameIsBuilding = false
+  const refreshPlanBox = (): void => {
+    if (planRho === 0) {
+      planBox.copy(frameBox)
+      fitFrame.copy(frameBox)
+    } else {
+      planBox.copy(planBoxOf(store, siteByModel, frameIsBuilding, planRho))
+      if (planBox.isEmpty()) planBox.copy(frameBox)
+      const c = planBox.getCenter(new Vector3())
+      const [x, y] = turnXY([c.x, c.y], planRho)
+      fitFrame.setFromCenterAndSize(new Vector3(x, y, c.z), planBox.getSize(new Vector3()))
+    }
+    frameScale = sceneScale(fitFrame)
+  }
   const refreshFrameBox = (): void => {
     frameBox.makeEmpty()
     for (const rec of store.elements.values()) {
       if (!siteByModel.get(rec.modelKey)?.has(rec.id)) frameBox.union(rec.bbox)
     }
+    frameIsBuilding = !frameBox.isEmpty()
     if (frameBox.isEmpty()) frameBox.copy(store.bbox)
-    frameScale = sceneScale(frameBox)
+    refreshPlanBox()
   }
 
   /* ── scene, cameras, section visuals ────────────────────────────────────── */
   /**
    * The one way the rig is built — at construction and on every `restage`. Its last argument is
-   * the project frame's own zero in scene coordinates (scene = project − offset), which is where
+   * the files' own zero in scene coordinates (scene = world − offset), which is where
    * the ground stands; scene z = 0 is only where the first placement streamed happened to be
    * (2026-10-01, `scene.ts` `groundLevel`).
    */
   const buildRig = (): SceneRig =>
-    buildScene(store.bbox, materials, themeName, groundGridOn, 0 - offset[2])
+    buildScene(store.bbox, materials, themeName, groundGridOn, 0 - offset[2], planRho)
   let rig: SceneRig = buildRig()
   let cam: CameraRig = createCameraRig({
     scale: rig.scale,
-    bbox: frameBox,
+    bbox: fitFrame,
     nearScale: () => frameScale,
+    planRotation: () => planRho,
     reduceMotion,
     onProjection: (p) => on.projection?.(p)
   })
@@ -534,8 +629,9 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     stageScale = rig.scale
     cam = createCameraRig({
       scale: rig.scale,
-      bbox: frameBox,
+      bbox: fitFrame,
       nearScale: () => frameScale,
+      planRotation: () => planRho,
       reduceMotion,
       onProjection: (p) => on.projection?.(p)
     })
@@ -742,7 +838,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       // L254: the plane moved, so look at it square on and reframe.
       reaim: (normal) => {
         cam.viewDir(normal)
-        cam.fitBox(frameBox)
+        cam.fitBox(fitFrame)
         on.cubeView?.()
       }
     },
@@ -754,8 +850,9 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     materials,
     bbox: store.bbox,
     scale: () => stageScale,
-    frame: frameBox,
+    frame: planBox,
     frameScale: () => frameScale,
+    plan: () => planRho,
     groundZ: () => rig.groundZ,
     camera: () => cam.camera,
     view: () => ({ theta: cam.cur.theta, phi: cam.cur.phi }),
@@ -899,7 +996,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
         const rec = id == null ? null : (store.elements.get(id) ?? null)
         invalidate()
         if (!rec) {
-          cam.fitBox(frameBox)
+          cam.fitBox(fitFrame)
           cam.fly()
           return
         }
@@ -957,7 +1054,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       // L685. No `fly()`: the reference lets a cube click ease at the normal rate.
       onView: (dir) => {
         cam.viewDir(dir)
-        cam.fitBox(frameBox)
+        cam.fitBox(fitFrame)
         on.cubeView?.()
       }
     })
@@ -1290,7 +1387,6 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
 
     const [ox, oy, oz] = meta?.offset ?? [0, 0, 0]
     offset = meta?.offset ?? offset
-    if (meta && 'frame' in meta) projFrame = meta.frame ?? null
     // A grid at any angle is drawable: its two plan endpoints come across and the annotation
     // layer clips the line they define to the padded footprint (`shared/annotate.ts`).
     gridsByModel.set(
@@ -1336,7 +1432,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
    * knows what a boot batch is (`model/federation-store.ts`); the viewer does not.
    */
   function frameExtents(): void {
-    cam.fitBox(frameBox)
+    cam.fitBox(fitFrame)
     cam.easeIn()
     invalidate()
   }
@@ -1478,6 +1574,27 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       rig.invalidateShadows()
       invalidateOcclusion()
     },
+    setPlanRotation: (deg) => {
+      const rho = (deg * Math.PI) / 180
+      if (rho === planRho) return
+      // Standing on a named view, the camera is put back on it in the new plan: turned by the
+      // change at once — the boot hands the rotation over before it frames, so nothing eases —
+      // and framed again. A free camera stays where it is.
+      const named = viewOn(cam.goal.theta, cam.goal.phi, planRho)
+      const turn = rho - planRho
+      planRho = rho
+      refreshPlanBox()
+      cube?.setPlanRotation(rho)
+      rig.setPlanRotation(rho)
+      annotations.rebuild()
+      if (named) {
+        cam.goal.theta += turn
+        cam.cur.theta += turn
+        // Still on that view, so the lit view button stays as it is.
+        if (store.elements.size) cam.fitBox(fitFrame)
+      }
+      invalidateOcclusion()
+    },
     // L428. The compass follows the angle; every spot label is re-rendered and re-published.
     setCoords: (c) => {
       coords = { ...coords, ...c }
@@ -1551,7 +1668,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       invalidate()
     },
     zoomExtents: (zoom) => {
-      cam.fitBox(frameBox, zoom)
+      cam.fitBox(fitFrame, zoom)
       cam.fly()
       invalidate()
     },
@@ -1615,7 +1732,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       frameScale: +frameScale.toFixed(3),
       seeThrough: seeThroughCount,
       offset,
-      frame: projFrame,
+      planRotationDeg: +((planRho * 180) / Math.PI).toFixed(4),
       annotations: annotations.debug(),
       tool,
       hovered,

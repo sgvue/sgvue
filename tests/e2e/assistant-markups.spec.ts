@@ -118,7 +118,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
       spot: { name: string; level: number }
     }
     expect(spot.results[0].ok).toBe(true)
-    expect(placed).toMatchObject({ placed: true, name: 'C1', at: 'top', on: 'bounding box', pointFrame: 'project' })
+    expect(placed).toMatchObject({ placed: true, name: 'C1', at: 'top', on: 'bounding box', pointFrame: 'world' })
     // The middle of the box's top face, to the millimetre — the point `get_element` would report.
     expect(placed.pointMetres.x).toBeCloseTo((x0 + x1) / 2, 3)
     expect(placed.pointMetres.y).toBeCloseTo((y0 + y1) / 2, 3)

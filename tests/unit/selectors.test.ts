@@ -463,7 +463,7 @@ describe('toolbar, status bar and lanes', () => {
       visibleCount: 40,
       federation,
       units: 'm' as const,
-      bootGeoref: null
+      georefSource: null
     }
     expect(statusValues(s)).toEqual({
       backend: 'WebGL2',

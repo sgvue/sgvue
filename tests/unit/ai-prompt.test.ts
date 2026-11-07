@@ -433,7 +433,7 @@ describe('the system contract', () => {
     }
     for (const said of [
       'manage_markups also places a spot coordinate or a laser measurement at a point you name',
-      'the top, centre or base of an element’s bounding box, or a project-frame point',
+      'the top, centre or base of an element’s bounding box, or a point in world metres',
       'exactly as the user’s click with that tool would',
       'The point is taken on the box, not on a picked surface, so say so when you report it',
       'place one only when asked',

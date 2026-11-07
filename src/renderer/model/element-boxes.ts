@@ -2,7 +2,7 @@
  * What one element's geometry amounts to — its box and how many parts it is made of — from
  * the chunks the worker already streamed.
  *
- * `IfcElement.bbox` is declared in the **project frame**, metres, Z-up, with the federation
+ * `IfcElement.bbox` is declared in the file's own **world** coordinates, metres, Z-up, with the federation
  * offset *not* subtracted (`shared/model-index.types.ts`). The geometry stream already
  * computes exactly that box per **part** — `PartRecord.bbox6`, the AABB of the transformed
  * local AABB — in the same frame minus the offset. So the box half of this file is: union the
@@ -25,7 +25,7 @@
  */
 import type { FederationOffset, GeometryChunk } from '../../shared/geometry-contract.types'
 
-/** `[minX, minY, minZ, maxX, maxY, maxZ]`, project-frame metres, Z-up. */
+/** `[minX, minY, minZ, maxX, maxY, maxZ]`, world metres, Z-up. */
 export type Box6 = [number, number, number, number, number, number]
 
 /** One element's geometry, as the index records it. */
