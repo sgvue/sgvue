@@ -17,7 +17,9 @@
  * atomically — a uniquely named temporary file beside the target, then one `rename` — as
  * `exports.ts` writes.
  *
- * **What it reads.** Open Project… is the native Open dialog, filtered to `.sgvue`, then at most
+ * **What it reads.** Open Project… is the native Open dialog, filtered to `.sgvue` — or, since phase
+ * 5 (plan D10), a `.sgvue` the OS handed the app (a double-click, `project-launch.ts`) or one
+ * dropped on the window, each through the same `openNow` — then at most
  * `PROJECT_MAX_BYTES` of the file picked, as text, once — a read like `scheduleFile:open`, not an
  * `admit()`. The models the project names are a different matter: **each path goes through
  * `admit()`** (`file-protocol.ts`) before the page hears of it, and the page is handed only what
@@ -46,6 +48,8 @@ import {
   ProjectClose,
   ProjectDirty,
   ProjectLocateRequest,
+  ProjectOpenDropped,
+  ProjectReady,
   ProjectSnapshot,
   type ProjectLocated,
   type ProjectNothing,
@@ -61,6 +65,7 @@ import {
   resolveRelPath,
   type ProjectFile
 } from '../shared/project-file'
+import { isProjectFileName } from '../shared/project-drop'
 import { admit, isRemotePath } from './file-protocol'
 import { listRecents } from './sessions'
 import { mainContents, mainWindow, messageBox, openDialog } from './window'
@@ -220,6 +225,9 @@ export function resetProjects(): void {
   state.quitting = false
   lastDir = null
   waiting.clear()
+  parked = null
+  page.loaded = false
+  page.listening = false
 }
 
 const isMac = (): boolean => process.platform === 'darwin'
@@ -473,7 +481,7 @@ export async function saveProject(as: boolean): Promise<boolean> {
   try {
     return (await saveNow(as)).kind === 'saved'
   } finally {
-    state.busy = false
+    idle()
   }
 }
 
@@ -557,21 +565,68 @@ async function pickOpenPath(win: BrowserWindow): Promise<string | null> {
   return canceled || !filePaths[0] ? null : filePaths[0]
 }
 
-async function openNow(): Promise<void> {
+/**
+ * Where a project to open comes from (phase 5, plan D10): File › Open Project…'s dialog, or a path
+ * — one the OS handed the app (a double-click, the Dock, `argv`: `project-launch.ts`) or one the
+ * page read off a dropped `File` with the preload's `webUtils.getPathForFile`, as an IFC drop is.
+ */
+export type OpenRequest = { kind: 'dialog' } | { kind: 'os' | 'drop'; path: string }
+
+/** Why a given path is not opened, before anything is asked or read. */
+export const NOT_A_PROJECT = 'Only an SGVue project file (.sgvue) opens this way.'
+export const NETWORK_DROP =
+  'A project on a network share opens with File › Open Project… or a double-click, not by dropping it.'
+
+/**
+ * Whether a path handed to the app may be opened as a project, by its shape alone — checked before
+ * the unsaved-changes question and before the file system is touched. It must name a `.sgvue`.
+ * A network or device path (`isRemotePath`, `file-protocol.ts`) is judged by the rule `admit()`
+ * already applies: **from the OS** it is the user's own act, like a pick in the Open dialog
+ * (`'any'`), so it passes; **from a drop** the renderer names the path, as on `file:admit`, which
+ * trusts a network path only on the recents list or admitted earlier this run — lists that never
+ * hold a `.sgvue` — so it is refused, before the host is ever asked.
+ */
+export function givenPathProblem(path: string, kind: 'os' | 'drop'): string | null {
+  if (!isProjectFileName(path)) return NOT_A_PROJECT
+  if (kind === 'drop' && isRemotePath(path)) return NETWORK_DROP
+  return null
+}
+
+/**
+ * Open a project — **the one function every route ends in**: the menu's dialog, a double-click and
+ * a drop. The unsaved-changes question first; then the path (the dialog's answer, or the one
+ * given, checked by `givenPathProblem` and, through its real path, still a `.sgvue`); at most
+ * `PROJECT_MAX_BYTES`, `readProject`, and each model through `admit()`. Resolves whether a
+ * `project:opened` — the project, or why it was refused — was sent to the page.
+ */
+async function openNow(req: OpenRequest): Promise<boolean> {
   const win = mainWindow()
-  if (!win) return
+  if (!win) return false
+  const send = (msg: ProjectOpened): boolean => {
+    const page = mainContents()
+    page?.send(CH_PROJECT_OPENED, msg)
+    return page !== undefined
+  }
+  if (req.kind !== 'dialog') {
+    const problem = givenPathProblem(req.path, req.kind)
+    if (problem) return send({ ok: false, name: projectNameOf(req.path), message: problem })
+  }
   // Opening another project would lose the open one's changes, exactly as quitting would.
   if (state.path && state.dirty) {
     const choice = await askUnsaved(win)
-    if (choice === 'cancel') return
-    if (choice === 'save' && !(await saveForQuestion(win))) return
+    if (choice === 'cancel') return false
+    if (choice === 'save' && !(await saveForQuestion(win))) return false
   }
-  const path = await pickOpenPath(win)
-  if (!path) return
+  const path = req.kind === 'dialog' ? await pickOpenPath(win) : req.path
+  if (!path) return false
   const name = projectNameOf(path)
-  const send = (msg: ProjectOpened): void => mainContents()?.send(CH_PROJECT_OPENED, msg)
   let text: string
   try {
+    // A path the app was handed is a `.sgvue` by its real name too: a link called `x.sgvue` that
+    // points at another kind of file is not read.
+    if (req.kind !== 'dialog' && !isProjectFileName(await realpath(path))) {
+      return send({ ok: false, name, message: NOT_A_PROJECT })
+    }
     text = await readProjectFile(path)
   } catch (e) {
     const tooLarge = e instanceof Error && e.message === 'too large'
@@ -593,18 +648,82 @@ async function openNow(): Promise<void> {
   state.dirty = false
   lastDir = dirname(path)
   refreshTitle()
-  send({ ok: true, name, text, models })
+  return send({ ok: true, name, text, models })
+}
+
+/** `openNow`, once at a time: a request while a save, an open or a question is under way does nothing. */
+async function runOpen(req: OpenRequest): Promise<boolean> {
+  if (state.busy) return false
+  state.busy = true
+  try {
+    return await openNow(req)
+  } finally {
+    idle()
+  }
 }
 
 /** File › Open Project…. */
 export async function openProject(): Promise<void> {
-  if (state.busy) return
-  state.busy = true
-  try {
-    await openNow()
-  } finally {
-    state.busy = false
-  }
+  await runOpen({ kind: 'dialog' })
+}
+
+/**
+ * `project:openDropped` — a `.sgvue` dropped on the window or the designed drop zone (phase 5,
+ * D10). Only the main window's page may ask, checked before the payload is read. The path is the
+ * preload's `webUtils.getPathForFile` for the dropped `File` — the IFC drop's route — and it is
+ * opened by `openNow`, as a drop: so a network path is refused (`givenPathProblem`). Resolves
+ * whether the page was sent a `project:opened`; `false` also when something else of this module
+ * was under way, which is how one drop the page hears twice opens once.
+ */
+export function openDroppedProject(sender: WebContents, raw: unknown): Promise<boolean> {
+  fromMain(sender)
+  const { path } = ProjectOpenDropped.parse(raw)
+  return runOpen({ kind: 'drop', path })
+}
+
+/* ────────────────────────────── from the OS (phase 5, D10) ────────────────────────────── */
+
+/**
+ * A project the OS handed the app — a double-click, the Dock, `argv` on first launch or a second
+ * launch — waiting for a page that can hear it, or for this module to be free. The latest wins.
+ */
+let parked: string | null = null
+/** The main window's page: finished loading, and listening for `project:opened` (`project:ready`). */
+const page = { loaded: false, listening: false }
+
+/**
+ * Open a project the OS handed the app (`project-launch.ts`): at once if the page can hear it and
+ * nothing else is under way, else as soon as both are true — never before the window's page is
+ * ready, which is how a double-click that **launched** the app opens its project.
+ */
+export function openProjectFromOS(path: string): void {
+  parked = path
+  flushParked()
+}
+
+function flushParked(): void {
+  if (parked === null || !page.loaded || !page.listening || state.busy) return
+  const win = mainWindow()
+  if (!win || !mainContents()) return
+  const path = parked
+  parked = null
+  if (win.isMinimized()) win.restore()
+  win.focus()
+  void runOpen({ kind: 'os', path })
+}
+
+/** The end of a save, an open or a Locate…: free again, and a parked project may open now. */
+function idle(): void {
+  state.busy = false
+  flushParked()
+}
+
+/** `project:ready` — the page is listening for `project:opened`. Only the main window's page. */
+export function projectPageReady(sender: WebContents, raw: unknown): void {
+  fromMain(sender)
+  ProjectReady.parse(raw)
+  page.listening = true
+  flushParked()
 }
 
 /* ────────────────────────────── Locate… (phase 4, D4) ────────────────────────────── */
@@ -649,7 +768,7 @@ export async function locateModel(sender: WebContents, raw: unknown): Promise<Pr
     const [file] = await admit([path], 'any', refused)
     return { file: file ?? null, refused: file ? null : (refused[0] ?? null) }
   } finally {
-    state.busy = false
+    idle()
   }
 }
 
@@ -672,6 +791,11 @@ export function attachProjectWindow(win: BrowserWindow): void {
   win.on('page-title-updated', (event) => {
     if (state.path) event.preventDefault()
   })
+  // A new page is not listening yet: a project the OS hands the app waits for its `project:ready`.
+  win.webContents.on('did-navigate', () => {
+    page.loaded = false
+    page.listening = false
+  })
   win.webContents.on('did-finish-load', () => {
     const had = state.path !== null
     state.path = null
@@ -680,6 +804,9 @@ export function attachProjectWindow(win: BrowserWindow): void {
     state.allowClose = false
     waiting.clear()
     if (had) clearTitle(win)
+    // After the slate is clean, never before: a project parked for this page may open now.
+    page.loaded = true
+    flushParked()
   })
   win.on('close', (event) => {
     const act = closeAction({
@@ -703,6 +830,8 @@ export function attachProjectWindow(win: BrowserWindow): void {
     state.allowClose = false
     state.quitting = false
     waiting.clear()
+    page.loaded = false
+    page.listening = false
   })
 }
 
@@ -717,6 +846,8 @@ async function askBeforeClose(win: BrowserWindow): Promise<void> {
   }
   if (!go) {
     state.quitting = false
+    // The window stays: a project the OS handed the app meanwhile may open now.
+    flushParked()
     return
   }
   state.allowClose = true

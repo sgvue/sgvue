@@ -164,7 +164,13 @@ describe('read-only guard', () => {
       // 2026-11-08 (phase 4, D4) — a missing model's Locate…: the model's file name goes in, for
       // the dialog's title, never a path; main shows its own Open dialog and answers only what
       // `admit()` let through of the user's pick.
-      'locateProjectModel'
+      'locateProjectModel',
+      // 2026-11-08 (phase 5, D10) — a dropped `.sgvue`: the path `pathForFile` gave for the
+      // dropped `File`, the IFC drop's own route; main checks the sender, the extension and the
+      // network-path rule before the file system, and opens it as Open Project… opens a pick.
+      // `projectReady` carries nothing: the page listens, so a project the OS handed the app opens.
+      'openDroppedProject',
+      'projectReady'
     ])
   })
 
@@ -234,7 +240,29 @@ describe('read-only guard', () => {
     // The page reaches main on exactly those three channels, and names no path on any.
     const preload = readFileSync(join(SRC, 'preload/index.ts'), 'utf8')
     const invoked = [...preload.matchAll(/ipcRenderer\.invoke\((CH_PROJECT_[A-Z_]+)/g)].map((m) => m[1]).sort()
-    expect(invoked).toEqual(['CH_PROJECT_CLOSE', 'CH_PROJECT_DIRTY', 'CH_PROJECT_LOCATE', 'CH_PROJECT_SNAPSHOT'])
+    expect(invoked).toEqual([
+      'CH_PROJECT_CLOSE',
+      'CH_PROJECT_DIRTY',
+      'CH_PROJECT_LOCATE',
+      'CH_PROJECT_OPEN_DROPPED',
+      'CH_PROJECT_READY',
+      'CH_PROJECT_SNAPSHOT'
+    ])
+    // Phase 5: the drop names one path — the dropped `File`'s, as an IFC drop's `admitPaths` does —
+    // and the ready call nothing. Both check the sender before the payload is read.
+    expect(preload).toMatch(/openDroppedProject: \(path: string\): Promise<boolean> => ipcRenderer\.invoke\(CH_PROJECT_OPEN_DROPPED, \{ path \}\)/)
+    expect(preload).toMatch(/projectReady: \(\): Promise<void> => ipcRenderer\.invoke\(CH_PROJECT_READY\)/)
+    expect(code).toMatch(/export function openDroppedProject\(sender: WebContents, raw: unknown\): Promise<boolean> \{\s*fromMain\(sender\)\n\s*const \{ path \} = ProjectOpenDropped\.parse\(raw\)\n\s*return runOpen\(\{ kind: 'drop', path \}\)/)
+    expect(code).toMatch(/export function projectPageReady\(sender: WebContents, raw: unknown\): void \{\s*fromMain\(sender\)\n/)
+    // Every route — the menu's dialog, the OS, a drop — ends in the one `openNow`, question first.
+    const openNow = /async function openNow\(req: OpenRequest\)[\s\S]*?\n\}/.exec(code)
+    expect(openNow, 'projects.ts no longer declares `openNow`').not.toBeNull()
+    const body = openNow![0]
+    expect(body.indexOf('askUnsaved(win)')).toBeGreaterThan(-1)
+    expect(body.indexOf('askUnsaved(win)')).toBeLessThan(body.indexOf('readProjectFile(path)'))
+    expect(body).toMatch(/await admitProjectModels\(path, read\.project, recents\)/)
+    expect([...code.matchAll(/\bopenNow\(/g)]).toHaveLength(2)
+    expect([...code.matchAll(/runOpen\(\{ kind: '(\w+)'/g)].map((m) => m[1]).sort()).toEqual(['dialog', 'drop', 'os'])
     // Phase 4: Locate… sends a name, never a path, and main checks the sender first, reads the path
     // from its own Open dialog alone, and lets it through only by `admit()`.
     expect(preload).toMatch(/locateProjectModel: \(name: string\): Promise<ProjectLocated \| null> => ipcRenderer\.invoke\(CH_PROJECT_LOCATE, \{ name \}\)/)

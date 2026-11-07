@@ -68,6 +68,8 @@ vi.mock('../../src/main/deep-link', () => ({
   launchHash: () => '',
   takeLaunchLink: () => null
 }))
+// 2026-11-08 (project phase 5): the OS's project routes read `process.argv` — vitest's here.
+vi.mock('../../src/main/project-launch', () => ({ installProjectLaunch: () => {} }))
 // Off, so importing main on Windows reads no registry and appends no GPU switch (2026-09-25).
 vi.mock('../../src/main/settings', () => ({ preferNvidia: () => false }))
 vi.mock('../../src/main/ai/session', () => ({ registerAiIpc: () => {} }))

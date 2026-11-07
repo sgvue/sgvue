@@ -62,7 +62,13 @@ const {
   afterQuestionSave,
   NOTHING_REASON,
   closeFromPage,
-  locateModel
+  locateModel,
+  openProjectFromOS,
+  openDroppedProject,
+  projectPageReady,
+  givenPathProblem,
+  NOT_A_PROJECT,
+  NETWORK_DROP
 } = projects
 
 
@@ -131,6 +137,9 @@ function fakeWindow() {
     setRepresentedFilename: vi.fn(),
     setDocumentEdited: vi.fn(),
     close: vi.fn(),
+    isMinimized: () => false,
+    restore: vi.fn(),
+    focus: vi.fn(),
     on
   }
   const emit = (ev: string, ...args: unknown[]) => handlers.get(ev)?.forEach((fn) => fn(...args))
@@ -725,4 +734,173 @@ describe('the question on close', () => {
     expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
   })
 
+})
+
+/* ────────────────────────────── phase 5 (D10): double-click and drop ────────────────────────────── */
+
+describe('a project the OS or a drop hands the app — the same open, question first', () => {
+  const opened = () => page.sent.filter(([c]) => c === CH_PROJECT_OPENED).map(([, m]) => m as Record<string, unknown>)
+  const until = (check: () => void) => vi.waitFor(check, { timeout: 3000, interval: 5 })
+  const settle = () => new Promise((r) => setTimeout(r, 20))
+  const onDisk = (name: string): string => {
+    const path = join(review, name)
+    writeFileSync(path, projectAt())
+    return path
+  }
+  /** The window's page: loaded, and — unless `listening` is false — saying it listens. */
+  function pageUp(listening = true): void {
+    attachProjectWindow(page.win as never)
+    page.emit('did-navigate')
+    page.emit('did-finish-load')
+    if (listening) projectPageReady(page.contents as never, undefined)
+  }
+
+  it('givenPathProblem: a .sgvue by name; a network path only from the OS', () => {
+    expect(givenPathProblem('/d/a.sgvue', 'os')).toBeNull()
+    expect(givenPathProblem('/d/a.SGVUE', 'drop')).toBeNull()
+    expect(givenPathProblem('/d/a.ifc', 'os')).toBe(NOT_A_PROJECT)
+    expect(givenPathProblem('/d/a.sgvue.json', 'drop')).toBe(NOT_A_PROJECT)
+    expect(givenPathProblem('\\\\server\\share\\a.sgvue', 'os')).toBeNull()
+    expect(givenPathProblem('\\\\server\\share\\a.sgvue', 'drop')).toBe(NETWORK_DROP)
+    expect(givenPathProblem('\\\\?\\C:\\a.sgvue', 'drop')).toBe(NETWORK_DROP)
+    expect(givenPathProblem('//server/share/a.sgvue', 'drop')).toBe(NETWORK_DROP)
+  })
+
+  it('from the OS before the page listens: parked, then opened once it does — never sent to a deaf page', async () => {
+    const path = onDisk('double-clicked.sgvue')
+    attachProjectWindow(page.win as never)
+    openProjectFromOS(path)
+    await settle()
+    expect(opened()).toEqual([])
+    page.emit('did-navigate')
+    page.emit('did-finish-load')
+    await settle()
+    expect(opened()).toEqual([])
+    projectPageReady(page.contents as never, undefined)
+    await until(() => expect(opened()).toHaveLength(1))
+    expect(opened()[0]).toMatchObject({ ok: true, name: 'double-clicked' })
+    expect(projects.currentProject()).toBe(path)
+    expect(page.win.focus).toHaveBeenCalled()
+    // The menu's dialog was never shown: the path was the OS's.
+    expect(dialog.showOpenDialog).not.toHaveBeenCalled()
+  })
+
+  it('from the OS after ready: opened at once; a reload makes it wait for the new page', async () => {
+    pageUp()
+    const path = onDisk('second-launch.sgvue')
+    openProjectFromOS(path)
+    await until(() => expect(opened()).toHaveLength(1))
+    page.emit('did-navigate')
+    openProjectFromOS(onDisk('after-reload.sgvue'))
+    await settle()
+    expect(opened()).toHaveLength(1)
+    page.emit('did-finish-load')
+    projectPageReady(page.contents as never, undefined)
+    await until(() => expect(opened()).toHaveLength(2))
+    expect(opened()[1]).toMatchObject({ ok: true, name: 'after-reload' })
+  })
+
+  it('from the OS with unsaved changes: the question comes first — Cancel opens nothing, the open project stays', async () => {
+    pageUp()
+    page.answer({ text: projectAt() })
+    const kept = join(review, 'kept-os.sgvue')
+    saveAnswer(kept)
+    await saveProject(false)
+    setDirty(page.contents as never, { dirty: true })
+    dialog.showMessageBox.mockResolvedValueOnce({ response: 2 })
+    openProjectFromOS(onDisk('incoming.sgvue'))
+    await until(() => expect(dialog.showMessageBox).toHaveBeenCalledTimes(1))
+    await settle()
+    expect((dialog.showMessageBox.mock.calls[0][1] as { buttons: string[] }).buttons).toEqual(['Save', "Don't Save", 'Cancel'])
+    expect(opened()).toEqual([])
+    expect(projects.currentProject()).toBe(kept)
+  })
+
+  it('from the OS with unsaved changes — Don’t Save: opened', async () => {
+    pageUp()
+    page.answer({ text: projectAt() })
+    saveAnswer(join(review, 'discard-os.sgvue'))
+    await saveProject(false)
+    setDirty(page.contents as never, { dirty: true })
+    dialog.showMessageBox.mockResolvedValueOnce({ response: 1 })
+    const path = onDisk('incoming2.sgvue')
+    openProjectFromOS(path)
+    await until(() => expect(opened()).toHaveLength(1))
+    expect(projects.currentProject()).toBe(path)
+  })
+
+  it('a drop: opened as the menu opens a pick, and answers that it was sent', async () => {
+    pageUp()
+    const path = onDisk('dropped.sgvue')
+    expect(await openDroppedProject(page.contents as never, { path })).toBe(true)
+    expect(opened()).toHaveLength(1)
+    expect(opened()[0]).toMatchObject({ ok: true, name: 'dropped' })
+    expect(projects.currentProject()).toBe(path)
+  })
+
+  it('a drop with unsaved changes: the question first, and Cancel answers false with nothing sent', async () => {
+    pageUp()
+    page.answer({ text: projectAt() })
+    saveAnswer(join(review, 'kept-drop.sgvue'))
+    await saveProject(false)
+    setDirty(page.contents as never, { dirty: true })
+    dialog.showMessageBox.mockResolvedValueOnce({ response: 2 })
+    expect(await openDroppedProject(page.contents as never, { path: onDisk('dropped2.sgvue') })).toBe(false)
+    expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
+    expect(opened()).toEqual([])
+  })
+
+  it('one drop heard twice opens once: the second is refused while the first runs', async () => {
+    pageUp()
+    const path = onDisk('twice.sgvue')
+    const [a, b] = await Promise.all([
+      openDroppedProject(page.contents as never, { path }),
+      openDroppedProject(page.contents as never, { path })
+    ])
+    expect([a, b]).toEqual([true, false])
+    expect(opened()).toHaveLength(1)
+  })
+
+  it('a drop refuses a network path before touching it, and a file that is not a project', async () => {
+    pageUp()
+    expect(await openDroppedProject(page.contents as never, { path: '\\\\attacker\\share\\x.sgvue' })).toBe(true)
+    expect(opened()[0]).toEqual({ ok: false, name: 'x', message: NETWORK_DROP })
+    const ifc = join(review, 'model.ifc')
+    writeFileSync(ifc, 'ISO-10303-21;')
+    await openDroppedProject(page.contents as never, { path: ifc })
+    expect(opened()[1]).toMatchObject({ ok: false, message: NOT_A_PROJECT })
+    // Neither asked anything, nor became the open project.
+    expect(dialog.showMessageBox).not.toHaveBeenCalled()
+    expect(projects.currentProject()).toBeNull()
+  })
+
+  it('refuses a directory called x.sgvue, a link to a non-project, and a file over 16 MiB', async () => {
+    pageUp()
+    const dir = join(review, 'folder.sgvue')
+    mkdirSync(dir, { recursive: true })
+    await openDroppedProject(page.contents as never, { path: dir })
+    expect(opened()[0]).toMatchObject({ ok: false, message: 'This project file could not be read.' })
+    const target = join(review, 'plain.txt')
+    writeFileSync(target, projectAt())
+    const link = join(review, 'disguised.sgvue')
+    rmSync(link, { force: true })
+    const { symlinkSync } = await import('node:fs')
+    symlinkSync(target, link)
+    await openDroppedProject(page.contents as never, { path: link })
+    expect(opened()[1]).toMatchObject({ ok: false, message: NOT_A_PROJECT })
+    const huge = join(review, 'huge-drop.sgvue')
+    writeFileSync(huge, Buffer.alloc(PROJECT_MAX_BYTES + 1, 0x20))
+    await openDroppedProject(page.contents as never, { path: huge })
+    expect(opened()[2]).toMatchObject({ ok: false, message: expect.stringMatching(/larger than 16 MB/) as unknown as string })
+    rmSync(huge)
+  })
+
+  it('answers only the main window’s page, before the payload is read', () => {
+    pageUp()
+    const other = { send: vi.fn() }
+    expect(() => openDroppedProject(other as never, { path: 'not even checked' })).toThrow('not available')
+    expect(() => projectPageReady(other as never, undefined)).toThrow('not available')
+    expect(() => openDroppedProject(page.contents as never, { path: '' })).toThrow()
+    expect(() => openDroppedProject(page.contents as never, { path: '/d/a\u0000.sgvue' })).toThrow()
+  })
 })

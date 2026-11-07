@@ -77,3 +77,38 @@ describe('Windows installer', () => {
     expect(bmp(file)).toEqual({ width, height, bpp: 24, compression: 0 })
   })
 })
+
+/**
+ * 2026-11-08 — the `.sgvue` project file, phase 5 (plan D10): both installers register the file
+ * type. electron-builder writes it from `fileAssociations` — macOS `CFBundleDocumentTypes`, NSIS
+ * APP_ASSOCIATE under SHELL_CONTEXT (HKCU for this per-user installer) and APP_UNASSOCIATE in the
+ * uninstaller — so the block is the whole of it, and `build/installer.nsh` is not touched.
+ */
+describe('the .sgvue file association', () => {
+  function associations(): Record<string, string>[] {
+    const lines = read('electron-builder.yml').split(/\r?\n/)
+    const start = lines.findIndex((l) => /^fileAssociations:\s*$/.test(l))
+    expect(start, 'electron-builder.yml has a fileAssociations: block').toBeGreaterThan(-1)
+    const out: Record<string, string>[] = []
+    for (const line of lines.slice(start + 1)) {
+      if (/^\S/.test(line)) break
+      const item = /^ {2}- ([A-Za-z]+):\s*(.*?)\s*$/.exec(line)
+      const more = /^ {4}([A-Za-z]+):\s*(.*?)\s*$/.exec(line)
+      if (item) out.push({ [item[1]]: item[2] })
+      else if (more && out.length) out[out.length - 1][more[1]] = more[2]
+    }
+    return out
+  }
+
+  it('declares .sgvue once, as "SGVue Project", an Editor on macOS, with the app icon', () => {
+    expect(associations()).toEqual([{ ext: 'sgvue', name: 'SGVue Project', description: 'SGVue Project', role: 'Editor' }])
+    // No `icon:` and no build/sgvue.icns or .ico: both platforms fall back to the app's own icon.
+    expect(existsSync(join(ROOT, 'build/sgvue.icns'))).toBe(false)
+    expect(existsSync(join(ROOT, 'build/sgvue.ico'))).toBe(false)
+  })
+
+  it('is registered per-user, the install mode, and not by our own NSIS', () => {
+    expect(nsisOptions().perMachine ?? 'false').toBe('false')
+    expect(read('build/installer.nsh')).not.toMatch(/APP_ASSOCIATE|Software\\Classes|"\.?sgvue"/i)
+  })
+})

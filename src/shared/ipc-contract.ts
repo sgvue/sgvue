@@ -430,3 +430,16 @@ export interface ProjectLocated {
   file: PickedFile | null
   refused: RefusedFile | null
 }
+
+/**
+ * 2026-11-08 (phase 5, plan D10) — `project:openDropped`: the dropped project's path, as the
+ * preload's `webUtils.getPathForFile` gave it. No control characters; main checks the extension
+ * and the network-path rule before it touches the file system (`main/projects.ts`).
+ */
+export const ProjectOpenDropped = z
+  .object({ path: z.string().min(1).max(4096).regex(/^[^\u0000-\u001f\u007f]*$/) })
+  .strict()
+export type ProjectOpenDropped = z.infer<typeof ProjectOpenDropped>
+
+/** `project:ready` carries nothing: the page is listening for `project:opened`. */
+export const ProjectReady = z.undefined()

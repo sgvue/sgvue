@@ -40,7 +40,16 @@ import { lockNavigation, mainWindow, messageBox, openDialog, setMainWindow } fro
 import { closeSchedules, connectSchedules, openSchedules, schedulesWindow } from './schedules-window'
 import { closeVee, connectVee, openVee } from './vee-window'
 import { openScheduleFile, saveExport } from './exports'
-import { answerSnapshot, attachProjectWindow, closeFromPage, locateModel, setDirty } from './projects'
+import {
+  answerSnapshot,
+  attachProjectWindow,
+  closeFromPage,
+  locateModel,
+  openDroppedProject,
+  projectPageReady,
+  setDirty
+} from './projects'
+import { installProjectLaunch } from './project-launch'
 import { updatesUrl } from './about'
 import { checkForUpdate } from './updates'
 import {
@@ -49,6 +58,8 @@ import {
   CH_EXPORT_SAVE,
   CH_PROJECT_CLOSE,
   CH_PROJECT_LOCATE,
+  CH_PROJECT_OPEN_DROPPED,
+  CH_PROJECT_READY,
   CH_PROJECT_DIRTY,
   CH_PROJECT_SNAPSHOT,
   CH_SCHEDULE_FILE_OPEN,
@@ -312,6 +323,11 @@ function registerIpc(): void {
   ipcMain.handle(CH_PROJECT_CLOSE, (event, raw: unknown) => closeFromPage(event.sender, raw))
   // 2026-11-08 (phase 4, D4) — a missing model's Locate…: main's Open dialog, then `admit()`.
   ipcMain.handle(CH_PROJECT_LOCATE, (event, raw: unknown) => locateModel(event.sender, raw))
+  // 2026-11-08 (phase 5, D10) — a `.sgvue` dropped on the window: opened as File › Open Project…
+  // opens a pick, question first. And the page saying it listens, so a project the OS handed the
+  // app before then (a double-click that launched it) is opened now.
+  ipcMain.handle(CH_PROJECT_OPEN_DROPPED, (event, raw: unknown) => openDroppedProject(event.sender, raw))
+  ipcMain.handle(CH_PROJECT_READY, (event, raw: unknown) => projectPageReady(event.sender, raw))
 
   registerAiIpc()
 }
@@ -420,6 +436,12 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   installDeepLinks()
+  // 2026-11-08 (phase 5, D10) — a double-clicked `.sgvue`: macOS `open-file` (which, like
+  // `open-url`, can fire before `ready`) and `argv` on Windows and Linux, first launch and second.
+  // After `installDeepLinks`, so its `second-instance` listener brings the window forward first.
+  installProjectLaunch(() => {
+    if (!mainWindow()) createWindow()
+  })
   gpuAsked = chooseGpu()
   if (gpuAsked) watchGpuCrash(gpuAsked)
 

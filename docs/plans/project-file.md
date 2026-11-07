@@ -1,6 +1,6 @@
 # The `.sgvue` project file — plan
 
-*2026-11-07 · status: **approved** — the owner: *"Approve the recommended defaults for both plans. go with .sgvue"* · D1…D12 are the recommended defaults below.*
+*2026-11-07 · status: **approved; phases 1–5 built 2026-11-08** (BCF export, phase 6, optional and not started) — the owner: *"Approve the recommended defaults for both plans. go with .sgvue"* · D1…D12 are the recommended defaults below.*
 
 ## What it is
 

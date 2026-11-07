@@ -469,6 +469,7 @@ describe('a project never stays "loading"', () => {
     // The bridge, as far as the project's half uses it.
     vi.stubGlobal('window', {
       sgvue: {
+        projectReady: async () => undefined,
         closeProject: closed,
         setProjectDirty: async () => undefined,
         onProjectSnapshotRequest: () => () => undefined,

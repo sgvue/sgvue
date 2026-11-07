@@ -19,7 +19,9 @@ import {
   CH_PROJECT_CLOSE,
   CH_PROJECT_DIRTY,
   CH_PROJECT_LOCATE,
+  CH_PROJECT_OPEN_DROPPED,
   CH_PROJECT_OPENED,
+  CH_PROJECT_READY,
   CH_PROJECT_SAVED,
   CH_PROJECT_SNAPSHOT,
   CH_PROJECT_SNAPSHOT_REQUEST,
@@ -229,7 +231,16 @@ const api = {
    * title, and never a path. Main shows the native Open dialog for one IFC and answers what
    * `admit()` let through, or `null`.
    */
-  locateProjectModel: (name: string): Promise<ProjectLocated | null> => ipcRenderer.invoke(CH_PROJECT_LOCATE, { name })
+  locateProjectModel: (name: string): Promise<ProjectLocated | null> => ipcRenderer.invoke(CH_PROJECT_LOCATE, { name }),
+  /**
+   * 2026-11-08 (phase 5, plan D10) — a `.sgvue` dropped on the window or the drop zone: its path,
+   * as `pathForFile` gave it for the dropped `File` — the IFC drop's own route. Main opens it as
+   * File › Open Project… opens a pick (the unsaved-changes question first) and answers whether it
+   * sent a `project:opened`.
+   */
+  openDroppedProject: (path: string): Promise<boolean> => ipcRenderer.invoke(CH_PROJECT_OPEN_DROPPED, { path }),
+  /** The page now listens for `project:opened`: a project the OS handed the app opens now. No payload. */
+  projectReady: (): Promise<void> => ipcRenderer.invoke(CH_PROJECT_READY)
 }
 
 contextBridge.exposeInMainWorld('sgvue', api)

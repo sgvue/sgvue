@@ -20,7 +20,7 @@
  */
 import { test, expect, _electron as electron } from '@playwright/test'
 import { existsSync } from 'node:fs'
-import { mkdtemp, open, readdir, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, open, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { ROOT, statusText, TINY } from './helpers'
@@ -289,4 +289,49 @@ test('the packaged app carries the brand-mark icon', async () => {
   // The scaffold icon `build/` shipped until Phase 10 was 85 649 bytes; the brand mark drawn
   // by `scripts/make-icons.py` is ten sizes and far larger. A stale copy would be caught here.
   expect((await stat(icon)).size).toBeGreaterThan(150_000)
+})
+
+/**
+ * 2026-11-08 — the `.sgvue` project file, phase 5 (plan D10): the macOS bundle declares the
+ * document type, so Finder hands a double-clicked `.sgvue` to SGVue as `open-file`. The Windows
+ * association is written by the NSIS installer into HKCU at install time, so `dist/win-unpacked`
+ * has nothing to read — that half is checked by hand on an installed copy (`docs/RELEASING.md`).
+ */
+test('the packaged macOS app declares the .sgvue document type', async () => {
+  test.skip(process.platform !== 'darwin', 'the Windows association is written by the installer, not the unpacked tree')
+  test.skip(!existsSync(EXECUTABLE), NO_APP)
+  const plist = await readFile(join(APP, 'Contents/Info.plist'), 'utf8')
+  const types = /<key>CFBundleDocumentTypes<\/key>\s*<array>([\s\S]*?)<\/array>\s*<key>/.exec(plist)
+  expect(types, 'Info.plist has no CFBundleDocumentTypes').not.toBeNull()
+  expect(types![1]).toMatch(/<key>CFBundleTypeExtensions<\/key>\s*<array>\s*<string>sgvue<\/string>\s*<\/array>/)
+  expect(types![1]).toMatch(/<key>CFBundleTypeName<\/key>\s*<string>SGVue Project<\/string>/)
+  expect(types![1]).toMatch(/<key>CFBundleTypeRole<\/key>\s*<string>Editor<\/string>/)
+})
+
+/**
+ * …and a `.sgvue` in the launch `argv` — what a double-click on Windows does, and what a terminal
+ * does on either platform — opens that project in the packaged app: the window title names it.
+ * The project is the frozen corpus with its first model pointed at `tiny.ifc`; its other two are
+ * missing, which is phase 4's case and only adds their rows.
+ */
+test('the packaged app opens a .sgvue named in its launch argv', async () => {
+  test.skip(!existsSync(EXECUTABLE), NO_APP)
+  const dir = await mkdtemp(join(tmpdir(), 'sgvue-packaged-project-'))
+  const userData = join(dir, 'userData')
+  const project = join(dir, 'argv launch.sgvue')
+  const file = JSON.parse(await readFile(join(ROOT, 'tests/fixtures/project/v1-synthetic.sgvue'), 'utf8')) as {
+    models: { name: string; relPath: string | null; absPath: string; size: number }[]
+  }
+  file.models[0] = { ...file.models[0], name: basename(TINY), relPath: null, absPath: resolve(TINY), size: (await stat(TINY)).size }
+  await writeFile(project, JSON.stringify(file), 'utf8')
+  const app = await electron.launch({ executablePath: EXECUTABLE, args: [`--user-data-dir=${userData}`, project] })
+  try {
+    await app.firstWindow()
+    await expect
+      .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getTitle() ?? ''), { timeout: 60_000 })
+      .toMatch(/^argv launch( •)? — SGVue$/)
+  } finally {
+    await app.close()
+    await rm(dir, { recursive: true, force: true })
+  }
 })

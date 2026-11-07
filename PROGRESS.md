@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — `.sgvue` project file, phase 5: double-click and drop
+
+**Did.** `.sgvue` is registered in both installers (per-user on Windows, removed on uninstall).
+Double-clicking one, dropping it on the Dock icon or naming it on the command line opens it;
+a second launch brings the running window forward and opens it there. A `.sgvue` dropped on the
+window or the drop zone opens the same way; the first project in a drop opens alone and the rest
+are named in error rows. Every route asks about unsaved changes first and goes through the same
+open function as File › Open Project…. A project on a network share opens by double-click or the
+menu, not by a drop.
+
+**Verified.** New headless tests for `argv`, `open-file`, second launch, parking, drop routing and
+the packaging config, each probed failing; typecheck, lint, 3 342 unit tests and the build pass.
+Deep review PASS. **Not run:** two new packaged checks (`Info.plist` declares the type; a `.sgvue`
+in `argv` opens) and the real double-click in Finder and Explorer — they need an installed copy.
+
 ## 2026-11-08 — `.sgvue` project file, phase 4: changed and missing models
 
 **Did.** A model whose file changed since the project was saved opens anyway: its references come

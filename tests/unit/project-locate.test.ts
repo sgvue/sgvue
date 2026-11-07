@@ -116,6 +116,7 @@ beforeAll(() => {
   vi.stubGlobal('localStorage', memoryStorage())
   vi.stubGlobal('window', {
     sgvue: {
+      projectReady: async () => undefined,
       closeProject: closed,
       setProjectDirty: async (d: boolean) => void dirtyCalls.push(d),
       onProjectSnapshotRequest: () => () => undefined,

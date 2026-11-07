@@ -11,6 +11,19 @@ protocols:
   - name: SGVue link
     schemes:
       - sgvue
+# 2026-11-08 — the `.sgvue` project file, phase 5 (docs/plans/project-file.md D10): a double-click
+# opens it in SGVue. macOS: a `CFBundleDocumentTypes` entry in Info.plist (role Editor, rank
+# Default), delivered as `open-file` (`src/main/project-launch.ts`). Windows (NSIS): electron-builder's
+# own APP_ASSOCIATE / APP_UNASSOCIATE, written under SHELL_CONTEXT — HKCU\Software\Classes, since the
+# installer is per-user (build/installer.nsh forces the mode) — with the command `"SGVue.exe" "%1"`,
+# read from argv; a real uninstall deletes the class and the `.sgvue` OpenWithProgids value, and an
+# update re-registers it after the old uninstaller ran. No `icon`: with no build/sgvue.icns or
+# build/sgvue.ico, both platforms show the app's own icon. Linux is not built.
+fileAssociations:
+  - ext: sgvue
+    name: SGVue Project
+    description: SGVue Project
+    role: Editor
 directories:
   buildResources: build
 files:

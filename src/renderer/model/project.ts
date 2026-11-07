@@ -1119,6 +1119,9 @@ export function installProject(): () => void {
   const offRequest = bridge?.onProjectSnapshotRequest(({ n }) => answerSnapshot(n))
   const offOpened = bridge?.onProjectOpened((msg) => void openProjectMessage(msg))
   const offSaved = bridge?.onProjectSaved(({ n }) => onSaved(n))
+  // 2026-11-08 (phase 5, D10) — listening now: a project the OS handed the app before this page
+  // could hear it (a double-click that launched the app) is opened by main from here.
+  void bridge?.projectReady().catch(() => undefined)
   onFreshStart(closeProject)
   // The Schedules window changed the project's saved setups or its open schedule.
   onProjectSchedules(() => {

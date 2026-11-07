@@ -8,6 +8,21 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+### Added
+
+- **Project files (`.sgvue`).** File › Save Project (⌘S / Ctrl+S), Save Project As… and Open
+  Project… save a coordination review — which IFC files are open and everything done on top of
+  them: colours, hidden elements, sections, camera, viewpoints, filter sets, schedules, spots and
+  measurements. The IFC files are referenced, never copied or changed. The window title shows the
+  project and a `•` while there are unsaved changes, and quitting asks first.
+- A model that changed since the project was saved opens anyway, with its saved items re-applied
+  by GlobalId and a note of how many no longer match; a missing model gets **Locate…**.
+- **Double-click a `.sgvue` to open it**, or drag it onto the SGVue window, the home page's drop
+  zone or (macOS) the Dock icon. On Windows the installer registers the file type for your user
+  only; if Windows asks which app opens `.sgvue`, pick SGVue, and the file icon may appear only
+  after Explorer refreshes. On macOS, Finder learns the type once the app has been opened. A
+  project on a network share opens by double-click or File › Open Project…, not by dragging it in.
+
 ## [1.3.0] - 2026-10-09
 
 ### Added

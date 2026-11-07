@@ -1065,6 +1065,21 @@ Anything not on this list is a defect.
   (`already open in this project`). When every model was missing, the first one located boots the
   viewer. A row dismissed with × loses its Locate… until the project is reopened. No other
   element was added.)*
+  *(Amended 2026-11-08 — phase 5, plan D10, owner-approved with the plan: "register `.sgvue` in
+  both installers (macOS `open-file`, Windows argv), and the drop zone also takes a `.sgvue`".
+  Double-clicking a `.sgvue` in Finder or Explorer, dropping it on the Dock icon or naming it on
+  the command line opens it as File › Open Project… opens a pick — the unsaved-changes question
+  first — and a running SGVue's window comes forward. A `.sgvue` dropped on the window or on the
+  designed drop zone opens the same way; the drop zone keeps its look and copy. A drop opens its
+  first project alone; every other file in it gets the designed error row (`not opened — a project
+  was dropped with it` · `not opened — one project opens at a time`), a `.sgvue` dragged from
+  somewhere that is not a disk gets `not on disk — save it to a folder, then open it`, and a
+  project on a network share is refused from a drop (`A project on a network share opens with File
+  › Open Project… or a double-click, not by dropping it.`). A file that is not a `.sgvue` reads
+  `Only an SGVue project file (.sgvue) opens this way.` The file type is `SGVue Project` with the
+  app's own icon, registered per-user by the Windows installer and removed by a real uninstall.
+  **No new element, no new control.** Not yet seen installed: the packaged checks wait for the
+  owner's yes.)*
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1341,6 +1356,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **Save and Open a `.sgvue` project, phase 2** (`main/projects.ts`, the fourth writer; `model/project.ts`): main pulls the project from the page (`project:snapshotRequest` → `project:snapshot`), re-reads it with `readProject`, computes `relPath` against the real folder it writes to (a carried model's re-based, `relPathFor`) and writes atomically to the open project or the Save dialog's answer, UTF-8, ≤ 16 MiB, `.sgvue` forced. Open Project… admits each model path through `admit()` (relPath, then absPath; a network path only on the project's own share or where the user has been); a project replaces what is open, restored through `applySession`. **A model the project names and could not open is never dropped by a save** (`carryForward`). Dirty is by value (`projectStateKey`); close, quit and Open ask (`closeAction`, `afterQuestionSave`). A fresh start that is not the project's own closes it (`project:close`); the project's own load, even with no file admitted, does not. D12: `assignedColors`, under the override and over the library and slot colours, from `MC` less its grey, written `assigned: true`. Viewpoints, filter sets, schedules and markups are written now, restored in phase 3.
 - 2026-11-07 — **while a project is open its viewpoints, filter sets and saved schedules are its own** (phase 3; `setProjectLists`; Schedules over `projectSchedules` / `projectSaved`, fitted by `portableSavedList`, a refused list leaves the window writing nowhere); closing brings `localStorage`'s back untouched, a first Save As imports; markups stay carried until placed; a measurement stores an optional unit `normal` and re-fires from it, else fires only the directions it read; one on a missing model is carried; a self-chosen schedule (`fromDefault`) is not the project's; viewpoints pair with the file's by an explicit map, not by id.
 - 2026-11-08 — **project phase 4 (D3, D4)**: a changed model opens, is restored by GlobalId, and its error row says `changed since the project was saved — N saved items no longer match` (`project.stale` until saved). A missing model's row offers `Locate…` — `project:locate` (a name in, main's Open dialog, `admit()`) and `locateFile` (the project's key and name, never a fresh start; a file already open is refused). `restoreOnto` binds every located model that has joined and `restoreLocated` waits while the project loads, so either order converges; then a full restore when all were missing, else `mergeLocated`. Opened, changed and located models keep their ids (`ProjectModelInfo.id`).
+- 2026-11-08 — **project phase 5 (D10): a `.sgvue` opens by double-click and by drop** — `fileAssociations` in `electron-builder.yml` (per-user HKCU on Windows, `Editor` on macOS, app icon); `main/project-launch.ts` (`open-file`, `argv`, `second-instance`; a link in the same `argv` wins) parks the path until the page has loaded and said `project:ready`; a drop sends `project:openDropped {path}`; every route goes through `projects.ts`'s one `openNow`, question first, behind `runOpen`; a dropped network path is refused; the first `.sgvue` of a drop opens alone and the rest get error rows.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

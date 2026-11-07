@@ -33,6 +33,7 @@
  */
 import type { AdmitResult, PickedFile, RefusedFile } from '../../shared/ipc-contract'
 import { NO_SECTIONS } from '../../shared/sections'
+import { projectDrop, PROJECT_NOT_ON_DISK, type ProjectDrop } from '../../shared/project-drop'
 import { restorableIds, sessionOrder, type SessionPayload } from '../../shared/session-codec'
 import * as up from '../../shared/upload'
 import { getViewer, resetHistory, useShell, type LibraryFile } from '../state/shell'
@@ -671,6 +672,9 @@ export async function openDialog(): Promise<void> {
  */
 export async function dropFiles(files: readonly File[]): Promise<void> {
   const bridge = api()
+  // 2026-11-08 (phase 5, D10) — a `.sgvue` in the drop: the project opens, alone (`projectDrop`).
+  const plan = projectDrop(files.map((f) => f.name))
+  if (plan) return dropProject(files, plan)
   const chosen: ChosenFile[] = []
   for (const file of files) {
     const raw = bridge?.pathForFile(file) ?? ''
@@ -692,6 +696,31 @@ export async function dropFiles(files: readonly File[]): Promise<void> {
   }
   if (!chosen.length) return
   await begin(chosen)
+}
+
+/**
+ * 2026-11-08 (phase 5, plan D10) — a drop with a project file in it. The project's path comes the
+ * IFC drop's way — the preload's `webUtils.getPathForFile` — and main opens it as File › Open
+ * Project… opens a pick: the unsaved-changes question first, then the file, then each model
+ * through `admit()` (`main/projects.ts`). The rest of the drop is not opened, and each file of it
+ * gets the designed error row saying why — once main has sent the project (or its refusal), after
+ * the project's own fresh start, so that start does not take the rows away; a Cancel in the
+ * question, or a second hearing of the same drop while the first is under way, adds none. A
+ * dropped project that is not a file on disk names no path, and is its own error row.
+ */
+async function dropProject(files: readonly File[], plan: ProjectDrop): Promise<void> {
+  const bridge = api()
+  const project = files[plan.project]
+  const path = bridge?.pathForFile(project) ?? ''
+  if (!path) return addError(project.name, PROJECT_NOT_ON_DISK)
+  let sent = false
+  try {
+    sent = (await bridge?.openDroppedProject(path)) === true
+  } catch {
+    /* refused by main's contract: nothing was opened, and nothing is said about the rest */
+  }
+  if (!sent) return
+  for (const { index, reason } of plan.ignored) addError(files[index].name, reason)
 }
 
 /**

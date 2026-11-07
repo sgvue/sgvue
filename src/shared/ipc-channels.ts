@@ -131,6 +131,21 @@ export const CH_PROJECT_SAVED = 'project:saved'
  * project open).
  */
 export const CH_PROJECT_LOCATE = 'project:locate'
+/**
+ * 2026-11-08 (phase 5, plan D10) — main window → main: a `.sgvue` was dropped on the window or the
+ * designed drop zone. `{ path }`, the path the preload's `webUtils.getPathForFile` gave for the
+ * dropped `File` — the IFC drop's own route. Main opens it as File › Open Project… opens a pick:
+ * the unsaved-changes question first, then at most 16 MiB, `readProject`, each model through
+ * `admit()`. Answers whether a project — or main's refusal of one — was sent on `project:opened`.
+ */
+export const CH_PROJECT_OPEN_DROPPED = 'project:openDropped'
+/**
+ * 2026-11-08 (phase 5) — main window → main: the page is listening for `project:opened`. No
+ * payload. A project the OS handed the app before then (a double-click that launched it, macOS
+ * `open-file` before `ready`) is parked in main and opened now — never sent to a page that could
+ * not hear it.
+ */
+export const CH_PROJECT_READY = 'project:ready'
 
 /**
  * Every channel main registers a handler for, for `SYSTEM_SPEC.md` §10 and the guard test.
@@ -164,5 +179,7 @@ export const IPC_CHANNELS = [
   CH_PROJECT_SNAPSHOT,
   CH_PROJECT_DIRTY,
   CH_PROJECT_CLOSE,
-  CH_PROJECT_LOCATE
+  CH_PROJECT_LOCATE,
+  CH_PROJECT_OPEN_DROPPED,
+  CH_PROJECT_READY
 ] as const
