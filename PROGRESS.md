@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — noImplicitAny on
+
+**Did.** Step 1 of the lint hardening: `noImplicitAny: true` in `tsconfig.node.json` and `tsconfig.web.json`, overriding `@electron-toolkit/tsconfig`'s `false`. Three errors, all in tests, fixed with real types: `display-units.test.ts`'s stub `mkLabel` parameters, and `gpu-guard.test.ts` loading `electron-guard.cjs` through `createRequire` with its used exports typed.
+
+**Verified.** `npm run typecheck`, `npm run build`, `npm test` (3 123 passed / 4 skipped).
+
 ## 2026-11-07 — the stage cannot be scrolled
 
 **Did.** The owner, of a stage that a script or `scrollIntoView` could scroll: *"Yes, fix it"*. The design's

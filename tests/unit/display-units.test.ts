@@ -538,7 +538,7 @@ describe('the annotation layer re-renders every label in the unit', () => {
   function host(): AnnotationHost {
     const overlay: LabelOverlay = {
       labelBase: () => ({}),
-      mkLabel: (pos, html, style = {}, dx = 0, dy = 0) => {
+      mkLabel: (pos: Vector3, html: string, style: Partial<CSSStyleDeclaration> = {}, dx = 0, dy = 0) => {
         const el = { innerHTML: html, style: { ...style }, title: '', addEventListener: () => {} }
         const label: Label = {
           el: el as unknown as HTMLDivElement,

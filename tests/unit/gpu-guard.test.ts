@@ -5,6 +5,7 @@
  * drift, because they are the app's answer to the three kernel panics of 2026-09-17 — and to
  * the discovery that `workingSetSize` cannot see the memory that caused them.
  */
+import { createRequire } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
 
 // `gpu-guard.ts` imports `app` from electron for its polling half. The pure half under test
@@ -26,8 +27,26 @@ const {
 } = await import('../../src/main/gpu-guard')
 
 // The dev-script guard must read the same number the app's guard does, or a bounded run and a
-// live session disagree about what is safe.
-const scriptGuard = await import('../../scripts/lib/electron-guard.cjs')
+// live session disagree about what is safe. A `.cjs` has no type declaration, so the part this
+// test reads is typed here, as `third-party-notices.test.ts` types its script.
+interface GuardLimits {
+  maxGpuMB: number
+  maxRendererMB: number
+  maxPressure: number
+  maxSeconds: number
+  pollMs: number
+}
+interface GuardReading {
+  gpuMB: number
+  rendererMB: number
+  gpuBlindMB: number
+  pressure: number
+}
+const scriptGuard = createRequire(__filename)('../../scripts/lib/electron-guard.cjs') as {
+  parseFootprintMB: (text: string) => number | null
+  breachOf: (reading: GuardReading, elapsedSeconds: number, limits: GuardLimits) => string | null
+  DEFAULTS: GuardLimits
+}
 
 describe('parseFootprintMB', () => {
   it('reads the phys_footprint line footprint(1) actually prints', () => {

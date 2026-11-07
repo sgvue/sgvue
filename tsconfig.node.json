@@ -15,6 +15,8 @@
   ],
   "compilerOptions": {
     "composite": true,
+    // The base (`@electron-toolkit/tsconfig`) sets `strict` but turns this back off; we want it on.
+    "noImplicitAny": true,
     // `vite/client` is what declares the `?url` asset imports. The two workers are left out of
     // this project's `include` for exactly that reason, but a test that reaches a renderer
     // module pulls their *types* in through the bridges, so the declarations have to be here.

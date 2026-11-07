@@ -3,6 +3,8 @@
   "include": ["src/renderer/**/*", "src/shared/**/*", "src/schedule/**/*", "src/worker/**/*", "src/preload/api.d.ts"],
   "compilerOptions": {
     "composite": true,
+    // The base (`@electron-toolkit/tsconfig`) sets `strict` but turns this back off; we want it on.
+    "noImplicitAny": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
