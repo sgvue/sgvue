@@ -1118,17 +1118,19 @@ const CASES = [
     group: 'operate',
     tags: ['operate', 'display'],
     fixture: 'mock',
-    prompt: 'Turn the canvas grid under the model off — I only want to see the building.',
+    // 2026-11-07: both grids start off (owner-requested), so the case turns the canvas grid
+    // on — it was "turn it off", which would now be a no-op — and the IFC gridlines stay off.
+    prompt: 'Turn the canvas grid under the model on — I want to see the ground plane.',
     truth: {},
     expect: {
       facts: [{ any: ['canvas grid', 'ground grid', 'grid'] }],
       tools: { require: ['toggle_display'], maxCalls: 6 },
-      /** The canvas grid, and not the IFC gridlines: those stay on. */
-      view: { display: { groundGrid: false, grids: true }, visible: { changed: false } }
+      /** The canvas grid, and not the IFC gridlines: those stay off. */
+      view: { display: { groundGrid: true, grids: false }, visible: { changed: false } }
     },
     oracle: {
-      calls: [{ name: 'toggle_display', input: { groundGrid: false } }],
-      reply: 'The canvas grid is off. The IFC gridlines are untouched.'
+      calls: [{ name: 'toggle_display', input: { groundGrid: true } }],
+      reply: 'The canvas grid is on. The IFC gridlines are untouched.'
     }
   },
   {

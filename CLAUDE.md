@@ -216,7 +216,7 @@ Anything not on this list is a defect.
   a button right after Levels, the neighbours' markup, class and on/off colours,
   `data-tip="canvas grid"`, a framed 3 × 3 grid glyph in the toolbar's stroke. It shows or hides
   the fine ground `GridHelper` — not the IFC grids. *(Amended 2026-10-08: and the ground veil
-  with it — below.)* On by default; not saved in a session.
+  with it — below.)* On by default *(off since 2026-11-07 — below)*; not saved in a session.
   **Amended 2026-10-02:** it was recorded here as "not reachable by the assistant", and now it
   is — `toggle_display`'s `groundGrid`, through the button's own `setGroundGrid` — because the
   owner's direction of 2026-10-01 (*"assistant should possess everything user can do on the
@@ -934,6 +934,16 @@ Anything not on this list is a defect.
   default window (1264 × 755) by 22 px (it fitted exactly before), and with the update notice by
   24 px at 1280 × 820 (fitted before) and 89 px at 1264 × 755 (34 before). The default viewer is
   byte-identical to the build before, in both themes.
+- **2026-11-07 — the IFC gridlines and the canvas grid are off when the app starts.** Asked for
+  by the owner in these words: *"Make gridlines and canvas off by default."* Amends 2026-09-24's
+  canvas-grid entry and the design's own default of gridlines on. The two toolbar buttons,
+  Gridlines and `canvas grid`, keep their markup, tips, handlers and on / off colours; only where
+  they start changes. With the canvas grid off the ground veil is not drawn (2026-10-08), so at
+  boot what is below grade is seen at full contrast from above. A session, share link or
+  viewpoint that stores `grids` still restores what it stored; `groundGrid` is still not saved.
+  The defaults are one list, `DISPLAY_DEFAULTS` (`shared/ai-schema.ts`), which the store reads
+  and the assistant's sparse view state compares against. **No new element and no new control.**
+  Not yet measured in a window; parity captures now need both switched on to match the design.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1187,6 +1197,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-09 — **the landing page's georeferencing line is one constant, `GEOREF_NOTE`** (`shared/upload.ts`, beside the page's other copy), drawn as `<span data-role="georef-note">` after the drop zone and its upload rows and before the "or" divider, in the drop zone caption's own style string; it says the other models are placed *relative to* the first, not *to match* it — each stands where its own map position puts it (2026-10-08).
 - 2026-10-09 — **local folders, build output and IFC files are kept out of `app.asar`** (`electron-builder.yml` `files`, still a deny-list): the root folders a maintainer's `.git/info/exclude` keeps out of git — `reports/`, `research_notes/`, `reference/` — and `dist/`, `out-baseline/`, `tmp/` and `**/*.{ifc,ifczip}`. The first 1.3.0 package carried `reports/` and `research_notes/`, local notes holding a home path, until `tests/unit/asar-contents.test.ts` failed on it; electron-builder leaves out only its own output directory, so a build into `dist/<name>` packs the rest of `dist/`; a release built on GitHub never has these folders, a local `dist:win` does.
 - 2026-10-17 — **`package.json`'s `overrides` forces exceljs's `uuid` to `^11.1.1`** (`{ "exceljs": { "uuid": "^11.1.1" } }`) for GHSA-w5hq-g745-h8pq: exceljs 4.4.0, the latest, declares `uuid: ^8.3.0`, so Dependabot's security update cannot reach it; exceljs calls only `v4()`, with no buffer, never the vulnerable path. It changes the lockfile and the Node-side copy only — the renderer bundles exceljs's prebuilt browser build, which carries its own uuid, so `out/` is byte-identical before and after (94 files, `exceljs.min-Qns6GaRS.js` included). Remove it when exceljs declares a `uuid` ≥ 11.1.1.
+- 2026-11-07 — **the IFC gridlines and the canvas grid start off** (owner-requested): `DISPLAY_DEFAULTS` reads `grids: false`, `groundGrid: false`, and the store's seven display switches take their first values from it, so there is one list of defaults, not two; the read-back prompt line and the `op-canvas-grid` eval case (now "turn it on") follow.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

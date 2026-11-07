@@ -197,7 +197,7 @@ of it (below); the fourth runs on the plain mock, with its instruction in a view
 | `op-act-on-found-ids` | Find the walls with a two-hour fire rating using the database, then isolate exactly those elements. *(needs `ids-input` — shipped 2026-09-20; the isolate is under the 5 % guard, so the runner clicks Apply)* | — |
 | `op-selection-target` | Isolate what I have selected. *(needs `selection-target` — shipped 2026-09-20; also under the guard)* | a selection |
 | `op-filter-set-name` | Save this as a filter set called "L3 minus windows", then apply it again by name. *(needs `filter-sets` — shipped 2026-09-20)* | — |
-| `op-canvas-grid` | Turn the canvas grid under the model off — I only want to see the building. *(2026-10-02; the IFC gridlines must stay on)* | — |
+| `op-canvas-grid` | Turn the canvas grid under the model on — I want to see the ground plane. *(2026-10-02; since 2026-11-07, when both grids start off, it turns the canvas grid on and the IFC gridlines must stay off)* | — |
 | `op-clear-selection` | Deselect everything. *(2026-10-02)* | a selection |
 | `op-add-to-selection` | Add the doors on L2 to what I have selected. *(2026-10-02; the stairs stay selected)* | a selection |
 | `op-undo` | Undo that last change to the view. *(2026-10-02; a step back that can be redone, not a reset)* | a live isolate |

@@ -140,12 +140,13 @@ describe('the defaults the sparse rule is measured against', () => {
   it('are the store’s own first values, switch for switch', () => {
     resetShell()
     expect(displayState(st())).toEqual(DISPLAY_DEFAULTS)
+    // 2026-11-07, owner-requested: the gridlines and the canvas grid start off.
     expect(DISPLAY_DEFAULTS).toEqual({
-      grids: true,
+      grids: false,
       levels: false,
       shadows: true,
       dims: false,
-      groundGrid: true,
+      groundGrid: false,
       snap: true,
       originalMaterials: true
     })
@@ -277,19 +278,20 @@ describe('the per-turn view state is sparse', () => {
     st().setShadows(false)
     st().toggleDims()
     st().toggleSnap()
-    st().setGroundGrid(false)
+    st().setGroundGrid(true)
     st().toggleNative()
     st().setTool('measure')
     st().toggleModel('STR')
     st().setSec('grid', { name: 'C', offset: 500, flip: true, cut: false })
     const state = perTurn()
     expect(Object.keys(state)).toEqual([...CORE_KEYS, 'display', 'tool', 'modelsHidden', 'sectionPlanes'])
+    // Gridlines and the canvas grid start off since 2026-11-07, so off their default is on.
     expect(state.display).toEqual({
-      grids: false,
+      grids: true,
       levels: true,
       shadows: false,
       dims: true,
-      groundGrid: false,
+      groundGrid: true,
       snap: false,
       originalMaterials: false
     })
@@ -362,7 +364,7 @@ describe('get_view_state reads everything back, in full', () => {
 
     const body = await run('get_view_state')
     expect(body.display).toEqual({
-      grids: true,
+      grids: false,
       levels: true,
       shadows: false,
       dims: false,

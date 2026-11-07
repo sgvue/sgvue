@@ -830,9 +830,10 @@ describe('the other view tools', () => {
   })
 
   it('toggle_display turns things on and off and says which', async () => {
-    const body = await run('toggle_display', { grids: false, levels: true })
-    expect(body.changed).toEqual(['grids off', 'levels on'])
-    expect(useShell.getState().grids).toBe(false)
+    // Gridlines start off since 2026-11-07, so this turns both on.
+    const body = await run('toggle_display', { grids: true, levels: true })
+    expect(body.changed).toEqual(['grids on', 'levels on'])
+    expect(useShell.getState().grids).toBe(true)
     expect(useShell.getState().levels).toBe(true)
     expect((await run('toggle_display', {})).message).toBe('Nothing to change.')
   })

@@ -99,6 +99,7 @@ import { frameKey } from '../../shared/georef'
 import { NO_SECTIONS, type SecKind, type SecPlane, type Sections } from '../../shared/sections'
 import type { DisplayUnit } from '../../shared/units'
 import { sphericalOf } from '../../shared/view-angles'
+import { DISPLAY_DEFAULTS } from '../../shared/ai-schema'
 import {
   mergeUndo,
   revertNote,
@@ -355,8 +356,8 @@ export interface ShellState {
   /**
    * The fine ground grid under the model (2026-09-24, owner-requested: *"Add an option to
    * toggle off canvas gridline."*). Not the IFC grids — that is `grids`. Off, the ground veil
-   * goes with it (2026-10-08, owner-requested), so nothing below grade is dimmed. Not saved in a
-   * session. It was recorded then as not reachable by the assistant; since 2026-10-02 it is
+   * goes with it (2026-10-08, owner-requested), so nothing below grade is dimmed. Off by default
+   * since 2026-11-07 (owner-requested), like `grids`. Not saved in a session. It was recorded then as not reachable by the assistant; since 2026-10-02 it is
    * (`toggle_display`'s `groundGrid`, through `setGroundGrid` below) — the owner's direction
    * of 2026-10-01, *"assistant should possess everything user can do on the app"*.
    */
@@ -931,8 +932,12 @@ export const useShell = create<ShellState>((set, get) => ({
   tool: 'select',
   propOpen: {},
   copied: false,
-  grids: true,
-  levels: false,
+  // The seven display switches start where `DISPLAY_DEFAULTS` says (`shared/ai-schema.ts`),
+  // the one list the assistant's sparse view state is measured against. Since 2026-11-07 the
+  // gridlines and the canvas grid start off (the owner: *"Make gridlines and canvas off by
+  // default."*).
+  grids: DISPLAY_DEFAULTS.grids,
+  levels: DISPLAY_DEFAULTS.levels,
   view: 'iso',
   proj: 'persp',
   card: null,
@@ -944,15 +949,15 @@ export const useShell = create<ShellState>((set, get) => ({
   measureCount: 0,
   spotCount: 0,
   stats: { fps: 0, backend: '…', calls: 0 },
-  shadows: true,
-  groundGrid: true,
+  shadows: DISPLAY_DEFAULTS.shadows,
+  groundGrid: DISPLAY_DEFAULTS.groundGrid,
   modelColors: {},
-  nativeMats: true,
+  nativeMats: DISPLAY_DEFAULTS.originalMaterials,
   palette: null,
-  dims: false,
+  dims: DISPLAY_DEFAULTS.dims,
   active: null,
   confirmRemove: null,
-  snap: true,
+  snap: DISPLAY_DEFAULTS.snap,
   uploads: [],
   uploadNames: {},
   booted: false,

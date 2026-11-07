@@ -1063,17 +1063,17 @@ test('the canvas grid toggle hides and shows the ground grid, and survives a the
 
     const lit = (): Promise<string> => toggle.evaluate((b) => getComputedStyle(b).color)
 
-    const on = await settledShot(page)
-    const litOn = await lit()
-    await toggle.click()
+    // Off by default since 2026-11-07 (owner-requested).
     const off = await settledShot(page)
-    expect(await pixelsDiffer(page, on, off)).toBeGreaterThan(1000)
-    expect(await lit()).not.toBe(litOn)
+    const litOff = await lit()
     await toggle.click()
-    expect(await pixelsDiffer(page, on, await settledShot(page))).toBeLessThan(20)
+    const on = await settledShot(page)
+    expect(await pixelsDiffer(page, off, on)).toBeGreaterThan(1000)
+    expect(await lit()).not.toBe(litOff)
+    await toggle.click()
+    expect(await pixelsDiffer(page, off, await settledShot(page))).toBeLessThan(20)
 
     // Off, then a theme switch — which rebuilds the grid helper in the new theme's colours.
-    await toggle.click()
     // Since 2026-10-01 the theme button is in this same group, two after the toggle and clear
     // of the view cube's canvas. (The button under the canvas's empty corner is Schedules now;
     // the toolbar test below clicks that one through it.)
@@ -1132,9 +1132,10 @@ test('the ground stands at the file’s zero, not at the height of the first par
       height: 60
     }
     const toggle = page.locator('button[data-tip="canvas grid"]')
-    const on = { all: await settledShot(page), middle: await settledShot(page, 0, middle) }
-    await toggle.click()
+    // Off by default since 2026-11-07, so the click turns it on.
     const off = { all: await settledShot(page), middle: await settledShot(page, 0, middle) }
+    await toggle.click()
+    const on = { all: await settledShot(page), middle: await settledShot(page, 0, middle) }
     expect(await pixelsDiffer(page, on.all, off.all)).toBeGreaterThan(1000)
     expect(await pixelsDiffer(page, on.middle, off.middle)).toBeLessThan(20)
   } finally {

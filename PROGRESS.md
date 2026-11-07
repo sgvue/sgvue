@@ -4,6 +4,18 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — gridlines and the canvas grid off by default
+
+**Did.** The owner: *"Make gridlines and canvas off by default."* `DISPLAY_DEFAULTS` now has
+`grids` and `groundGrid` false, and the store's seven display switches read their first values
+from it. The read-back instruction line names the new defaults, and the eval case
+`op-canvas-grid` now turns the canvas grid on. Four unit test files and three e2e specs
+(`smoke`, `feet`, `vee-trace`) were updated for the new starting state. Sessions, links and
+viewpoints restore a stored `grids` as before.
+
+**Verified.** `npm run typecheck`; `npm test` (2 998 passed / 4 skipped); reviewer PASS.
+**Owed:** an e2e run of the three updated specs (needs the owner's yes — it opens a window).
+
 ## 2026-11-07 — 21 Dependabot security alerts cleared, six Dependabot PRs folded in
 
 **Did.** Exact pins bumped in `package.json`: Electron 44.3.0 → 44.10.0 (#15), zod 4.6.5 →

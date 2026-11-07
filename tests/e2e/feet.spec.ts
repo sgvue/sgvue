@@ -76,7 +76,9 @@ test('a model in feet boots in ft, every readout follows, and the card’s mm pu
       }, { timeout: 20_000 })
       .toBe('ft')
 
-    // ── the 3D labels: the grid dimensions, and the level tags once levels are on ──
+    // ── the 3D labels: the grid dimensions once gridlines are on (off by default since
+    // 2026-11-07), and the level tags once levels are on ──
+    await page.locator('button[data-tip="Gridlines (G)"]').click()
     await expect.poll(() => overlayTexts(page)).toContain(`20'-0"`)
     await page.locator('button[data-tip="Levels (L)"]').click()
     await expect.poll(async () => (await overlayTexts(page)).some((t) => t.includes('Level 2') && t.includes(`+10'-6"`))).toBe(true)

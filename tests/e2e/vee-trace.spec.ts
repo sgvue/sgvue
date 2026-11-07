@@ -725,13 +725,14 @@ test('revert puts back everything that reply changed — theme, camera, visibili
     await expect(html).toHaveAttribute('data-theme', 'dark')
     await expect(proj).toHaveText('persp')
     await expect(count).toHaveText('412 / 412')
-    // A view button that is not lit is the colour of the next one that is not; gridlines are on.
+    // A view button that is not lit is the colour of the next one that is not; gridlines are off
+    // (by default since 2026-11-07).
     const planOff = await colour(plan)
     expect(await colour(north)).toBe(planOff)
     // …and the 3D button is the one that is lit: the building boots on that view.
     const isoLit = await colour(iso)
     expect(isoLit).not.toBe(planOff)
-    const gridsOn = await colour(grids)
+    const gridsOff = await colour(grids)
 
     // 1 — a reply that only read has nothing to revert, so it offers nothing.
     const read = await turn('What is showing?', [['get_view_state', {}]], async () => {})
@@ -756,10 +757,10 @@ test('revert puts back everything that reply changed — theme, camera, visibili
     await expect(looks.locator(REVERT)).toHaveCount(1)
     await expect(looks.locator(REVERT)).toHaveText('revert')
 
-    // The user carries on by hand with something that reply never touched: the gridlines.
-    const gridsOnLight = await colour(grids)
+    // The user carries on by hand with something that reply never touched: the gridlines, on.
+    const gridsOffLight = await colour(grids)
     await grids.click()
-    await expect.poll(() => colour(grids)).not.toBe(gridsOnLight)
+    await expect.poll(() => colour(grids)).not.toBe(gridsOffLight)
 
     await looks.locator(REVERT).click()
     // The theme and the camera are back — the projection with it, the view button unlit…
@@ -767,9 +768,9 @@ test('revert puts back everything that reply changed — theme, camera, visibili
     await expect(proj).toHaveText('persp')
     await expect.poll(() => colour(plan)).toBe(planOff)
     expect(await colour(north)).toBe(planOff)
-    // …the gridlines are still off, as the user left them: in the dark theme again, the button
-    // is not the colour it had while they were on. Nothing was hidden, and nothing was lost.
-    expect(await colour(grids)).not.toBe(gridsOn)
+    // …the gridlines are still on, as the user left them: in the dark theme again, the button
+    // is not the colour it had while they were off. Nothing was hidden, and nothing was lost.
+    expect(await colour(grids)).not.toBe(gridsOff)
     await expect(count).toHaveText('412 / 412')
     await expect(log.getByText('Everything else was reverted.')).toHaveCount(0)
     // Used once: the control is gone and the reply is dimmed, as the design dims it.

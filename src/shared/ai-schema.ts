@@ -231,16 +231,18 @@ export interface DisplayState {
 }
 
 /**
- * What each switch is when the app starts — the store's own first values
- * (`renderer/state/shell.ts`; `tests/unit/ai-readback.test.ts` holds the two together). The
- * per-turn view state names a switch only while it differs from this.
+ * What each switch is when the app starts — the one list: the store takes its first values from
+ * it (`renderer/state/shell.ts`; `tests/unit/ai-readback.test.ts` holds the two together). The
+ * per-turn view state names a switch only while it differs from this. Since 2026-11-07 the
+ * gridlines and the canvas grid start off (the owner: *"Make gridlines and canvas off by
+ * default."*).
  */
 export const DISPLAY_DEFAULTS: Readonly<DisplayState> = Object.freeze({
-  grids: true,
+  grids: false,
   levels: false,
   shadows: true,
   dims: false,
-  groundGrid: true,
+  groundGrid: false,
   snap: true,
   originalMaterials: true
 })

@@ -265,7 +265,9 @@ describe('the system contract', () => {
     for (const said of [
       'only when it is not at its default',
       'whatever it does not list is at its default',
-      'levels and dimensions off',
+      'shadows, snap and original materials on',
+      // 2026-11-07: the gridlines and the canvas grid start off.
+      'gridlines, the canvas grid, levels and dimensions off',
       'the select tool armed',
       'every model showing',
       'get_view_state reports all of it in full'
@@ -276,7 +278,7 @@ describe('the system contract', () => {
     const off = Object.entries(DISPLAY_DEFAULTS)
       .filter(([, on]) => !on)
       .map(([k]) => k)
-    expect(off).toEqual(['levels', 'dims'])
+    expect(off).toEqual(['grids', 'levels', 'dims', 'groundGrid'])
     // No shouting, and no line of the design's was touched to make room.
     for (const line of [asked, readback]) {
       expect([line.slice(0, 24), line.match(/\b[A-Z]{3,}\b/g)]).toEqual([line.slice(0, 24), null])

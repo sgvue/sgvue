@@ -122,18 +122,19 @@ describe('the mock, as these cases need it', () => {
 /* ────────────────────────────── 1. toggle_display ────────────────────────────── */
 
 describe('toggle_display — the canvas grid, snap and original materials', () => {
-  it('turns each of the three off through its own action, and tells the viewer as a click does', async () => {
-    const body = await run('toggle_display', { groundGrid: false, snap: false, originalMaterials: false })
-    expect(body.message).toBe('canvas grid off, snap off, original materials off.')
-    expect(body.changed).toEqual(['canvas grid off', 'snap off', 'original materials off'])
+  it('turns each of the three off its default through its own action, and tells the viewer as a click does', async () => {
+    // The canvas grid starts off since 2026-11-07, so it is turned on; the other two off.
+    const body = await run('toggle_display', { groundGrid: true, snap: false, originalMaterials: false })
+    expect(body.message).toBe('canvas grid on, snap off, original materials off.')
+    expect(body.changed).toEqual(['canvas grid on', 'snap off', 'original materials off'])
     expect(body.already).toEqual([])
-    expect([st().groundGrid, st().snap, st().nativeMats]).toEqual([false, false, false])
+    expect([st().groundGrid, st().snap, st().nativeMats]).toEqual([true, false, false])
     // `setGroundGrid`, `toggleSnap` and `toggleNative` each tell the viewer themselves.
-    expect(called('setGroundGrid')).toEqual([[false]])
+    expect(called('setGroundGrid')).toEqual([[true]])
     expect(called('setSnap')).toEqual([[false]])
     expect(called('setModelColors')).toEqual([[{}, false]])
     // …and the result reads every switch back.
-    expect(body.display).toEqual({ ...DISPLAY_DEFAULTS, groundGrid: false, snap: false, originalMaterials: false })
+    expect(body.display).toEqual({ ...DISPLAY_DEFAULTS, groundGrid: true, snap: false, originalMaterials: false })
     expect(turn.acted).toBe(true)
     // None of them is a visibility key: nothing was hidden and nothing went on the undo stack.
     expect(visible()).toBe(412)
@@ -141,7 +142,7 @@ describe('toggle_display — the canvas grid, snap and original materials', () =
   })
 
   it('leaves the state a click on the control leaves', async () => {
-    await run('toggle_display', { groundGrid: false, snap: false, originalMaterials: false })
+    await run('toggle_display', { groundGrid: true, snap: false, originalMaterials: false })
     const byTool = displayState(st())
     resetShell()
     st().commitModels(full)
@@ -183,9 +184,10 @@ describe('toggle_display — the canvas grid, snap and original materials', () =
     expect(body.changed).toEqual([])
     expect(st().dims).toBe(false)
     // A mix: what moved and what did not, in the switches' own order.
-    const mixed = await run('toggle_display', { snap: true, grids: false, dims: true, levels: false })
-    expect(mixed.message).toBe('grids off, levels already off, dimensions on, snap already on.')
-    expect(mixed.changed).toEqual(['grids off', 'dimensions on'])
+    // Gridlines start off since 2026-11-07, so they are the one turned on here.
+    const mixed = await run('toggle_display', { snap: true, grids: true, dims: true, levels: false })
+    expect(mixed.message).toBe('grids on, levels already off, dimensions on, snap already on.')
+    expect(mixed.changed).toEqual(['grids on', 'dimensions on'])
     expect(mixed.already).toEqual(['levels off', 'snap on'])
   })
 
@@ -1151,8 +1153,8 @@ describe('one held change per turn', () => {
   it('still applies a change that needs no confirmation while one is waiting', async () => {
     await isolateStairs()
     const waiting = turn.pending
-    const grid = await run('toggle_display', { groundGrid: false })
-    expect(grid.changed).toEqual(['canvas grid off'])
+    const grid = await run('toggle_display', { groundGrid: true })
+    expect(grid.changed).toEqual(['canvas grid on'])
     const walls = await run('select_elements', { rules: [is('IfcEntity', 'IfcWall')], zoom: false })
     expect(walls.selected).toBe(80)
     expect(turn.pending).toBe(waiting)
