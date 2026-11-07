@@ -182,6 +182,7 @@ export function createLabelOverlay(host: HTMLElement | null): LabelOverlay {
       { position: 'absolute', left: '0', top: '0', pointerEvents: 'none', display: 'none' },
       style
     )
+    // eslint-disable-next-line no-unsanitized/property -- `html` is checked at every caller: mkLabel / mkElement are sinks of no-unsanitized/method in eslint.config.mjs
     el.innerHTML = html
     host?.appendChild(el)
     owned.push(el)
@@ -220,6 +221,7 @@ export function createLabelOverlay(host: HTMLElement | null): LabelOverlay {
         },
         style
       )
+      // eslint-disable-next-line no-unsanitized/property -- `html` is checked at every caller: mkLabel / mkElement are sinks of no-unsanitized/method in eslint.config.mjs
       el.innerHTML = html
       host?.appendChild(el)
       const label: Label = {

@@ -1,4 +1,4 @@
-// ESLint (2026-11-07, lint hardening steps 2–3). Flat config, type-aware parsing, and one rule a
+// ESLint (2026-11-07, lint hardening steps 2–4). Flat config, type-aware parsing, and one rule a
 // step: nothing from a recommended set is on, so each rule is added — and measured — on its own.
 //
 // What is linted: the app's own TypeScript, `src/**/*.{ts,tsx}`. Not linted:
@@ -7,6 +7,7 @@
 //  - `scripts/` — CommonJS dev utilities in no tsconfig, so a type-aware rule cannot run there.
 //  - `design-reference/` (the read-only specification), build output, and
 //    `src/renderer/dev/sample-model.js`, the design's own mock copied verbatim.
+import noUnsanitized from 'eslint-plugin-no-unsanitized'
 import reactHooks from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
 
@@ -49,8 +50,53 @@ const TRAPS = {
   clipboard: {
     selector: "MemberExpression[property.name='clipboard'][object.name='navigator'], MemberExpression[property.name='clipboard'][object.property.name='navigator'], VariableDeclarator[init.name='navigator'] > ObjectPattern > Property[key.name='clipboard']",
     message: 'navigator.clipboard is refused in this app, always (no clipboard permission is granted); copy through copyText in src/renderer/clipboard.ts, the one sanctioned copier. See docs/DECISIONS.md (2026-10-02, the clipboard).'
+  },
+  // Step 4: markup. no-unsanitized (below) covers the DOM's own HTML sinks; React's is this.
+  dangerouslySetInnerHTML: {
+    selector: "JSXAttribute[name.name='dangerouslySetInnerHTML'], Property[key.name='dangerouslySetInnerHTML']",
+    message: 'dangerouslySetInnerHTML parses its string as markup, and text from an IFC file is untrusted; render text as JSX children, which React escapes. See docs/DECISIONS.md (2026-11-07, untrusted text and markup).'
+  },
+  escName: {
+    // no-unsanitized trusts a call to `esc` as escaped (ESCAPERS), so the name is the one in
+    // src/shared/html.ts and nothing else. Every way to bind or rebind it is refused: a
+    // declaration, a destructure (with or without a default), a parameter of any function, an
+    // import or a re-export of another function under it, and an assignment to it.
+    selector: [
+      "FunctionDeclaration[id.name='esc']",
+      "VariableDeclarator[id.name='esc']",
+      "ObjectPattern > Property[value.name='esc']",
+      "ObjectPattern > Property[value.left.name='esc']",
+      "ArrayPattern > Identifier[name='esc']",
+      "ArrayPattern > AssignmentPattern[left.name='esc']",
+      ":function > Identifier.params[name='esc']",
+      ":function > AssignmentPattern.params[left.name='esc']",
+      ":function > RestElement.params[argument.name='esc']",
+      "TSParameterProperty[parameter.name='esc']",
+      "ImportSpecifier[local.name='esc'][imported.name!='esc']",
+      "ImportDefaultSpecifier[local.name='esc']",
+      "ImportNamespaceSpecifier[local.name='esc']",
+      "ExportSpecifier[exported.name='esc'][local.name!='esc']",
+      "AssignmentExpression[left.name='esc']"
+    ].join(', '),
+    message: "`esc` is the app's one HTML escape (src/shared/html.ts), and the linter trusts a call by that name as escaped; give this function another name. See docs/DECISIONS.md (2026-11-07, untrusted text and markup)."
   }
 }
+// Step 4: untrusted text and markup. Text authored inside an IFC file reaches labels, tags and
+// the Schedules window, so every write of a string into markup — innerHTML / outerHTML,
+// insertAdjacentHTML, document.write, createContextualFragment, setHTMLUnsafe — must be a
+// literal, a template whose every `${…}` is `esc(…)`, or carry a disable directive saying why
+// it is safe. `esc` (src/shared/html.ts) is the one escape the plugin is told to trust.
+// `taggedTemplates: []`: left out, the plugin would also trust `escapeHTML` and
+// `Sanitizer.escapeHTML` tagged templates — names nothing here reserves.
+const ESCAPERS = { escape: { methods: ['esc'], taggedTemplates: [] } }
+// The 3D view's label overlay writes its `html` argument into innerHTML (viewer/overlay.ts), so
+// its two factories are sinks too: their callers are checked here, as a sink's own are, instead
+// of one directive inside them hiding every caller.
+const OVERLAY_SINKS = {
+  mkLabel: { properties: [1] },
+  mkElement: { properties: [0] }
+}
+
 const trapsBut = (...keep) =>
   ['error', ...Object.entries(TRAPS).filter(([k]) => !keep.includes(k)).map(([, v]) => v)]
 
@@ -87,7 +133,8 @@ export default [
       // (`src/schedule/export/xlsx.ts`, `src/shared/model-index.types.ts`), and a directive for
       // a rule ESLint does not know is an error. Later steps turn its rules on one at a time.
       '@typescript-eslint': tseslint.plugin,
-      'react-hooks': reactHooks
+      'react-hooks': reactHooks,
+      'no-unsanitized': noUnsanitized
     },
     linterOptions: {
       // Off while those two directives name rules that are not on, which would report them as
@@ -96,6 +143,8 @@ export default [
     },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
+      'no-unsanitized/method': ['error', ESCAPERS, OVERLAY_SINKS],
+      'no-unsanitized/property': ['error', ESCAPERS],
       'no-restricted-syntax': trapsBut()
     }
   },
@@ -110,5 +159,10 @@ export default [
     // The one sanctioned copier: it tries the async API, and falls back to execCommand.
     files: ['src/renderer/clipboard.ts'],
     rules: { 'no-restricted-syntax': trapsBut('clipboard') }
+  },
+  {
+    // Where `esc` is declared.
+    files: ['src/shared/html.ts'],
+    rules: { 'no-restricted-syntax': trapsBut('escName') }
   }
 ]

@@ -202,16 +202,22 @@ function paint(scope: RenderScope) {
 
   if (full) coverage = buildCoverage(store, def.entity);
   if (panes) {
+    // eslint-disable-next-line no-unsanitized/property -- renderRail: every file- or user-derived value in it goes through esc()
     railPane.innerHTML = renderRail(state, store);
+    // eslint-disable-next-line no-unsanitized/property -- renderInspector and its panels: every file- or user-derived value in it goes through esc()
     inspectorPane.innerHTML = renderInspector(state, store, coverage, res);
+    // eslint-disable-next-line no-unsanitized/property -- renderOverlay and its overlays: every file- or user-derived value in it goes through esc()
     overlayRoot.innerHTML = renderOverlay(state, store, coverage);
   }
   // The header on every scope: its undo / redo buttons follow every edit, and the name box
   // it holds is kept focused by preserve.ts like any other.
+  // eslint-disable-next-line no-unsanitized/property -- renderHeader: every file- or user-derived value in it goes through esc()
   header.innerHTML = renderHeader(state);
   if (table) {
+    // eslint-disable-next-line no-unsanitized/property -- renderSchedule: every file- or user-derived value in it goes through esc(); colours are validated literals
     outputPane.innerHTML = renderSchedule(state, res, coverage);
     drawn = null;
+    // eslint-disable-next-line no-unsanitized/property -- renderStatus: numbers, and the selection note through esc()
     statusBar.innerHTML = renderStatus(state, res, coverage, ms);
   }
 
@@ -295,6 +301,7 @@ window.addEventListener('beforeprint', () => {
   const { store, def } = state;
   if (!store) return;
   printing = true;
+  // eslint-disable-next-line no-unsanitized/property -- renderSchedule: every file- or user-derived value in it goes through esc(); colours are validated literals
   outputPane.innerHTML = renderSchedule(state, runSchedule(store, def, { cap: Infinity }), coverage);
   drawn = null;
 });
@@ -408,6 +415,7 @@ function markSelection(scroll: boolean): number[] {
     b.classList.toggle('sel-here', state.selEntities.includes(b.dataset.entity ?? ''));
   }
   const note = statusBar.querySelector('.sel-note');
+  // eslint-disable-next-line no-unsanitized/property -- selNoteHtml: the selection note through esc()
   if (note) note.innerHTML = selNoteHtml(state, shown);
   if (scroll && on.length) reveal(drawnRows().get(on[0]), 'center');
   return on;

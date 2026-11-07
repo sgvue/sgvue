@@ -82,6 +82,7 @@ import {
   type XY
 } from '../../shared/annotate'
 import { toMap, type BasePoint } from '../../shared/georef'
+import { esc } from '../../shared/html'
 import { turnXY } from '../../shared/plan-rotation'
 import { formatDim, type DisplayUnit } from '../../shared/units'
 import type { Materials } from './materials'
@@ -505,7 +506,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
         { at: [b[0] + dir[0] * gap, b[1] + dir[1] * gap], sign: 1 }
       ]
       for (const { at, sign } of ends) {
-        const label = overlay.mkLabel(new Vector3(at[0], at[1], lineZ), g.name, {
+        // The grid's tag is the file's own text: escaped, so it is printed and never parsed.
+        const label = overlay.mkLabel(new Vector3(at[0], at[1], lineZ), esc(g.name), {
           ...overlay.labelBase(),
           ...BUBBLE_STYLE
         })
@@ -563,6 +565,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
           ).map((run) => ({ ...run, at: turnXY(run.at, rho), span: turnXY(run.span, rho), dir: turnXY(run.dir, rho) }))
     if (!runs.length) return
     const labels = runs.map((run, k) => {
+      // eslint-disable-next-line no-unsanitized/method -- formatDim prints a number and its unit, nothing from the file
       const label = overlay.mkLabel(new Vector3(run.at[0], run.at[1], lineZ), formatDim(run.spacing, unit), {
         ...overlay.labelBase(),
         color: 'var(--ink)',
@@ -696,6 +699,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       levelGroup.add(ring)
       levelLines.push(ring)
       const anchor = turnXY(levelTagAnchor(rect), rho)
+      // eslint-disable-next-line no-unsanitized/method -- levelTagHtml escapes the storey name (esc); the rest is a formatted number
       const tag = overlay.mkLabel(
         new Vector3(anchor[0], anchor[1], z),
         levelTagHtml(s.name, s.authored, unit),
@@ -862,6 +866,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     const f = filePoint(s.p)
     const m = toMap(coords, f.x, f.y, f.z)
     const tag = s.labels[0]
+    // eslint-disable-next-line no-unsanitized/property -- spotGridHtml / spotLevelHtml print numbers and the design's own markup only
     tag.el.innerHTML = s.expanded ? spotGridHtml(f, m, unit) : spotLevelHtml(m ? m.Z : f.z, unit)
     tag.el.title = s.expanded ? 'Show level only' : 'Show E, N and Z'
     const o = s.expanded ? SPOT_GRID_OFFSET : SPOT_LEVEL_OFFSET
@@ -982,6 +987,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       const c = placeDimLabel(r.dirs, at, taken)
       taken.push(dimLabelRect(at(c)))
       dimLabels.push(
+        // eslint-disable-next-line no-unsanitized/method -- formatDim prints a number and its unit, nothing from the file
         overlay.mkLabel(
           r.a.clone().lerp(r.b, c.t),
           formatDim(r.v, unit),
@@ -1042,8 +1048,10 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       // measured once, when it is made, and its text has just changed.
       rebuild()
       for (const m of measures) {
+        // eslint-disable-next-line no-unsanitized/property -- laserLabelHtml prints the axis letter (X, Y, Z) and a formatted number only
         for (const r of m.readings) r.label.el.innerHTML = laserLabelHtml(r.axis, r.len, unit)
       }
+      // eslint-disable-next-line no-unsanitized/property -- laserLiveHtml prints axis letters and formatted numbers only
       if (liveLabel.on) liveLabel.el.innerHTML = laserLiveHtml(liveRays, unit)
       for (const s of spots) renderSpot(s)
       drawDims()
@@ -1078,6 +1086,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
           [r.b, r.plus]
         ] as const) {
           if (len == null) continue
+          // eslint-disable-next-line no-unsanitized/method -- laserLabelHtml prints the axis letter (X, Y, Z) and a formatted number only
           const label = overlay.mkLabel(
             p.clone().lerp(end, 0.5),
             laserLabelHtml(r.axis, len, unit),
@@ -1126,6 +1135,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       liveLabel.on = rays.length > 0
       liveLabel.pos.copy(p)
       liveRays = rays
+      // eslint-disable-next-line no-unsanitized/property -- laserLiveHtml prints axis letters and formatted numbers only
       liveLabel.el.innerHTML = laserLiveHtml(rays, unit)
     },
 

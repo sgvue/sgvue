@@ -2,15 +2,12 @@
 // reaches innerHTML goes through esc() first — IFC files are user data and can contain
 // anything, including angle brackets. What SGVue leaves out: `download` — a file is written by
 // main behind the native Save dialog (phase 4, `exporting.ts`), never by an `<a download>`.
+// `esc` itself moved to `shared/html.ts` (2026-11-07), unchanged, so the 3D view's labels use
+// the same one; it is re-exported here for every Schedules module that imports it from `./dom`.
 
-export function esc(s: unknown): string {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { esc } from '../../shared/html';
+
+export { esc };
 
 /** Keep a number inside a range. Rounding is the caller's business — a width rounds, a
  *  percentage does not. */

@@ -28,6 +28,7 @@
  * which is the design exactly, and it is well defined at 43°.
  */
 import { DASH, FOOT, signedF3 } from './fmt'
+import { esc } from './html'
 import {
   coord3,
   coordIn,
@@ -512,9 +513,12 @@ export const LEVEL_TAG_DX = -30
  * So the ring's height and the tag's number are two arguments, not one. `signedMm` is the
  * design's own formatter, U+2212 and thin spaces included — and since 2026-10-09 the display
  * unit's (`shared/units.ts`, `formatElevation`): `+4.000` in `m`, `+13'-1 1/2"` in `ft`.
+ *
+ * The name is the file's own text, so it is escaped (`esc`, 2026-11-07): a storey called
+ * `<img src=x onerror=…>` is printed, never parsed. A name without `& < > " '` is unchanged.
  */
 export const levelTagHtml = (name: string, authoredElevation: number, unit: DisplayUnit = 'mm'): string =>
-  `<b style="font-weight:500;color:var(--ink)">${name}</b>&nbsp; ${formatElevation(authoredElevation, unit)}`
+  `<b style="font-weight:500;color:var(--ink)">${esc(name)}</b>&nbsp; ${formatElevation(authoredElevation, unit)}`
 
 /* ────────────────────────────── laser meter ────────────────────────────── */
 

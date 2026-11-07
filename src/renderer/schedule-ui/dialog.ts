@@ -48,6 +48,7 @@ function ask(o: Ask): Promise<string | null> {
   const scrim = document.createElement('div');
   scrim.className = 'dlg-scrim';
   // (`tabindex="-1"`: the card can be given the focus by script, and Tab never lands on it.)
+  // eslint-disable-next-line no-unsanitized/property -- title, message, value and confirm go through esc(); the conditionals pick between literals
   scrim.innerHTML = `<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title"
       ${o.message ? 'aria-describedby="dlg-message"' : ''}${o.forAssistant ? ' tabindex="-1"' : ''}>
       <span class="dlg-label" id="dlg-title">${esc(o.title)}</span>

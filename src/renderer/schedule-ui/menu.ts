@@ -67,6 +67,7 @@ export function openMenu(x: number, y: number, entries: MenuEntry[], label: stri
   box.className = 'ctx-menu';
   box.tabIndex = -1;
   box.style.cssText = BOX.replace('{x}', String(clampCtxX(x, window.innerWidth))).replace('{y}', String(y));
+  // eslint-disable-next-line no-unsanitized/property -- each label goes through esc(); ITEM and KEY are literals, i an index
   box.innerHTML = entries.map((m, i) =>
     `<button role="menuitem" tabindex="-1" data-i="${i}"${m.disabled ? ' disabled aria-disabled="true"' : ' class="hv-step"'}`
     + ` style="${ITEM.replace('{top}', m.sep ? '1px solid var(--border)' : '0')}">`

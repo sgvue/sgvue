@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — untrusted text and markup
+
+**Did.** Step 4 of the lint hardening: `eslint-plugin-no-unsanitized` 4.1.5 (exact pin, dev-only), `no-unsanitized/method` and `no-unsanitized/property` as errors, trusting one escape, `esc`, now in `src/shared/html.ts` (moved unchanged from the Schedules window, re-exported there); no tagged template trusted. The label overlay's `mkLabel` / `mkElement` became checked sinks; `dangerouslySetInnerHTML` and any other binding named `esc` joined the `TRAPS` list. Audited every sink and the Schedules renderers' interpolations: **two were unsafe** — a grid bubble printed the file's grid tag raw, and a level tag the storey name — and both now go through `esc`, byte-identical for ordinary names. The other 21 sites carry a one-line reason.
+
+**Verified.** Lint clean, typecheck clean, build ok, tests 3 131 passed / 4 skipped (8 new in `tests/unit/markup-escape.test.ts`, which feed `<img src=x onerror=alert(1)>` through both fixed sites and fail, with the lint, when either fix is reverted). Deep review: PASS; its three hardening items applied. No window opened.
+
 ## 2026-11-07 — the known traps are lint errors
 
 **Did.** Step 3 of the lint hardening: seven `no-restricted-syntax` entries (`TRAPS`, `eslint.config.mjs`), each naming its trap and pointing at `docs/TRAPS.md` (the clipboard one at `docs/DECISIONS.md`): `BatchedMesh`, `GetLine` flatten `true`, `getSpatialStructure`, `COORDINATE_TO_ORIGIN: true`, `.raycast(`, `intersectObject(s)`, `navigator.clipboard`. Overrides: `viewer/cube.ts` (`intersectObjects` on the cube's own meshes) and `renderer/clipboard.ts` (the sanctioned copier). No violation in `src/`.

@@ -319,6 +319,7 @@ export interface SnapContext {
 export function createSnapper(edges: EdgeStore, overlay: LabelOverlay, ctx: SnapContext): Snapper {
   let snapOn = true
   const caches = new Map<number, SnapCache>()
+  // eslint-disable-next-line no-unsanitized/method -- MARKER_HTML is a string literal (viewer-core.js L389); the snap reading is written with textContent
   const element = overlay.mkElement(MARKER_HTML)
   const glyph = element.firstElementChild as HTMLElement | null
   const text = element.lastElementChild as HTMLElement | null
