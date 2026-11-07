@@ -4,6 +4,19 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — Windows CI: four tests assumed POSIX paths
+
+**Did.** CI run 42396622558 failed four `npm test` cases on windows-latest only. All were tests:
+the style-strings check built its file keys with `\`, and the project tests' temp root kept the
+runner's 8.3 short name (`RUNNER~1`) where `admit()` spells it out. The tests now use `/` and
+`realpathSync.native`; new cases run the relPath logic on Windows drive and share paths (reading
+the raw JSON so `readProject` cannot hide a `\`), and a guard fails any test that calls
+`realpathSync(` without `.native`. No app change: relPaths were already `/` on every OS, so a
+project saved on Windows opens on a Mac.
+
+**Verified.** 3 540 unit tests pass locally; each new case probed failing. Test-only, so no review
+round — the Windows CI run is the judge.
+
 ## 2026-11-08 — Dependabot #27 cleared: minimatch forced to 11 where 9 and 10 were used
 
 **Did.** Five scoped `overrides` in `package.json` move the vulnerable `minimatch` copies (10.2.6

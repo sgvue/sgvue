@@ -36,7 +36,7 @@
  * is no longer in the code.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import nodePath, { join, type PlatformPath } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
@@ -121,10 +121,14 @@ interface Parsed {
 
 const parsed = new Map<string, Parsed | null>()
 
-/** A module specifier, relative to `from`, as a repository path — or null for a package. */
-function resolveModule(from: string, spec: string): string | null {
+/**
+ * A module specifier, relative to `from`, as a repository path — `/`-separated on every host, as
+ * DEVIATIONS spells it — or null for a package. `path` is the host's; the test below runs it under
+ * `path.win32` too, which joins with a backslash (the Windows CI failure of 2026-11-07).
+ */
+function resolveModule(from: string, spec: string, path: PlatformPath = nodePath): string | null {
   if (!spec.startsWith('.')) return null
-  const base = join(dirname(from), spec)
+  const base = path.join(path.dirname(from), spec).split(path.sep).join('/')
   for (const ext of ['.ts', '.tsx', '/index.ts', '/index.tsx']) if (existsSync(join(ROOT, base + ext))) return base + ext
   return null
 }
@@ -552,6 +556,15 @@ describe('inline style strings are the design’s', () => {
   // A string written once and used in several places is one string to check.
   const found = [...new Map(scans.flatMap((x) => x.found).map((f) => [`${f.file}:${f.line}:${textOf(f.pieces)}`, f])).values()]
   const computed = scans.flatMap((x) => x.computed)
+
+  it('a relative import is a /-separated repository path under either platform’s path rules', () => {
+    for (const path of [nodePath.posix, nodePath.win32]) {
+      expect(resolveModule('src/renderer/app/Sidebar.tsx', '../state/selectors/sidebar', path)).toBe(
+        'src/renderer/state/selectors/sidebar.ts'
+      )
+    }
+    expect(found.filter((f) => f.file.includes('\\')).map((f) => f.file)).toEqual([])
+  })
 
   it('reads the design and the port, not two empty lists', () => {
     // A broken extraction would otherwise pass vacuously.

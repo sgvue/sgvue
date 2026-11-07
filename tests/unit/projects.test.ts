@@ -11,12 +11,15 @@
  * `webContents` that answers each snapshot request with the text a test sets.
  */
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Real paths, as `admit()` gives them: on macOS the temporary folder is a link into /private.
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'sgvue-projects-')))
+// Real paths, as `admit()` gives them: on macOS the temporary folder is a link into /private, and
+// on Windows it can be an 8.3 short name (`C:\Users\RUNNER~1\…`) that only the native realpath —
+// the one `fs/promises` and so `admit()` use — spells out; `realpathSync` alone keeps it.
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'sgvue-projects-')))
 const docs = join(root, 'Documents')
 const review = join(root, 'review')
 const models = join(review, 'models')
@@ -74,6 +77,14 @@ const {
 
 afterAll(() => {
   rmSync(root, { recursive: true, force: true })
+})
+
+describe('the temporary folder', () => {
+  it('is spelled exactly as admit() and the writer spell a real path', async () => {
+    // Otherwise every expected path below differs from what the module hands back — on Windows by
+    // an 8.3 short name, which a relPath then climbs out of and back into (CI, 2026-11-07).
+    expect(root).toBe(await realpath(root))
+  })
 })
 
 /* ────────────────────────────── a project to save ────────────────────────────── */
@@ -444,6 +455,40 @@ describe('macOS’s own marks (2026-11-07)', () => {
       expect(page.win.setRepresentedFilename).not.toHaveBeenCalled()
       expect(page.win.setDocumentEdited).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('relPaths from Windows paths — /-separated on every host, so a project saved on Windows opens on a Mac', () => {
+  const winProject = (absPaths: readonly string[]): string => {
+    const p = structuredClone(fixture)
+    p.models = p.models.slice(0, absPaths.length)
+    p.models.forEach((m, i) => {
+      m.absPath = absPaths[i]
+      m.relPath = null
+    })
+    return JSON.stringify(p)
+  }
+  // The text as written — not read back through `readProject`, which would normalise a `\\`.
+  const relPaths = (text: string): (string | null)[] =>
+    (JSON.parse(text) as { models: { relPath: string | null }[] }).models.map((m) => m.relPath)
+
+  it('a drive path: beside, below and above the project, without case', () => {
+    const text = winProject(['C:\\Users\\Jo\\review\\models\\ARC.ifc', 'c:\\users\\JO\\shared\\STR.ifc'])
+    expect(relPaths(finaliseProject(text, 'C:\\Users\\Jo\\review\\review.sgvue'))).toEqual([
+      'models/ARC.ifc',
+      '../shared/STR.ifc'
+    ])
+  })
+
+  it('a share, and a model on another drive (no relPath, only its absPath)', () => {
+    const text = winProject(['\\\\srv\\proj\\models\\ARC.ifc', 'D:\\STR.ifc'])
+    expect(relPaths(finaliseProject(text, '\\\\srv\\proj\\review\\review.sgvue'))).toEqual(['../models/ARC.ifc', null])
+  })
+
+  it('a carried relPath written with \\ is re-based and written with /', () => {
+    const m = { relPath: '..\\shared\\STR.ifc', absPath: 'D:\\old\\STR.ifc' }
+    expect(relPathFor(m, 'C:\\p\\review\\copies\\r.sgvue', 'C:\\p\\review\\r.sgvue')).toBe('../../shared/STR.ifc')
+    expect(relPathFor(m, 'C:\\p\\review\\r.sgvue', 'C:\\p\\review\\r.sgvue')).toBe('../shared/STR.ifc')
   })
 })
 

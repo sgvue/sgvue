@@ -24,7 +24,7 @@ vi.mock('../../src/main/projects', () => ({ openProjectFromOS }))
 
 const { installProjectLaunch, projectArgs, projectFromArgv } = await import('../../src/main/project-launch')
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'sgvue-launch-')))
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'sgvue-launch-')))
 const TOWER = join(root, 'Tower A.sgvue')
 const OTHER = join(root, 'other.sgvue')
 writeFileSync(TOWER, '{}')
