@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the privacy search is npm run privacy
+
+**Did.** Core protection, plan item 12. `scripts/privacy.cjs` scans every tracked file for e-mail addresses (allow-list with a reason each, reserved example domains), home paths that are not placeholders, private names and accounts compared by peppered SHA-256 of normalised words and runs of two or three (eight entries: the owner's name in its spellings, the private address's local part, the macOS account as a path segment), and coordinates in the SVY21 / Singapore longitude band other than the synthetic set and the design's mock. Masked output, `--show`, `--commits <range>`, `--hash`. `npm run privacy` in `package.json`, a step in `ci.yml` (after `npm ci`); `tests/unit/privacy.test.ts` holds the rules with inputs built from pieces. `docs/COMMANDS.md` has the command.
+
+**Verified.** PASS on the tree (571 tracked files, 21 binary, 0 findings, 2.7 s) and with `--commits HEAD~20..HEAD`. Probe, removed: a temporary tracked file with a private address, `/Users/` and `C:\\Users\\` paths, the owner's name, the account as a path segment, a band coordinate and a longitude gave 8 findings naming `privacy-probe.txt:1`–`:7`, exit 1. The new and changed files scan clean themselves. `npm test` 3 177 passed / 4 skipped; typecheck, lint, build clean.
+
 ## 2026-11-07 — design-reference/ is pinned by SHA-256
 
 **Did.** Core protection, plan item 2. `scripts/design-reference-pin.cjs` lists every file under `design-reference/` (git's tracked files there plus untracked, not-ignored ones) and hashes it; `--write` writes `tests/design-reference.sha256` (25 files), no flag checks. `tests/unit/design-reference-pin.test.ts` uses the script's own functions and fails naming each file `changed`, `added` or `removed`, with how to put it back — or, for a new handoff, how to update the list. `docs/COMMANDS.md` has the command.

@@ -36,6 +36,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # The privacy scan (scripts/privacy.cjs): nothing personal — an address, a home path, a
+      # private name, a real coordinate — in any tracked file. Every push here is public.
+      - run: npm run privacy
       - run: npm run typecheck
       - run: npm run lint
       # The unit tests download Electron's binary on first use (one test imports `electron`).

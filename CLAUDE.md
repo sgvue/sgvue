@@ -1301,6 +1301,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **the core is protected by headless CI checks** (owner-approved, `docs/plans/core-protection.md`, Tier 1); visual baselines, a performance budget and the full e2e run on the owner's yes before a release.
 - 2026-11-07 — **a synthetic reference model and its IfcOpenShell truth are committed** (`tests/fixtures/reference.ifc` from `scripts/make-reference-ifc.py`, byte-identical on every run; `reference.expected.json`, the one expected.json `.gitignore` lets through): both conformance tests always run on it, in CI too, and on a `samples/` model beside it when one is present.
 - 2026-11-07 — **`design-reference/` is pinned file by file** (`tests/design-reference.sha256`, checked by `tests/unit/design-reference-pin.test.ts` in `npm test`): a changed, added or removed file fails by name; `node scripts/design-reference-pin.cjs --write` updates the list, only with an owner's new handoff, in the same commit.
+- 2026-11-07 — **the privacy search is `npm run privacy`** (`scripts/privacy.cjs`, a CI step and a release-job step): e-mail addresses outside a reasoned allow-list, home paths that are not placeholders, private names by SHA-256 only (`--hash "<text>"` adds one; the text never enters the repository), and a coordinate-band check that names no real site; findings masked unless `--show`; `--commits <range>` before a push.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
@@ -1315,6 +1316,7 @@ A new decision is recorded as **one line here and a full row in `docs/DECISIONS.
 | `npm run typecheck` | `tsc --noEmit` for the node and web projects |
 | `npm run lint` | ESLint over `src/**/*.{ts,tsx}` with type-aware parsing (`eslint.config.mjs`); runs in CI after typecheck |
 | `npm test` | vitest (unit + read-only guard) |
+| `npm run privacy` | The privacy search before every push (`scripts/privacy.cjs`; a CI step): e-mails, home paths, private names (by hash only) and real-coordinate bands over every tracked file; masked `file:line`, exit 1 on a finding |
 | `npm run test:e2e` | Electron smoke test through `scripts/safe-e2e.cjs` (the guarded wrapper — **never** a bare `npx playwright test`). Runs on Windows too: same limits, working set + the GPU dedicated-memory counter instead of `phys_footprint` |
 | `npm run dist:mac` / `dist:win` | Installers. `dist:mac` writes `dist/SGVue-<version>-arm64.dmg` and `dist/SGVue-<version>-x64.dmg`; `dist:win` writes `dist/SGVue-<version>-setup.exe` (`<version>` is `package.json`'s). The DMGs ad-hoc signed (since 2026-10-05), the installer unsigned. Before `dist:mac`, run `node node_modules/electron/install.js` — Electron 44.10.0 has no install script, and without its binary the Mac build lacks Electron's and Chromium's notice files |
 | **`npm run test:packaged`** | The **packaged** app — `dist/mac-arm64/SGVue.app` on macOS, `dist/win-unpacked` on Windows — through `scripts/safe-app.cjs`: a share link, the production CSP, the unpacked `.wasm`, Preferences from the real menu. Skips when there is no `dist/`; the `.icns` test is macOS-only |
