@@ -594,9 +594,13 @@ export const manage_schedules: Executor = async (input, ctx) => {
       return {
         forModel: { message: `Copied the saved setup "${shown(name)}" to ${quoted(answer.name)}.`, done: true, name: named }
       }
+    case 'delete':
+    case 'print':
+    case 'open_file':
     default:
       // `delete`, `print` and `open_file` are never answered `done`: they only ask. Should one
-      // ever be, it is said as what it is rather than as some other operation's sentence.
+      // ever be, it is said as what it is rather than as some other operation's sentence. The
+      // `default` is for an `op` that is none of `ManageOp` at run time (it is cast, above).
       return { forModel: { message: 'The Schedules window says that was done.', done: true } }
   }
 }

@@ -43,7 +43,7 @@ export function alignForCalc(calc: Calculated | undefined): 'left' | 'center' | 
   switch (calc ? resultOf(calc) : 'number') {
     case 'text': return 'left';
     case 'yesNo': return 'center';
-    default: return 'right';
+    case 'number': return 'right';
   }
 }
 

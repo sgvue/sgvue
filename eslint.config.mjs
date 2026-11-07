@@ -1,4 +1,4 @@
-// ESLint (2026-11-07, lint hardening steps 2–4). Flat config, type-aware parsing, and one rule a
+// ESLint (2026-11-07, lint hardening steps 2–5). Flat config, type-aware parsing, and one rule a
 // step: nothing from a recommended set is on, so each rule is added — and measured — on its own.
 //
 // What is linted: the app's own TypeScript, `src/**/*.{ts,tsx}`. Not linted:
@@ -129,9 +129,10 @@ export default [
       }
     },
     plugins: {
-      // Registered with none of its rules on: two ported lines carry a directive naming one
+      // Registered for two reasons: two ported lines carry a directive naming one of its rules
       // (`src/schedule/export/xlsx.ts`, `src/shared/model-index.types.ts`), and a directive for
-      // a rule ESLint does not know is an error. Later steps turn its rules on one at a time.
+      // a rule ESLint does not know is an error; and its rules are turned on one a step — step 5
+      // turned on `switch-exhaustiveness-check`, below.
       '@typescript-eslint': tseslint.plugin,
       'react-hooks': reactHooks,
       'no-unsanitized': noUnsanitized
@@ -145,7 +146,25 @@ export default [
       'react-hooks/rules-of-hooks': 'error',
       'no-unsanitized/method': ['error', ESCAPERS, OVERLAY_SINKS],
       'no-unsanitized/property': ['error', ESCAPERS],
-      'no-restricted-syntax': trapsBut()
+      'no-restricted-syntax': trapsBut(),
+      // Step 5: a switch over a union names every member, so a member added to the union — a
+      // `PendingAction` kind, a tool name, a display unit, a section kind — fails lint at every
+      // switch that forgot it.
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        {
+          // A `default:` does not count as handling the members it would catch: otherwise a
+          // forgotten member is swallowed by it in silence, which is the case this rule is for.
+          considerDefaultExhaustiveForUnions: false,
+          // A `default:` beside every member listed is kept: it then catches only a value that
+          // is outside the type at run time (one read off a port, a file, a cast), and with the
+          // option above it can no longer hide a member.
+          allowDefaultCaseForExhaustiveSwitch: true,
+          // A switch over an open set (`string`, `number`) has no member to forget, and its
+          // fall-through is often the point (`attr`'s property lookup after its seven names).
+          requireDefaultForNonUnion: false
+        }
+      ]
     }
   },
   {

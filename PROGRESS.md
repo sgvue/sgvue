@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — switches over a union name every member
+
+**Did.** Step 5 of the lint hardening: `@typescript-eslint/switch-exhaustiveness-check` as an error, with `considerDefaultExhaustiveForUnions: false`, `allowDefaultCaseForExhaustiveSwitch: true` and `requireDefaultForNonUnion: false`. Five option sets measured over `src/` (3, 1, 4, 4 and 5 findings; counting a default as exhaustive would have missed two of the three). The three fixed by listing the members with the behaviour they already had: the GPU guard's `wait` / `none` as `break`; `manage_schedules`' `done` answer for `delete` / `print` / `open_file` beside the `default:` they reached; `alignForCalc`'s `default:` → `case 'number':`.
+
+**Verified.** Lint clean, both typechecks clean, build ok; `npm test` 3 131 passed / 4 skipped on five runs — one earlier run straight after a build had one failure that was not captured and did not recur. A probe (`DisplayUnit` switch naming only `mm` with a `default:`) was reported, `Cases not matched: "ft" | "m"`.
+
 ## 2026-11-07 — untrusted text and markup
 
 **Did.** Step 4 of the lint hardening: `eslint-plugin-no-unsanitized` 4.1.5 (exact pin, dev-only), `no-unsanitized/method` and `no-unsanitized/property` as errors, trusting one escape, `esc`, now in `src/shared/html.ts` (moved unchanged from the Schedules window, re-exported there); no tagged template trusted. The label overlay's `mkLabel` / `mkElement` became checked sinks; `dangerouslySetInnerHTML` and any other binding named `esc` joined the `TRAPS` list. Audited every sink and the Schedules renderers' interpolations: **two were unsafe** — a grid bubble printed the file's grid tag raw, and a level tag the storey name — and both now go through `esc`, byte-identical for ordinary names. The other 21 sites carry a one-line reason.

@@ -226,6 +226,9 @@ export function watchGpu(contents: WebContents, limitMB: number = GPU_LIMIT_MB):
             break
           // `wait`: still over, inside the grace period. `none`: back under, and the step has
           // already forgotten the warning, so a later spike warns again.
+          case 'wait':
+          case 'none':
+            break
         }
       })
       .finally(() => {
