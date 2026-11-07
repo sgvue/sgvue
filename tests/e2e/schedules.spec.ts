@@ -164,7 +164,10 @@ test('the toolbar opens Schedules; a row click selects in 3D; closing main close
         .close()
     })
     await closed
-    await exited
+    // macOS keeps an app with no window running (main's `window-all-closed`), so only
+    // elsewhere does the process exit by itself; on macOS `finally` closes it.
+    if (process.platform === 'darwin') quit = false
+    else await exited
   } finally {
     if (!quit) await app.close()
   }
@@ -369,8 +372,8 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
 
     // Ctrl-click two, Equal width: both take the width of the column Format is editing.
     await heads.nth(1).click()
-    await heads.nth(0).click({ modifiers: ['Control'] })
-    await heads.nth(3).click({ modifiers: ['Control'] })
+    await heads.nth(0).click({ modifiers: ['ControlOrMeta'] })
+    await heads.nth(3).click({ modifiers: ['ControlOrMeta'] })
     await act(sched, 'fit-equal').click()
     await expect.poll(async () => [await widthVar(0), await widthVar(3)]).toEqual([await widthVar(1), await widthVar(1)])
 
@@ -601,13 +604,13 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
     await rows.nth(0).click()
     await expect(note).toHaveText('')
     await expect(railItems(sched).filter({ hasText: 'IfcDoor' })).not.toHaveClass(/sel-here/)
-    await rows.nth(2).click({ modifiers: ['Control'] })
+    await rows.nth(2).click({ modifiers: ['ControlOrMeta'] })
     await expect(marked).toHaveCount(2)
     await expect(card).toContainText('2 selected')
     await rows.nth(4).click({ modifiers: ['Shift'] })
     await expect(marked).toHaveCount(3)
     await expect(card).toContainText('3 selected')
-    await rows.nth(2).click({ modifiers: ['Control'] })
+    await rows.nth(2).click({ modifiers: ['ControlOrMeta'] })
     await expect(marked).toHaveCount(2)
     await expect(card).toContainText('2 selected')
     await sched.keyboard.press('ArrowDown')
@@ -631,7 +634,7 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
     // 5 — the row menu on a Ctrl-selected pair: Isolate leaves only those two in the main
     // window, and Ctrl+Z there brings everything back.
     await rows.nth(0).click()
-    await rows.nth(1).click({ modifiers: ['Control'] })
+    await rows.nth(1).click({ modifiers: ['ControlOrMeta'] })
     await expect(card).toContainText('2 selected')
     const [, total] = await counts(page)
     await expect.poll(() => counts(page)).toEqual([total, total])
@@ -672,7 +675,7 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
     await expect(sched.locator('.overlay')).toHaveCount(0)
     await expect(heads.last()).toHaveText('GUID')
     await rows.nth(0).click()
-    await rows.nth(1).click({ modifiers: ['Control'] })
+    await rows.nth(1).click({ modifiers: ['ControlOrMeta'] })
     await rows.nth(0).click({ button: 'right' })
     await menuItem(sched, 'Copy GUIDs (2)').click()
     await expect(sched.locator('.toast')).toHaveText('Copied 2 GUIDs.')
@@ -826,7 +829,7 @@ test('phase 3 screenshots (SGVUE_SHOTS)', async () => {
 
       // The row menu, on a Ctrl-selected pair.
       await rows.nth(1).click()
-      await rows.nth(2).click({ modifiers: ['Control'] })
+      await rows.nth(2).click({ modifiers: ['ControlOrMeta'] })
       await rows.nth(2).click({ button: 'right' })
       await expect(menu(sched)).toBeVisible()
       await sched.waitForTimeout(300)

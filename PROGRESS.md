@@ -4,6 +4,26 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the private history's Mac test fixes and its Goal section brought over
+
+**Did.** Two commits of the private repository ported by hand, the public files' newer content
+kept. From `4cc5b05` (the "still owed" of 2026-10-17's Mac entry): seven multi-select clicks in
+`schedules.spec.ts` use `ControlOrMeta`; its toolbar test closes the app on macOS rather than
+wait for an exit that macOS never makes; and `smoke.spec.ts`'s update-notice test waits for the
+landing's `ifcrise` before it reads boxes. Its fourth fix, `federation-store.test.ts` disposing
+its federation, was already here (`disposeFederation`, 2026-10-05) and was not taken; its
+`CLAUDE.md` line and `docs/DECISIONS.md` row are, the row saying so. From `7917734`: the
+`## Goal` section of `CLAUDE.md`, with "public release planned" now "publicly released". No
+file under `src/` changed.
+
+**Verified** on an M4 Pro, macOS 26.5.1, Node 24.17.0: `npm ci`, `npm test`
+(2 998 passed / 4 skipped), `npm run build`, and `npm run test:e2e --
+tests/e2e/schedules.spec.ts tests/e2e/smoke.spec.ts` (40 passed / 3 skipped / 1 failed;
+`clean:`). The skipped are the two `SGVUE_SHOTS` screenshot tests and the `SGVUE_IFC`
+real-model one. **Still failing on macOS, and on `main` before this change:** `smoke.spec.ts`'s
+"a viewpoint is renamed by double-click" — the row's box during the edit reads (288, 100), not
+(321, 119.5), every run; not part of the ported commit, left as found.
+
 ## 2026-10-17 — the assistant's errors are told apart by the SDK's own classes
 
 **Did.** `classifyError` (`src/main/ai/gateway.ts`) tested `error.name` against the SDK's

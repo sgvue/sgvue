@@ -878,6 +878,21 @@ test('the landing page shows an update notice with a link when a newer version i
       }
     }, NOTICE)
 
+  /**
+   * The landing column rises in (`ifcrise`: .3s from `translateY(8px)`) and a bounding box
+   * reports that transform, so boxes read one after another during it are read at different
+   * moments. Wait for its finite animations to end first, as `keyboard.spec.ts` does for the menu.
+   */
+  const settled = (page: Page): Promise<void> =>
+    page.locator('[data-role="landing"]').evaluate((el) =>
+      Promise.all(
+        el
+          .getAnimations({ subtree: true })
+          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+          .map((a) => a.finished)
+      ).then(() => undefined)
+    )
+
   // ── a newer version is out ──
   {
     const { app, page } = await launch(dir, { SGVUE_UPDATE_LATEST: '99.0.0' })
@@ -896,6 +911,7 @@ test('the landing page shows an update notice with a link when a newer version i
       expect(await notice.evaluate((e) => [...e.children].map((k) => k.tagName))).toEqual(['SPAN', 'BUTTON'])
 
       // In the 620 px column, between the introduction and the drop zone, a column gap from each.
+      await settled(page)
       const drop = page.getByText(DROP_COPY).locator('xpath=ancestor::label')
       const [n, d] = [(await notice.boundingBox())!, (await drop.boundingBox())!]
       const intro = (await page.getByText('Open a model to begin').locator('xpath=..').boundingBox())!
@@ -966,6 +982,7 @@ test('the landing page shows an update notice with a link when a newer version i
       await expect(dismiss).toBeVisible({ timeout: 20_000 })
       await expect(notice).toBeVisible()
       const banner = dismiss.locator('xpath=..')
+      await settled(page)
       const [n, b] = [(await notice.boundingBox())!, (await banner.boundingBox())!]
       expect(b.y - (n.y + n.height)).toBeCloseTo(22, 1)
       expect(b.x).toBeCloseTo(n.x, 1)
