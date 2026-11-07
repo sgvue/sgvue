@@ -1300,6 +1300,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **a fourth disk writer, `src/main/projects.ts`**: the project file only, to a path the user picked in Save As or a `.sgvue` they opened this run (⌘S re-saves it without a dialog), atomic, ≤ 16 MB.
 - 2026-11-07 — **the core is protected by headless CI checks** (owner-approved, `docs/plans/core-protection.md`, Tier 1); visual baselines, a performance budget and the full e2e run on the owner's yes before a release.
 - 2026-11-07 — **a synthetic reference model and its IfcOpenShell truth are committed** (`tests/fixtures/reference.ifc` from `scripts/make-reference-ifc.py`, byte-identical on every run; `reference.expected.json`, the one expected.json `.gitignore` lets through): both conformance tests always run on it, in CI too, and on a `samples/` model beside it when one is present.
+- 2026-11-07 — **`design-reference/` is pinned file by file** (`tests/design-reference.sha256`, checked by `tests/unit/design-reference-pin.test.ts` in `npm test`): a changed, added or removed file fails by name; `node scripts/design-reference-pin.cjs --write` updates the list, only with an owner's new handoff, in the same commit.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

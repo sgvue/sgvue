@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — design-reference/ is pinned by SHA-256
+
+**Did.** Core protection, plan item 2. `scripts/design-reference-pin.cjs` lists every file under `design-reference/` (git's tracked files there plus untracked, not-ignored ones) and hashes it; `--write` writes `tests/design-reference.sha256` (25 files), no flag checks. `tests/unit/design-reference-pin.test.ts` uses the script's own functions and fails naming each file `changed`, `added` or `removed`, with how to put it back — or, for a new handoff, how to update the list. `docs/COMMANDS.md` has the command.
+
+**Verified.** The 25 hashes equal the committed blobs'; a clone with `core.autocrlf=true` / `core.eol=crlf` hashes identically (`.gitattributes` keeps text LF and the 14 fonts and images binary). Probe, reverted: an appended space in `README.md`, a new file and a moved `sample-model.js` failed the test (and the script, exit 1) with `changed: design-reference/README.md`, `added: design-reference/probe-new.txt`, `removed: design-reference/design/sample-model.js`. `npm test` 3 177 passed / 4 skipped; typecheck, lint and build clean.
+
 ## 2026-11-07 — a synthetic reference model; the conformance tests run in CI
 
 **Did.** Core protection, plan item 1. `scripts/make-reference-ifc.py` (on `make-tiny-ifc.py`'s `Fixture`) writes `tests/fixtures/reference.ifc`: ten storeys, 1 845 elements + 252 spaces, millimetres, the site placement at the synthetic shared origin with its −43.4103° turn, a `1`–`8` / `A`–`E` grid, type sets overridden by an occurrence set of the same name, quantities, a layer-set usage, a classification, `USERDEFINED` + `ObjectType`, type-only PredefinedTypes, mapped doors in openings, glass transparent only by its surface style. `expected-from-ifcopenshell.py` (unchanged) wrote `reference.expected.json`; `.gitignore` lets that one file through. `index-builder.fixture.test.ts` and `geometry-streamer.fixture.test.ts` run it unconditionally and a `samples/` model beside it when present (skip notice kept); one new geometry check: the windows' alpha is the style's 0.3, every other part's 1.
