@@ -23,6 +23,7 @@ files:
   - '!scripts/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!vitest.config.{js,ts,mjs,cjs}'
+  - '!eslint.config.{js,ts,mjs,cjs}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!{CLAUDE.md,PROGRESS.md,README.md,CHANGELOG.md,CONTRIBUTING.md,CODE_OF_CONDUCT.md,SECURITY.md,SUPPORT.md}'

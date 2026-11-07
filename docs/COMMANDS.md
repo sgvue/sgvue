@@ -12,6 +12,7 @@ icon generators — are only here.
 | `npm run build` | Typecheck, then build into `out/` |
 | `npm run preview` | Run the built app without the dev server |
 | `npm run typecheck` | `tsc --noEmit` for the node and web projects |
+| `npm run lint` | ESLint over `src/**/*.{ts,tsx}` with type-aware parsing (`eslint.config.mjs`); since 2026-11-07, one rule a step of the lint hardening |
 | `npm test` | vitest (unit + read-only guard) |
 | `node scripts/third-party-notices.cjs` | Write `THIRD_PARTY_NOTICES.md` — every third-party component the installers ship, with its licence — from the installed tree and `scripts/third-party-notices.json` (2026-10-05). `--check` only compares, as `npm test` does. Run it after any dependency change |
 | `npm run test:e2e` | Electron smoke test through `scripts/safe-e2e.cjs` (the guarded wrapper — **never** a bare `npx playwright test`). Runs on Windows too — see *The guards on Windows* below |

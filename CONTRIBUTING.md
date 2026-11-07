@@ -33,6 +33,7 @@ first `npm test` does — or at once with `node node_modules/electron/install.js
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | `tsc` over the Node side and the web side |
+| `npm run lint` | ESLint over `src/**/*.{ts,tsx}`, with type information (`eslint.config.mjs`) |
 | `npm test` | The unit tests and the read-only guard (vitest). No Electron window and no GPU; the tests make no network call — only the first run may download Electron's binary, once (above) |
 | `npm run build` | Type-check, then build main, preload and renderer into `out/` |
 | `npm run test:e2e` | The Electron end-to-end suite (Playwright), through its guard. Needs a GPU with WebGL2 |
@@ -60,9 +61,9 @@ code; do not run the same thing again.
 
 ## Tests, and what CI runs
 
-- `npm run typecheck` and `npm test` must pass. CI runs `npm ci`, `npm run typecheck`,
-  `npm test` and `npm run build` on Windows, macOS and Ubuntu for every pull request and every
-  push to `main`.
+- `npm run typecheck`, `npm run lint` and `npm test` must pass. CI runs `npm ci`,
+  `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` on Windows, macOS and
+  Ubuntu for every pull request and every push to `main`.
 - Tests that need a real model skip themselves without one (`samples/` is git-ignored), and the
   packaged-archive test skips without a `dist/`.
 - The end-to-end suite needs a real GPU, so CI does not run it. If you change the interface or

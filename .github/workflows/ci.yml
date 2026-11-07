@@ -37,6 +37,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       # The unit tests download Electron's binary on first use (one test imports `electron`).
       - run: npm test
       - run: npm run build
