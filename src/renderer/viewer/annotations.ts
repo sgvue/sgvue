@@ -77,6 +77,7 @@ import {
   type DimRect,
   type GridDimRun,
   type LaserAxis,
+  type LaserDirection,
   type LaserSides,
   type Rect,
   type XY
@@ -110,6 +111,12 @@ export interface MeasureRecord {
   y?: number
   z?: number
   sides: Partial<Record<'x' | 'y' | 'z', LaserSides>>
+  /**
+   * 2026-11-07 (project file phase 3) — the face the laser was fired from, scene frame, unit
+   * length: what the project file writes so a restored measurement fires as the click did.
+   * Absent when it was fired with none.
+   */
+  normal?: [number, number, number]
 }
 
 /**
@@ -229,8 +236,11 @@ export interface Annotations {
    * before.
    */
   setUnits(u: DisplayUnit): void
-  /** L398. A click with the laser tool. */
-  addLaser(p: Vector3, normal: Vector3 | null, selfId: number): void
+  /**
+   * L398. A click with the laser tool. `only` (2026-11-07, a project's restored measurement)
+   * keeps the rays to those directions, plan frame; omitted, every one the normal allows.
+   */
+  addLaser(p: Vector3, normal: Vector3 | null, selfId: number, only?: readonly LaserDirection[]): void
   /** L413. A click with the spot tool. */
   addSpot(p: Vector3): void
   /** L615–617. The live preview under the pointer. */
@@ -334,6 +344,8 @@ interface Measurement {
   labels: Label[]
   /** Each side's reading and the label that prints it — what a change of unit re-renders. */
   readings: { label: Label; axis: LaserAxis; len: number }[]
+  /** The face it was fired from, or `null` (`MeasureRecord.normal`). */
+  normal: [number, number, number] | null
 }
 interface Spot {
   id: number
@@ -778,7 +790,12 @@ export function createAnnotations(host: AnnotationHost): Annotations {
    * thousands of elements (`batches.ts`), so object identity would reject far too much; the
    * element the ray started from is what the reference's 5 cm window is actually about.
    */
-  function laserFrom(p: Vector3, normal: Vector3 | null, selfId: number): LaserRay[] {
+  function laserFrom(
+    p: Vector3,
+    normal: Vector3 | null,
+    selfId: number,
+    only?: readonly LaserDirection[]
+  ): LaserRay[] {
     const far = LASER_FAR * host.scale()
     _origin.copy(p).addScaledVector(normal ?? Z_UP, LASER_LIFT)
     const n = normal ? ([normal.x, normal.y, normal.z] as [number, number, number]) : null
@@ -789,6 +806,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     const nPlan = n && rho !== 0 ? ([...turnXY([n[0], n[1]], -rho), n[2]] as [number, number, number]) : n
     const axes = laserAxes(rho)
     for (const { axis, sign } of laserDirections(nPlan)) {
+      if (only && !only.some((d) => d.axis === axis && d.sign === sign)) continue
       _dir.copy(axes[axis]).multiplyScalar(sign)
       let hit = host.ray(_origin, _dir, far, LASER_MIN_DISTANCE)
       // L378's `!(x.object === self && x.distance < 0.05)`: step past the surface we are on.
@@ -832,6 +850,14 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     laser.visible = rays.length > 0
   }
 
+  /** A face normal as a unit vector, or `null` for none — or one with no length or a non-finite part. */
+  const unitOrNull = (n: Vector3 | null): [number, number, number] | null => {
+    if (!n) return null
+    const len = n.length()
+    if (!Number.isFinite(len) || len === 0) return null
+    return [n.x / len, n.y / len, n.z / len]
+  }
+
   const measureList = (): MeasureRecord[] =>
     measures.map((m) => {
       const out: MeasureRecord = {
@@ -839,6 +865,7 @@ export function createAnnotations(host: AnnotationHost): Annotations {
         p: m.p.toArray() as [number, number, number],
         sides: {}
       }
+      if (m.normal) out.normal = [...m.normal]
       for (const r of m.rays) {
         const k = r.axis.toLowerCase() as 'x' | 'y' | 'z'
         out[k] = r.len
@@ -1058,8 +1085,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
       host.invalidate()
     },
 
-    addLaser: (p, normal, selfId) => {
-      const rays = laserFrom(p, normal, selfId)
+    addLaser: (p, normal, selfId, only) => {
+      const rays = laserFrom(p, normal, selfId, only)
       if (!rays.length) return
       const m: Measurement = {
         id: ++mid,
@@ -1067,7 +1094,8 @@ export function createAnnotations(host: AnnotationHost): Annotations {
         rays,
         lines: [],
         labels: [overlay.mkLabel(p, '', ORIGIN_STYLE)],
-        readings: []
+        readings: [],
+        normal: unitOrNull(normal)
       }
       for (const r of rays) {
         const line = new Line(

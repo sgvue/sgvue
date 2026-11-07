@@ -26,8 +26,23 @@
  * never dropped by a save**: its entry and every reference to it are carried forward from the
  * opened file, exactly as that file had them (`Carried`, `carryForward`).
  *
- * **Written in phase 2, restored in phase 3:** viewpoints, filter sets, schedules and markups.
- * They are in every file this saves; `applyProjectRestore` deliberately does not put them back yet.
+ * **The project's own lists (phase 3, plan D9).** While a project is open its saved viewpoints and
+ * named filter sets are the store's lists (`setProjectLists`) and its saved schedule setups and
+ * open schedule are held by the Schedules link (`setProjectSchedules`), which the Schedules
+ * window shows: every save, rename, delete or cap rule — the controls' and the assistant's, through
+ * the same actions — acts on the project's lists, writes nothing to `localStorage`, and makes the
+ * project unsaved. When it closes the app's own `localStorage` lists come back, untouched. A Save
+ * As from a session with no project takes the lists the app shows at that moment into the new
+ * project, once (the plan's one-time import). With no project open nothing here runs.
+ *
+ * **Markups (phase 3).** A spot is placed again at its stored point, and a laser measurement is
+ * **measured again** there through the viewer's own commit (`placeSpot` / `placeMeasure`), so it
+ * reads the model as it is now, along the plan axes it has now — firing only the directions it
+ * read when saved, because the file holds no surface normal and a ray fired into the face the
+ * point sits on reads that element's own thickness (`measureReplay`). A measurement standing on
+ * no loaded element while a model is missing is taken to be that model's: it is not measured,
+ * and is carried into every save as the file had it, as the model is. One whose rays read
+ * nothing now is not placed, and is counted (`lastProjectRestore`).
  *
  * **Unsaved changes.** While a project is open the review state it saves is compared with the
  * state as it was opened or last saved (`projectStateKey`, by value), and main is told when that
@@ -40,6 +55,8 @@
  * nothing is assigned, so nothing changes.
  */
 import { MC } from '../../shared/colors'
+import type { LaserDirection } from '../../shared/annotate'
+import { turnXY } from '../../shared/plan-rotation'
 import { ID_STRIDE, modelKeyOf } from '../../shared/federate'
 import { IDENTITY_FRAME_KEY } from '../../shared/georef'
 import type {
@@ -53,6 +70,7 @@ import type {
 import {
   carryForward,
   leastUsedColour,
+  MAX_MARKUPS,
   PROJECT_MAX_BYTES,
   projectOf,
   projectText,
@@ -60,6 +78,7 @@ import {
   restorePlanOf,
   type ProjectContext,
   type ProjectFile,
+  type ProjectMeasure,
   type ProjectModelInfo,
   type ProjectSavedSchedule,
   type ProjectSource,
@@ -68,13 +87,13 @@ import {
 } from '../../shared/project-file'
 import { idNumbering, type SessionCamera, type SessionFile } from '../../shared/session-codec'
 import type { ScheduleDef } from '../../schedule/schedule/def'
-import { listSaved, SAVED_KEY } from '../schedule-ui/schedules'
+import { listSaved } from '../schedule-ui/schedules'
 import { modelLabel, rowSwatch } from '../state/selectors/models'
 import { viewpointHidden } from '../state/selectors/views'
 import { getViewer, useShell, type ShellState } from '../state/shell'
 import { api } from '../api'
 import { afterPaint, federation as fed } from './federation-store'
-import { openSchedule } from './schedule-link'
+import { onProjectSchedules, openSchedule, projectSchedules, setProjectSchedules } from './schedule-link'
 import { addError, onFreshStart, openProjectFiles, startOver } from './upload-pipeline'
 
 /** A loaded model's file, as the project records it (`federation.projectFiles()`). */
@@ -194,6 +213,21 @@ export function projectContextOf(
 export interface Carried {
   file: ProjectFile
   ids: readonly string[]
+  /**
+   * 2026-11-07 (phase 3) — which of the project's viewpoints are the opened file's, and still that
+   * viewpoint: live viewpoint id → its index in `file.viewpoints`. An id leaves it when its
+   * viewpoint is deleted, so one saved later under the same id gains nothing of the file's.
+   * Absent, viewpoints are paired by id (`carryForward`).
+   */
+  views?: Map<number, number>
+  /**
+   * 2026-11-07 (phase 3) — the file's markups that are not on screen, written back as it had
+   * them: every one of them from the moment the project opens until `placeMarkups` has placed
+   * what it could — so a restore that fails half way loses none — and after that the
+   * measurements that stood on a missing model, and anything the viewer could not place.
+   */
+  measures?: readonly ProjectFile['markups']['measures'][number][]
+  spots?: readonly ProjectFile['markups']['spots'][number][]
 }
 
 /**
@@ -210,15 +244,22 @@ export function buildProject(i: SnapshotInputs, savedAt: string, savedBy: string
     .filter((c) => !loaded.has(c.key))
   const ctx = { ...projectContextOf(i.state, i.files, savedAt, savedBy), carried: keep }
   const built = projectOf(projectSourceOf(i), ctx)
-  if (!carried || !keep.length) return built
-  return {
-    ...built,
-    project: carryForward(
-      built.project,
+  if (!carried) return built
+  let project = built.project
+  if (keep.length) {
+    project = carryForward(
+      project,
       carried.file,
-      keep.map((c) => c.id)
+      keep.map((c) => c.id),
+      carried.views
     )
   }
+  if (carried.measures?.length || carried.spots?.length) {
+    const measures = [...project.markups.measures, ...(carried.measures ?? [])]
+    const spots = [...project.markups.spots, ...(carried.spots ?? [])]
+    project = { ...project, markups: { spots: spots.slice(0, MAX_MARKUPS), measures: measures.slice(0, MAX_MARKUPS) } }
+  }
+  return { ...built, project }
 }
 
 /** JSON with every object's keys sorted, so two equal values always read the same. */
@@ -252,7 +293,7 @@ export function projectStateKey(i: SnapshotInputs): string {
     storeyVis: offOnly(src.storeyVis),
     modelVis: offOnly(src.modelVis),
     spots: src.spots.map((sp) => sp.p),
-    measures: src.measures.map((m) => [m.p, m.x, m.y, m.z, m.sides]),
+    measures: src.measures.map((m) => [m.p, m.x, m.y, m.z, m.sides, m.normal ?? null]),
     models: i.files.map((f) => [f.key, f.path, f.sha256]),
     assigned: i.state.assignedColors
   })
@@ -295,6 +336,160 @@ export function assignColours(
 /* ────────────────────────────── restoring ────────────────────────────── */
 
 /**
+ * A list whose ids each name one entry (phase 3): an id the file repeats is given the next one
+ * free, so deleting, renaming or restoring one entry never acts on another. The first of a
+ * repeated id keeps it; a list with no repeat is returned as it is.
+ */
+export function uniqueIds<T extends { id: number }>(xs: readonly T[]): T[] {
+  const seen = new Set<number>()
+  let next = Math.max(0, ...xs.map((x) => x.id)) + 1
+  let changed = false
+  const out = xs.map((x) => {
+    if (!seen.has(x.id)) {
+      seen.add(x.id)
+      return x
+    }
+    changed = true
+    const id = next++
+    seen.add(id)
+    return { ...x, id }
+  })
+  return changed ? out : [...xs]
+}
+
+/**
+ * How a saved measurement with **no stored normal** is measured again (phase 3) — a file written
+ * before the normal was, or a measurement fired with no face — from what the file holds of it, a
+ * point and each side's reading. (With a normal, `placeMarkups` fires exactly as the click did.)
+ *
+ *  · `only` — the directions that read something when it was saved, and no others. The laser
+ *    never fires into the face its point sits on (`laserDirections`); with no normal to tell
+ *    which face that is, a ray fired every way would run into it and read the element's own
+ *    thickness. A direction into the face always read nothing, so it is never among these.
+ *  · `normal` — for the ray's 3 mm lift off the surface, plan frame: on each axis that read one
+ *    side and not the other, towards the side that read (the other is where the face is). Absent
+ *    when no axis says — the laser then lifts the point straight up, as for a point with no face.
+ */
+export function measureReplay(m: Pick<ProjectMeasure, 'sides'>): {
+  only: LaserDirection[]
+  normal: [number, number, number] | null
+} {
+  const only: LaserDirection[] = []
+  const n: [number, number, number] = [0, 0, 0]
+  ;(['X', 'Y', 'Z'] as const).forEach((axis, i) => {
+    const side = m.sides[axis.toLowerCase() as 'x' | 'y' | 'z']
+    const plus = side?.plus != null
+    const minus = side?.minus != null
+    if (plus) only.push({ axis, sign: 1 })
+    if (minus) only.push({ axis, sign: -1 })
+    if (plus !== minus) n[i] = plus ? 1 : -1
+  })
+  const len = Math.hypot(n[0], n[1], n[2])
+  return { only, normal: len ? [n[0] / len, n[1] / len, n[2] / len] : null }
+}
+
+/** How far off an element's box a saved point may stand and still be on it: the laser's self window. */
+export const ON_SURFACE_M = 0.05
+
+/**
+ * Whether a world point stands on — inside, or within `ON_SURFACE_M` of — the box of a loaded
+ * element (`bbox`, world coordinates): a test made once for the elements, asked once a point.
+ * Box arithmetic, conservative as every box is: a point that passes may still be in the air
+ * beside a rotated part, never the other way round.
+ */
+export function onLoadedElements(
+  elements: readonly { model: string; bbox?: readonly number[] }[]
+): (p: readonly [number, number, number]) => boolean {
+  const t = ON_SURFACE_M
+  const inside = (p: readonly number[], b: readonly number[]): boolean =>
+    p[0] >= b[0] - t && p[0] <= b[3] + t && p[1] >= b[1] - t && p[1] <= b[4] + t && p[2] >= b[2] - t && p[2] <= b[5] + t
+  // Each model's union box first, so a point far from a model never walks its elements.
+  const byModel = new Map<string, { box: number[]; boxes: (readonly number[])[] }>()
+  for (const el of elements) {
+    const b = el.bbox
+    if (!b || b.length !== 6) continue
+    let m = byModel.get(el.model)
+    if (!m) byModel.set(el.model, (m = { box: [...b], boxes: [] }))
+    for (let k = 0; k < 3; k++) {
+      m.box[k] = Math.min(m.box[k], b[k])
+      m.box[k + 3] = Math.max(m.box[k + 3], b[k + 3])
+    }
+    m.boxes.push(b)
+  }
+  const models = [...byModel.values()]
+  return (p) => models.some((m) => inside(p, m.box) && m.boxes.some((b) => inside(p, b)))
+}
+
+/** What the last restore did with the file's markups — for the dev harness and the tests. */
+export interface MarkupRestore {
+  spots: number
+  /** Spots the viewer did not place (there was no 3D view): carried, unplaced. */
+  spotsCarried: number
+  /** Measured again and placed. */
+  measured: number
+  /** Standing on no loaded element while a model is missing: carried into every save, unplaced. */
+  carried: number
+  /** Measured again and read nothing — no ray reached a face. Not placed. */
+  unread: number
+}
+let lastRestore: MarkupRestore | null = null
+export const lastProjectRestore = (): MarkupRestore | null => lastRestore
+
+/**
+ * Put the file's markups back through the viewer's own commit (`placeSpot` / `placeMeasure`, the
+ * store's, at the stored **world** point — the store subtracts the offset). A spot is placed as it
+ * was. A measurement is measured again: with its stored normal exactly as the click fired it,
+ * else by `measureReplay` — unless a model is missing and its point is on no loaded element; then
+ * it is returned, to be carried, as is a spot the viewer did not place. Spot tags come back
+ * collapsed.
+ */
+export function placeMarkups(
+  file: ProjectFile,
+  elements: readonly { model: string; bbox?: readonly number[] }[],
+  anyMissing: boolean
+): {
+  carried: ProjectFile['markups']['measures'][number][]
+  spots: ProjectFile['markups']['spots'][number][]
+  counts: MarkupRestore
+} {
+  const shell = useShell.getState()
+  const counts: MarkupRestore = { spots: 0, spotsCarried: 0, measured: 0, carried: 0, unread: 0 }
+  const carried: ProjectFile['markups']['measures'][number][] = []
+  const spots: ProjectFile['markups']['spots'][number][] = []
+  for (const sp of file.markups.spots) {
+    if (shell.placeSpot(sp.at)) counts.spots++
+    else {
+      spots.push(sp)
+      counts.spotsCarried++
+    }
+  }
+  const rho = (useShell.getState().planRotationDeg * Math.PI) / 180
+  const onLoaded = anyMissing && file.markups.measures.length ? onLoadedElements(elements) : null
+  for (const m of file.markups.measures) {
+    if (onLoaded && !onLoaded(m.at)) {
+      carried.push(m)
+      counts.carried++
+      continue
+    }
+    let placed: boolean
+    if (m.normal) {
+      // The face it was fired from, as the click had it: every direction it allows, as a click.
+      placed = useShell.getState().placeMeasure(m.at, m.normal, -1)
+    } else {
+      const { only, normal } = measureReplay(m)
+      // The inferred normal is the plan's; the viewer takes it in the scene's frame and turns it back.
+      const scene: [number, number, number] | null = normal
+        ? [...turnXY([normal[0], normal[1]], rho), normal[2]]
+        : null
+      placed = only.length > 0 && useShell.getState().placeMeasure(m.at, scene, -1, only)
+    }
+    if (placed) counts.measured++
+    else counts.unread++
+  }
+  return { carried, spots, counts }
+}
+
+/**
  * Put a project's restored state back through the store's own restore path (`applySession`, which
  * follows `RESTORE_ORDER`): what is hidden, the storey and model eyes, activate mode, the user's
  * own model colours and Original materials, the colours the project assigned (D12), the tree's grouping, the display switches, both
@@ -306,9 +501,8 @@ export function assignColours(
  * The restored maps are null-prototype (`restorePlanOf`); the store only spreads, indexes and
  * enumerates them, so a storey named `__proto__` is an ordinary entry there too.
  *
- * **Not restored yet — phase 3:** the viewpoints, filter sets, saved schedules, the open schedule
- * and the markups (`state.views`, `filterSets`, `schedules`, `openSchedule`, `spots`,
- * `measures`). Phase 2 writes them; phase 3 moves those lists into the project (D9).
+ * The lists and the markups are not this function's: the lists are the project's own while it is
+ * open (`enterLists`), and the markups are placed by the viewer once this has run (`placeMarkups`).
  */
 export function applyProjectRestore(plan: RestorePlan): void {
   const st = plan.state
@@ -366,24 +560,23 @@ let lastWrite: { dropped: ProjectWrite['dropped'] } | null = null
 /** For the dev harness and the tests: the last save's `dropped` counts. */
 export const lastProjectWrite = (): { dropped: ProjectWrite['dropped'] } | null => lastWrite
 
-const savedSchedules = (): ProjectSavedSchedule[] => listSaved()
+/**
+ * The saved schedule setups and the open schedule a save writes: an open project's own (held by
+ * the Schedules link), else — a Save As from a session with no project, the one-time import —
+ * the Schedules window's `localStorage` list and the schedule it shows.
+ */
+function liveSchedules(): { schedules: ProjectSavedSchedule[]; openSchedule: ScheduleDef | null } {
+  const held = project.open ? projectSchedules() : null
+  if (held) return { schedules: [...held.saved], openSchedule: held.open }
+  return { schedules: listSaved(), openSchedule: openSchedule()?.def ?? null }
+}
 
 const liveInputs = (): SnapshotInputs => ({
   state: useShell.getState(),
   cam: getViewer()?.getCamera() ?? null,
   files: fed.projectFiles(),
-  schedules: savedSchedules(),
-  openSchedule: openSchedule()?.def ?? null
+  ...liveSchedules()
 })
-
-/** The raw stored schedules, cheap to read, for the short-circuit below. */
-function rawSaved(): string | null {
-  try {
-    return localStorage.getItem(SAVED_KEY)
-  } catch {
-    return null
-  }
-}
 
 /** The things the key is computed from, by reference: while none changed the key cannot have. */
 let lastRefs: unknown[] = []
@@ -395,7 +588,8 @@ function liveKey(force = false): string {
     s.hidden, s.storeyVis, s.modelVis, s.active, s.modelColors, s.nativeMats, s.treeMode, s.grids,
     s.levels, s.shadows, s.snap, s.dims, s.sections, s.stack, s.view, s.units, s.groundGrid,
     s.views, s.filterSets, s.spots, s.measures, s.federation, s.assignedColors, s.library,
-    s.uploadNames, openSchedule(), rawSaved(), cam ? JSON.stringify(cam) : null
+    // The project's schedules are a new object whenever the Schedules window changes them.
+    s.uploadNames, projectSchedules(), cam ? JSON.stringify(cam) : null
   ]
   if (!force && refs.length === lastRefs.length && refs.every((r, i) => r === lastRefs[i])) return lastKey
   lastRefs = refs
@@ -460,16 +654,36 @@ function answerSnapshot(n: number): void {
 }
 
 let interval: ReturnType<typeof setInterval> | undefined
-/** The camera and the Schedules window's lists change outside the store: looked at once a second. */
+/** The camera changes outside the store: looked at once a second. */
 const watch = (): void => {
   if (interval === undefined) interval = setInterval(() => checkDirty(), 1000)
 }
+
+/**
+ * The first save of a session with no project (phase 3, the plan's one-time import): from now on
+ * the lists the app shows are the new project's — the same lists, which nothing writes to
+ * `localStorage` any more. `localStorage` keeps what it had, and is the app's again once the
+ * project closes.
+ */
+function importLists(): void {
+  const s = useShell.getState()
+  s.setProjectLists({ views: s.views, filterSets: s.filterSets })
+  // Only what the Schedules window's port can carry: a setup that cannot cross it is left out
+  // and counted (`setProjectSchedules`), never sent to be refused.
+  scheduleFit = setProjectSchedules({ saved: listSaved(), open: openSchedule()?.def ?? null })
+}
+
+/** What the last hand-over of a project's schedules left out (`setProjectSchedules`). */
+let scheduleFit: { dropped: number; openDropped: boolean } | null = null
+/** For the dev harness and the tests: what the last hand-over of a project's schedules left out. */
+export const lastProjectScheduleFit = (): { dropped: number; openDropped: boolean } | null => scheduleFit
 
 /** Main says the snapshot `n` is on disk: that is the state to compare with from now on. */
 function onSaved(n: number): void {
   const snap = snapshots.get(n)
   snapshots.clear()
   if (!snap) return
+  if (!project.open) importLists()
   project.open = true
   project.loading = false
   project.baseline = snap.key
@@ -521,10 +735,34 @@ async function restoreOnto(file: ProjectFile, admittedAs: ReadonlyMap<string, st
   const f = fed.current
   const plan = restorePlanOf(file, { models: f.models, elements: f.elements }, { bind, offset: useShell.getState().offset })
   if (Object.keys(plan.unmatched).length) console.info('[sgvue] project references that matched nothing:', plan.unmatched)
+  // The project's lists, now that its viewpoints' elements can be named by the ids they have.
+  const views = enterLists(plan, true)
   // What is not open — missing, refused, changed — is carried into every save, unchanged.
-  carried = plan.missing.length ? { file, ids: plan.missing } : null
+  // The file's markups stay carried until they are placed: a restore that throws before then
+  // must not let the next save drop them.
+  carried = { file, ids: plan.missing, views, measures: file.markups.measures, spots: file.markups.spots }
   if (f.models.length) applyProjectRestore(plan)
   await afterPaint()
+  if (!f.models.length) return
+  // The markups last, so the laser reads the view the project restored.
+  const placed = placeMarkups(file, f.elements, plan.missing.length > 0)
+  lastRestore = placed.counts
+  carried = { ...carried, measures: placed.carried, spots: placed.spots }
+  const c = placed.counts
+  if (c.carried || c.unread || c.spotsCarried) console.info('[sgvue] project markups not placed:', c)
+}
+
+/**
+ * The project's saved viewpoints, named filter sets and saved schedules become the lists the app
+ * shows (plan D9) — viewpoints and filter sets in the store, schedules through the Schedules
+ * link, and, with `show`, its open schedule on screen. An id the file repeats is made unique
+ * (`uniqueIds`). Returns which live viewpoint is which of the file's (`Carried.views`).
+ */
+function enterLists(plan: RestorePlan, show: boolean): Map<number, number> {
+  const views = uniqueIds(plan.state.views)
+  useShell.getState().setProjectLists({ views, filterSets: uniqueIds(plan.state.filterSets) })
+  scheduleFit = setProjectSchedules({ saved: plan.state.schedules, open: plan.state.openSchedule }, show)
+  return new Map(views.map((v, i) => [v.id, i]))
 }
 
 /** Loading is over, restored or not: from here the state is the project's as opened. */
@@ -555,6 +793,9 @@ export function closeProject(): void {
   carried = null
   snapshots.clear()
   useShell.setState({ assignedColors: {} })
+  // The app's own lists again — `localStorage`'s, which the project never wrote.
+  useShell.getState().setProjectLists(null)
+  setProjectSchedules(null)
   void api()?.closeProject().catch(() => undefined)
 }
 
@@ -577,10 +818,20 @@ export async function openProjectMessage(msg: ProjectOpened): Promise<void> {
   project.baseline = ''
   project.sawRows = false
   snapshots.clear()
-  // Until the restore says otherwise, every model of the file is one that is not open.
-  carried = { file, ids: file.models.map((m) => m.id) }
   startOver()
   useShell.setState({ assignedColors: {} })
+  // Its lists are the app's from now on — before any model has loaded, so a federation change
+  // never reads the building's `localStorage` list over them — and every model of the file is
+  // one that is not open until the restore says otherwise.
+  const views = enterLists(restorePlanOf(file, { models: [], elements: [] }), false)
+  carried = {
+    file,
+    ids: file.models.map((m) => m.id),
+    views,
+    measures: file.markups.measures,
+    spots: file.markups.spots
+  }
+  lastRestore = null
 
   const sent = new Map<string, ProjectModelFile>(msg.models.map((m) => [m.id, m]))
   const files: PickedFile[] = []
@@ -619,8 +870,18 @@ export function installProject(): () => void {
   const offOpened = bridge?.onProjectOpened((msg) => void openProjectMessage(msg))
   const offSaved = bridge?.onProjectSaved(({ n }) => onSaved(n))
   onFreshStart(closeProject)
+  // The Schedules window changed the project's saved setups or its open schedule.
+  onProjectSchedules(() => {
+    if (project.open && !project.loading) scheduleCheck()
+  })
   const offStore = useShell.subscribe((s, prev) => {
     if (!project.open) return
+    // A viewpoint the file had and the user deleted is gone for good: one saved later under the
+    // same id is a new viewpoint, and gains nothing of the file's (`carryForward`).
+    if (s.views !== prev.views && carried?.views?.size) {
+      const live = new Set(s.views.map((v) => v.id))
+      for (const id of [...carried.views.keys()]) if (!live.has(id)) carried.views.delete(id)
+    }
     if (project.loading) {
       // Every one of the project's files failed to load: no batch joined, so no restore will
       // run. The landing page is back with the rows saying why, and that is the project as opened.
@@ -635,16 +896,13 @@ export function installProject(): () => void {
     }
     scheduleCheck()
   })
-  // The Schedules window saves its setups in this origin's storage, and says so here.
-  const onStorage = (): void => scheduleCheck()
-  if (typeof window !== 'undefined') window.addEventListener('storage', onStorage)
   return () => {
     offRequest?.()
     offOpened?.()
     offSaved?.()
     onFreshStart(null)
+    onProjectSchedules(null)
     offStore()
-    if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage)
     clearTimeout(checkTimer)
     if (interval !== undefined) clearInterval(interval)
     interval = undefined

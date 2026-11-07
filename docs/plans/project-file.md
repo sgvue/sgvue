@@ -117,7 +117,7 @@ An "Allowed desktop deviations" entry (the File menu items, the title marker, th
 
 ## Carried into later phases (from the phase-2 review)
 
-- Phase 3: `carryForward` merges a carried model's viewpoint refs into the written viewpoint of the same `id`; while viewpoints still live in `localStorage` a coincidental id could gain foreign refs (carried models only). Moving viewpoints into the project removes it.
-- Phase 3: decide whether a restored measurement is re-measured or drawn from its stored lengths.
+- ~~Phase 3: `carryForward` merging viewpoints by id~~ — done: an explicit pairing map.
+- ~~Phase 3: re-measure or draw from stored lengths~~ — done: re-fired from a stored normal, else the directions that read.
 - Phase 4: with an all-missing project open, a new pick on the landing page closes it (the file is untouched) — Locate… is the way in.
 - Before release: on macOS ⌘Q, the Vee and Schedules child windows may close before the main window's question, and stay closed on Cancel — check in the e2e run.

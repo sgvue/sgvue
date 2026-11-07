@@ -38,6 +38,14 @@
 //                       template, a saved setup; a deletion, Print and Open schedule file only
 //                       raise this window's own dialog. Answered at once by `manageAck`, the
 //                       schedule on screen posted ahead of it
+//
+// 2026-11-07 — the `.sgvue` project file, phase 3 (plan D9):
+//   port → `projectSchedules` → while a project is open in the main window, its saved setups
+//                       are My templates (schedules.ts), and every change to them goes back as
+//                       `projectSaved`; `null` — the project closed — is this window's own
+//                       `localStorage` list again. With `open`, the project's open schedule is
+//                       shown as the current one, as `define` shows one, without its toast.
+//                       A new port is a new main page with no project until it says otherwise.
 
 import '../styles/fonts.css';
 import '../styles/design.css';
@@ -52,7 +60,10 @@ import { copyText } from '../clipboard';
 import type { ScheduleSnapshot } from '../../schedule/adapter';
 import { resetHistory } from '../../schedule/history';
 import { colourColumn } from '../../schedule/colour';
-import { MANAGE_FRESH_MS, ToSchedules, type ActKind, type ExportFormat } from '../../schedule/messages';
+import {
+  MANAGE_FRESH_MS, readProjectSchedules, SavedListShape, ToSchedules, type ActKind, type ExportFormat,
+  type PortSavedEntry,
+} from '../../schedule/messages';
 import { StoreBuilder } from '../../schedule/ifc/store';
 import { openingSchedule } from '../../schedule/schedule/columns';
 import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def';
@@ -66,6 +77,7 @@ import { wireApp } from './events';
 import { renderHeader, renderStatus, selNoteHtml } from './header';
 import { renderInspector } from './inspector';
 import { manageFromChat } from './manage';
+import { projectListOn, refuseProjectList, setProjectList } from './schedules';
 import { openMenu } from './menu';
 import { renderOverlay } from './overlays';
 import { flushPending, wirePending } from './pending';
@@ -233,6 +245,13 @@ setRenderer(paint);
 
 /** The last `current` posted, as JSON, so an unchanged schedule is never sent twice. */
 let sentCurrent = '';
+/**
+ * 2026-11-07 (project file phase 3) — the schedule `openingSchedule` chose by itself for the
+ * snapshot on screen, as JSON, while nobody has chosen one: `current` says so (`fromDefault`)
+ * while the schedule is still exactly it, so an open project does not take a schedule nobody
+ * picked as its own. `null` once a schedule was asked for — the assistant's, a project's.
+ */
+let defaultJson: string | null = null;
 let currentTimer: ReturnType<typeof setTimeout> | undefined;
 
 /**
@@ -258,10 +277,11 @@ function postCurrent(): void {
   const rowCount = !def || !store ? 0
     : shown && !previewing ? shown.totalDataRows
       : runSchedule(store, def, { cap: 0 }).totalDataRows;
-  const json = JSON.stringify([def, rowCount]);
+  const fromDefault = def !== null && defaultJson !== null && JSON.stringify(def) === defaultJson;
+  const json = JSON.stringify([def, rowCount, fromDefault]);
   if (json === sentCurrent) return;
   sentCurrent = json;
-  port.postMessage({ type: 'current', def, rowCount });
+  port.postMessage({ type: 'current', def, rowCount, ...(fromDefault ? { fromDefault: true } : {}) });
 }
 
 /** A schedule the assistant made or changed. Anything `parseScheduleDef` refuses is ignored. */
@@ -275,6 +295,7 @@ function define(raw: unknown, kind: 'made' | 'edited'): void {
   }
   // A half-typed edit belongs to the schedule on screen: land it before that is replaced.
   flushPending();
+  defaultJson = null;
   // Whatever was queued for the old schedule is dropped; the paint below queues this one, and
   // it is always echoed back.
   clearTimeout(currentTimer);
@@ -290,6 +311,49 @@ function define(raw: unknown, kind: 'made' | 'edited'): void {
   });
   // The assistant by its own name, as the main window's panel and pill call it (2026-10-01).
   flash(kind === 'made' ? 'Schedule from Ask Vee' : 'Schedule changed by Ask Vee');
+}
+
+/**
+ * A project's saved setups become this window's list, or (`null`) its own list comes back; with
+ * `open`, the project's open schedule is the current one (2026-11-07). Every change to a
+ * project's list is reported back as it stands — only what the port can carry, which is what
+ * `schedules.ts` lets a write leave behind.
+ */
+function projectSchedules(saved: PortSavedEntry[] | null, open: unknown): void {
+  const was = projectListOn();
+  setProjectList(saved, (entries) => {
+    const sent = SavedListShape.safeParse(entries);
+    if (sent.success) port?.postMessage({ type: 'projectSaved', saved: entries });
+  });
+  // A repaint either way, so My templates shows the list it now has.
+  if (!(open && showProjectSchedule(open)) && (was || saved)) render();
+}
+
+/**
+ * The schedule a project had open, shown as the current one — `define`'s path, as a fresh start:
+ * not marked changed, nobody's template or saved setup, and no toast, since nobody asked for it
+ * in this window. Anything `parseScheduleDef` refuses is ignored.
+ */
+function showProjectSchedule(raw: unknown): boolean {
+  if (!state.store) return false;
+  let def: ScheduleDef;
+  try {
+    def = parseScheduleDef(raw);
+  } catch {
+    return false;
+  }
+  flushPending();
+  defaultJson = null;
+  clearTimeout(currentTimer);
+  currentTimer = undefined;
+  sentCurrent = '';
+  update({
+    def,
+    dirty: false,
+    selectedColumn: null, selectedCols: [], removedBy: null, litBy: null,
+    templateId: null, savedName: null,
+  });
+  return true;
 }
 
 // ---------- printing ----------
@@ -329,6 +393,8 @@ function load(snapshot: ScheduleSnapshot): void {
   // markers; otherwise the history refers to categories that are gone, and starts again.
   const { def, fits } = openingSchedule(store, state.store ? state.def : null);
   if (!fits) resetHistory(def);
+  // A schedule chosen by itself, not by anyone: `current` says so while it stays exactly this.
+  if (!fits) defaultJson = JSON.stringify(def);
   update({
     store,
     def,
@@ -343,6 +409,15 @@ function load(snapshot: ScheduleSnapshot): void {
 }
 
 function receive(data: unknown): void {
+  // A project's list first: one this window cannot read must still change where it writes.
+  const project = readProjectSchedules(data);
+  if (project) {
+    if (project.kind === 'refused') {
+      refuseProjectList();
+      render();
+    } else projectSchedules(project.kind === 'project' ? project.saved : null, project.kind === 'project' ? project.open : null);
+    return;
+  }
   const msg = ToSchedules.safeParse(data);
   if (!msg.success) return;
   const m = msg.data;
@@ -362,6 +437,9 @@ function receive(data: unknown): void {
       return;
     case 'define':
       define(m.def, m.kind);
+      return;
+    case 'projectSchedules':
+      // Read above, before the union: never reached.
       return;
     case 'export':
       exportFromChat(m.format, m.n);
@@ -519,6 +597,9 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (event.source !== window || event.data !== CH_SCHEDULE_PORT) return;
   port?.close();
   port = event.ports[0] ?? null;
+  // A new main page has opened no project yet: My templates is this window's own list until
+  // that page says otherwise (`projectSchedules`).
+  if (projectListOn()) projectSchedules(null, null);
   if (port) port.onmessage = (m: MessageEvent) => receive(m.data);
   // A new port is a new main page: it hears what is on screen again.
   sentCurrent = '';

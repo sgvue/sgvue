@@ -48,6 +48,8 @@ export function memoryStorage(): Storage {
 const INITIAL = useShell.getState()
 
 export function resetShell(): void {
+  // An open project's lists are module state too: the app's own lists again.
+  useShell.getState().setProjectLists(null)
   useShell.setState(INITIAL, true)
   resetHistory()
 }

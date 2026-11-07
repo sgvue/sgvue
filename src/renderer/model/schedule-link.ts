@@ -51,6 +51,13 @@
  *     does goes through it: `schedule:true` (`ai/executors/targets.ts`) resolves the open
  *     schedule's rows to ids in this renderer and acts through the store's own guarded actions.
  *
+ * 2026-11-07 — the `.sgvue` project file, phase 3 (plan D9): while a project is open, its saved
+ * setups and its open schedule are held here (`setProjectSchedules`, `projectSchedules()`), and
+ * the Schedules window shows them — on connect, and when the project opens or is first saved —
+ * through `projectSchedules`; from the table, `projectSaved` is the list after every change, and
+ * `current` is the project's open schedule from then on, kept when the window closes. Either is
+ * told to `onProjectSchedules`. With no project the port carries exactly what it did.
+ *
  * Nothing is built while no Schedules window is open, and the assistant's store only when the
  * assistant asks.
  */
@@ -69,7 +76,11 @@ import {
   type ExportRefusal,
   type ManageAck,
   type ManageOp,
-  type ManageResult
+  type ManageResult,
+  type PortSavedEntry,
+  DefShape,
+  portableSavedList,
+  readSavedList
 } from '../../schedule/messages'
 import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def'
 import { modelLabel } from '../state/selectors/models'
@@ -109,6 +120,18 @@ let manageN = 0
 let aiStore: { federation: Federation; labels: string; store: ModelStore; rowIds: number[] } | null = null
 /** Watches the federation while the slot is full, to empty it the moment it changes. */
 let unwatchStore: (() => void) | null = null
+
+/**
+ * 2026-11-07 — an open project's saved setups and the schedule it has open: `null` with no
+ * project. `open` follows what the Schedules window shows while it is open, and stays when it
+ * closes, so a project's open schedule is never lost by closing the window.
+ */
+export interface ProjectSchedules {
+  saved: readonly PortSavedEntry[]
+  open: ScheduleDef | null
+}
+let projectHeld: ProjectSchedules | null = null
+let projectListener: (() => void) | null = null
 
 /** What the next coalesced post carries. */
 const dirty = { sel: false, vis: false }
@@ -234,6 +257,18 @@ export function receive(data: unknown): void {
         // Not a schedule: nothing is open, as far as the assistant can tell.
       }
     }
+    if (projectHeld) {
+      // A schedule the window chose by itself is nobody's: the project has none open for it.
+      projectHeld = { ...projectHeld, open: m.fromDefault ? null : (current?.def ?? null) }
+      projectListener?.()
+    }
+    return
+  }
+  if (m.type === 'projectSaved') {
+    // A project's list only while one is open: a window's own list never reaches a project.
+    if (!projectHeld) return
+    projectHeld = { ...projectHeld, saved: readSavedList(m.saved) }
+    projectListener?.()
     return
   }
   if (m.type === 'exportAck') {
@@ -323,6 +358,8 @@ export function connect(next: MessagePort | null): void {
   port.onmessage = (event: MessageEvent): void => receive(event.data)
   sendTheme()
   sendStore()
+  // An open project's list, and the schedule it has open, after the snapshot they are of.
+  if (projectHeld) sendProjectSchedules(true)
   // Loud: a window opening on an existing selection scrolls to it.
   queueSelection(false)
   queueVis()
@@ -348,6 +385,55 @@ export function connect(next: MessagePort | null): void {
   })
   // Last, so a schedule sent by a waiter lands after the snapshot it is a schedule of.
   for (const w of [...waiters]) w()
+}
+
+/* ────────────────────────────── a project's schedules (2026-11-07) ────────────────────────────── */
+
+function sendProjectSchedules(withOpen: boolean): void {
+  port?.postMessage({
+    type: 'projectSchedules',
+    saved: projectHeld ? projectHeld.saved : null,
+    ...(withOpen && projectHeld?.open ? { open: projectHeld.open } : {})
+  })
+}
+
+/**
+ * The open project's saved setups and open schedule — or `null`, the project closed. The
+ * Schedules window, when one is joined, shows them at once: the list as My templates, and with
+ * `show`, the open schedule as its current one (a project being opened). A project that was
+ * already open and is closing, or a first save's import (`show` false), leaves the schedule on
+ * screen alone.
+ *
+ * What is held is only what the port can carry (`portableSavedList`): a name clipped to its bound,
+ * an entry or an open schedule the port's shape refuses left out — so the window is never sent a
+ * list it must refuse. What was left out is returned, counted, and said in the console.
+ */
+export function setProjectSchedules(
+  next: ProjectSchedules | null,
+  show = false
+): { dropped: number; openDropped: boolean } {
+  const was = projectHeld
+  let dropped = 0
+  let openDropped = false
+  if (next) {
+    const fit = portableSavedList(next.saved)
+    dropped = fit.dropped
+    openDropped = next.open !== null && !DefShape.safeParse(next.open).success
+    projectHeld = { saved: fit.saved, open: openDropped ? null : next.open }
+    if (dropped || openDropped) {
+      console.warn(`[sgvue] project schedules the Schedules window cannot hold were left out: ${dropped} saved setup(s)${openDropped ? ' and the open schedule' : ''}`)
+    }
+  } else projectHeld = null
+  if (port && (was || next)) sendProjectSchedules(show)
+  return { dropped, openDropped }
+}
+
+/** The open project's saved setups and open schedule, or `null` with no project. */
+export const projectSchedules = (): ProjectSchedules | null => projectHeld
+
+/** Told when the Schedules window changes the project's list or its open schedule. */
+export function onProjectSchedules(fn: (() => void) | null): void {
+  projectListener = fn
 }
 
 /* ────────────────────────────── the assistant (2026-09-28) ────────────────────────────── */

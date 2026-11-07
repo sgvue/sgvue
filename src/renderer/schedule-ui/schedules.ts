@@ -6,6 +6,7 @@
 // The key is SGVue's own, under the `sgvue.schedules.` prefix the Schedules window keeps to.
 
 import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def';
+import { SavedListShape } from '../../schedule/messages';
 
 export const SAVED_KEY = 'sgvue.schedules.saved.v1';
 /** How many setups the list keeps. Saves unshift, so the oldest entry is the last one. */
@@ -16,12 +17,42 @@ export const CAP = 100;
 export interface SavedEntry { name: string; def: ScheduleDef; savedAt: string }
 
 /**
+ * 2026-11-07 (project file phase 3, plan D9) — while a project is open in the main window, its
+ * saved setups are this window's list (`setProjectList`, from the port's `projectSchedules`):
+ * every read and write below acts on them, and `localStorage` is neither read nor written. Each
+ * write is reported back (`onWrite`), so the main window holds the project's list as it stands.
+ * `null` — no project — is the window's own `localStorage` list, exactly as before.
+ */
+let project: { entries: SavedEntry[]; onWrite: (entries: SavedEntry[]) => void; refused?: true } | null = null;
+
+/** Make `entries` this window's list, or (`null`) its own `localStorage` list again. */
+export function setProjectList(entries: SavedEntry[] | null, onWrite?: (entries: SavedEntry[]) => void): void {
+  project = entries ? { entries: structuredClone(entries), onWrite: onWrite ?? (() => undefined) } : null;
+}
+
+/**
+ * The main window sent a project's list this window could not read (2026-11-07). A project is
+ * open there, so `localStorage` is not this window's list either: until a list it can read
+ * arrives (or a new main page), My templates is empty and every write is refused — the caller
+ * says "Could not save — storage is unavailable or full." — rather than land in the wrong place.
+ */
+export function refuseProjectList(): void {
+  console.warn('[sgvue] the project\'s saved schedules could not be read here; saving setups is off until they can be.');
+  project = { entries: [], onWrite: () => undefined, refused: true };
+}
+
+/** Whether the list is an open project's. */
+export const projectListOn = (): boolean => project !== null;
+
+/**
  * Every entry goes through `parseScheduleDef` — the importer's own validator, which fills
  * the defaults and rejects what cannot be a schedule — and one that fails is dropped. Storage
  * is data like any file: a hand-edited or damaged entry (`def: {}`, `columns: 'nope'`) would
  * otherwise throw inside a paint and blank the window.
  */
 export function listSaved(): SavedEntry[] {
+  // A copy: the writers below edit what they are handed before they write it.
+  if (project) return structuredClone(project.entries);
   let parsed: unknown;
   try {
     const raw = localStorage.getItem(SAVED_KEY);
@@ -48,6 +79,15 @@ export function listSaved(): SavedEntry[] {
 }
 
 function write(entries: SavedEntry[]): boolean {
+  if (project?.refused) return false;
+  if (project) {
+    // A list the project could not carry is refused, as full storage refuses one: the caller
+    // says "Could not save — storage is unavailable or full." and nothing changes.
+    if (!SavedListShape.safeParse(entries).success) return false;
+    project.entries = structuredClone(entries);
+    project.onWrite(structuredClone(entries));
+    return true;
+  }
   try {
     localStorage.setItem(SAVED_KEY, JSON.stringify(entries));
     return true;

@@ -43,7 +43,7 @@ import type { BasePoint } from '../../shared/georef'
 import type { GeometryChunk } from '../../shared/geometry-contract.types'
 import type { Annotations, MeasureRecord, SpotRecord, SpotShown } from './annotations'
 import { createAnnotations } from './annotations'
-import type { DimRect } from '../../shared/annotate'
+import type { DimRect, LaserDirection } from '../../shared/annotate'
 import { fedId } from '../../shared/federate'
 import { turnXY } from '../../shared/plan-rotation'
 import { viewOn } from '../../shared/view-angles'
@@ -382,7 +382,13 @@ export interface Viewer {
    * places nothing.
    */
   placeSpot(p: readonly number[]): void
-  placeMeasure(p: readonly number[], normal: readonly number[] | null, selfId: number): boolean
+  /** `only`: 2026-11-07, a project's restored measurement fires just the directions it read. */
+  placeMeasure(
+    p: readonly number[],
+    normal: readonly number[] | null,
+    selfId: number,
+    only?: readonly LaserDirection[]
+  ): boolean
   /** One spot tag's state, set — what a click on the tag toggles (`annotations.ts`). */
   showSpot(id: number, full: boolean): SpotShown
   getCamera(): CameraState
@@ -917,9 +923,14 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     invalidateOcclusion()
   }
   /** False when no ray read anything: `addLaser` then adds nothing. */
-  const commitLaser = (p: Vector3, normal: Vector3 | null, selfId: number): boolean => {
+  const commitLaser = (
+    p: Vector3,
+    normal: Vector3 | null,
+    selfId: number,
+    only?: readonly LaserDirection[]
+  ): boolean => {
     const had = annotations.measureCount
-    annotations.addLaser(p, normal, selfId)
+    annotations.addLaser(p, normal, selfId, only)
     invalidateOcclusion()
     return annotations.measureCount > had
   }
@@ -1670,11 +1681,12 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     },
     // 2026-10-02 — the click's own commit, for a point the assistant names.
     placeSpot: (p) => commitSpot(new Vector3().fromArray(p)),
-    placeMeasure: (p, normal, selfId) =>
+    placeMeasure: (p, normal, selfId, only) =>
       commitLaser(
         new Vector3().fromArray(p),
         normal ? new Vector3().fromArray(normal) : null,
-        selfId
+        selfId,
+        only
       ),
     // The tag redraws itself and asks for its own frame (`annotations.ts`, `setExpanded`).
     showSpot: (id, full) => annotations.showSpot(id, full),

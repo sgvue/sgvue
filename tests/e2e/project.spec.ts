@@ -7,6 +7,9 @@
  * **Not run by the builder** — every Electron start needs the owner's yes. Run it only through
  * `npm run test:e2e` (`scripts/safe-e2e.cjs`), the guarded wrapper.
  *
+ * 2026-11-07 (phase 3): a saved viewpoint and a spot coordinate come back too — the viewpoint in
+ * the project's own list, the spot placed again through the viewer's own commit.
+ *
  * The two native dialogs are answered from the environment in a development build, as the IFC
  * Open dialog is (`SGVUE_OPEN_PATHS`): `SGVUE_SAVE_PROJECT_PATH` for Save Project As… and
  * `SGVUE_OPEN_PROJECT_PATH` for Open Project… (`src/main/projects.ts`; a packaged build has
@@ -16,7 +19,7 @@ import { test, expect, type ElectronApplication, type Page } from '@playwright/t
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DROP_COPY, HIGH_FIRST, launch, statusText, TINY } from './helpers'
+import { actionText, DROP_COPY, HIGH_FIRST, launch, statusText, TINY } from './helpers'
 
 let dir = ''
 
@@ -42,6 +45,13 @@ const windowTitle = async (app: ElectronApplication, page: Page): Promise<string
 
 /** The status bar's `visible / total`, without the live frame rate beside it. */
 const shownOf = async (page: Page): Promise<string> => /\d+ \/ \d+/.exec(await statusText(page))?.[0] ?? ''
+
+/** A click on the canvas the way a hand does it: the pointer arrives, then clicks. */
+async function clickAt(page: Page, x: number, y: number): Promise<void> {
+  await page.mouse.move(x - 10, y)
+  await page.mouse.move(x, y)
+  await page.mouse.click(x, y)
+}
 
 /** The MODELS row swatch of a file, as `rgb(…)`. */
 const swatchOf = (page: Page, file: string): Promise<string> =>
@@ -77,14 +87,32 @@ test('Save Project, quit, Open Project: the models, a colour and a hidden storey
       await page.locator('button[title="Show / hide storey"]').nth(1).click()
       await expect.poll(() => shownOf(page), { timeout: 20_000 }).not.toBe(shown)
 
+      // Phase 3: a saved viewpoint, and a spot coordinate on the model.
+      await page.locator('button[data-tip="Saved viewpoints"]').click()
+      await page.getByRole('button', { name: 'Save current view' }).click()
+      await expect(page.getByText('Viewpoint 1', { exact: true })).toBeVisible()
+      await page.locator('button[data-tip="Saved viewpoints"]').click()
+      const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
+      await page.locator('button[data-tip="Spot coordinate (C)"]').click()
+      await clickAt(page, vp.x + vp.width / 2, vp.y + vp.height / 2)
+      await expect.poll(() => actionText(page)).toContain('1 spots')
+      await page.locator('button[data-tip^="Select (Esc)"]').click()
+
       // No project yet: the title is the app's own.
       expect(await windowTitle(app, page)).toBe('SGVue')
       await menu(app, 'project-save')
       await expect.poll(() => stat(project).then(() => true, () => false), { timeout: 20_000 }).toBe(true)
       await expect.poll(() => windowTitle(app, page)).toBe('review — SGVue')
-      const file = JSON.parse(await readFile(project, 'utf8')) as { format: string; models: { name: string }[] }
+      const file = JSON.parse(await readFile(project, 'utf8')) as {
+        format: string
+        models: { name: string }[]
+        viewpoints: { name: string }[]
+        markups: { spots: unknown[] }
+      }
       expect(file.format).toBe('sgvue-project')
       expect(file.models.map((m) => m.name).sort()).toEqual(['high-first.ifc', 'tiny.ifc'])
+      expect(file.viewpoints.map((v) => v.name)).toEqual(['Viewpoint 1'])
+      expect(file.markups.spots).toHaveLength(1)
 
       // A change marks it unsaved; undoing it by hand clears the mark — dirty is by value.
       const eye = page.locator('button[title="Show / hide storey"]').nth(0)
@@ -116,6 +144,12 @@ test('Save Project, quit, Open Project: the models, a colour and a hidden storey
       await expect(page.locator('aside div.hv-step', { hasText: 'high-first.ifc' })).toBeVisible()
       await expect.poll(() => shownOf(page), { timeout: 20_000 }).toBe(status)
       await expect.poll(() => swatchOf(page, 'tiny.ifc')).toBe(colour)
+      // Phase 3: the spot is placed again, and the viewpoint is in the project's list — a fresh
+      // profile's own list is empty, so it can only have come from the project.
+      await expect.poll(() => actionText(page), { timeout: 20_000 }).toContain('1 spots')
+      await page.locator('button[data-tip="Saved viewpoints"]').click()
+      await expect(page.getByText('Viewpoint 1', { exact: true })).toBeVisible()
+      await page.locator('button[data-tip="Saved viewpoints"]').click()
       await expect.poll(() => windowTitle(app, page)).toBe('review — SGVue')
     } finally {
       await app.close()

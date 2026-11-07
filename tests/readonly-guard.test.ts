@@ -462,7 +462,18 @@ describe('read-only guard', () => {
     const typedPosts = (text: string): string[] =>
       [...text.matchAll(/postMessage\(\{\s*type: '([a-zA-Z]+)'/g)].map((m) => m[1])
     const posted = [...new Set(typedPosts(link))].sort()
-    expect(posted).toEqual(['colours', 'define', 'export', 'manage', 'selection', 'store', 'theme', 'vis'])
+    // 2026-11-07 (project file phase 3): `projectSchedules`, an open project's saved setups.
+    expect(posted).toEqual([
+      'colours',
+      'define',
+      'export',
+      'manage',
+      'projectSchedules',
+      'selection',
+      'store',
+      'theme',
+      'vis'
+    ])
     // The review's leftover of phase 4: that list is read off the calls whose message is a
     // literal with its `type` spelled first, so a `port.postMessage(msg)` with a variable would
     // post a type this pin never saw. Every `postMessage(` call in that file is one of the

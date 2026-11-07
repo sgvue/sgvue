@@ -26,6 +26,12 @@
  *                                          of the window's own actions — undo, redo, a template,
  *                                          a saved setup, Print, Open schedule file — by name;
  *                                          answered by `manageAck`
+ *                             `projectSchedules`  (2026-11-07, project file phase 3) an open
+ *                                          project's saved setups — the window's My templates
+ *                                          list while it is open, never written to this
+ *                                          window's `localStorage` — or `null`: no project, the
+ *                                          window's own list again; and, with `open`, the
+ *                                          project's open schedule, shown as the current one
  *   Schedules → main window   `current`    the schedule on screen and its row count
  *                                          (2026-09-28), so the assistant can see it — on
  *                                          connect and after every change, at most one per
@@ -42,6 +48,9 @@
  *                             `manageAck`  what became of a `manage` (2026-10-02) — done, asked,
  *                                          or why not — at once, never after a dialog; and, for
  *                                          the two lists, the names: bounded, and only on demand
+ *                             `projectSaved`  (2026-11-07) the project's saved setups after a
+ *                                          save, rename, duplicate, delete or the cap changed
+ *                                          them — only while a project's list is the window's
  *
  * Main-side ids are admitted by `admitIds` / `admitGroups`: a list longer than the federation
  * cannot be a real selection and is ignored whole; duplicates and ids the federation does not
@@ -54,7 +63,7 @@
  */
 import { z } from 'zod'
 import { OP_LABELS } from './schedule/compare'
-import { CORE_KEYS, MAX_FILTERS, MAX_SORT_LEVELS, type CoreKey, type Op } from './schedule/def'
+import { CORE_KEYS, MAX_FILTERS, MAX_SORT_LEVELS, parseScheduleDef, type CoreKey, type Op, type ScheduleDef } from './schedule/def'
 
 const Cell = z.object({
   v: z.union([z.string(), z.number(), z.boolean()]),
@@ -334,6 +343,134 @@ export const ManageMessage = z
   })
   .strict()
 
+/* ────────────────────────────── a project's saved setups (2026-11-07) ────────────────────────────── */
+
+/**
+ * The most a project's saved-setup list may weigh over the port, as JSON: the project file's own
+ * cap (`shared/project-file.ts`, `PROJECT_MAX_BYTES`, 16 MiB) — a list that could not be saved in
+ * a project cannot be one. The window refuses a write that would pass it (`schedules.ts`), as
+ * full storage refuses one.
+ */
+export const MAX_SAVED_LIST_CHARS = 16 * 1024 * 1024
+
+/**
+ * One saved setup, as the window's My templates holds it (`SavedEntry`): its name — the identity,
+ * the user's own text — its definition and when it was saved. `.strict()`; the definition is
+ * `DefShape`'s, and then `parseScheduleDef`'s on receipt.
+ */
+/** The longest saved setup name the port carries: a definition's own name bound (`DefShape`). */
+export const SAVED_NAME_MAX = 1000
+
+export const SavedEntryShape = z
+  .object({ name: z.string().min(1).max(SAVED_NAME_MAX), def: DefShape, savedAt: z.string().max(64) })
+  .strict()
+
+/** A whole list: at most the hundred the window keeps, and at most `MAX_SAVED_LIST_CHARS`. */
+export const SavedListShape = z
+  .array(SavedEntryShape)
+  .max(MANAGE_SAVED_MAX)
+  .refine((l) => JSON.stringify(l).length <= MAX_SAVED_LIST_CHARS, {
+    message: `over ${MAX_SAVED_LIST_CHARS} characters`
+  })
+
+/**
+ * Main window → Schedules: the open project's saved setups, or `null` — no project is open, and
+ * the window's own `localStorage` list is its list again. With `open` (a project being opened,
+ * or the window joining one that is), the schedule that project had open, shown as the current
+ * one; `null` or absent leaves the schedule on screen alone. Sent only while a project is open,
+ * or as it closes, so with no project the port carries exactly what it did.
+ */
+export const ProjectSchedulesMessage = z
+  .object({
+    type: z.literal('projectSchedules'),
+    saved: SavedListShape.nullable(),
+    open: DefShape.nullable().optional()
+  })
+  .strict()
+
+/** One saved setup, read: the definition through `parseScheduleDef`, its name the identity. */
+export interface PortSavedEntry {
+  name: string
+  def: ScheduleDef
+  savedAt: string
+}
+
+/**
+ * A saved-setup list that crossed the port, read as the window's own list is read
+ * (`schedules.ts`, `listSaved`): each definition through `parseScheduleDef` — one it refuses is
+ * left out — its name written onto it, a repeated name kept once (the first, as the list's order
+ * is its age), at most `MANAGE_SAVED_MAX`. The entries are new objects; the input is untouched.
+ */
+export function readSavedList(list: readonly { name: string; def: unknown; savedAt: string }[]): PortSavedEntry[] {
+  const out: PortSavedEntry[] = []
+  const seen = new Set<string>()
+  for (const e of list) {
+    if (out.length >= MANAGE_SAVED_MAX) break
+    if (seen.has(e.name)) continue
+    try {
+      const def = parseScheduleDef(e.def)
+      def.name = e.name
+      out.push({ name: e.name, def, savedAt: e.savedAt })
+      seen.add(e.name)
+    } catch {
+      // Not a schedule: left out, as the window's own reader leaves it out.
+    }
+  }
+  return out
+}
+
+/**
+ * A saved-setup list made fit to cross the port (2026-11-07) — what the main window does before it
+ * hands a project's list to the Schedules window, so that the window is never sent a list it must
+ * refuse: each name clipped to `SAVED_NAME_MAX` (the definition's name with it), each entry the
+ * port's shape — a definition `DefShape` refuses is left out — a name clipped onto another's kept
+ * once, at most `MANAGE_SAVED_MAX`, and, past `MAX_SAVED_LIST_CHARS`, the oldest left out until
+ * it fits. Every entry left out is counted (`dropped`); none is left out in silence.
+ */
+export function portableSavedList(
+  list: readonly { name: string; def: ScheduleDef; savedAt: string }[]
+): { saved: PortSavedEntry[]; dropped: number } {
+  const saved: PortSavedEntry[] = []
+  const seen = new Set<string>()
+  let dropped = 0
+  for (const e of list) {
+    const name = e.name.slice(0, SAVED_NAME_MAX)
+    const entry = { name, def: { ...e.def, name }, savedAt: e.savedAt.slice(0, 64) }
+    if (saved.length >= MANAGE_SAVED_MAX || seen.has(name) || !SavedEntryShape.safeParse(entry).success) {
+      dropped++
+      continue
+    }
+    seen.add(name)
+    saved.push(entry)
+  }
+  // The list's order is its age, newest first: what has to go to fit goes from the end.
+  while (saved.length && JSON.stringify(saved).length > MAX_SAVED_LIST_CHARS) {
+    saved.pop()
+    dropped++
+  }
+  return { saved, dropped }
+}
+
+/**
+ * The Schedules window's reading of a `projectSchedules` (2026-11-07): `null` when `data` is not
+ * one; `refused` when it is and fails the shape — the window must then neither show nor write its
+ * own `localStorage` list, since the main window believes a project is open; `none` when no
+ * project is open; else the project's list, read (`readSavedList`), and its open schedule.
+ */
+export function readProjectSchedules(
+  data: unknown
+):
+  | null
+  | { kind: 'refused' }
+  | { kind: 'none' }
+  | { kind: 'project'; saved: PortSavedEntry[]; open: unknown } {
+  if (!data || typeof data !== 'object' || (data as { type?: unknown }).type !== 'projectSchedules') return null
+  const m = ProjectSchedulesMessage.safeParse(data)
+  if (!m.success) return { kind: 'refused' }
+  if (m.data.saved === null) return { kind: 'none' }
+  return { kind: 'project', saved: readSavedList(m.data.saved), open: m.data.open ?? null }
+}
+
 /** Everything the Schedules window accepts. */
 export const ToSchedules = z.discriminatedUnion('type', [
   StoreMessage,
@@ -343,7 +480,8 @@ export const ToSchedules = z.discriminatedUnion('type', [
   ColoursMessage,
   DefineMessage,
   ExportMessage,
-  ManageMessage
+  ManageMessage,
+  ProjectSchedulesMessage
 ])
 
 export const SelectMessage = z.object({
@@ -377,7 +515,13 @@ export const ClearColoursMessage = z.object({ type: z.literal('clearColours') })
 export const CurrentMessage = z.object({
   type: z.literal('current'),
   def: DefShape.nullable(),
-  rowCount: z.number().int().min(0).max(100_000_000)
+  rowCount: z.number().int().min(0).max(100_000_000),
+  /**
+   * 2026-11-07 (project file phase 3) — `def` is the schedule the window chose by itself for the
+   * models on screen (`openingSchedule`), untouched since: nobody picked it, so an open project
+   * keeps its own open schedule `null` for it. Absent means false.
+   */
+  fromDefault: z.boolean().optional()
 })
 
 /**
@@ -478,6 +622,11 @@ export const ManageAckMessage = z
   })
   .strict()
 
+/** Schedules → main window: the project's saved setups as they now stand (`ProjectSchedulesMessage`). */
+export const ProjectSavedMessage = z
+  .object({ type: z.literal('projectSaved'), saved: SavedListShape })
+  .strict()
+
 /** Everything the main window accepts from the Schedules window. */
 export const FromSchedules = z.discriminatedUnion('type', [
   SelectMessage,
@@ -486,7 +635,8 @@ export const FromSchedules = z.discriminatedUnion('type', [
   ClearColoursMessage,
   CurrentMessage,
   ExportAckMessage,
-  ManageAckMessage
+  ManageAckMessage,
+  ProjectSavedMessage
 ])
 
 export type SelectMessage = z.infer<typeof SelectMessage>

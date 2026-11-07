@@ -370,6 +370,16 @@ const ModelSchema = z.object({
 
 const Sides = z.object({ minus: finite.nullable(), plus: finite.nullable() })
 
+/** How far from 1 a stored normal's length may be: room for a hand-edited file's rounded digits. */
+export const NORMAL_TOLERANCE = 1e-3
+/** Three finite numbers of unit length (within `NORMAL_TOLERANCE`). */
+export const isUnitNormal = (n: unknown): n is [number, number, number] =>
+  Array.isArray(n) &&
+  n.length === 3 &&
+  n.every((x) => typeof x === 'number' && Number.isFinite(x)) &&
+  Math.abs(Math.hypot(n[0] as number, n[1] as number, n[2] as number) - 1) <= NORMAL_TOLERANCE
+const UnitNormal = xyz.refine((n) => isUnitNormal(n), 'is not a unit vector')
+
 const ProjectSchemaShape = z.object({
   format: z.literal(PROJECT_FORMAT),
   version: z.literal(PROJECT_VERSION),
@@ -447,7 +457,13 @@ const ProjectSchemaShape = z.object({
           x: finite.optional(),
           y: finite.optional(),
           z: finite.optional(),
-          sides: z.object({ x: Sides.optional(), y: Sides.optional(), z: Sides.optional() })
+          sides: z.object({ x: Sides.optional(), y: Sides.optional(), z: Sides.optional() }),
+          /**
+           * 2026-11-07 (phase 3) — the face the laser was fired from, unit length, world frame
+           * (the scene's, which differs from it by a translation only). Optional: a file written
+           * before it, or a measurement fired with no face, has none, and an older reader ignores it.
+           */
+          normal: UnitNormal.optional()
         })
       )
       .max(MAX_MARKUPS)
@@ -617,6 +633,8 @@ export interface ProjectMeasure {
   y?: number
   z?: number
   sides: Partial<Record<'x' | 'y' | 'z', LaserSides>>
+  /** 2026-11-07 (phase 3) — the face the laser was fired from, unit length; absent for none. */
+  normal?: readonly number[]
 }
 
 /**
@@ -901,7 +919,10 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
         ...(m.x !== undefined ? { x: m.x } : {}),
         ...(m.y !== undefined ? { y: m.y } : {}),
         ...(m.z !== undefined ? { z: m.z } : {}),
-        sides: { ...m.sides }
+        sides: { ...m.sides },
+        // Written only when it is one: a normal that is not a unit vector of finite numbers is
+        // left out, and the measurement is restored as one with no face.
+        ...(isUnitNormal(m.normal) ? { normal: [m.normal[0], m.normal[1], m.normal[2]] as [number, number, number] } : {})
       }
     ]
   })
@@ -963,12 +984,23 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
  * opened file's models named by `ids` that are not open now (missing, refused, changed — the
  * `carried` of `projectOf`'s context) are put back into a project just written, **exactly as the
  * opened file had them** — the entry (path, digest, size, label, colour and its flags, eye) and
- * every reference to one of their elements: in `hidden`, and in each viewpoint the written file
- * has under the same id, with that viewpoint's eyes for them. The model stays missing; its data
- * survives the save. A model the written file already has (its id taken, or loaded again) is not
- * carried. Pure, and bounded as the writer is.
+ * every reference to one of their elements: in `hidden`, and in each viewpoint of the written
+ * file that **is** one of the opened file's, with that viewpoint's eyes for them. The model stays
+ * missing; its data survives the save. A model the written file already has (its id taken, or
+ * loaded again) is not carried. Pure, and bounded as the writer is.
+ *
+ * Which written viewpoint is which opened one is `viewpointPairs`: written viewpoint id → index in
+ * `opened.viewpoints` (2026-11-07, phase 3 — the project's viewpoints are its own list, and only
+ * the caller knows which of them came from the file and are still that viewpoint; one deleted
+ * and another saved under the same id is not). Omitted, a written viewpoint is paired with the
+ * opened one of the same id — right only where ids are known to name one viewpoint each.
  */
-export function carryForward(written: ProjectFile, opened: ProjectFile, ids: readonly string[]): ProjectFile {
+export function carryForward(
+  written: ProjectFile,
+  opened: ProjectFile,
+  ids: readonly string[],
+  viewpointPairs?: ReadonlyMap<number, number>
+): ProjectFile {
   const taken = new Set(written.models.map((m) => m.id))
   const want = new Set(ids)
   const room = Math.max(0, MAX_MODELS - written.models.length)
@@ -981,12 +1013,17 @@ export function carryForward(written: ProjectFile, opened: ProjectFile, ids: rea
     return out.slice(0, MAX_REFS)
   }
   const byId = new Map(opened.viewpoints.map((v) => [v.id, v]))
+  const originOf = (id: number): ProjectFile['viewpoints'][number] | undefined => {
+    if (!viewpointPairs) return byId.get(id)
+    const at = viewpointPairs.get(id)
+    return at !== undefined ? opened.viewpoints[at] : undefined
+  }
   return {
     ...written,
     models: [...written.models, ...carried],
     visibility: { ...written.visibility, hidden: merge(written.visibility.hidden, opened.visibility.hidden) },
     viewpoints: written.viewpoints.map((v) => {
-      const o = byId.get(v.id)
+      const o = originOf(v.id)
       if (!o) return v
       const modelVis = dict<boolean>()
       for (const [m, on] of Object.entries(v.modelVis)) modelVis[m] = on

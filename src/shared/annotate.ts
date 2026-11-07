@@ -525,6 +525,11 @@ export const levelTagHtml = (name: string, authoredElevation: number, unit: Disp
 /** L367. The three axes the laser fires along, in the design's order. */
 export const LASER_AXES = ['X', 'Y', 'Z'] as const
 export type LaserAxis = (typeof LASER_AXES)[number]
+/** One of the six directions the laser fires, in the plan frame: an axis and which way along it. */
+export interface LaserDirection {
+  axis: LaserAxis
+  sign: 1 | -1
+}
 
 /** L372. The ray starts this far off the surface it was fired from. */
 export const LASER_LIFT = 0.003

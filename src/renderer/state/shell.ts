@@ -140,6 +140,7 @@ import type { ChatChip, ChatPending, ChatTable, PendingAction, PlacedMarkup } fr
 import type { ChatTrace } from '../ai/trace-facts'
 import { seedAudit } from '../ai/analysis'
 import type { MeasureRecord, SpotRecord, SpotShown } from '../viewer/annotations'
+import type { LaserDirection } from '../../shared/annotate'
 import type {
   SectionConfig,
   SectionsConfig,
@@ -545,7 +546,13 @@ export interface ShellState {
   placeMeasure: (
     p: readonly [number, number, number],
     normal: readonly [number, number, number] | null,
-    selfId: number
+    selfId: number,
+    /**
+     * 2026-11-07 (project file phase 3) — a measurement a project restores fires only the
+     * directions it read when it was saved (`LaserDirection`, plan frame). Omitted: every
+     * direction the normal allows, as a click fires.
+     */
+    only?: readonly LaserDirection[]
   ) => boolean
   /** One spot tag's state, set — its level alone, or its full E / N / Z: a click on the tag. */
   showSpot: (id: number, full: boolean) => SpotShown
@@ -648,6 +655,14 @@ export interface ShellState {
   dropView: (id: number) => void
   /** 2026-09-24: a double-clicked name, committed. Trimmed; blank keeps the old name. */
   renameView: (id: number, name: string) => void
+  /**
+   * 2026-11-07 (project file phase 3, plan D9) — where the saved viewpoints and named filter sets
+   * live. Given lists, they are an open project's: shown from now on, and every save, rename,
+   * delete and cap rule acts on them and writes nothing to `localStorage`. `null` puts the app's
+   * own `localStorage` lists back, read again, untouched by the project. No project open: never
+   * called, and nothing is different.
+   */
+  setProjectLists: (lists: { views: readonly Viewpoint[]; filterSets: readonly FilterSet[] } | null) => void
 
   /* ── the landing page and the upload rows (`:1143–1200`, `:1930–1940`) ── */
   /** `:1143`, `:1145`. The drop zone's accent border and "Release to load". */
@@ -795,6 +810,21 @@ export const peekHistory = (back: boolean): string | null => history.peek(back)
 
 /** The storage key `views` is read from and written to — one list per building (`:1102`). */
 let viewsKey = viewsKeyFor('')
+
+/**
+ * 2026-11-07 (project file phase 3) — the saved viewpoints and filter sets are an open project's
+ * (`setProjectLists`): then nothing writes them to `localStorage`, and a federation change does
+ * not read the building's list over them. False whenever no project is open.
+ */
+let listsInProject = false
+/** Tests only: whether the two lists are an open project's. */
+export const projectListsOn = (): boolean => listsInProject
+const keepViews = (views: readonly Viewpoint[]): void => {
+  if (!listsInProject) storeViews(viewsKey, views)
+}
+const keepFilterSets = (sets: readonly FilterSet[]): void => {
+  if (!listsInProject) storeFilterSets(sets)
+}
 
 /** How long "Copied" stands on the GlobalId button. `SGVue.dc.html:1991`. */
 export const COPIED_MS = 1400
@@ -1229,7 +1259,7 @@ export const useShell = create<ShellState>((set, get) => ({
     const next = fstack.saveFilterSet(sets, get().stack, now, label)
     if (!next) return
     set({ filterSets: next })
-    storeFilterSets(next)
+    keepFilterSets(next)
   },
 
   /** `SGVue.dc.html:1670`. */
@@ -1239,7 +1269,7 @@ export const useShell = create<ShellState>((set, get) => ({
   forgetFilterSet: (id) => {
     const next = get().filterSets.filter((f) => f.id !== id)
     set({ filterSets: next })
-    storeFilterSets(next)
+    keepFilterSets(next)
   },
 
   /* ────────────────────────────── viewpoints ────────────────────────────── */
@@ -1259,7 +1289,7 @@ export const useShell = create<ShellState>((set, get) => ({
     const now = Math.max(Date.now(), ...s.views.map((v) => (Number.isFinite(v.id) ? v.id + 1 : 0)))
     const views = [...s.views, viewpointOf(s, viewer.getCamera(), now)]
     set({ views })
-    storeViews(viewsKey, views)
+    keepViews(views)
   },
 
   /**
@@ -1313,7 +1343,7 @@ export const useShell = create<ShellState>((set, get) => ({
   dropView: (id) => {
     const views = get().views.filter((x) => x.id !== id)
     set({ views, activeView: get().activeView === id ? null : get().activeView })
-    storeViews(viewsKey, views)
+    keepViews(views)
   },
 
   /**
@@ -1324,7 +1354,25 @@ export const useShell = create<ShellState>((set, get) => ({
     const views = renameViews(get().views, id, name)
     if (views === get().views) return
     set({ views })
-    storeViews(viewsKey, views)
+    keepViews(views)
+  },
+
+  setProjectLists: (lists) => {
+    const s = get()
+    if (lists) {
+      listsInProject = true
+      // The lists the app already shows, handed over as they are (a first save's one-time
+      // import), keep the row marked; another list is another project's.
+      set({
+        views: lists.views,
+        filterSets: lists.filterSets,
+        activeView: lists.views === s.views ? s.activeView : null
+      })
+      return
+    }
+    if (!listsInProject) return
+    listsInProject = false
+    set({ views: loadViews(viewsKey), filterSets: loadFilterSets(), activeView: null })
   },
 
   /* ────────────────────────────── shell ────────────────────────────── */
@@ -1537,10 +1585,10 @@ export const useShell = create<ShellState>((set, get) => ({
     viewer.placeSpot([p[0] - o[0], p[1] - o[1], p[2] - o[2]])
     return true
   },
-  placeMeasure: (p, normal, selfId) => {
+  placeMeasure: (p, normal, selfId, only) => {
     if (!viewer) return false
     const o = get().offset
-    return viewer.placeMeasure([p[0] - o[0], p[1] - o[1], p[2] - o[2]], normal, selfId)
+    return viewer.placeMeasure([p[0] - o[0], p[1] - o[1], p[2] - o[2]], normal, selfId, only)
   },
   showSpot: (id, full) => viewer?.showSpot(id, full) ?? 'missing',
 
@@ -2038,7 +2086,9 @@ export const useShell = create<ShellState>((set, get) => ({
       booted: keys.length > 0,
       ready: keys.length > 0,
       visibleCount: federation.elements.length,
-      ...(viewsChanged ? { views: loadViews(nextViewsKey), activeView: null } : {})
+      // 2026-11-07 (project file phase 3): an open project's viewpoints are its own, whatever
+      // building the models name; the key still follows, for when the project closes.
+      ...(viewsChanged && !listsInProject ? { views: loadViews(nextViewsKey), activeView: null } : {})
     })
     batched(() => {
       if (viewer) {

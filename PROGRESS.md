@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — `.sgvue` project file, phase 3: lists and markups live in the project
+
+**Did.** While a project is open, its viewpoints, named filter sets and saved schedules are its
+own (no `localStorage` writes; closing brings the app's own lists back; the first Save As imports
+them). The Schedules window gets the project's list and open schedule over two new strict port
+messages, fitted before sending, and refuses writes if it cannot read one. Spots and laser
+measurements come back through the viewer's own commit (an optional stored face normal; carried
+until placed, so nothing is lost if a restore fails). Carried viewpoints pair by an explicit map.
+The Schedules window's own default schedule no longer marks a project unsaved.
+
+**Verified.** 34 new unit tests, each fix probed failing; typecheck, lint, build and 3 286 unit
+tests pass, three full runs plus ten runs of each new file with no failure (one earlier unexplained
+failure did not recur). Deep review PASS twice. The e2e, extended for a viewpoint and a spot, is
+**not run** — it needs a window.
+
 ## 2026-11-07 — `.sgvue` project file, phase 2: Save and Open
 
 **Did.** File › Open Project…, Save Project (⌘S) and Save Project As… (⇧⌘S). `src/main/projects.ts`
