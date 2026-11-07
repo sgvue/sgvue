@@ -118,7 +118,7 @@ import {
 } from './selectors/views'
 import { askAboutText } from './selectors/props'
 import { tableCsv } from './selectors/chat'
-import { pickableFor } from './selectors/models'
+import { modelSwatches, pickableFor } from './selectors/models'
 import { el } from '../dom'
 import { copyText } from '../clipboard'
 import {
@@ -666,6 +666,23 @@ export interface ShellState {
 let viewer: Viewer | null = null
 export const setViewer = (v: Viewer | null): void => {
   viewer = v
+  pushCutColors(true)
+}
+
+/**
+ * The section cut's colours (2026-11-07, owner-requested): each model's outline in the swatch
+ * its MODELS row shows — `modelSwatches`, the row's own rule. Pushed to the viewer when it is
+ * handed in and whenever the federation, the library or a model override changes, and only
+ * when the map itself changed (`lastCutColors`).
+ */
+let lastCutColors = ''
+function pushCutColors(force = false): void {
+  const s = useShell.getState()
+  const map = modelSwatches(s.federation, s.library, s.modelColors)
+  const k = JSON.stringify(map)
+  if (!force && k === lastCutColors) return
+  lastCutColors = k
+  viewer?.setCutColors(map)
 }
 export const getViewer = (): Viewer | null => viewer
 
@@ -2009,3 +2026,11 @@ export const useShell = create<ShellState>((set, get) => ({
     if (brow !== get().brow) set({ brow })
   }
 }))
+
+useShell.subscribe((s, prev) => {
+  const changed =
+    s.federation !== prev.federation ||
+    s.library !== prev.library ||
+    s.modelColors !== prev.modelColors
+  if (changed) pushCutColors()
+})

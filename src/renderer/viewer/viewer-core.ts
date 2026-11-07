@@ -38,7 +38,7 @@
  * imitated: the records, the labels, the numbering and the rays are the click's own.
  */
 import type { Object3D } from 'three/webgpu'
-import { Box3, Vector2, Vector3 } from 'three/webgpu'
+import { Box3, Color, Vector2, Vector3 } from 'three/webgpu'
 import type { BasePoint, ProjectFrame } from '../../shared/georef'
 import type { GeometryChunk } from '../../shared/geometry-contract.types'
 import type { Annotations, MeasureRecord, SpotRecord, SpotShown } from './annotations'
@@ -77,8 +77,8 @@ import type { Backend, BackendPreference, SceneRig } from './scene'
 import { buildScene, createRenderer, glRendererName, sceneScale } from './scene'
 import type { GridSegment, SectionConfig, SectionsConfig, SectionVisuals } from './section'
 import { createSection } from './section'
-import type { CutPlane } from './section-cut'
-import { sectionCut } from './section-cut'
+import type { CutPlane, RGB } from './section-cut'
+import { cutColours, sectionCut } from './section-cut'
 import type { Snapper } from './snap'
 import { createSnapper } from './snap'
 /** Statically `false` in a production build, so `viewer.dev` below never exists there. */
@@ -273,6 +273,12 @@ export interface Viewer {
    * wherever "Original materials" is off and no colour-by or model swatch says otherwise.
    */
   setClassColors(map: Record<number, string> | null): void
+  /**
+   * 2026-11-07 (owner-requested): the colour each model's cut outline is drawn in, by model key
+   * — the swatch its MODELS row shows (`selectors/models.ts`, `modelSwatches`). A model the map
+   * does not name is drawn in the accent.
+   */
+  setCutColors(map: Record<string, string> | null): void
   setPickable(fn: ((el: ViewerElement) => boolean) | null): void
   setTool(t: Tool): void
   /** Escape: abandon whatever the current tool was building. */
@@ -370,6 +376,8 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
   let hlColor: string | null = null
   let elColors: Record<number, string> = {}
   let modelColors: Record<string, string> = {}
+  /** The cut outline's colour per model key, already in the working colour space. */
+  let cutColors = new Map<string, RGB>()
   let classColors: Record<number, string> = {}
   let nativeMats = true
   let pickOk: ((el: ViewerElement) => boolean) | null = null
@@ -786,7 +794,12 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     }
     const t = performance.now()
     const r = sectionCut(store, cutPlanes, (rec) => drawsEdge(rec.id))
-    section.setCut(r.segments, r.count)
+    const accent = new Color(materials.theme.accent)
+    section.setCut(
+      r.segments,
+      r.count,
+      cutColours(r, (key) => cutColors.get(key), [accent.r, accent.g, accent.b])
+    )
     cutStat = {
       segments: r.count,
       elements: r.elements,
@@ -1413,6 +1426,8 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       materials.setTheme(t)
       rig.setTheme(t)
       cube?.setTheme(t)
+      // The accent is the cut outline's fallback colour, and it is the theme's.
+      if (cutPlanes.length) markCut()
       requestPaint()
       invalidate()
     },
@@ -1435,6 +1450,16 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       if (native != null) nativeMats = !!native
       requestPaint()
       invalidate()
+    },
+    setCutColors: (map) => {
+      const next = new Map<string, RGB>()
+      for (const [key, hex] of Object.entries(map ?? {})) {
+        // `Color.set` takes an sRGB hex into the working colour space, as every material's does.
+        const c = new Color(hex)
+        next.set(key, [c.r, c.g, c.b])
+      }
+      cutColors = next
+      if (cutPlanes.length) markCut()
     },
     setClassColors: (map) => {
       classColors = map ?? {}

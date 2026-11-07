@@ -386,6 +386,8 @@ Anything not on this list is a defect.
   32 294 / 32 277 in `section-level-L2`, dark / light; with it hidden each of those frames is
   HEAD's — byte-identical in `section-grid-C`, within HEAD's own run-to-run label noise in the
   other two. The preview, `bubble-click-opens-section` and the four states before them draw none.
+  *(Amended 2026-11-07: each model's outline is drawn in its MODELS row's colour, the accent
+  only as a fallback — below.)*
 - **2026-10-01 — undo, redo and the markup counts are an action bar above the status bar, and
   the stage's bottom edge is one row.** Asked for by the owner in these words: *"The footer in
   3D viewport that hold unit, coordinate system and frame per second. When i hide or measure
@@ -934,6 +936,20 @@ Anything not on this list is a defect.
   default window (1264 × 755) by 22 px (it fitted exactly before), and with the update notice by
   24 px at 1280 × 820 (fitted before) and 89 px at 1264 × 755 (34 before). The default viewer is
   byte-identical to the build before, in both themes.
+- **2026-11-07 — each model's section-cut outline is drawn in the colour its MODELS row shows.**
+  Asked for by the owner in these words: *"Update the section cut lines color on the different
+  models to match with the color code assigned to the model."* 2026-09-28's outline was the
+  theme's accent; each segment is now the swatch of the model its element belongs to — the
+  user's override, else the library entry's swatch, else the slot's colour from the design's
+  model palette (`MC`), one rule (`rowSwatch`) for the row and the cut — whichever way "Original
+  materials" is set, as the row is. The accent is only the fallback for a model the viewer has
+  no colour for (a replacement still streaming in under its own label). **Unchanged:** the
+  2.5 px width, the depth test and its bias, what is outlined, the two-plane trimming, the clip,
+  the cap colour, the plane outline, the preview sheet, and one mesh in one draw. **No new
+  element, no new control.** On the dev mock the cut is ARC `#D8D2C6`, STR `#9AA5A3`, SIT
+  `#8FAE82`, MEP `#8FA3B5` (its library swatches); the production demo building, never in the
+  library, takes `MC[slot]` — its STR `#35C4B6` is the dark theme's accent. **Not yet measured
+  visually**: no window was opened, and the parity capture waits for the owner's yes.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1187,6 +1203,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-09 — **the landing page's georeferencing line is one constant, `GEOREF_NOTE`** (`shared/upload.ts`, beside the page's other copy), drawn as `<span data-role="georef-note">` after the drop zone and its upload rows and before the "or" divider, in the drop zone caption's own style string; it says the other models are placed *relative to* the first, not *to match* it — each stands where its own map position puts it (2026-10-08).
 - 2026-10-09 — **local folders, build output and IFC files are kept out of `app.asar`** (`electron-builder.yml` `files`, still a deny-list): the root folders a maintainer's `.git/info/exclude` keeps out of git — `reports/`, `research_notes/`, `reference/` — and `dist/`, `out-baseline/`, `tmp/` and `**/*.{ifc,ifczip}`. The first 1.3.0 package carried `reports/` and `research_notes/`, local notes holding a home path, until `tests/unit/asar-contents.test.ts` failed on it; electron-builder leaves out only its own output directory, so a build into `dist/<name>` packs the rest of `dist/`; a release built on GitHub never has these folders, a local `dist:win` does.
 - 2026-10-17 — **`package.json`'s `overrides` forces exceljs's `uuid` to `^11.1.1`** (`{ "exceljs": { "uuid": "^11.1.1" } }`) for GHSA-w5hq-g745-h8pq: exceljs 4.4.0, the latest, declares `uuid: ^8.3.0`, so Dependabot's security update cannot reach it; exceljs calls only `v4()`, with no buffer, never the vulnerable path. It changes the lockfile and the Node-side copy only — the renderer bundles exceljs's prebuilt browser build, which carries its own uuid, so `out/` is byte-identical before and after (94 files, `exceljs.min-Qns6GaRS.js` included). Remove it when exceljs declares a `uuid` ≥ 11.1.1.
+- 2026-11-07 — **each model's cut outline is its MODELS row's swatch** (owner-requested): `rowSwatch` / `modelSwatches` (`selectors/models.ts`) are the row's one rule, pushed by `shell.ts` as `viewer.setCutColors(byModelKey)` on hand-in and when `federation`, `library` or `modelColors` change (only when the map changed); `sectionCut` tags each segment with its model (`CutResult.models`, `modelOf`), `cutColours` makes `instanceColorStart` / `instanceColorEnd` (stride 6), and `Line2NodeMaterial` takes `vertexColors: true` with a white `color`; still one mesh, one draw; the accent is the fallback, re-read on a theme change; "Original materials" changes nothing. Headless timing unchanged within noise.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

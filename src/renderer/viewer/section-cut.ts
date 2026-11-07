@@ -38,6 +38,12 @@
  * The line where the two cut faces meet inside a solid is no surface triangle's, so it is not
  * drawn. With one plane nothing is trimmed and the result is the single-plane cut, float for
  * float.
+ *
+ * **Each model's own colour (2026-11-07, owner-requested: *"Update the section cut lines color on
+ * the different models to match with the color code assigned to the model."*).** Every segment
+ * carries a tag — the index, in `CutResult.models`, of the model key of the element it was cut
+ * from — and `cutColours` turns the tags into the per-instance colours `section.ts` draws, from
+ * the colour each model's MODELS row shows, the accent for a model with none.
  */
 import type { BatchStore, ElementRecord } from './batches'
 
@@ -59,22 +65,31 @@ export const TURN_SIN = 1e-4
 /** Shorter than this, in metres, a segment is nothing. */
 const MIN_LENGTH = 1e-9
 
-/** A growable list of segments, six floats each: ax, ay, az, bx, by, bz. */
+/**
+ * A growable list of segments, six floats each: ax, ay, az, bx, by, bz — and, per segment, the
+ * `tag` that was current when it was pushed (2026-11-07: its model's index).
+ */
 export interface SegmentList {
   readonly count: number
+  /** What the next pushed segments are tagged with; 0 until it is set. */
+  tag: number
   push(ax: number, ay: number, az: number, bx: number, by: number, bz: number): void
   /** The segments, exactly `count * 6` floats long. */
   take(): Float32Array
+  /** Each segment's tag, exactly `count` long. */
+  takeTags(): Uint16Array
 }
 
 export function segmentList(capacity = 1024): SegmentList {
   let data = new Float32Array(capacity * 6)
+  let tags = new Uint16Array(capacity)
   let count = 0
   return {
     get count() {
       return count
     },
-    push: (ax, ay, az, bx, by, bz) => {
+    tag: 0,
+    push(ax, ay, az, bx, by, bz) {
       const dx = bx - ax
       const dy = by - ay
       const dz = bz - az
@@ -83,6 +98,9 @@ export function segmentList(capacity = 1024): SegmentList {
         const next = new Float32Array(data.length * 2)
         next.set(data)
         data = next
+        const nextTags = new Uint16Array(tags.length * 2)
+        nextTags.set(tags)
+        tags = nextTags
       }
       const at = count * 6
       data[at] = ax
@@ -91,9 +109,11 @@ export function segmentList(capacity = 1024): SegmentList {
       data[at + 3] = bx
       data[at + 4] = by
       data[at + 5] = bz
+      tags[count] = this.tag
       count++
     },
-    take: () => data.slice(0, count * 6)
+    take: () => data.slice(0, count * 6),
+    takeTags: () => tags.slice(0, count)
   }
 }
 
@@ -477,6 +497,10 @@ export interface CutResult {
   /** Six floats per segment, in the scene frame — every plane's, one list. */
   segments: Float32Array
   count: number
+  /** Per segment, the index in `models` of the model its element belongs to. */
+  modelOf: Uint16Array
+  /** The model keys the segments came from, in the order they were first cut. */
+  models: string[]
   /** Elements whose box reached a plane and that were walked, summed over the planes. */
   elements: number
   /** Triangles walked, summed over the planes. */
@@ -495,6 +519,9 @@ export function sectionCut(
   include: (rec: ElementRecord) => boolean
 ): CutResult {
   const out = segmentList()
+  const models: string[] = []
+  const modelIndex = new Map<string, number>()
+  let lastKey: string | null = null
   let elements = 0
   let triangles = 0
   for (const plane of planes) {
@@ -504,6 +531,16 @@ export function sectionCut(
       if (rec.space || !boxStraddles(min, max, plane)) continue
       if (!others.every((o) => boxReachesKept(min, max, o)) || !include(rec)) continue
       elements++
+      // Elements arrive model by model, so the map is read only where the model changes.
+      if (rec.modelKey !== lastKey) {
+        lastKey = rec.modelKey
+        let tag = modelIndex.get(lastKey)
+        if (tag === undefined) {
+          tag = models.push(lastKey) - 1
+          modelIndex.set(lastKey, tag)
+        }
+        out.tag = tag
+      }
       for (let p = 0; p < rec.slotOf.length; p++) {
         const slot = store.slots[rec.slotOf[p]]
         if (slot.removed) continue
@@ -517,5 +554,37 @@ export function sectionCut(
       }
     }
   }
-  return { segments: out.take(), count: out.count, elements, triangles }
+  return {
+    segments: out.take(),
+    count: out.count,
+    modelOf: out.takeTags(),
+    models,
+    elements,
+    triangles
+  }
+}
+
+/** A colour as the renderer's working space holds it, 0–1 a channel. */
+export type RGB = readonly [number, number, number]
+
+/**
+ * The per-instance colours for `section.ts`: six floats a segment — its start's rgb and its
+ * end's, the same — the colour of the model it was cut from (`colourOf(key)`), else `fallback`.
+ * One lookup per model, then one copy per segment.
+ */
+export function cutColours(
+  cut: Pick<CutResult, 'count' | 'modelOf' | 'models'>,
+  colourOf: (key: string) => RGB | null | undefined,
+  fallback: RGB
+): Float32Array {
+  const byTag = cut.models.map((key) => colourOf(key) ?? fallback)
+  const out = new Float32Array(cut.count * 6)
+  for (let i = 0; i < cut.count; i++) {
+    const c = byTag[cut.modelOf[i]] ?? fallback
+    const at = i * 6
+    out[at] = out[at + 3] = c[0]
+    out[at + 1] = out[at + 4] = c[1]
+    out[at + 2] = out[at + 5] = c[2]
+  }
+  return out
 }
