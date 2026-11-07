@@ -1130,9 +1130,12 @@ export const useShell = create<ShellState>((set, get) => ({
    * paints a step whose own colour is not in the element-colour map yet.
    */
   setStepColor: (id, color) => {
-    get().updStep(id, { color })
-    set({ hlColor: color })
-    viewer?.setHighlightColor(color)
+    // One repaint for the stack and the colour (core protection #7), not one each.
+    batched(() => {
+      get().updStep(id, { color })
+      set({ hlColor: color })
+      viewer?.setHighlightColor(color)
+    })
   },
 
   /* ────────────────────────────── colour by property ────────────────────────────── */
@@ -1750,51 +1753,55 @@ export const useShell = create<ShellState>((set, get) => ({
     const placed = msg?.placed ?? []
     if (!undo && !placed.length) return
     let note = ''
-    if (undo) {
-      const plan = revertPlan(undo, snapshot(s))
-      if (undo.changed.includes('vis')) s.pushUndo()
-      get().applySession(plan.payload)
-      // A section that starts cutting again unlights the toolbar's view button on its way
-      // (`on.cubeView`, as its re-aim is a cube move). Which button is lit is the plan's to say.
-      if (plan.payload.view !== undefined && get().view !== plan.payload.view) {
-        set({ view: plan.payload.view })
+    // One repaint for everything the revert puts back (core protection #7): the restore, the
+    // colour scheme and the selection each asked for their own.
+    batched(() => {
+      if (undo) {
+        const plan = revertPlan(undo, snapshot(s))
+        if (undo.changed.includes('vis')) s.pushUndo()
+        get().applySession(plan.payload)
+        // A section that starts cutting again unlights the toolbar's view button on its way
+        // (`on.cubeView`, as its re-aim is a cube move). Which button is lit is the plan's to say.
+        if (plan.payload.view !== undefined && get().view !== plan.payload.view) {
+          set({ view: plan.payload.view })
+        }
+
+        const x = plan.extra
+        if (x.groundGrid !== undefined && x.groundGrid !== get().groundGrid) get().setGroundGrid(x.groundGrid)
+        if (x.panelOpen !== undefined && x.panelOpen !== get().panelOpen) get().togglePanel()
+        if ('card' in x && x.card !== get().card) {
+          // `openCard` on a card that is not up opens it; nothing here is asked to toggle one shut.
+          if (x.card) get().openCard(x.card)
+          else get().closeCard()
+        }
+        if (x.tool !== undefined && x.tool !== get().tool) get().setTool(x.tool)
+        if (x.search !== undefined && x.search !== get().search) get().setSearch(x.search)
+        if ('activeView' in x && x.activeView !== get().activeView) set({ activeView: x.activeView })
+        if ('colorBy' in x) {
+          // The legend's own two paths: the scheme's groups as they were, or its ×.
+          if (x.colorBy) {
+            get().setColorByGroups(
+              x.colorBy.prop,
+              x.colorBy.groups.map((g) => ({ value: g.v, ids: g.ids }))
+            )
+          } else get().clearColorBy()
+        }
+        // Last: `select` also re-places the dimension labels, which follow `dims` and the
+        // selection.
+        if (x.selIds) get().select([...x.selIds])
+        else if (undo.changed.includes('dims')) pushDims(get().selIds, get().dims)
+
+        note = revertNote(plan.lost)
       }
 
-      const x = plan.extra
-      if (x.groundGrid !== undefined && x.groundGrid !== get().groundGrid) get().setGroundGrid(x.groundGrid)
-      if (x.panelOpen !== undefined && x.panelOpen !== get().panelOpen) get().togglePanel()
-      if ('card' in x && x.card !== get().card) {
-        // `openCard` on a card that is not up opens it; nothing here is asked to toggle one shut.
-        if (x.card) get().openCard(x.card)
-        else get().closeCard()
+      // The markups that reply placed and that are still there — the Markups card's own ×, by
+      // the record's id. One the user removed since is skipped in silence.
+      for (const mark of placed) {
+        if (mark.kind === 'measure') {
+          if (get().measures.some((m) => m.id === mark.id)) get().dropMeasure(mark.id)
+        } else if (get().spots.some((p) => p.id === mark.id)) get().dropSpot(mark.id)
       }
-      if (x.tool !== undefined && x.tool !== get().tool) get().setTool(x.tool)
-      if (x.search !== undefined && x.search !== get().search) get().setSearch(x.search)
-      if ('activeView' in x && x.activeView !== get().activeView) set({ activeView: x.activeView })
-      if ('colorBy' in x) {
-        // The legend's own two paths: the scheme's groups as they were, or its ×.
-        if (x.colorBy) {
-          get().setColorByGroups(
-            x.colorBy.prop,
-            x.colorBy.groups.map((g) => ({ value: g.v, ids: g.ids }))
-          )
-        } else get().clearColorBy()
-      }
-      // Last: `select` also re-places the dimension labels, which follow `dims` and the
-      // selection.
-      if (x.selIds) get().select([...x.selIds])
-      else if (undo.changed.includes('dims')) pushDims(get().selIds, get().dims)
-
-      note = revertNote(plan.lost)
-    }
-
-    // The markups that reply placed and that are still there — the Markups card's own ×, by
-    // the record's id. One the user removed since is skipped in silence.
-    for (const mark of placed) {
-      if (mark.kind === 'measure') {
-        if (get().measures.some((m) => m.id === mark.id)) get().dropMeasure(mark.id)
-      } else if (get().spots.some((p) => p.id === mark.id)) get().dropSpot(mark.id)
-    }
+    })
 
     set((st) => ({
       // The snapshot goes with the control: a reverted reply is never offered `revert` again
@@ -1822,34 +1829,35 @@ export const useShell = create<ShellState>((set, get) => ({
   applySession: (p) => {
     const s = get()
     const n = sessionPatch(p, s)
-    // `setTheme` writes `document.documentElement.dataset.theme` and tells the viewer, which is
-    // what the prototype's own `:1033` does — restoring the key alone would change nothing.
-    if (n.theme !== s.theme) s.setTheme(n.theme)
-    // 2026-10-09: the display unit, the same way — the viewer's labels print in it.
-    if (n.units !== s.units) s.setUnits(n.units)
-    set({
-      hidden: n.hidden,
-      storeyVis: n.storeyVis,
-      modelVis: n.modelVis,
-      active: n.active,
-      modelColors: n.modelColors,
-      nativeMats: n.nativeMats,
-      treeMode: n.treeMode,
-      grids: n.grids,
-      levels: n.levels,
-      snap: n.snap,
-      dims: n.dims,
-      sections: n.sections,
-      stack: n.stack,
-      hlColor: n.hlColor,
-      view: n.view,
-      // No `coords` (2026-10-08): the base point is the boot file's, read-only, and a payload's
-      // own is not read back (`shared/session-codec.ts`, `sessionPatch`).
-      uploadNames: n.uploadNames
-    })
-    const v = viewer
-    // One repaint for the whole restore, not one per step (`viewer.batch`, refactor pass 2).
-    batched(() =>
+    // One repaint for the whole restore, not one per step (`viewer.batch`, refactor pass 2) — the
+    // theme and the unit included: a restore that changed the theme repainted every element twice.
+    batched(() => {
+      // `setTheme` writes `document.documentElement.dataset.theme` and tells the viewer, which is
+      // what the prototype's own `:1033` does — restoring the key alone would change nothing.
+      if (n.theme !== s.theme) s.setTheme(n.theme)
+      // 2026-10-09: the display unit, the same way — the viewer's labels print in it.
+      if (n.units !== s.units) s.setUnits(n.units)
+      set({
+        hidden: n.hidden,
+        storeyVis: n.storeyVis,
+        modelVis: n.modelVis,
+        active: n.active,
+        modelColors: n.modelColors,
+        nativeMats: n.nativeMats,
+        treeMode: n.treeMode,
+        grids: n.grids,
+        levels: n.levels,
+        snap: n.snap,
+        dims: n.dims,
+        sections: n.sections,
+        stack: n.stack,
+        hlColor: n.hlColor,
+        view: n.view,
+        // No `coords` (2026-10-08): the base point is the boot file's, read-only, and a payload's
+        // own is not read back (`shared/session-codec.ts`, `sessionPatch`).
+        uploadNames: n.uploadNames
+      })
+      const v = viewer
       applyRestore(
         n,
         p,
@@ -1873,7 +1881,7 @@ export const useShell = create<ShellState>((set, get) => ({
         // federation — so a payload recorded under another frame restores all but its camera.
         IDENTITY_FRAME_KEY
       )
-    )
+    })
   },
 
   /** `SGVue.dc.html:1642`. Local arithmetic, seeded as the first turn — never a model call. */

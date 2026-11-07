@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — render on demand and viewer.batch are tested headlessly
+
+**Did.** Core protection, plan item 7. `tests/unit/viewer-contract.ts`: every `Viewer` member, as a setter with its passes (full repaint, edge rebuild, picker rebuild) or not a setter with the reason. `tests/unit/viewer-invalidate.test.ts` (50 tests): the real `viewer-core.ts` with its GPU / DOM collaborators stubbed and the frame loop driven by hand — each of the 39 setters draws exactly one `invalidate()`'s two frames and the passes the contract names, the conditional ones both ways, `batch` runs each pass once and nests, and the real object's members equal the list. `tests/unit/shell-viewer-batch.test.ts` (58 tests): every store action that reaches the viewer (57, read from `state/shell.ts`) against a counting stub — it calls what it changed and runs each pass at most once. Fixed in `state/shell.ts`, by wrapping in `batched`: `setStepColor`, `applySession` (the theme and unit now inside the restore's batch) and `revertTurn` repainted every element 2, 2 and 3 times.
+
+**Verified.** 108 tests pass. Probes, reverted: `setSnap` without `invalidate()` → 0 frames, failed; `applyVis` without `batched` → 18 actions failed with 3 repaints each; a missing case → the enumeration names it. Before the fixes exactly those three actions failed. `npm test` 3 307 passed / 4 skipped; typecheck, lint, build clean. Not run: `frame-triggers.cjs` (needs a window) — the fixes change only how often the three passes run, not what is drawn; worth a guarded run on the owner's yes.
+
 ## 2026-11-07 — release builds run lint, the tests and the app.asar test
 
 **Did.** Core protection, plan item 10. `release.yml`: both jobs run `npm run privacy`, `npm run lint` and `npm test` after `npm ci` and before `dist:*`; after the build, `tests/unit/asar-contents.test.ts` runs with `SGVUE_ASAR` on `dist/win-unpacked/resources/app.asar`, and on `dist/mac-arm64/…` and `dist/mac/…` (the x64 app, never checked before). The test takes `SGVUE_ASAR` as its archive and fails when it is missing; without it nothing changed. `docs/COMMANDS.md` has the command.
