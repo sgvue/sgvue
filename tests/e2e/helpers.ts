@@ -241,16 +241,32 @@ export async function holdTurns(app: ElectronApplication): Promise<void> {
   })
 }
 
+/**
+ * Until main holds a turn. A question reaches main from the main window's renderer, which the
+ * Vee window hands it over their port and which builds the turn's view state and schema first
+ * (2026-11-07), so on the first turn it can still be on its way when the test's next line runs.
+ */
+async function turnHeld(app: ElectronApplication): Promise<void> {
+  await expect
+    .poll(() => app.evaluate(() => !!(globalThis as unknown as { __turn?: Held }).__turn?.wc), {
+      message: 'no turn reached main'
+    })
+    .toBe(true)
+}
+
 /** One event of the turn, as main's gateway sends it. */
-export const emit = (app: ElectronApplication, event: Record<string, unknown>): Promise<void> =>
-  app.evaluate((_electron, ev) => {
+export const emit = async (app: ElectronApplication, event: Record<string, unknown>): Promise<void> => {
+  await turnHeld(app)
+  return app.evaluate((_electron, ev) => {
     const held = (globalThis as unknown as { __turn: Held }).__turn
     held.wc!.send('ai:event', { ...ev, turnId: held.id })
   }, event)
+}
 
 /** One tool call: the stream announces it, then main forwards it for the renderer to run. */
-export const tool = (app: ElectronApplication, name: string, input: unknown = {}): Promise<void> =>
-  app.evaluate(
+export const tool = async (app: ElectronApplication, name: string, input: unknown = {}): Promise<void> => {
+  await turnHeld(app)
+  return app.evaluate(
     (_electron, call) => {
       const held = (globalThis as unknown as { __turn: Held }).__turn
       held.wc!.send('ai:event', { type: 'tool_start', turnId: held.id, name: call.name })
@@ -258,6 +274,7 @@ export const tool = (app: ElectronApplication, name: string, input: unknown = {}
     },
     { name, input }
   )
+}
 
 /** The answers so far. */
 export const toolResults = (app: ElectronApplication): Promise<ToolAnswer[]> =>

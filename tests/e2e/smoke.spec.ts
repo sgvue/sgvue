@@ -97,6 +97,8 @@ test('opens on the landing page, under the production CSP, with the pinned prelo
       'clearApiKey',
       'onOpenSettings',
       'openSchedules',
+      'openVee',
+      'closeVee',
       'checkUpdate',
       'openUpdatePage'
     ])
@@ -1545,16 +1547,38 @@ const pixelsOf = (page: Page, png: Buffer, hex: number): Promise<number> =>
     [png.toString('base64'), hex] as const
   )
 
-test('a section outlines what it cuts in the accent; hide, preview, clear and the theme follow', async () => {
-  // Asserted on the canvas's own pixels: the outline is the only thing drawn in the exact accent
-  // there (the plane's outline is blended at 0.8, its preview sheet at 0.1, and the grid bubbles
-  // are DOM, hidden for the capture). The segment count of a known wall is a unit test
-  // (`tests/unit/section-cut.test.ts`), because this suite runs the production bundle.
-  const DARK = 0x35c4b6
-  const LIGHT = 0x0e8a80
+/**
+ * The colour a model's MODELS row swatch shows, as `0xRRGGBB` — what that model's section-cut
+ * outline is drawn in since 2026-11-07 (`rowSwatch`, the row's and the cut's one rule). `file` is
+ * the row's file line.
+ */
+const rowSwatchOf = async (page: Page, file: string): Promise<number> => {
+  const css = await page
+    .locator('aside div.hv-step', { hasText: file })
+    .locator('button[title="Override this model\'s colour"]')
+    .evaluate((e) => getComputedStyle(e).backgroundColor)
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(css)
+  if (!m) throw new Error(`not a colour: ${css}`)
+  return (Number(m[1]) << 16) | (Number(m[2]) << 8) | Number(m[3])
+}
+
+test('a section outlines what it cuts in its model\'s colour; hide, preview, clear and the theme follow', async () => {
+  // Asserted on the canvas's own pixels: the outline is the only thing drawn in the exact colour
+  // of a model's MODELS row there (the plane's outline is the accent blended at 0.8, its preview
+  // sheet at 0.1, and the grid bubbles are DOM, hidden for the capture). The segment count of a
+  // known wall is a unit test (`tests/unit/section-cut.test.ts`), and the per-model tagging
+  // `tests/unit/cut-colours.test.ts`, because this suite runs the production bundle.
+  //
+  // Counted in STR's colour: the floor slab hidden below is a STR element (the mock's
+  // `STR_TYPES`), and STR is most of what grid C cuts. The colour is read off STR's row — the
+  // demo is never in the library, so it is the design's `MC[slot]`, which is the dark accent for
+  // STR's slot; the light theme is where the outline shows it follows the row, not the accent.
+  const STR_FILE = 'SB_STR_R25.ifc'
+  const LIGHT_ACCENT = 0x0e8a80
   const { app, page } = await launch(dir)
   try {
     await openDemo(page)
+    const str = await rowSwatchOf(page, STR_FILE)
     // The outline counts were measured with the canvas grid on, off by default since 2026-11-07;
     // with it off the ground veil is not drawn, so below-grade outline shows and the slab is a
     // smaller share.
@@ -1563,18 +1587,18 @@ test('a section outlines what it cuts in the accent; hide, preview, clear and th
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
     // Right of the Section card (12 + 300 px), clear of the toolbar, the cube and the status bar.
     const clip = { x: vp.x + 330, y: vp.y + 64, width: vp.width - 500, height: vp.height - 124 }
-    const accent = async (hex: number): Promise<number> => {
+    const count = async (hex: number): Promise<number> => {
       await overlay.evaluate((e) => (e.style.visibility = 'hidden'))
       const shot = await settledShot(page, 800, clip)
       await overlay.evaluate((e) => (e.style.visibility = ''))
       return pixelsOf(page, shot, hex)
     }
 
-    const none = await accent(DARK)
+    const none = await count(str)
     await page.locator('button[data-tip="Section from gridline / level"]').click()
     await page.getByRole('button', { name: 'C', exact: true }).click()
     // Grid C cut, the camera square to the plane: an elevation, outlined.
-    const cut = await accent(DARK)
+    const cut = await count(str)
     expect(cut).toBeGreaterThan(1000)
     expect(none).toBeLessThan(cut / 50)
 
@@ -1584,33 +1608,36 @@ test('a section outlines what it cuts in the accent; hide, preview, clear and th
     const eye = page.locator('aside button[title="Show / hide"]')
     await expect(eye).toHaveCount(1)
     await eye.click()
-    const hidden = await accent(DARK)
+    const hidden = await count(str)
     expect(hidden).toBeLessThan(cut * 0.97)
     await eye.click()
-    expect(Math.abs((await accent(DARK)) - cut)).toBeLessThan(cut / 50)
+    expect(Math.abs((await count(str)) - cut)).toBeLessThan(cut / 50)
 
     // Preview (`cut` off): the plane is shown, nothing is cut, nothing is outlined. The card has
     // two planes since 2026-10-01, each with its own controls; these are the gridline plane's.
     const gridBlock = page.getByRole('group', { name: 'Along a gridline' })
     const cutBtn = gridBlock.getByRole('button', { name: 'cut', exact: true })
     await cutBtn.click()
-    expect(await accent(DARK)).toBeLessThan(cut / 50)
+    expect(await count(str)).toBeLessThan(cut / 50)
     await cutBtn.click()
-    expect(Math.abs((await accent(DARK)) - cut)).toBeLessThan(cut / 50)
+    expect(Math.abs((await count(str)) - cut)).toBeLessThan(cut / 50)
 
-    // The theme recolours it: light's accent, and none of dark's.
+    // The theme: the row keeps its colour in either theme, and so does the outline — the light
+    // accent, which the outline was before 2026-11-07, is not drawn.
     const theme = page.locator('button[data-tip="Light / dark"]')
     const tb = (await theme.boundingBox())!
     await page.mouse.move(tb.x + tb.width / 2 - 20, tb.y + tb.height / 2)
     await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2)
     await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2)
     await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('light')
-    expect(await accent(LIGHT)).toBeGreaterThan(cut / 2)
-    expect(await accent(DARK)).toBeLessThan(cut / 50)
+    const strLight = await rowSwatchOf(page, STR_FILE)
+    expect(strLight).toBe(str)
+    expect(await count(strLight)).toBeGreaterThan(cut / 2)
+    expect(await count(LIGHT_ACCENT)).toBeLessThan(cut / 50)
 
     // Cleared: gone.
     await gridBlock.getByRole('button', { name: 'Clear', exact: true }).click()
-    expect(await accent(LIGHT)).toBeLessThan(cut / 50)
+    expect(await count(strLight)).toBeLessThan(cut / 50)
   } finally {
     await app.close()
   }
@@ -1646,20 +1673,21 @@ async function savedSections(userData: string): Promise<{ sections: unknown; sec
 }
 
 test('a gridline cut and a level cut are independent: own offset, cut, flip side and Clear, and Clear all', async () => {
-  const DARK = 0x35c4b6
   const NONE = { name: '', offset: 0, flip: false, cut: false }
   const { app, page } = await launch(dir)
   try {
     await openDemo(page)
+    // Since 2026-11-07 a model's outline is its MODELS row's colour; STR's is most of either cut.
+    const STR = await rowSwatchOf(page, 'SB_STR_R25.ifc')
     const overlay = page.locator('[data-role="overlay"]')
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
     const clip = { x: vp.x + 330, y: vp.y + 64, width: vp.width - 500, height: vp.height - 124 }
-    /** Pixels of the cut outline: the one thing drawn in the exact accent on the canvas. */
+    /** Pixels of STR's cut outline: the one thing drawn in its row's exact colour on the canvas. */
     const accent = async (): Promise<number> => {
       await overlay.evaluate((e) => (e.style.visibility = 'hidden'))
       const shot = await settledShot(page, 800, clip)
       await overlay.evaluate((e) => (e.style.visibility = ''))
-      return pixelsOf(page, shot, DARK)
+      return pixelsOf(page, shot, STR)
     }
     const sectionBtn = page.locator('button[data-tip="Section from gridline / level"]')
     const lit = (): Promise<string> => sectionBtn.evaluate((b) => getComputedStyle(b).color)
@@ -1904,14 +1932,23 @@ test('a share link written before there were two planes still restores its one s
     await expect(level.offset).toHaveValue('1.5')
     expect(await grid.summary()).toBe('offset m · no section')
     await expect(grid.offset).toHaveValue('0')
-    // It really cuts: the plane's outline of the model is on the canvas, in the accent.
+    // It really cuts: the plane's outline of the model is on the canvas, in the model's colour.
+    // Since 2026-11-07 that is what its MODELS row shows. A real file's row starts in the design's
+    // grey (`MC[0]`), which the fixture's unstyled faces could match, so the row is given one of
+    // the palette's colours first — with "Original materials" on, the faces keep the file's own —
+    // and the outline is counted in the colour the row then shows.
+    await page.locator('aside button[title="Override this model\'s colour"]').click()
+    const pick = page.locator('aside button[title^="#"]').last()
+    const picked = parseInt((await pick.getAttribute('title'))!.slice(1), 16)
+    await pick.click()
+    await expect.poll(() => rowSwatchOf(page, 'tiny.ifc')).toBe(picked)
     const overlay = page.locator('[data-role="overlay"]')
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
     const clip = { x: vp.x + 330, y: vp.y + 64, width: vp.width - 500, height: vp.height - 124 }
     await overlay.evaluate((e) => (e.style.visibility = 'hidden'))
-    const cut = await pixelsOf(page, await settledShot(page, 800, clip), 0x35c4b6)
+    const cut = await pixelsOf(page, await settledShot(page, 800, clip), picked)
     await level.button('Clear').click()
-    const whole = await pixelsOf(page, await settledShot(page, 800, clip), 0x35c4b6)
+    const whole = await pixelsOf(page, await settledShot(page, 800, clip), picked)
     await overlay.evaluate((e) => (e.style.visibility = ''))
     expect(cut).toBeGreaterThan(100)
     expect(whole).toBeLessThan(cut / 20)
