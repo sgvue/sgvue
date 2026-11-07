@@ -120,6 +120,14 @@ export function treeGroups(input: TreeInput): TreeGroup[] {
 }
 
 /**
+ * A disclosure chevron's look — a group row's (`SGVue.dc.html:180`), and since 2026-11-07 the
+ * sidebar's MODELS header's too: turned a quarter and in the accent while open.
+ */
+export function disclosure(open: boolean): { rot: number; chevColor: string } {
+  return { rot: open ? 90 : 0, chevColor: open ? 'var(--accent-ink)' : 'var(--faint)' }
+}
+
+/**
  * The grouping half of `treeGroups`, with every row unselected. It scans and sorts the whole
  * (scoped) federation, so `app/Sidebar.tsx` keeps it apart from the selection: a click in the
  * viewport re-runs `withSelection` alone.
@@ -145,8 +153,7 @@ export function groupTree(input: Omit<TreeInput, 'selIds'>): TreeGroup[] {
       label: key,
       count: items.length,
       open,
-      rot: open ? 90 : 0,
-      chevColor: open ? 'var(--accent-ink)' : 'var(--faint)',
+      ...disclosure(open),
       vis,
       hid: !vis,
       opacity: vis ? 1 : 0.5,

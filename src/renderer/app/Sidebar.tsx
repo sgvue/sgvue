@@ -21,14 +21,24 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { federation as fed } from '../model/federation-store'
 import { openDialog, openLibrary } from '../model/upload-pipeline'
 import { uploadRows } from '../state/selectors/uploads'
-import { pick, useShell, type SideSize } from '../state/shell'
+import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
 import { modelRows, addableRows } from '../state/selectors/models'
 import { storeyRows } from '../state/selectors/storeys'
 import { groupTree, rowWindow, withSelection, type TreeItem } from '../state/selectors/tree'
 import { treeKeyAction, treeNodes } from '../state/selectors/tree-keys'
 import { clampCtxX } from '../state/selectors/ctx'
-import { clampSection, sizedTail, TREE_MIN } from '../state/selectors/sidebar'
+import {
+  clampSection,
+  floorPx,
+  LOOSE_COLUMN,
+  sidebarTight,
+  sizedTail,
+  TIGHT_COLUMN,
+  tightTree,
+  treeMinFor
+} from '../state/selectors/sidebar'
+import { disclosure } from '../state/selectors/tree'
 import {
   matHint,
   nativeToggle,
@@ -77,8 +87,11 @@ const OVERSCAN = 10
  *
  * · the tree's floor rises from `0` to `40%` of the aside;
  * · the STOREYS rows wrapper (`:161`) gives way **first** and never below three rows;
- * · the MODELS rows wrapper (`:98`) is the last resort, and is untouched until the storey list
- *   is already at that minimum.
+ * · ~~the MODELS rows wrapper (`:98`) is the last resort~~ — until 2026-11-07, when MODELS
+ *   became collapsible and, expanded, always full (the owner: *"when expand always show
+ *   full"*). The last resort is now the tight column (`sidebarTight`, `selectors/sidebar.ts`):
+ *   the tree's 40 % becomes what it prefers, it gives way down to three rows, and only then does
+ *   everything under the MODELS header scroll.
  *
  * At six storeys or fewer every style string below is the design's, byte for byte, at every
  * window size — which is what keeps the design's own four-model mock exactly as drawn. That
@@ -94,6 +107,8 @@ const DESIGN_STOREY_COUNT = 6
 const STOREY_ROW_H = 32
 /** The rows wrapper's own `padding:2px 12px 8px 10px` (`:161`), inside `min-height` under `border-box`. */
 const STOREY_ROWS_PAD = 10
+/** The STOREYS rows' floor above six storeys: three rows. */
+const STOREY_ROWS_MIN = 3 * STOREY_ROW_H + STOREY_ROWS_PAD
 
 /**
  * What the STOREYS rows wrapper gains. `overflow:auto` is what lets a flex item shrink past its
@@ -117,16 +132,7 @@ const STOREY_ROWS_PAD = 10
  */
 const STOREY_SHRINK = 1_000_000
 const STOREY_ROWS_SCROLL =
-  `;flex:0 ${STOREY_SHRINK} auto;min-height:${3 * STOREY_ROW_H + STOREY_ROWS_PAD}px;overflow:auto`
-
-/**
- * What the MODELS rows wrapper gains: the last resort. It keeps the default shrink factor, so
- * with the storey list frozen at its three rows this is the only item left that can give; until
- * then it is untouched, and a single-model federation never scrolls it at all. Every popover
- * inside it — the override palette, the remove confirmation, the library list — is in flow, so
- * it scrolls with the rows rather than being clipped.
- */
-const MODEL_ROWS_SCROLL = ';flex:0 1 auto;overflow:auto'
+  `;flex:0 ${STOREY_SHRINK} auto;min-height:${STOREY_ROWS_MIN}px;overflow:auto`
 
 /**
  * Dev-only: `#rows=<n>` lowers the threshold so the windowed path can be exercised on the mock
@@ -222,7 +228,7 @@ function GroupRows({
 }
 
 /**
- * 2026-09-24 — a drag handle on the boundary under a rows wrapper (`selectors/sidebar.ts`).
+ * 2026-09-24 — the drag handle on the boundary under the STOREYS rows (`selectors/sidebar.ts`).
  * It takes no height: a 6 px hit area straddles the boundary, and its 1 px line is transparent
  * until hovered, when it turns `var(--accent)` — so an undragged sidebar looks as designed.
  */
@@ -312,20 +318,23 @@ function ConfirmUnload({
 const KEYS = pick(
   'federation', 'library', 'treeMode', 'search', 'expanded', 'hidden', 'selIds', 'storeyVis',
   'modelVis', 'modelColors', 'nativeMats', 'uploadNames', 'uploads', 'active', 'palette',
-  'confirmRemove', 'addOpen', 'card', 'visibleCount', 'sideModels', 'sideStoreys', 'loaded',
+  'confirmRemove', 'addOpen', 'card', 'visibleCount', 'sideStoreys', 'modelsOpen', 'loaded',
   'activate', 'allStoreys', 'askRemove', 'cancelRemove', 'dropUpload', 'hide', 'openCard',
-  'select', 'setCtx', 'setModelColor', 'setSearch', 'setSideSize', 'setTreeMode', 'show',
-  'soloStorey', 'toggleAdd', 'toggleGroup', 'toggleModel', 'toggleNative', 'togglePalette',
-  'togglePanel', 'toggleStorey', 'units'
+  'select', 'setCtx', 'setModelColor', 'setSearch', 'setSideStoreys', 'setTreeMode', 'show',
+  'soloStorey', 'toggleAdd', 'toggleGroup', 'toggleModel', 'toggleModels', 'toggleNative',
+  'togglePalette', 'togglePanel', 'toggleStorey', 'units'
 )
 
 export default function Sidebar(): React.JSX.Element {
   const st = useShell(useShallow(KEYS))
   /** The tree's scroll container — what a windowed group measures itself against. */
   const tree = useRef<HTMLDivElement>(null)
-  /** The MODELS and STOREYS rows wrappers — what the two drag handles size. */
-  const modelsRows = useRef<HTMLDivElement>(null)
+  /** The STOREYS rows wrapper — what the drag handle sizes. */
   const storeysRows = useRef<HTMLDivElement>(null)
+  /** 2026-11-07 — the aside, and the column under the MODELS header that scrolls when tight. */
+  const asideRef = useRef<HTMLElement>(null)
+  const column = useRef<HTMLDivElement>(null)
+  const modelsId = useId()
   const {
     federation,
     library,
@@ -346,8 +355,8 @@ export default function Sidebar(): React.JSX.Element {
     addOpen,
     card,
     visibleCount,
-    sideModels,
     sideStoreys,
+    modelsOpen,
     units
   } = st
 
@@ -447,58 +456,77 @@ export default function Sidebar(): React.JSX.Element {
     }
   }
 
-  /* ── the two drag handles (2026-09-24, `selectors/sidebar.ts`) ──────────────
-   * A section's floor is its first row plus the wrapper's own 10 px of padding. The first
-   * drag pins **both** sections at their current heights, so moving one never makes the
-   * other jump; the tree keeps `flex:1` and gives up everything above its three rows. */
-  const measure = (node: HTMLDivElement | null): SideSize | null => {
-    if (!node) return null
+  /* ── the drag handle (2026-09-24, `selectors/sidebar.ts`) ──────────────────
+   * The section's floor is its first row plus the wrapper's own 10 px of padding; the tree keeps
+   * `flex:1` and gives up everything above its three rows. Until 2026-11-07 there was a second
+   * handle, under MODELS, and the first drag pinned both lists; MODELS is now collapsible and,
+   * expanded, never changes height under a drag, so there is nothing else to pin. */
+  const onSplit = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (e.button !== 0) return
+    const node = storeysRows.current
+    const tr = tree.current
+    if (!node || !tr) return
     const row = node.querySelector<HTMLElement>('.hv-step')
     const min = Math.ceil((row ? row.getBoundingClientRect().height : 0) + STOREY_ROWS_PAD)
-    return { h: node.getBoundingClientRect().height, min }
-  }
-  const onSplit =
-    (which: 'models' | 'storeys') =>
-    (e: React.PointerEvent<HTMLDivElement>): void => {
-      if (e.button !== 0) return
-      const self = measure((which === 'models' ? modelsRows : storeysRows).current)
-      const other = measure((which === 'models' ? storeysRows : modelsRows).current)
-      const tr = tree.current
-      if (!self || !other || !tr) return
-      e.preventDefault()
-      const otherKey = which === 'models' ? 'storeys' : 'models'
-      const treeH = tr.getBoundingClientRect().height
-      const y0 = e.clientY
-      const handle = e.currentTarget
-      handle.setPointerCapture(e.pointerId)
-      const move = (ev: PointerEvent): void => {
-        const now = useShell.getState()
-        // A tree already under its three rows would make a pinned pair shrink together and jump,
-        // so then the other list is left as it is.
-        if (treeH >= TREE_MIN && !(otherKey === 'models' ? now.sideModels : now.sideStoreys)) {
-          now.setSideSize(otherKey, other)
-        }
-        now.setSideSize(which, { h: clampSection(self.h, ev.clientY - y0, self.min, treeH), min: self.min })
-      }
-      const up = (): void => {
-        handle.removeEventListener('pointermove', move)
-        handle.removeEventListener('pointerup', up)
-        handle.removeEventListener('pointercancel', up)
-      }
-      handle.addEventListener('pointermove', move)
-      handle.addEventListener('pointerup', up)
-      handle.addEventListener('pointercancel', up)
+    const h0 = node.getBoundingClientRect().height
+    e.preventDefault()
+    const treeH = tr.getBoundingClientRect().height
+    const y0 = e.clientY
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+    const move = (ev: PointerEvent): void => {
+      useShell.getState().setSideStoreys({ h: clampSection(h0, ev.clientY - y0, min, treeH), min })
     }
-  /**
-   * The tree's floor: the design's `0`, or 40 % above six storeys — unless a section is sized
-   * by hand, when it is three rows (above six storeys, only once both are).
-   */
-  const treeMin =
-    crowdedStoreys && !(sideModels && sideStoreys)
-      ? '40%'
-      : sideModels || sideStoreys
-        ? `${TREE_MIN}px`
-        : '0'
+    const up = (): void => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      handle.removeEventListener('pointercancel', up)
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
+  /** The tree's floor: the design's `0`, 40 % above six storeys, three rows once STOREYS is sized. */
+  const treeMin = treeMinFor(crowdedStoreys, !!sideStoreys)
+
+  /* ── the tight sidebar (2026-11-07, `sidebarTight`) ──────────────────────────
+   * MODELS, expanded, is always its full height, so with many models in a short window the
+   * usual rules would push the tree out of the aside. Measured from natural sizes and floors
+   * only, so the answer never depends on the layout it picks. */
+  /** `null` while the usual rules fit; tight, the tree's preferred height in whole pixels. */
+  const [tight, setTight] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const box = asideRef.current
+    const col = column.current
+    if (!box || !col) return
+    const check = (): void => {
+      let rigid = 0
+      for (const parent of [box, col]) {
+        for (const c of Array.from(parent.children)) {
+          if (c === col || c === tree.current || c === storeysRows.current) continue
+          rigid += c.getBoundingClientRect().height
+        }
+      }
+      const rows = storeysRows.current
+      const storeysFloor = sideStoreys
+        ? sideStoreys.min
+        : crowdedStoreys
+          ? STOREY_ROWS_MIN
+          : rows
+            ? rows.getBoundingClientRect().height
+            : 0
+      const asideH = box.clientHeight
+      const treeFloor = floorPx(treeMin, asideH)
+      setTight(sidebarTight(rigid, storeysFloor, treeFloor, asideH) ? Math.round(treeFloor) : null)
+    }
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(box)
+    for (const parent of [box, col]) {
+      for (const c of Array.from(parent.children)) if (c !== col && c !== tree.current) ro.observe(c)
+    }
+    return () => ro.disconnect()
+  }, [modelsOpen, crowdedStoreys, sideStoreys, treeMin])
 
   const project = projectHeader(st)
   const projBtn = projectButton(card === 'project')
@@ -510,6 +538,7 @@ export default function Sidebar(): React.JSX.Element {
 
   return (
     <aside
+      ref={asideRef}
       style={s(
         'width:300px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--card);border-right:1px solid var(--border)'
       )}
@@ -613,7 +642,24 @@ export default function Sidebar(): React.JSX.Element {
           'padding:6px 12px 4px;display:flex;align-items:center;gap:9px;font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)'
         )}
       >
-        <span>Models</span>
+        {/* 2026-11-07 — the label is the section's toggle, its chevron the element tree's own
+            (rotation, colour and transition from `disclosure`, the group row's rule). The
+            label keeps its place; nothing else in the header moved. */}
+        <button
+          onClick={st.toggleModels}
+          aria-expanded={modelsOpen}
+          aria-controls={modelsOpen ? modelsId : undefined}
+          style={s('display:flex;align-items:center;gap:6px;letter-spacing:inherit;text-transform:inherit')}
+        >
+          <span>Models</span>
+          <span
+            style={s(
+              `display:flex;justify-content:center;color:${disclosure(modelsOpen).chevColor};transform:rotate(${disclosure(modelsOpen).rot}deg);transition:transform .15s`
+            )}
+          >
+            <GroupChevron />
+          </span>
+        </button>
         {active && (
           <button
             onClick={() => st.activate(active)}
@@ -654,505 +700,503 @@ export default function Sidebar(): React.JSX.Element {
         )}
       </div>
 
-      {/* ── model rows, upload rows, library popover, native-materials toggle (`:91`) ── */}
-      {/* `:98` verbatim; the tail is added only above the design's own storey count. */}
-      <div
-        ref={modelsRows}
-        style={s(
-          'display:flex;flex-direction:column;padding:2px 12px 8px 10px;position:relative' +
-            (sideModels
-              ? sizedTail(sideModels.h, sideModels.min)
-              : crowdedStoreys
-                ? MODEL_ROWS_SCROLL
-                : '')
-        )}
-      >
-        {models.map((md) => (
-          <div key={md.key} style={s('display:flex;flex-direction:column')}>
-            <div
-              className="hv-step"
-              style={s(
-                `display:grid;grid-template-columns:24px 14px minmax(0,1fr) auto 22px 22px;align-items:center;gap:7px;padding:4px 4px 4px 2px;border-left:2px solid ${md.edge};background:${md.bg};border-radius:0 6px 6px 0;opacity:${md.opacity}`
-              )}
-            >
-              <button
-                onClick={() => st.toggleModel(md.key)}
-                title="Show / hide model"
-                className="hv-ink"
-                style={s(
-                  'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
-                )}
-              >
-                {md.vis ? <Eye /> : <EyeOff />}
-              </button>
-              <button
-                onClick={() => st.togglePalette(md.key)}
-                title="Override this model's colour"
-                className="hv-accent-line"
-                style={s(
-                  `width:14px;height:14px;border-radius:3px;background:${md.swatch};border:1px solid var(--border-strong);box-shadow:${md.swatchRing}`
-                )}
-              ></button>
-              <div
-                title={md.path || undefined}
-                style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}
-              >
-                <span
+      {/* 2026-11-07 — everything under the MODELS header: lays out nothing (`display:contents`)
+          until the sidebar is tight, then one column that scrolls (`sidebarTight`). */}
+      <div ref={column} style={s(tight === null ? LOOSE_COLUMN : TIGHT_COLUMN)}>
+        {/* ── model rows, upload rows, library popover, native-materials toggle (`:91`) ── */}
+        {/* `:98` verbatim, always its full height (2026-11-07); collapsed, it is not drawn. */}
+        {modelsOpen && (
+          <div
+            id={modelsId}
+            style={s('display:flex;flex-direction:column;padding:2px 12px 8px 10px;position:relative')}
+          >
+            {models.map((md) => (
+              <div key={md.key} style={s('display:flex;flex-direction:column')}>
+                <div
+                  className="hv-step"
                   style={s(
-                    'font:500 13px/1.3 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+                    `display:grid;grid-template-columns:24px 14px minmax(0,1fr) auto 22px 22px;align-items:center;gap:7px;padding:4px 4px 4px 2px;border-left:2px solid ${md.edge};background:${md.bg};border-radius:0 6px 6px 0;opacity:${md.opacity}`
                   )}
                 >
-                  {md.name}
-                </span>
-                <span
-                  style={s(
-                    'font:400 11px/1.3 var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
-                  )}
-                >
-                  {md.file}
-                </span>
-              </div>
-              <span
-                style={s(
-                  'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);min-width:26px;text-align:right'
-                )}
-              >
-                {md.count}
-              </span>
-              <button
-                onClick={() => st.activate(md.key)}
-                title="Activate — lists show only this model; the others stay visible in 3D but can't be selected"
-                className="hv-card-accent"
-                style={s(
-                  `width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${md.actFg}`
-                )}
-              >
-                <Target dot={md.actDot} />
-              </button>
-              {md.canRemove && (
-                <button
-                  onClick={() => st.askRemove(md.key)}
-                  title="Unload model"
-                  className="hv-card-ink"
-                  style={s(
-                    'width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
-                  )}
-                >
-                  <Cross size={12} weight={2} />
-                </button>
-              )}
-            </div>
-            {md.confirmOpen && (
-              <ConfirmUnload
-                name={md.name}
-                onCancel={st.cancelRemove}
-                onDelete={() => void fed.removeModel(md.key)}
-              />
-            )}
-            {md.paletteOpen && (
-              <div
-                style={s(
-                  'display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:2px 0 4px 32px;padding:7px 9px;background:var(--card);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow)'
-                )}
-              >
-                {md.colors.map((c) => (
                   <button
-                    key={c.c}
-                    onClick={() => st.setModelColor(md.key, c.c)}
-                    title={c.c}
+                    onClick={() => st.toggleModel(md.key)}
+                    title="Show / hide model"
+                    className="hv-ink"
                     style={s(
-                      `width:16px;height:16px;border-radius:4px;background:${c.c};border:1px solid var(--border-strong);box-shadow:${c.ring}`
+                      'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
+                    )}
+                  >
+                    {md.vis ? <Eye /> : <EyeOff />}
+                  </button>
+                  <button
+                    onClick={() => st.togglePalette(md.key)}
+                    title="Override this model's colour"
+                    className="hv-accent-line"
+                    style={s(
+                      `width:14px;height:14px;border-radius:3px;background:${md.swatch};border:1px solid var(--border-strong);box-shadow:${md.swatchRing}`
                     )}
                   ></button>
-                ))}
-                <span style={s('flex:1;min-width:6px')}></span>
-                <button
-                  onClick={() => st.setModelColor(md.key, null)}
+                  <div
+                    title={md.path || undefined}
+                    style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}
+                  >
+                    <span
+                      style={s(
+                        'font:500 13px/1.3 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+                      )}
+                    >
+                      {md.name}
+                    </span>
+                    <span
+                      style={s(
+                        'font:400 11px/1.3 var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+                      )}
+                    >
+                      {md.file}
+                    </span>
+                  </div>
+                  <span
+                    style={s(
+                      'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);min-width:26px;text-align:right'
+                    )}
+                  >
+                    {md.count}
+                  </span>
+                  <button
+                    onClick={() => st.activate(md.key)}
+                    title="Activate — lists show only this model; the others stay visible in 3D but can't be selected"
+                    className="hv-card-accent"
+                    style={s(
+                      `width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${md.actFg}`
+                    )}
+                  >
+                    <Target dot={md.actDot} />
+                  </button>
+                  {md.canRemove && (
+                    <button
+                      onClick={() => st.askRemove(md.key)}
+                      title="Unload model"
+                      className="hv-card-ink"
+                      style={s(
+                        'width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
+                      )}
+                    >
+                      <Cross size={12} weight={2} />
+                    </button>
+                  )}
+                </div>
+                {md.confirmOpen && (
+                  <ConfirmUnload
+                    name={md.name}
+                    onCancel={st.cancelRemove}
+                    onDelete={() => void fed.removeModel(md.key)}
+                  />
+                )}
+                {md.paletteOpen && (
+                  <div
+                    style={s(
+                      'display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:2px 0 4px 32px;padding:7px 9px;background:var(--card);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow)'
+                    )}
+                  >
+                    {md.colors.map((c) => (
+                      <button
+                        key={c.c}
+                        onClick={() => st.setModelColor(md.key, c.c)}
+                        title={c.c}
+                        style={s(
+                          `width:16px;height:16px;border-radius:4px;background:${c.c};border:1px solid var(--border-strong);box-shadow:${c.ring}`
+                        )}
+                      ></button>
+                    ))}
+                    <span style={s('flex:1;min-width:6px')}></span>
+                    <button
+                      onClick={() => st.setModelColor(md.key, null)}
+                      style={s(
+                        'font:500 11px/1 var(--sans);color:var(--accent-ink);padding:3px 2px;white-space:nowrap'
+                      )}
+                    >
+                      reset
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* upload rows (`:126`) — Phase 8 fills `uploads`; the row is the design's. */}
+            {uploadRows(uploads).map((u) => {
+              const busy = u.busy
+              return (
+                <div
+                  key={u.id}
                   style={s(
-                    'font:500 11px/1 var(--sans);color:var(--accent-ink);padding:3px 2px;white-space:nowrap'
+                    'display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;padding:4px 4px 6px 2px'
                   )}
                 >
-                  reset
-                </button>
+                  <span style={s('width:24px;height:24px;display:flex;align-items:center;justify-content:center')}>
+                    {busy && (
+                      <span
+                        style={s(
+                          'width:12px;height:12px;border-radius:50%;border:2px solid var(--border-strong);border-top-color:var(--accent);animation:ifcspin .7s linear infinite'
+                        )}
+                      ></span>
+                    )}
+                    {u.done && (
+                      <span
+                        style={s(
+                          'width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--ok-bg);color:var(--ok-ink);animation:ifcpop .3s ease-out'
+                        )}
+                      >
+                        <Tick />
+                      </span>
+                    )}
+                    {u.error && (
+                      <button
+                        onClick={() => st.dropUpload(u.id)}
+                        title="Dismiss"
+                        style={s(
+                          'width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--warn-bg);color:var(--warn-ink)'
+                        )}
+                      >
+                        <Bang />
+                      </button>
+                    )}
+                  </span>
+                  <span style={s('display:flex;flex-direction:column;gap:4px;min-width:0')}>
+                    <span
+                      style={s(
+                        'font:500 12.5px/1.3 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+                      )}
+                    >
+                      {u.name}
+                    </span>
+                    <span style={s('height:3px;border-radius:2px;background:var(--step-bg);overflow:hidden')}>
+                      <span
+                        style={s(
+                          `display:block;height:3px;border-radius:2px;background:var(--accent);width:${u.pct}%;transition:width .3s ease`
+                        )}
+                      ></span>
+                    </span>
+                    <span
+                      style={s(
+                        'font:400 10.5px/1.3 var(--mono);color:var(--faint);animation:ifcpulse 1.6s ease-in-out infinite'
+                      )}
+                    >
+                      {u.stage}
+                    </span>
+                  </span>
+                  <span
+                    style={s(
+                      'font:400 10.5px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)'
+                    )}
+                  >
+                    {u.pctLabel}
+                  </span>
+                </div>
+              )
+            })}
+
+            {/* library popover (`:139`) */}
+            {addOpen && (
+              <div
+                style={s(
+                  'display:flex;flex-direction:column;gap:2px;margin:4px 0 2px 24px;padding:6px;background:var(--card);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow)'
+                )}
+              >
+                {addable.map((a) => (
+                  <button
+                    key={a.key}
+                    onClick={() => {
+                      st.toggleAdd()
+                      void openLibrary([a])
+                    }}
+                    title={a.path || undefined}
+                    className="hv-step"
+                    style={s(
+                      'display:grid;grid-template-columns:10px minmax(0,1fr);align-items:center;gap:8px;padding:6px 8px;border-radius:6px;text-align:left'
+                    )}
+                  >
+                    <span
+                      style={s(
+                        `width:10px;height:10px;border-radius:2px;background:${a.swatch};border:1px solid var(--border-strong)`
+                      )}
+                    ></span>
+                    <span style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}>
+                      <span style={s('font:500 12.5px/1.3 var(--sans);color:var(--ink)')}>{a.name}</span>
+                      <span style={s('font:400 11px/1.3 var(--mono);color:var(--faint)')}>{a.file}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
-          </div>
-        ))}
 
-        {/* upload rows (`:126`) — Phase 8 fills `uploads`; the row is the design's. */}
-        {uploadRows(uploads).map((u) => {
-          const busy = u.busy
-          return (
+            {/* Original materials (`:149`) */}
             <div
-              key={u.id}
               style={s(
-                'display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;padding:4px 4px 6px 2px'
+                'display:flex;align-items:center;gap:10px;margin:4px 2px 0 24px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--card)'
               )}
             >
-              <span style={s('width:24px;height:24px;display:flex;align-items:center;justify-content:center')}>
-                {busy && (
-                  <span
-                    style={s(
-                      'width:12px;height:12px;border-radius:50%;border:2px solid var(--border-strong);border-top-color:var(--accent);animation:ifcspin .7s linear infinite'
-                    )}
-                  ></span>
-                )}
-                {u.done && (
-                  <span
-                    style={s(
-                      'width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--ok-bg);color:var(--ok-ink);animation:ifcpop .3s ease-out'
-                    )}
-                  >
-                    <Tick />
-                  </span>
-                )}
-                {u.error && (
-                  <button
-                    onClick={() => st.dropUpload(u.id)}
-                    title="Dismiss"
-                    style={s(
-                      'width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--warn-bg);color:var(--warn-ink)'
-                    )}
-                  >
-                    <Bang />
-                  </button>
-                )}
-              </span>
-              <span style={s('display:flex;flex-direction:column;gap:4px;min-width:0')}>
-                <span
-                  style={s(
-                    'font:500 12.5px/1.3 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
-                  )}
-                >
-                  {u.name}
+              <div style={s('display:flex;flex-direction:column;gap:2px;min-width:0;flex:1')}>
+                <span style={s('font:500 12.5px/1.3 var(--sans);color:var(--ink)')}>
+                  Original materials
                 </span>
-                <span style={s('height:3px;border-radius:2px;background:var(--step-bg);overflow:hidden')}>
-                  <span
-                    style={s(
-                      `display:block;height:3px;border-radius:2px;background:var(--accent);width:${u.pct}%;transition:width .3s ease`
-                    )}
-                  ></span>
+                <span style={s('font:400 11px/1.35 var(--sans);color:var(--faint)')}>
+                  {matHint(nativeMats, modelColors)}
                 </span>
-                <span
-                  style={s(
-                    'font:400 10.5px/1.3 var(--mono);color:var(--faint);animation:ifcpulse 1.6s ease-in-out infinite'
-                  )}
-                >
-                  {u.stage}
-                </span>
-              </span>
-              <span
-                style={s(
-                  'font:400 10.5px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)'
-                )}
-              >
-                {u.pctLabel}
-              </span>
-            </div>
-          )
-        })}
-
-        {/* library popover (`:139`) */}
-        {addOpen && (
-          <div
-            style={s(
-              'display:flex;flex-direction:column;gap:2px;margin:4px 0 2px 24px;padding:6px;background:var(--card);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow)'
-            )}
-          >
-            {addable.map((a) => (
+              </div>
               <button
-                key={a.key}
-                onClick={() => {
-                  st.toggleAdd()
-                  void openLibrary([a])
-                }}
-                title={a.path || undefined}
-                className="hv-step"
+                onClick={st.toggleNative}
+                title="Use the surface materials that came with the loaded IFC files"
                 style={s(
-                  'display:grid;grid-template-columns:10px minmax(0,1fr);align-items:center;gap:8px;padding:6px 8px;border-radius:6px;text-align:left'
+                  `flex:none;width:34px;height:20px;border-radius:999px;padding:2px;display:flex;align-items:center;background:${nat.track};border:1px solid ${nat.line}`
                 )}
               >
                 <span
                   style={s(
-                    `width:10px;height:10px;border-radius:2px;background:${a.swatch};border:1px solid var(--border-strong)`
+                    `width:14px;height:14px;border-radius:50%;background:${nat.knob};transform:translateX(${nat.x}px);transition:transform .15s ease`
                   )}
                 ></span>
-                <span style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}>
-                  <span style={s('font:500 12.5px/1.3 var(--sans);color:var(--ink)')}>{a.name}</span>
-                  <span style={s('font:400 11px/1.3 var(--mono);color:var(--faint)')}>{a.file}</span>
-                </span>
               </button>
-            ))}
+            </div>
           </div>
         )}
 
-        {/* Original materials (`:149`) */}
+        {/* ── STOREYS (`:160`) ── */}
         <div
           style={s(
-            'display:flex;align-items:center;gap:10px;margin:4px 2px 0 24px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--card)'
+            'padding:6px 12px 4px;display:flex;align-items:center;gap:9px;font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)'
           )}
         >
-          <div style={s('display:flex;flex-direction:column;gap:2px;min-width:0;flex:1')}>
-            <span style={s('font:500 12.5px/1.3 var(--sans);color:var(--ink)')}>
-              Original materials
-            </span>
-            <span style={s('font:400 11px/1.35 var(--sans);color:var(--faint)')}>
-              {matHint(nativeMats, modelColors)}
-            </span>
-          </div>
+          <span>Storeys</span>
+          <span style={s('flex:1;height:1px;background:var(--border)')}></span>
           <button
-            onClick={st.toggleNative}
-            title="Use the surface materials that came with the loaded IFC files"
+            onClick={st.allStoreys}
             style={s(
-              `flex:none;width:34px;height:20px;border-radius:999px;padding:2px;display:flex;align-items:center;background:${nat.track};border:1px solid ${nat.line}`
+              'font:500 11px/1 var(--sans);letter-spacing:0;text-transform:none;color:var(--accent-ink)'
             )}
           >
-            <span
-              style={s(
-                `width:14px;height:14px;border-radius:50%;background:${nat.knob};transform:translateX(${nat.x}px);transition:transform .15s ease`
-              )}
-            ></span>
+            show all
           </button>
         </div>
-      </div>
-
-      <SplitHandle onDown={onSplit('models')} onReset={() => st.setSideSize('models', null)} />
-
-      {/* ── STOREYS (`:160`) ── */}
-      <div
-        style={s(
-          'padding:6px 12px 4px;display:flex;align-items:center;gap:9px;font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)'
-        )}
-      >
-        <span>Storeys</span>
-        <span style={s('flex:1;height:1px;background:var(--border)')}></span>
-        <button
-          onClick={st.allStoreys}
+        {/* `:161` verbatim; the tail is added only above the design's own storey count. */}
+        <div
+          ref={storeysRows}
           style={s(
-            'font:500 11px/1 var(--sans);letter-spacing:0;text-transform:none;color:var(--accent-ink)'
+            'display:flex;flex-direction:column;padding:2px 12px 8px 10px' +
+              (sideStoreys
+                ? sizedTail(sideStoreys.h, sideStoreys.min)
+                : crowdedStoreys
+                  ? STOREY_ROWS_SCROLL
+                  : '')
           )}
         >
-          show all
-        </button>
-      </div>
-      {/* `:161` verbatim; the tail is added only above the design's own storey count. */}
-      <div
-        ref={storeysRows}
-        style={s(
-          'display:flex;flex-direction:column;padding:2px 12px 8px 10px' +
-            (sideStoreys
-              ? sizedTail(sideStoreys.h, sideStoreys.min)
-              : crowdedStoreys
-                ? STOREY_ROWS_SCROLL
-                : '')
-        )}
-      >
-        {storeys.map((sr) => (
-          <div
-            key={sr.name}
-            onClick={() => st.soloStorey(sr.name, sr.solo, storeyNames)}
-            title="Click: only this storey · click again: all storeys"
-            className="hv-step"
-            style={s(
-              `display:grid;grid-template-columns:24px minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:4px 8px 4px 4px;border-left:2px solid ${sr.edge};background:${sr.bg};border-radius:0 6px 6px 0;opacity:${sr.opacity};cursor:pointer`
-            )}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                st.toggleStorey(sr.name)
-              }}
-              title="Show / hide storey"
-              className="hv-ink"
-              style={s(
-                'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
-              )}
-            >
-              {sr.vis ? <Eye /> : <EyeOff />}
-            </button>
-            <span
-              style={s(
-                `font:500 13px/1.3 var(--sans);color:${sr.fg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
-              )}
-            >
-              {sr.name}
-            </span>
-            <span
-              style={s(
-                'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--faint)'
-              )}
-            >
-              {sr.elev}
-            </span>
-            <span
-              style={s(
-                'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);min-width:26px;text-align:right'
-              )}
-            >
-              {sr.count}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <SplitHandle onDown={onSplit('storeys')} onReset={() => st.setSideSize('storeys', null)} />
-
-      {/* ── element tree (`:175`) ── */}
-      <div
-        style={s(
-          'padding:6px 12px 4px;display:flex;align-items:center;gap:9px;font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)'
-        )}
-      >
-        <span id="sgvue-tree-title">{treeTitle(treeMode)}</span>
-        <span style={s('flex:1;height:1px;background:var(--border)')}></span>
-        <span
-          style={s(
-            'font:400 11px/1 var(--mono);letter-spacing:0;text-transform:none;color:var(--faint);white-space:nowrap'
-          )}
-        >
-          {visibleCount} / {total}
-        </span>
-      </div>
-      <div
-        ref={tree}
-        role="tree"
-        aria-labelledby="sgvue-tree-title"
-        onKeyDown={onTreeKey}
-        style={s(
-          // `:176` verbatim; `min-height` is `0` there and stays `0` at the design's own
-          // storey count. Above it, the tree keeps 40 % of the aside. Sized by hand: `treeMin`.
-          `flex:1;min-height:${treeMin};overflow:auto;padding:2px 12px 12px 10px;display:flex;flex-direction:column;gap:1px`
-        )}
-      >
-        {groups.map((g) => (
-          <div key={g.key} role="none" style={s('display:flex;flex-direction:column')}>
+          {storeys.map((sr) => (
             <div
-              onClick={() => st.toggleGroup(g.key)}
-              role="treeitem"
-              aria-expanded={g.open}
-              aria-level={1}
-              data-tree-key={`g:${g.key}`}
-              tabIndex={roving === `g:${g.key}` ? 0 : -1}
-              onFocus={() => setFocusKey(`g:${g.key}`)}
+              key={sr.name}
+              onClick={() => st.soloStorey(sr.name, sr.solo, storeyNames)}
+              title="Click: only this storey · click again: all storeys"
               className="hv-step"
               style={s(
-                // 2026-10-01 — the eye leads and the chevron trails, as the header says. The
-                // left padding is the design's 6 px, which is what puts this eye on the storey
-                // eye's own x (10 + 6 here, 10 + 2 + 4 there).
-                `display:grid;grid-template-columns:24px minmax(0,1fr) auto 14px;align-items:center;gap:6px;padding:5px 4px 5px 6px;border-radius:6px;cursor:pointer;opacity:${g.opacity}`
+                `display:grid;grid-template-columns:24px minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:4px 8px 4px 4px;border-left:2px solid ${sr.edge};background:${sr.bg};border-radius:0 6px 6px 0;opacity:${sr.opacity};cursor:pointer`
               )}
             >
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (g.vis) st.hide(g.ids)
-                  else st.show(g.ids)
+                  st.toggleStorey(sr.name)
                 }}
-                title="Show / hide group"
+                title="Show / hide storey"
                 className="hv-ink"
                 style={s(
                   'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
                 )}
               >
-                {g.vis ? <Eye /> : <EyeOff />}
+                {sr.vis ? <Eye /> : <EyeOff />}
               </button>
               <span
                 style={s(
-                  `font:${g.font};color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
+                  `font:500 13px/1.3 var(--sans);color:${sr.fg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
                 )}
               >
-                {g.label}
+                {sr.name}
               </span>
               <span
                 style={s(
-                  'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)'
+                  'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--faint)'
                 )}
               >
-                {g.count}
+                {sr.elev}
               </span>
               <span
                 style={s(
-                  `display:flex;justify-content:center;color:${g.chevColor};transform:rotate(${g.rot}deg);transition:transform .15s`
+                  'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);min-width:26px;text-align:right'
                 )}
               >
-                <GroupChevron />
+                {sr.count}
               </span>
             </div>
-            {g.open && (
-              <GroupRows
-                items={g.items}
-                scroller={tree}
-                row={(it, i) => (
-                  <div
-                    key={it.id}
-                    onClick={(ev) =>
-                      st.select(
-                        it.id,
-                        !(ev.ctrlKey || ev.metaKey),
-                        ev.ctrlKey || ev.metaKey ? 'toggle' : 'replace'
-                      )
-                    }
-                    onContextMenu={(ev) => {
-                      ev.preventDefault()
-                      // `:1831` clamps both axes; the top is clamped against the menu's own
-                      // measured height in `app/ContextMenu.tsx` since Phase 10.
-                      st.setCtx({
-                        x: clampCtxX(ev.clientX, window.innerWidth),
-                        y: ev.clientY,
-                        id: it.id
-                      })
-                    }}
-                    role="treeitem"
-                    aria-level={2}
-                    aria-selected={it.sel}
-                    aria-posinset={i + 1}
-                    aria-setsize={g.items.length}
-                    data-tree-key={`i:${it.id}`}
-                    tabIndex={roving === `i:${it.id}` ? 0 : -1}
-                    onFocus={() => setFocusKey(`i:${it.id}`)}
-                    className="hv-step"
-                    style={s(
-                      // 2026-10-01 — mirrored with its columns: the eye keeps its 2 px from the
-                      // row's edge (now the selection edge), the text its 8 px from the other.
-                      `display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:6px;padding:3px 8px 3px 2px;border-left:2px solid ${it.edge};background:${it.bg};border-radius:0 6px 6px 0;cursor:pointer;opacity:${it.opacity}`
-                    )}
-                  >
-                    <button
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        if (it.hid) st.show([it.id])
-                        else st.hide([it.id])
+          ))}
+        </div>
+
+        <SplitHandle onDown={onSplit} onReset={() => st.setSideStoreys(null)} />
+
+        {/* ── element tree (`:175`) ── */}
+        <div
+          style={s(
+            'padding:6px 12px 4px;display:flex;align-items:center;gap:9px;font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)'
+          )}
+        >
+          <span id="sgvue-tree-title">{treeTitle(treeMode)}</span>
+          <span style={s('flex:1;height:1px;background:var(--border)')}></span>
+          <span
+            style={s(
+              'font:400 11px/1 var(--mono);letter-spacing:0;text-transform:none;color:var(--faint);white-space:nowrap'
+            )}
+          >
+            {visibleCount} / {total}
+          </span>
+        </div>
+        <div
+          ref={tree}
+          role="tree"
+          aria-labelledby="sgvue-tree-title"
+          onKeyDown={onTreeKey}
+          style={s(
+            // `:176` verbatim; `min-height` is `0` there and stays `0` at the design's own
+            // storey count. Above it, the tree keeps 40 % of the aside. Sized by hand: `treeMin`.
+            // Tight (2026-11-07): that floor is what the tree prefers, and it keeps three rows.
+            `${tight === null ? `flex:1;min-height:${treeMin}` : tightTree(tight)};overflow:auto;padding:2px 12px 12px 10px;display:flex;flex-direction:column;gap:1px`
+          )}
+        >
+          {groups.map((g) => (
+            <div key={g.key} role="none" style={s('display:flex;flex-direction:column')}>
+              <div
+                onClick={() => st.toggleGroup(g.key)}
+                role="treeitem"
+                aria-expanded={g.open}
+                aria-level={1}
+                data-tree-key={`g:${g.key}`}
+                tabIndex={roving === `g:${g.key}` ? 0 : -1}
+                onFocus={() => setFocusKey(`g:${g.key}`)}
+                className="hv-step"
+                style={s(
+                  // 2026-10-01 — the eye leads and the chevron trails, as the header says. The
+                  // left padding is the design's 6 px, which is what puts this eye on the storey
+                  // eye's own x (10 + 6 here, 10 + 2 + 4 there).
+                  `display:grid;grid-template-columns:24px minmax(0,1fr) auto 14px;align-items:center;gap:6px;padding:5px 4px 5px 6px;border-radius:6px;cursor:pointer;opacity:${g.opacity}`
+                )}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (g.vis) st.hide(g.ids)
+                    else st.show(g.ids)
+                  }}
+                  title="Show / hide group"
+                  className="hv-ink"
+                  style={s(
+                    'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
+                  )}
+                >
+                  {g.vis ? <Eye /> : <EyeOff />}
+                </button>
+                <span
+                  style={s(
+                    `font:${g.font};color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
+                  )}
+                >
+                  {g.label}
+                </span>
+                <span
+                  style={s(
+                    'font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)'
+                  )}
+                >
+                  {g.count}
+                </span>
+                <span
+                  style={s(
+                    `display:flex;justify-content:center;color:${g.chevColor};transform:rotate(${g.rot}deg);transition:transform .15s`
+                  )}
+                >
+                  <GroupChevron />
+                </span>
+              </div>
+              {g.open && (
+                <GroupRows
+                  items={g.items}
+                  scroller={tree}
+                  row={(it, i) => (
+                    <div
+                      key={it.id}
+                      onClick={(ev) =>
+                        st.select(
+                          it.id,
+                          !(ev.ctrlKey || ev.metaKey),
+                          ev.ctrlKey || ev.metaKey ? 'toggle' : 'replace'
+                        )
+                      }
+                      onContextMenu={(ev) => {
+                        ev.preventDefault()
+                        // `:1831` clamps both axes; the top is clamped against the menu's own
+                        // measured height in `app/ContextMenu.tsx` since Phase 10.
+                        st.setCtx({
+                          x: clampCtxX(ev.clientX, window.innerWidth),
+                          y: ev.clientY,
+                          id: it.id
+                        })
                       }}
-                      title="Show / hide"
-                      className="hv-ink"
+                      role="treeitem"
+                      aria-level={2}
+                      aria-selected={it.sel}
+                      aria-posinset={i + 1}
+                      aria-setsize={g.items.length}
+                      data-tree-key={`i:${it.id}`}
+                      tabIndex={roving === `i:${it.id}` ? 0 : -1}
+                      onFocus={() => setFocusKey(`i:${it.id}`)}
+                      className="hv-step"
                       style={s(
-                        'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
+                        // 2026-10-01 — mirrored with its columns: the eye keeps its 2 px from the
+                        // row's edge (now the selection edge), the text its 8 px from the other.
+                        `display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:6px;padding:3px 8px 3px 2px;border-left:2px solid ${it.edge};background:${it.bg};border-radius:0 6px 6px 0;cursor:pointer;opacity:${it.opacity}`
                       )}
                     >
-                      {it.vis ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
-                    <span style={s('display:flex;flex-direction:column;gap:1px;min-width:0')}>
-                      <span
+                      <button
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          if (it.hid) st.show([it.id])
+                          else st.hide([it.id])
+                        }}
+                        title="Show / hide"
+                        className="hv-ink"
                         style={s(
-                          `font:400 12.5px/1.3 var(--sans);color:${it.fg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
+                          'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
                         )}
                       >
-                        {it.name}
+                        {it.vis ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                      <span style={s('display:flex;flex-direction:column;gap:1px;min-width:0')}>
+                        <span
+                          style={s(
+                            `font:400 12.5px/1.3 var(--sans);color:${it.fg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
+                          )}
+                        >
+                          {it.name}
+                        </span>
+                        <span
+                          style={s(
+                            'font:400 10.5px/1.3 var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+                          )}
+                        >
+                          {it.sub}
+                        </span>
                       </span>
-                      <span
-                        style={s(
-                          'font:400 10.5px/1.3 var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
-                        )}
-                      >
-                        {it.sub}
-                      </span>
-                    </span>
-                  </div>
-                )}
-              />
-            )}
-          </div>
-        ))}
+                    </div>
+                  )}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </aside>
   )
