@@ -24,6 +24,8 @@ vi.stubGlobal('__APP_VERSION__', '0.0.0-test')
 
 const { installMenu } = await import('../../src/main/menu')
 const { SITE_URL } = await import('../../src/main/about')
+const { setMainWindow } = await import('../../src/main/window')
+const { CH_SETTINGS_OPEN } = await import('../../src/shared/ipc-channels')
 
 function clickCheckForUpdates(): void {
   installMenu()
@@ -55,5 +57,58 @@ describe('Help › Check for updates…', () => {
     expect(url.search).toBe('')
     expect(url.hash).toBe('')
     expect(SITE_URL).toBe(url.href)
+  })
+})
+
+/** The Preferences… item, wherever the platform puts it (the app menu on macOS, File elsewhere). */
+function clickPreferences(): void {
+  installMenu()
+  const find = (items: MenuItemConstructorOptions[]): MenuItemConstructorOptions | undefined => {
+    for (const item of items) {
+      if (item.label === 'Preferences…') return item
+      const found = Array.isArray(item.submenu) ? find(item.submenu) : undefined
+      if (found) return found
+    }
+    return undefined
+  }
+  const item = find(built.at(-1)!)
+  expect(item).toBeDefined()
+  ;(item!.click as () => void)()
+}
+
+/** A main window whose page records what is sent to it and, destroyed, throws as Electron's does. */
+function mainWith(pageDestroyed: boolean) {
+  const sent: string[] = []
+  setMainWindow({
+    isDestroyed: () => false,
+    webContents: {
+      isDestroyed: () => pageDestroyed,
+      send: (channel: string) => {
+        if (pageDestroyed) throw new TypeError('Object has been destroyed')
+        sent.push(channel)
+      }
+    }
+  } as never)
+  return sent
+}
+
+describe('Preferences…', () => {
+  it('asks the main window’s page to open the dialog', () => {
+    const sent = mainWith(false)
+    clickPreferences()
+    expect(sent).toEqual([CH_SETTINGS_OPEN])
+    setMainWindow(null)
+  })
+
+  it('does nothing, and throws nothing, when the main window’s page is already destroyed', () => {
+    const sent = mainWith(true)
+    expect(() => clickPreferences()).not.toThrow()
+    expect(sent).toEqual([])
+    setMainWindow(null)
+  })
+
+  it('does nothing when there is no main window', () => {
+    setMainWindow(null)
+    expect(() => clickPreferences()).not.toThrow()
   })
 })

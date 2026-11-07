@@ -226,4 +226,22 @@ describe('building the client (C1, review)', () => {
     expect(anthropicClient).toHaveBeenCalledTimes(2)
     expect(events(wc).at(-1)).toMatchObject({ type: 'done', turnId: 't2' })
   })
+
+  it('a build that fails after the window closed tells nobody, and throws nothing', async () => {
+    let gone = false
+    vi.mocked(anthropicClient).mockImplementationOnce(async () => {
+      gone = true
+      throw new Error('Cannot find module @anthropic-ai/sdk')
+    })
+    const wc = Object.assign(window(), {
+      isDestroyed: () => gone,
+      send(channel: string, payload: Record<string, unknown>) {
+        // As Electron's: a destroyed page throws on every call.
+        if (gone) throw new TypeError('Object has been destroyed')
+        wc.sent.push([channel, payload])
+      }
+    })
+    await expect(start(wc, 't1')).resolves.toBeUndefined()
+    expect(wc.sent).toEqual([])
+  })
 })

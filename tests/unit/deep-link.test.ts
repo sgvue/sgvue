@@ -2,10 +2,11 @@
  * `src/main/deep-link.ts` — the argv parser and the `second-instance` handler.
  *
  * `electron` is mocked down to the one thing the module touches, `app.on`, whose listeners the
- * test then fires itself; `main/window.ts`'s `mainWindow()` answers with a stand-in window that
- * records what was asked of it (since 2026-09-25 a link goes to the main window by name, never
- * to whichever window was created first). macOS `open-url` is the same `deliver`, so the
- * window behaviour below is what it does too.
+ * test then fires itself; the real `main/window.ts` is handed a stand-in window that records
+ * what was asked of it (since 2026-09-25 a link goes to the main window by name, never to
+ * whichever window was created first), so its `mainWindow()` and `mainContents()` are the ones
+ * the app runs. macOS `open-url` is the same `deliver`, so the window behaviour below is what
+ * it does too.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -18,13 +19,22 @@ class FakeWindow {
   loading = false
   restored = 0
   focused = 0
+  /** The page alone is gone: the window's own teardown, before the window itself is destroyed. */
+  contentsDestroyed = false
   sent: { channel: string; payload: unknown }[] = []
   webContents = {
-    isLoading: (): boolean => this.loading,
+    isDestroyed: (): boolean => this.contentsDestroyed,
+    // As Electron's: a destroyed page throws on every call.
+    isLoading: (): boolean => {
+      if (this.contentsDestroyed) throw new TypeError('Object has been destroyed')
+      return this.loading
+    },
     send: (channel: string, payload: unknown): void => {
+      if (this.contentsDestroyed) throw new TypeError('Object has been destroyed')
       this.sent.push({ channel, payload })
     }
   }
+  isDestroyed = (): boolean => false
   isMinimized = (): boolean => this.minimized
   restore = (): void => {
     this.minimized = false
@@ -35,16 +45,19 @@ class FakeWindow {
   }
 }
 
-let windows: FakeWindow[] = []
-
 vi.mock('electron', () => ({
   app: {
     on: (event: string, fn: (...args: unknown[]) => void) => listeners.set(event, fn)
-  }
+  },
+  dialog: {}
 }))
-vi.mock('../../src/main/window', () => ({ mainWindow: () => windows[0] }))
 
-const { installDeepLinks, launchHash, linkFromArgv } = await import('../../src/main/deep-link')
+const { flushPendingLink, installDeepLinks, launchHash, linkFromArgv } = await import(
+  '../../src/main/deep-link'
+)
+const { setMainWindow } = await import('../../src/main/window')
+/** Make `win` the main window — or, with nothing, leave the app with none. */
+const useWindow = (win?: FakeWindow): void => setMainWindow((win ?? null) as never)
 const { CH_LINK_OPEN } = await import('../../src/shared/ipc-contract')
 const { payloadFromLink } = await import('../../src/shared/session-codec')
 
@@ -59,7 +72,7 @@ function secondInstance(argv: readonly string[]): void {
 
 beforeEach(() => {
   listeners.clear()
-  windows = []
+  useWindow()
   delete process.env.SGVUE_LINK
   installDeepLinks()
 })
@@ -139,7 +152,7 @@ describe('a second launch', () => {
   it('brings a minimised window forward when the argv carries no link', () => {
     const win = new FakeWindow()
     win.minimized = true
-    windows = [win]
+    useWindow(win)
     secondInstance(['SGVue.exe'])
     expect(win.restored).toBe(1)
     expect(win.minimized).toBe(false)
@@ -149,7 +162,7 @@ describe('a second launch', () => {
 
   it('focuses a window that is not minimised, and restores nothing', () => {
     const win = new FakeWindow()
-    windows = [win]
+    useWindow(win)
     secondInstance(['SGVue.exe'])
     expect(win.restored).toBe(0)
     expect(win.focused).toBe(1)
@@ -158,7 +171,7 @@ describe('a second launch', () => {
   it('sends the link and brings the window forward when the argv carries one', () => {
     const win = new FakeWindow()
     win.minimized = true
-    windows = [win]
+    useWindow(win)
     secondInstance(['SGVue.exe', LINK])
     expect(win.sent).toEqual([{ channel: CH_LINK_OPEN, payload: { url: LINK } }])
     expect(win.restored).toBe(1)
@@ -168,10 +181,39 @@ describe('a second launch', () => {
   it('parks a link rather than sending it into a window that is still loading', () => {
     const win = new FakeWindow()
     win.loading = true
-    windows = [win]
+    useWindow(win)
     secondInstance(['SGVue.exe', LINK])
     expect(win.sent).toEqual([])
     expect(win.focused).toBe(0)
+  })
+
+  it('parks a link, and throws nothing, when the window’s page is already destroyed', () => {
+    const win = new FakeWindow()
+    win.contentsDestroyed = true
+    useWindow(win)
+    expect(() => secondInstance(['SGVue.exe', LINK])).not.toThrow()
+    expect(win.sent).toEqual([])
+    expect(win.focused).toBe(0)
+    // The link was held, not lost: the next live page's load sends it.
+    const next = new FakeWindow()
+    useWindow(next)
+    flushPendingLink()
+    expect(next.sent).toEqual([{ channel: CH_LINK_OPEN, payload: { url: LINK } }])
+    expect(next.focused).toBe(1)
+  })
+
+  it('sends a link parked while the window was loading once its load finishes', () => {
+    const win = new FakeWindow()
+    win.loading = true
+    useWindow(win)
+    secondInstance(['SGVue.exe', LINK])
+    expect(win.sent).toEqual([])
+    win.loading = false
+    flushPendingLink()
+    expect(win.sent).toEqual([{ channel: CH_LINK_OPEN, payload: { url: LINK } }])
+    // Sent once: a second flush has nothing left.
+    flushPendingLink()
+    expect(win.sent).toHaveLength(1)
   })
 
   it('does nothing, and throws nothing, when there is no window', () => {

@@ -19,8 +19,9 @@ import { app, type BrowserWindow } from 'electron'
 import { CH_LINK_OPEN } from '../shared/ipc-contract'
 import { LINK_PATTERN } from '../shared/session-codec'
 // The main window by name, never `getAllWindows()[0]`: since 2026-09-25 the Schedules window
-// can exist too, and a link or a second launch belongs to the main window.
-import { mainWindow } from './window'
+// can exist too, and a link or a second launch belongs to the main window. A post goes to its
+// page through `mainContents()`, which is undefined once that page is destroyed (2026-11-07).
+import { mainContents, mainWindow } from './window'
 
 /** The first `sgvue://` argument in an argv, or `null`. Windows and the dev hook both use it. */
 export function linkFromArgv(argv: readonly string[]): string | null {
@@ -74,14 +75,19 @@ function surface(win: BrowserWindow): void {
   win.focus()
 }
 
-/** Hand a link to the renderer, or park it until there is one. */
+/**
+ * Hand a link to the renderer, or park it until there is one. A window whose page is already
+ * destroyed — its own teardown — has no renderer to hear it, so the link is parked as it is for
+ * no window at all, and the next page's `did-finish-load` sends it.
+ */
 function deliver(url: string): void {
   const win = mainWindow()
-  if (!win || win.webContents.isLoading()) {
+  const page = mainContents()
+  if (!win || !page || page.isLoading()) {
     pending = url
     return
   }
-  win.webContents.send(CH_LINK_OPEN, { url })
+  page.send(CH_LINK_OPEN, { url })
   surface(win)
 }
 

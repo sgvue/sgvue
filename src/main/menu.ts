@@ -15,13 +15,16 @@ import { CH_SETTINGS_OPEN } from '../shared/ipc-channels'
 import { aboutBoxOptions, aboutPanelOptions, updatesUrl } from './about'
 import { activeGraphics, type GpuInfoLike } from './gpu-choice'
 import { openSchedules } from './schedules-window'
-import { messageBox, targetWindow } from './window'
+import { mainContents, messageBox, targetWindow } from './window'
 
 const isMac = process.platform === 'darwin'
 
-/** Ask the main window to show the Preferences dialog. It is drawn by the renderer. */
+/**
+ * Ask the main window to show the Preferences dialog. It is drawn by the renderer, so nothing
+ * happens while there is no live page to draw it (`mainContents()`, 2026-11-07).
+ */
 function openPreferences(): void {
-  targetWindow()?.webContents.send(CH_SETTINGS_OPEN)
+  mainContents()?.send(CH_SETTINGS_OPEN)
 }
 
 /**

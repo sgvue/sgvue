@@ -147,8 +147,10 @@ export function registerAiIpc(): void {
   ipcMain.handle(CH_AI_TURN_START, async (event, raw: unknown) => {
     const turn = AiTurnStart.parse(raw)
     const wc = event.sender
-    const fail = (kind: AiErrorKind, message: string): void =>
-      wc.send(CH_AI_EVENT, { type: 'error', turnId: turn.turnId, kind, message } satisfies AiEvent)
+    // `fail` can run after an await (the client build), by which time the window may be gone.
+    const fail = (kind: AiErrorKind, message: string): void => {
+      if (!wc.isDestroyed()) wc.send(CH_AI_EVENT, { type: 'error', turnId: turn.turnId, kind, message } satisfies AiEvent)
+    }
 
     const key = apiKey() ?? ''
     if (!key) {

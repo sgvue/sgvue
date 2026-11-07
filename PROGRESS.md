@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the rest of the "Object has been destroyed" class
+
+**Did.** A share link (`deep-link.ts`) and Preferences… (`menu.ts`) post to the main page through `mainContents()` — a link that finds no live page is parked and sent on the next page's load — and the assistant's turn-start `fail` (`ai/session.ts`) checks its sender first. Every other page call in `src/main/` checked: safe.
+
+**Verified.** 6 new unit tests, each failing on the old code; typecheck, lint, build clean; reviewed: PASS. Not seen in a real window.
+
 ## 2026-11-07 — promises are never dropped
 
 **Did.** Step 6 of the lint hardening, the last: `@typescript-eslint/no-floating-promises` (`ignoreVoid: true`, `ignoreIIFE: false`) and `@typescript-eslint/no-misused-promises` (`checksConditionals`, `checksSpreads` and all six `checksVoidReturn` sub-options) as errors. Measured first: 2 floating findings (67 with `ignoreVoid: false`, the 65 extra already marked `void`), 0 misused under every sub-option. Both findings were three 0.186's `async` `Renderer.dispose()` dropped in the viewer's and the view cube's `dispose`; each now ends in a `.catch` that logs through `console.error('[sgvue] … —', error)`. The 65 existing `void` sites are not audited — a possible follow-up (`shell.openExternal`, `win.loadURL` / `loadFile`, the launch GPU-info log and the GPU guard's poll chain have no handler of their own; the runtime still reports a rejection).
