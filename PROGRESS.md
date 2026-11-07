@@ -4,6 +4,20 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — the packaged checks run: `.sgvue` declared and opened, on a buildingSMART model
+
+**Did.** Built both Mac installers (`dist/SGVue-1.3.0-arm64.dmg`, `-x64.dmg`) and ran
+`npm run test:packaged`. The Info.plist test failed against a correct app: its regex stopped at the
+nested `</array>` of `CFBundleTypeExtensions`. It now reads the plist with `plutil -extract … json`.
+The big-model test ran on buildingSMART's own sample, `IFC 4.3 ADD2 / Simple-Scene /
+Infra-Landscaping.ifc` (CC BY 4.0, 2.3 MB; the whole ten-file scene is in
+`samples/buildingsmart-ifc43-simple-scene/`, git-ignored).
+
+**Verified.** 5 of 5 pass under `safe-app.cjs`: the share link under the production CSP, the
+icon, `.sgvue` declared as "SGVue Project" (Editor), a `.sgvue` in `argv` opens, and the sample —
+ready in 4.28 s, `111 / 111` elements, 60 fps orbiting, peak footprint 1 071 MB. Still owed: a
+real double-click in Finder and in Explorer.
+
 ## 2026-11-08 — two audit fixes: the SQL tool's result size, and copy csv's file text
 
 **Did.** A quick security audit (Electron shell and IPC, untrusted files and links, the assistant)

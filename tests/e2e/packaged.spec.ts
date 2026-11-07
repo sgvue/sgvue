@@ -19,6 +19,7 @@
  * on a checkout that has never built an installer.
  */
 import { test, expect, _electron as electron } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdtemp, open, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -300,12 +301,21 @@ test('the packaged app carries the brand-mark icon', async () => {
 test('the packaged macOS app declares the .sgvue document type', async () => {
   test.skip(process.platform !== 'darwin', 'the Windows association is written by the installer, not the unpacked tree')
   test.skip(!existsSync(EXECUTABLE), NO_APP)
-  const plist = await readFile(join(APP, 'Contents/Info.plist'), 'utf8')
-  const types = /<key>CFBundleDocumentTypes<\/key>\s*<array>([\s\S]*?)<\/array>\s*<key>/.exec(plist)
-  expect(types, 'Info.plist has no CFBundleDocumentTypes').not.toBeNull()
-  expect(types![1]).toMatch(/<key>CFBundleTypeExtensions<\/key>\s*<array>\s*<string>sgvue<\/string>\s*<\/array>/)
-  expect(types![1]).toMatch(/<key>CFBundleTypeName<\/key>\s*<string>SGVue Project<\/string>/)
-  expect(types![1]).toMatch(/<key>CFBundleTypeRole<\/key>\s*<string>Editor<\/string>/)
+  // Read structurally: the array nests arrays, so no regex can find where it ends. `plutil`
+  // exits non-zero when the key is missing, which fails the test with its own message.
+  const json = execFileSync(
+    '/usr/bin/plutil',
+    ['-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', join(APP, 'Contents/Info.plist')],
+    { encoding: 'utf8' }
+  )
+  const types = JSON.parse(json) as Record<string, unknown>[]
+  expect(Array.isArray(types), 'CFBundleDocumentTypes is not an array').toBe(true)
+  const sgvue = types.filter(
+    (t) => JSON.stringify(t.CFBundleTypeExtensions) === JSON.stringify(['sgvue'])
+  )
+  expect(sgvue, 'no document type declares exactly the .sgvue extension').toHaveLength(1)
+  expect(sgvue[0].CFBundleTypeName).toBe('SGVue Project')
+  expect(sgvue[0].CFBundleTypeRole).toBe('Editor')
 })
 
 /**
