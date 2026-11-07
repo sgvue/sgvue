@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the inline style strings are held to the design
+
+**Did.** Core protection, plan item 3. `tests/unit/design-style-strings.test.ts` reads every `s(…)` call in `src/renderer/app/` and `src/renderer/App.tsx` with the TypeScript parser, follows names to their `const` (in scope, or imported), parameters to their callers' arguments, joins, branches and one-expression style functions, and requires each resulting string to be one whole `style="…"` value of `SGVue.dc.html` — a `${…}` only where the design has a `{{ … }}`. A string the design does not have must be in `DEVIATIONS`, keyed by file and string, naming the dated CLAUDE.md entry that changed it; a listed string no longer in the code fails as stale; a call it cannot read must be listed in `COMPUTED` (none today).
+
+**Verified.** 531 strings read, 416 the design's, 115 listed against 27 recorded entries. One difference has no record and is listed `UNRECORDED — reported 2026-11-07`: the 3D and W view buttons write `border-radius` before `color`, where the design writes it last (same computed style). Probes, reverted: a changed `ContextMenu` literal failed naming `ContextMenu.tsx:137` and the string; a changed listed divider failed as unlisted and its entry as stale. typecheck, lint, `npm test`, build, privacy clean.
+
 ## 2026-11-07 — seven more traps are lint errors, and the tests are linted
 
 **Did.** Core protection, plan item 9. `eslint.config.mjs` gains seven `TRAPS` entries, each an error naming its trap: arithmetic with `ID_STRIDE` / `LEGACY_ID_STRIDE` outside `federate.ts`; `GetVertexArray` / `GetIndexArray` not followed at once by `.slice()`; `getPropertySets` inside a loop or an array-iteration callback; setting `opacityNode` or `depthNode`; `PCFSoftShadowMap`; a −π/2 turn about X (`rotation.x =` or `rotateX`). Exceptions with a reason: `federate.ts`, `materials.ts`' intended `opacityNode`, one legacy-id decode in `session-codec.ts`, and stride arithmetic in tests (an oracle independent of `fedId`). `tests/**/*.{ts,tsx}` is linted under every rule; `reportUnusedDisableDirectives` is `error`, and the two ported directives for rules that are not on were removed. One test fix: a floating `copyGuid` promise in `shell-store.test.ts` marked `void`. `docs/COMMANDS.md`'s lint row says the new scope.
