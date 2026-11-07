@@ -17,6 +17,9 @@ import { Box3, Vector3 } from 'three/webgpu'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SETTERS, VIEWER_MEMBERS, type Work } from './viewer-contract'
 import type { Viewer } from '../../src/renderer/viewer/viewer-core'
+import { federate } from '../../src/shared/federate'
+import type { ModelIndex } from '../../src/shared/model-index.types'
+import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 
 /**
  * The counters, and what the viewer handed its collaborators. Hoisted, because the module mocks
@@ -32,6 +35,8 @@ const h = vi.hoisted(() => ({
   setClips: null as null | ((planes: unknown[]) => void),
   /** The annotation layer's `invalidate`, which its own spot-tag toggle calls. */
   annotationsInvalidate: null as null | (() => void),
+  /** The grids and storeys the viewer hands its section layer — what it draws and cuts at. */
+  ladders: null as null | { grids: () => unknown[]; storeys: () => unknown[] },
   elements: new Map<number, unknown>()
 }))
 
@@ -142,8 +147,9 @@ vi.mock('../../src/renderer/viewer/input', () => ({
   canvasNdc: () => ({ px: 0, py: 0 })
 }))
 vi.mock('../../src/renderer/viewer/section', () => ({
-  createSection: (deps: { setClips: (p: unknown[]) => void }) => {
+  createSection: (deps: { setClips: (p: unknown[]) => void; grids: () => unknown[]; storeys: () => unknown[] }) => {
     h.setClips = deps.setClips
+    h.ladders = { grids: deps.grids, storeys: deps.storeys }
     return {
       objects: [],
       current: { grid: null, level: null },
@@ -210,6 +216,7 @@ vi.mock('../../src/renderer/viewer/camera', async () => {
 })
 
 const { createViewer } = await import('../../src/renderer/viewer/viewer-core')
+const { metaOf } = await import('../../src/renderer/model/federation-store')
 
 /** `viewer-core.ts`'s `EXTRA_FRAMES`: one `invalidate()` draws this many frames, then rests. */
 const FRAMES_PER_INVALIDATE = 2
@@ -414,5 +421,56 @@ describe('viewer.batch', () => {
     // The frames still coalesce — seven invalidate()s in one task draw what one does — but the
     // passes do not.
     expect(cost(() => heavy(viewer))).toEqual({ frames: FRAMES_PER_INVALIDATE, paint: 7, edges: 3, picker: 2 })
+  })
+})
+
+/* ────────── the drawn ladders, in model-key order (core protection #6, 2026-11-07) ────────── */
+
+describe('the grids and storeys the viewer draws and cuts at are unioned in model-key order', () => {
+  /** A fresh viewer with these models added in this order, and the ladders it ends up with. */
+  async function drawn(models: readonly ModelIndex[]): Promise<{ grids: unknown[]; storeys: unknown[] }> {
+    const v = await createViewer({ canvas: canvas as unknown as HTMLCanvasElement })
+    try {
+      for (const [slot, index] of models.entries()) await v.addModel(index.modelKey, slot, [], metaOf(index, [0, 0, 0]))
+      return { grids: h.ladders!.grids(), storeys: h.ladders!.storeys() }
+    } finally {
+      v.dispose()
+    }
+  }
+
+  /** Two files that disagree: B's grids stand 10 m east of A's, and B names A's levels its own way. */
+  const a: ModelIndex = { ...mockModelIndex('ARC'), modelKey: 'A' }
+  const base = mockModelIndex('STR')
+  const b: ModelIndex = {
+    ...base,
+    modelKey: 'B',
+    grids: base.grids.map((g) => ({ ...g, start: [g.start[0] + 10, g.start[1]], end: [g.end[0] + 10, g.end[1]] })),
+    storeys: base.storeys.map((x) => ({ ...x, name: `Level ${x.name}` }))
+  }
+
+  it('draws the same ladders in either load order — the ones the federation lists', async () => {
+    const ab = await drawn([a, b])
+    const ba = await drawn([b, a])
+    expect(ba).toEqual(ab)
+    // The gridline and the level ring are the same file's the Section card's chips and the
+    // STOREYS list name (`shared/federate.ts`, `unionGrids` / `unionStoreys`).
+    const fed = federate([b, a])
+    const grids = ab.grids as { name: string; p0: readonly number[] }[]
+    for (const g of fed.grids) expect(grids.find((x) => x.name === g.name)?.p0).toEqual([g.start[0], g.start[1]])
+    expect((ab.storeys as { name: string }[]).map((x) => x.name)).toEqual(fed.storeys.map((x) => x.name))
+  })
+
+  it('draws the design mock exactly as the load-order union did', async () => {
+    const boot = ['ARC', 'STR', 'SIT', 'MEP'].map((k) => mockModelIndex(k))
+    // The rule before: first seen in boot order wins, storeys sorted by height.
+    const first = <T extends { name: string }>(lists: T[][]): T[] => {
+      const m = new Map<string, T>()
+      for (const list of lists) for (const x of list) if (!m.has(x.name)) m.set(x.name, x)
+      return [...m.values()]
+    }
+    const metas = boot.map((x) => metaOf(x, [0, 0, 0]))
+    const grids = first(metas.map((m) => (m.grids ?? []).map((g) => ({ name: g.name, p0: [...g.start], p1: [...g.end] }))))
+    const storeys = first(metas.map((m) => (m.storeys ?? []).map((x) => ({ ...x })))).sort((p, q) => p.elev - q.elev)
+    expect(await drawn(boot)).toEqual({ grids, storeys })
   })
 })
