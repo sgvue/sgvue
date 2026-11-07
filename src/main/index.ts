@@ -40,12 +40,16 @@ import { lockNavigation, mainWindow, messageBox, openDialog, setMainWindow } fro
 import { closeSchedules, connectSchedules, openSchedules, schedulesWindow } from './schedules-window'
 import { closeVee, connectVee, openVee } from './vee-window'
 import { openScheduleFile, saveExport } from './exports'
+import { answerSnapshot, attachProjectWindow, closeFromPage, setDirty } from './projects'
 import { updatesUrl } from './about'
 import { checkForUpdate } from './updates'
 import {
   AdmitRequest,
   ApiKeyPayload,
   CH_EXPORT_SAVE,
+  CH_PROJECT_CLOSE,
+  CH_PROJECT_DIRTY,
+  CH_PROJECT_SNAPSHOT,
   CH_SCHEDULE_FILE_OPEN,
   CH_UPDATE_CHECK,
   CH_UPDATE_OPEN,
@@ -118,6 +122,8 @@ function createWindow(): void {
 
   // Named, not found: since 2026-09-25 the Schedules window can exist too (`window.ts`).
   setMainWindow(win)
+  // 2026-11-07 — the project file: its title, and the unsaved-changes question on close and quit.
+  attachProjectWindow(win)
   win.on('closed', () => {
     setMainWindow(null)
     closeSchedules()
@@ -294,6 +300,15 @@ function registerIpc(): void {
     if (event.sender !== mainWindow()?.webContents) return
     void shell.openExternal(updatesUrl(__APP_VERSION__))
   })
+
+  // 2026-11-07 — the project file (`projects.ts`, the fourth writer). The page only answers:
+  // main pulls the project when File › Save Project asks for it, and the page says whether the
+  // open project has unsaved changes. All three are refused, before the payload is read, unless
+  // the sender is the main window's page.
+  ipcMain.handle(CH_PROJECT_SNAPSHOT, (event, raw: unknown) => answerSnapshot(event.sender, raw))
+  ipcMain.handle(CH_PROJECT_DIRTY, (event, raw: unknown) => setDirty(event.sender, raw))
+  // …and says when a fresh start on the landing page replaced the open project.
+  ipcMain.handle(CH_PROJECT_CLOSE, (event, raw: unknown) => closeFromPage(event.sender, raw))
 
   registerAiIpc()
 }

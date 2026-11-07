@@ -46,6 +46,8 @@ export interface SpatialInput {
   files?: ModelFiles
   coords: CoordState
   uploadNames: Record<string, string>
+  /** 2026-11-07 (plan D12) — colours given to models added to an open project; the MODELS row's. */
+  assigned?: Record<string, string>
   /**
    * The display unit (2026-10-09): the site's height and position are coordinates — metres, or
    * decimal feet in `ft` — and the height to the top storey an elevation, in feet and inches in
@@ -68,7 +70,7 @@ export function unitsLine(units: Units): string {
 const or = (v: string | undefined | null): string => (v ? v : DASH)
 
 export function spatialCards(input: SpatialInput): SpatialCard[] {
-  const { federation: m, library, files = [], coords: co, uploadNames, units = 'mm' } = input
+  const { federation: m, library, files = [], coords: co, uploadNames, units = 'mm', assigned = {} } = input
   /** A coordinate, comma-grouped to three decimals as the design's own `f3` here (`:1749`). */
   const xyz = (v: number): string => group3(coordIn(v, units))
   const cu = coordUnit(units)
@@ -89,7 +91,7 @@ export function spatialCards(input: SpatialInput): SpatialCard[] {
     return {
       type: 'IfcProject',
       name: label,
-      swatch: baseSwatch(key, x.slot, library, path),
+      swatch: baseSwatch(key, x.slot, library, path, assigned),
       rows: [
         { k: 'Name', v: `${p.name} — ${label}` },
         { k: 'GlobalId', v: or(x.meta.project?.guid) },

@@ -1028,6 +1028,27 @@ Anything not on this list is a defect.
   rings, the ground grid and the laser's X / Y are square with the grids, and the compass shows
   turned against the cube. **No new element and no new control.** Not yet measured in a window.
 
+- **2026-11-07 — File › Open Project…, Save Project and Save Project As…; the window title names
+  the open project and marks unsaved changes; closing or quitting asks.** Owner-approved with the
+  project-file plan (D8), in these words: *"Approve the recommended defaults for both plans. go
+  with .sgvue"*. Three native menu items at the top of the File menu: Open Project… (the native
+  Open dialog, filtered to `.sgvue`), Save Project (⌘S / Ctrl+S — the open project with no dialog,
+  else the native Save dialog) and Save Project As… (⇧⌘S / Ctrl+Shift+S). While a project is open
+  the OS window title is `<project name> — SGVue`, with ` •` after the name while there are changes
+  since it was opened or saved; on macOS the window also carries the platform's own marks — the
+  title bar's proxy icon and the close button's dot — cleared when the project goes. Closing the
+  window, quitting, or opening another project with unsaved changes asks in a native message box:
+  `Do you want to save the changes you made to "<name>"?` · `Your changes will be lost if you don't
+  save them.` · **Save** · **Don't Save** · **Cancel**. If Save is chosen there and there is nothing
+  a project can write — its models still loading, no model with a file on screen — the native
+  "Could not save project" box says why in one line and the window stays; with no model open at
+  all, nothing is unsaved and the window closes. A save that fails says so in that box. A project's
+  missing or changed models are named in the designed banner or error row. All of it is OS chrome,
+  like the Open dialog; with no project open the title is the app's own and nothing asks. The
+  page's `S` (snap) no longer fires with ⌘ or Ctrl held. **No designed surface changes, and no new
+  element or control in the window.** Not yet seen in a window: `tests/e2e/project.spec.ts` waits
+  for the owner's yes.
+
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
 2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's
@@ -1300,6 +1321,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **a fourth disk writer, `src/main/projects.ts`**: the project file only, to a path the user picked in Save As or a `.sgvue` they opened this run (⌘S re-saves it without a dialog), atomic, ≤ 16 MB.
 - 2026-11-07 — **the core is protected by headless CI checks** (owner-approved, `docs/plans/core-protection.md`, Tier 1); visual baselines, a performance budget and the full e2e run on the owner's yes before a release.
 - 2026-11-07 — **the `.sgvue` format v1 is `shared/project-file.ts`** (phase 1, headless): one zod schema, bounds shared by reader and writer, model ids `m1…` and null-prototype maps; elements `[modelId, GlobalId]`, a `Model` rule tagged `{model}`; colours carry `own` and only the user's are restored (*"Stay teal"*); coordinates are world; `readProject` never throws. The corpus `tests/fixtures/project/v1-synthetic.sgvue` must always read to the same state.
+- 2026-11-07 — **Save and Open a `.sgvue` project, phase 2** (`main/projects.ts`, the fourth writer; `model/project.ts`): main pulls the project from the page (`project:snapshotRequest` → `project:snapshot`), re-reads it with `readProject`, computes `relPath` against the real folder it writes to (a carried model's re-based, `relPathFor`) and writes atomically to the open project or the Save dialog's answer, UTF-8, ≤ 16 MiB, `.sgvue` forced. Open Project… admits each model path through `admit()` (relPath, then absPath; a network path only on the project's own share or where the user has been); a project replaces what is open, restored through `applySession`. **A model the project names and could not open is never dropped by a save** (`carryForward`). Dirty is by value (`projectStateKey`); close, quit and Open ask (`closeAction`, `afterQuestionSave`). A fresh start that is not the project's own closes it (`project:close`); the project's own load, even with no file admitted, does not. D12: `assignedColors`, under the override and over the library and slot colours, from `MC` less its grey, written `assigned: true`. Viewpoints, filter sets, schedules and markups are written now, restored in phase 3.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
@@ -1340,13 +1362,16 @@ is the history, and `docs/SYSTEM_SPEC.md` §11 is what is still owed before a pu
 - **Viewer only. Never write model data.** No IFC write path, no "save model", no tool that
   edits a name, property, classification or geometry. `src/shared/readonly-list.ts` holds the
   forbidden names and `tests/readonly-guard.test.ts` fails the build if one appears.
-- **Only three modules may write to disk**: `src/main/settings.ts`, `src/main/sessions.ts` and,
-  since 2026-09-25 (Schedules phase 4, owner-approved), `src/main/exports.ts` — which writes
-  only to a path the user picked in the native Save dialog in the same call. No designed
-  control of the main window produces a file (its panel's `copy csv` writes the clipboard); the
-  Schedules window's Export menu does — and, since 2026-09-28, the assistant's
-  `export_schedule` can open that menu's Save dialog, where only the user's Save writes. Adding
-  a fourth writer is a design change, not a convenience.
+- **Only four modules may write to disk**: `src/main/settings.ts`, `src/main/sessions.ts`,
+  `src/main/exports.ts` (since 2026-09-25, Schedules phase 4, owner-approved) — which writes only to
+  a path the user picked in the native Save dialog in the same call — and, since 2026-11-07 (the
+  `.sgvue` project file, plan D11, owner-approved), `src/main/projects.ts`, which writes only to a
+  path the user picked in its Save dialog in the same call or to the project file this run opened
+  or saved. The page never names that path and never asks for a write: main pulls the project and
+  re-reads it with `readProject` before writing. No designed control of the main window produces
+  a file (its panel's `copy csv` writes the clipboard); the Schedules window's Export menu does —
+  and, since 2026-09-28, the assistant's `export_schedule` can open that menu's Save dialog, where
+  only the user's Save writes. Adding a fifth writer is a design change, not a convenience.
 - **Every implementation task goes to the `builder` agent**, one phase or half-phase per run,
   ending in a Build Report.
 - **The reviewer commits**, after reviewing the report against the diff and against the design.

@@ -14,6 +14,7 @@ import { app, Menu, shell, type MenuItemConstructorOptions } from 'electron'
 import { CH_SETTINGS_OPEN } from '../shared/ipc-channels'
 import { aboutBoxOptions, aboutPanelOptions, updatesUrl } from './about'
 import { activeGraphics, type GpuInfoLike } from './gpu-choice'
+import { openProject, saveProject } from './projects'
 import { openSchedules } from './schedules-window'
 import { mainContents, messageBox, targetWindow } from './window'
 
@@ -80,6 +81,24 @@ function buildMenu(): Menu {
     {
       label: 'File',
       submenu: [
+        // 2026-11-07 — the `.sgvue` project file (`projects.ts`, plan D8). Each acts on the main
+        // window, whichever window has focus. ⌘S and ⇧⌘S are taken by nothing else in this menu;
+        // the page's own `S` (snap) leaves a key pressed with ⌘ or Ctrl alone (`state/keys.ts`).
+        { id: 'project-open', label: 'Open Project…', click: () => void openProject() },
+        { type: 'separator' },
+        {
+          id: 'project-save',
+          label: 'Save Project',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => void saveProject(false)
+        },
+        {
+          id: 'project-save-as',
+          label: 'Save Project As…',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => void saveProject(true)
+        },
+        { type: 'separator' },
         ...(isMac ? [] : ([preferences, { type: 'separator' }] as MenuItemConstructorOptions[])),
         isMac ? { role: 'close' } : { role: 'quit' }
       ]

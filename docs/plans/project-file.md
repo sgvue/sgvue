@@ -114,3 +114,10 @@ An "Allowed desktop deviations" entry (the File menu items, the title marker, th
 5. A surface for `outside[]`, `dropped` and `unmatched` (phase 4's wording).
 6. Use `Object.hasOwn` / `in` on the restored maps — they are null-prototype.
 7. Write the file as UTF-8.
+
+## Carried into later phases (from the phase-2 review)
+
+- Phase 3: `carryForward` merges a carried model's viewpoint refs into the written viewpoint of the same `id`; while viewpoints still live in `localStorage` a coincidental id could gain foreign refs (carried models only). Moving viewpoints into the project removes it.
+- Phase 3: decide whether a restored measurement is re-measured or drawn from its stored lengths.
+- Phase 4: with an all-missing project open, a new pick on the landing page closes it (the file is untouched) — Locate… is the way in.
+- Before release: on macOS ⌘Q, the Vee and Schedules child windows may close before the main window's question, and stay closed on Cancel — check in the e2e run.

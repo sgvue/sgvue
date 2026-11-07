@@ -4,6 +4,22 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — `.sgvue` project file, phase 2: Save and Open
+
+**Did.** File › Open Project…, Save Project (⌘S) and Save Project As… (⇧⌘S). `src/main/projects.ts`
+is the fourth disk writer: main pulls the text from the page, re-reads it and writes atomically to
+the open project or the Save dialog's path. Opening a project replaces what is open, admits each
+model through `admit()` and restores the review state by GlobalId; a model that could not be opened
+is carried into every save unchanged. The title shows `name • — SGVue` while unsaved (on macOS also
+the proxy icon and the close-button dot); closing, quitting or opening another project asks Save ·
+Don't Save · Cancel. D12 assigned colours, saved and restored. Ctrl+S no longer toggles snap.
+Viewpoints, filter sets, schedules and markups are written, restored in phase 3.
+
+**Verified.** 59 new unit tests and 37 mutation probes; typecheck, lint, 3 252 unit tests and the
+build pass. Deep review: PASS, then its minor fixes FAIL (an all-missing project closed itself),
+PASS in a third round the owner approved. `tests/e2e/project.spec.ts` is written and **not run** —
+it needs a window.
+
 ## 2026-11-07 — `.sgvue` project file, phase 1: format and codec
 
 **Did.** `src/shared/project-file.ts`: the v1 schema, `readProject`, `projectOf` (writer),

@@ -41,6 +41,11 @@ export interface ModelRow {
 
 export interface ModelInput {
   federation: Federation
+  /**
+   * 2026-11-07 (plan D12) — colours given to models added to an open project (the store's
+   * `assignedColors`). Absent or empty — no project open — and every row is what it was.
+   */
+  assigned?: Record<string, string>
   /** Each loaded model's file, by model key — `federation-store.ts`'s `sessionFiles()`. */
   files: ModelFiles
   library: readonly LibraryFile[]
@@ -75,14 +80,25 @@ export function libraryEntry(
 export const pathOf = (key: string, files: ModelFiles): string | undefined =>
   files.find((f) => f.key === key)?.path
 
-/** The swatch a model shows before any override: its library colour, else `MC[slot]`. */
+/**
+ * The swatch a model shows before any override: the colour an open project gave it (D12), else
+ * its library colour, else `MC[slot]`.
+ *
+ * 2026-11-07 — where the assigned colour sits: **under the user's override and over the
+ * library's**. Under the override, because an override is the user's own pick and always wins.
+ * Over the library swatch and the slot's, because those are colours by position — the Recent
+ * list's order, the federation slot — which move when the recents or the load order do, and an
+ * assigned colour exists to stay put. A model that was never assigned one has no entry here, so
+ * it falls through exactly as before — to the grey `MC[0]` too, which keeps its cut in the accent.
+ */
 export function baseSwatch(
   key: string,
   slot: number,
   library: readonly LibraryFile[],
-  path?: string
+  path?: string,
+  assigned: Record<string, string> = {}
 ): string {
-  return libraryEntry(key, path, library)?.swatch ?? MC[slot % MC.length]
+  return (Object.hasOwn(assigned, key) ? assigned[key] : undefined) ?? libraryEntry(key, path, library)?.swatch ?? MC[slot % MC.length]
 }
 
 /**
@@ -95,9 +111,10 @@ export function rowSwatch(
   slot: number,
   library: readonly LibraryFile[],
   modelColors: Record<string, string>,
-  path?: string
+  path?: string,
+  assigned: Record<string, string> = {}
 ): string {
-  return modelColors[key] || baseSwatch(key, slot, library, path)
+  return modelColors[key] || baseSwatch(key, slot, library, path, assigned)
 }
 
 /**
@@ -113,9 +130,13 @@ export function cutSwatch(
   slot: number,
   library: readonly LibraryFile[],
   modelColors: Record<string, string>,
-  path?: string
+  path?: string,
+  assigned: Record<string, string> = {}
 ): string | null {
   if (modelColors[key]) return modelColors[key]
+  // An assigned colour (D12) is one the model was given, so it is its own — never the grey,
+  // which the project's palette leaves out (`model/project.ts`, `ASSIGN_PALETTE`).
+  if (Object.hasOwn(assigned, key)) return assigned[key]
   const lib = libraryEntry(key, path, library)?.swatch
   if (lib) return lib
   const i = slot % MC.length
@@ -132,12 +153,13 @@ export function modelSwatches(
   federation: Pick<Federation, 'models'>,
   library: readonly LibraryFile[],
   modelColors: Record<string, string>,
-  files: ModelFiles = []
+  files: ModelFiles = [],
+  assigned: Record<string, string> = {}
 ): Record<string, string> {
   const out: Record<string, string> = {}
   for (const m of federation.models) {
     const key = m.meta.modelKey
-    const c = cutSwatch(key, m.slot, library, modelColors, pathOf(key, files))
+    const c = cutSwatch(key, m.slot, library, modelColors, pathOf(key, files), assigned)
     if (c) out[key] = c
   }
   return out
@@ -177,7 +199,7 @@ export function modelFile(
 }
 
 export function modelRows(input: ModelInput): ModelRow[] {
-  const { federation, files, library, modelVis, modelColors, nativeMats, uploadNames } = input
+  const { federation, files, library, modelVis, modelColors, nativeMats, uploadNames, assigned = {} } = input
   const counts = new Map<string, number>()
   for (const e of federation.elements) counts.set(e.model, (counts.get(e.model) ?? 0) + 1)
   const loaded = federation.models.length
@@ -204,7 +226,7 @@ export function modelRows(input: ModelInput): ModelRow[] {
       actFg: act ? 'var(--sel-ink)' : 'var(--faint)',
       actDot: act ? 'currentColor' : 'none',
       active: act,
-      swatch: rowSwatch(key, m.slot, library, modelColors, path),
+      swatch: rowSwatch(key, m.slot, library, modelColors, path, assigned),
       swatchRing: live ? '0 0 0 1.5px var(--accent)' : 'none',
       paletteOpen: input.palette === key,
       confirmOpen: input.confirmRemove === key,

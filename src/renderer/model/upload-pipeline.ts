@@ -100,6 +100,16 @@ let pending: BatchItem[] = []
 let pendingNames: Record<string, string> = {}
 /** A session or share link that asked for this load, restored once the batch has joined. */
 let pendingSession: SessionPayload | null = null
+/**
+ * 2026-11-07 — a project that asked for this load (`model/project.ts`): the batch is ordered by
+ * the project's own model order (`order`, by path), and `then` restores the project once the
+ * batch has joined, where a session's payload is applied.
+ */
+export interface AfterJoin {
+  order: readonly string[]
+  then: () => Promise<void>
+}
+let pendingAfter: AfterJoin | null = null
 
 /** Timers started by `queue`'s 500 ms stagger, so a dispose can cancel them. */
 const staggered = new Set<ReturnType<typeof setTimeout>>()
@@ -371,13 +381,20 @@ async function join(hold: Promise<unknown>): Promise<void> {
     .uploads.filter((u) => u.done)
     .map((u) => u.id)
   const session = pendingSession
+  const afterJoin = pendingAfter
   // A session's element ids are numbered by slot, and slots go in batch order: the session's
-  // own file order, not the order the parses happened to finish in (refactor pass 2, P5).
-  const items = session ? sessionOrder(pending, (i) => i.file?.path, session.files ?? []) : pending
+  // own file order, not the order the parses happened to finish in (refactor pass 2, P5). A
+  // project's models take their slots in the project's order the same way.
+  const items = session
+    ? sessionOrder(pending, (i) => i.file?.path, session.files ?? [])
+    : afterJoin
+      ? sessionOrder(pending, (i) => i.file?.path, afterJoin.order.map((path, slot) => ({ key: '', path, name: '', sha256: '', slot })))
+      : pending
   const names = pendingNames
   pending = []
   pendingNames = {}
   pendingSession = null
+  pendingAfter = null
   const dropRows = (): void => {
     if (mine === epoch) for (const id of rows) useShell.getState().dropUpload(id)
   }
@@ -413,6 +430,8 @@ async function join(hold: Promise<unknown>): Promise<void> {
       const live = fed.current.byId
       applySession({ ...session, ...restorableIds(session, fed.sessionFiles(), (id) => live.has(id)) })
     }
+    // A restore that fails leaves the models on screen, as a session's never unloads them for it.
+    if (afterJoin) await afterJoin.then().catch((err: unknown) => console.error('[sgvue] project restore failed —', err))
   } catch (err) {
     // Refactor pass 2, P10: the batch has undone itself (`addBatch`). With a model already on
     // screen that model stays, and the rows say what went wrong — the designed error row, not
@@ -472,13 +491,25 @@ function fail(id: string, err: unknown): void {
  * cancelled dialog cancels nothing — and with no `await` between it and `queue`, so of two
  * quick picks the later always wins. After boot a pick joins the federation, as designed.
  */
-function freshStart(): void {
+function freshStart(forProject = false): void {
   const demo = demoShown
   if (useShell.getState().booted && !demo) return
+  // 2026-11-07 — a fresh start that is not a project's own closes the open project
+  // (`model/project.ts`): what loads next is not it.
+  if (!forProject) freshStartListener?.()
   disposeUploads()
   fed.resetUnshown()
   if (demo) forgetDemoView()
   useShell.setState({ uploads: [], initErr: '' })
+}
+
+/**
+ * 2026-11-07 — told of every fresh start that is not a project's own (`model/project.ts`, which
+ * imports this module, hands it in): the open project, if any, is closed.
+ */
+let freshStartListener: (() => void) | null = null
+export const onFreshStart = (fn: (() => void) | null): void => {
+  freshStartListener = fn
 }
 
 /**
@@ -520,12 +551,16 @@ function forgetDemoView(): void {
  * in between. After boot: a native "Replace model?" for each file whose model is already open
  * or loading, then the queue.
  */
-async function begin(files: readonly ChosenFile[], session?: SessionPayload): Promise<void> {
-  if (!useShell.getState().booted || demoShown) freshStart()
+async function begin(files: readonly ChosenFile[], session?: SessionPayload, after?: AfterJoin): Promise<void> {
+  if (!useShell.getState().booted || demoShown) freshStart(after !== undefined)
   else files = await confirmPick(files, busy, askReplace)
   if (session) pendingSession = session
+  if (after) pendingAfter = after
   // A session whose every file was rejected must not be left waiting for the *next* upload.
-  if (!queue(files) && session) pendingSession = null
+  if (!queue(files)) {
+    if (session) pendingSession = null
+    if (after) pendingAfter = null
+  }
 }
 
 /**
@@ -632,6 +667,41 @@ export async function showRefused(refused: readonly RefusedFile[]): Promise<void
 }
 
 /**
+ * 2026-11-07 — **a project replaces what is open** (`model/project.ts`, plan phase 2): the
+ * landing page's fresh start, taken whether or not a model is on screen. Whatever is loading is
+ * cancelled, every loaded model leaves the scene, and the review state that would point into the
+ * old federation goes with it — the demo's own rule (`forgetDemoView`): storey and model
+ * switches, the filter stack, both section planes, the undo history, the markups. The empty
+ * commit that follows prunes the rest and puts the landing page back, from which the project's
+ * own models then boot.
+ */
+export function startOver(): void {
+  disposeUploads()
+  fed.resetUnshown()
+  forgetDemoView()
+  useShell.setState({ uploads: [], initErr: '' })
+}
+
+/**
+ * 2026-11-07 — a project's models, after `startOver`: the files main admitted for it, and those
+ * it refused with the drop zone's own reason (the designed error row), through the same `begin`
+ * every pick takes. `after` restores the project once the batch has joined. Resolves `false`
+ * when nothing was queued — no file was admitted — and `after` will then never run.
+ *
+ * `after` is handed to `begin` **whatever the number of files**: it is what marks this fresh start
+ * as the project's own, so it does not close the project it is loading (`onFreshStart`). With no
+ * file queued, `begin` drops it again, so it never waits for a later pick's batch.
+ */
+export async function openProjectFiles(
+  files: readonly PickedFile[],
+  refused: readonly RefusedFile[],
+  after: AfterJoin
+): Promise<boolean> {
+  await begin([...files.map(chosenOf), ...refused.map(refusedOf)], undefined, after)
+  return files.length > 0
+}
+
+/**
  * 2026-10-02 — a recent file the assistant proposed and the user applied (`state/shell.ts`,
  * `applyPending`; the consent gate). The request carries the path the app's own list had for
  * the file; it is looked up again on **main's recents list**, read fresh, and only an entry
@@ -731,4 +801,5 @@ export function disposeUploads(): void {
   pending = []
   pendingNames = {}
   pendingSession = null
+  pendingAfter = null
 }

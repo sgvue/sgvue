@@ -317,7 +317,7 @@ function ConfirmUnload({
 /** The store fields this component reads — it re-renders when one of them changes. */
 const KEYS = pick(
   'federation', 'library', 'treeMode', 'search', 'expanded', 'hidden', 'selIds', 'storeyVis',
-  'modelVis', 'modelColors', 'nativeMats', 'uploadNames', 'uploads', 'active', 'palette',
+  'modelVis', 'modelColors', 'assignedColors', 'nativeMats', 'uploadNames', 'uploads', 'active', 'palette',
   'confirmRemove', 'addOpen', 'card', 'visibleCount', 'sideStoreys', 'modelsOpen', 'loaded',
   'activate', 'allStoreys', 'askRemove', 'cancelRemove', 'dropUpload', 'hide', 'openCard',
   'select', 'setCtx', 'setModelColor', 'setSearch', 'setSideStoreys', 'setTreeMode', 'show',
@@ -346,6 +346,7 @@ export default function Sidebar(): React.JSX.Element {
     storeyVis,
     modelVis,
     modelColors,
+    assignedColors,
     nativeMats,
     uploadNames,
     uploads,
@@ -375,13 +376,14 @@ export default function Sidebar(): React.JSX.Element {
         library,
         modelVis,
         modelColors,
+        assigned: assignedColors,
         nativeMats,
         uploadNames,
         active,
         palette,
         confirmRemove
       }),
-    [federation, library, modelVis, modelColors, nativeMats, uploadNames, active, palette, confirmRemove]
+    [federation, library, modelVis, modelColors, assignedColors, nativeMats, uploadNames, active, palette, confirmRemove]
   )
   const addable = useMemo(() => addableRows(library, st.loaded), [library, st.loaded])
   const storeys = useMemo(

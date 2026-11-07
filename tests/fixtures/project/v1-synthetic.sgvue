@@ -27,6 +27,19 @@
       "colour": "#E8A33D",
       "own": true,
       "visible": false
+    },
+    {
+      "id": "m3",
+      "name": "Synthetic MEP.ifc",
+      "relPath": "models/Synthetic MEP.ifc",
+      "absPath": "/projects/synthetic/review/models/Synthetic MEP.ifc",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "size": 111111,
+      "label": "Synthetic MEP",
+      "colour": "#7B8CF0",
+      "own": false,
+      "assigned": true,
+      "visible": true
     }
   ],
   "view": {

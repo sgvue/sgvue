@@ -16,6 +16,12 @@ import {
   CH_FILE_OPEN,
   CH_FILE_TOKEN,
   CH_LINK_OPEN,
+  CH_PROJECT_CLOSE,
+  CH_PROJECT_DIRTY,
+  CH_PROJECT_OPENED,
+  CH_PROJECT_SAVED,
+  CH_PROJECT_SNAPSHOT,
+  CH_PROJECT_SNAPSHOT_REQUEST,
   CH_RECENTS_ADD,
   CH_RECENTS_LIST,
   CH_SCHEDULE_PORT,
@@ -40,6 +46,10 @@ import type {
   AiToolResult,
   AiTurnStart,
   LinkOpen,
+  ProjectOpened,
+  ProjectSaved,
+  ProjectSnapshot,
+  ProjectSnapshotRequest,
   RecentAdd,
   RecentFile,
   SessionEnvelope,
@@ -176,7 +186,42 @@ const api = {
    * The notice's button: open the download page in the user's browser. No payload — main
    * builds the URL from its own constant and version, so no URL crosses this bridge.
    */
-  openUpdatePage: (): Promise<void> => ipcRenderer.invoke(CH_UPDATE_OPEN)
+  openUpdatePage: (): Promise<void> => ipcRenderer.invoke(CH_UPDATE_OPEN),
+  /**
+   * 2026-11-07 — the `.sgvue` project file (`main/projects.ts`, the fourth writer). **The page
+   * never asks for a write and never names a path**: File › Save Project makes main ask for the
+   * project as it stands (`onProjectSnapshotRequest`), the page answers with its text
+   * (`answerProjectSnapshot`), and main — which keeps the project's path itself — reads that text
+   * again and writes it where the user chose. One way, main → page: `onProjectOpened` (what Open
+   * Project… read, each model's file already admitted) and `onProjectSaved`. `setProjectDirty`
+   * says whether the open project has unsaved changes, for the title and the question on quit, and
+   * `closeProject` that a fresh start replaced it.
+   */
+  onProjectSnapshotRequest: (fn: (req: ProjectSnapshotRequest) => void): (() => void) => {
+    const listener = (_event: unknown, req: ProjectSnapshotRequest): void => fn(req)
+    ipcRenderer.on(CH_PROJECT_SNAPSHOT_REQUEST, listener)
+    return () => {
+      ipcRenderer.off(CH_PROJECT_SNAPSHOT_REQUEST, listener)
+    }
+  },
+  answerProjectSnapshot: (snap: ProjectSnapshot): Promise<void> => ipcRenderer.invoke(CH_PROJECT_SNAPSHOT, snap),
+  onProjectOpened: (fn: (msg: ProjectOpened) => void): (() => void) => {
+    const listener = (_event: unknown, msg: ProjectOpened): void => fn(msg)
+    ipcRenderer.on(CH_PROJECT_OPENED, listener)
+    return () => {
+      ipcRenderer.off(CH_PROJECT_OPENED, listener)
+    }
+  },
+  onProjectSaved: (fn: (msg: ProjectSaved) => void): (() => void) => {
+    const listener = (_event: unknown, msg: ProjectSaved): void => fn(msg)
+    ipcRenderer.on(CH_PROJECT_SAVED, listener)
+    return () => {
+      ipcRenderer.off(CH_PROJECT_SAVED, listener)
+    }
+  },
+  setProjectDirty: (dirty: boolean): Promise<void> => ipcRenderer.invoke(CH_PROJECT_DIRTY, { dirty }),
+  /** The page closed the open project (a fresh start replaced it). No payload. */
+  closeProject: (): Promise<void> => ipcRenderer.invoke(CH_PROJECT_CLOSE)
 }
 
 contextBridge.exposeInMainWorld('sgvue', api)

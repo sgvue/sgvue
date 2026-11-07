@@ -100,10 +100,36 @@ export const CH_UPDATE_CHECK = 'update:check'
  */
 export const CH_UPDATE_OPEN = 'update:open'
 
+/* ────────────────────────────── the project file (2026-11-07, phase 2) ────────────────────────────── */
+
+/**
+ * Main → main window: "give me the project as it stands" — File › Save Project, Save Project
+ * As… and the Save of the unsaved-changes question. `{ n }`, answered on `project:snapshot`.
+ * Main pulls; the page never asks main to write, and never names a path (`main/projects.ts`).
+ */
+export const CH_PROJECT_SNAPSHOT_REQUEST = 'project:snapshotRequest'
+/** Main window → main: the answer to one `project:snapshotRequest` — the project's text, or `null`. */
+export const CH_PROJECT_SNAPSHOT = 'project:snapshot'
+/** Main window → main: whether the open project has unsaved changes. Ignored with none open. */
+export const CH_PROJECT_DIRTY = 'project:dirty'
+/**
+ * Main window → main: the open project is closed — a fresh start on the landing page replaced it.
+ * No payload; main forgets the project's path and puts the title back.
+ */
+export const CH_PROJECT_CLOSE = 'project:close'
+/**
+ * Main → main window: File › Open Project… read a project — its text and, per model, the file
+ * main admitted for it — or refused one, with the reader's sentence.
+ */
+export const CH_PROJECT_OPENED = 'project:opened'
+/** Main → main window: the snapshot numbered `n` is what is now on disk. */
+export const CH_PROJECT_SAVED = 'project:saved'
+
 /**
  * Every channel main registers a handler for, for `SYSTEM_SPEC.md` §10 and the guard test.
  * The main → renderer sends (`link:open`, `ai:event`, `ai:tool:exec`, `settings:open`,
- * `schedule:port`, `vee:port`) have no handler and are not here.
+ * `schedule:port`, `vee:port`, `project:snapshotRequest`, `project:opened`, `project:saved`)
+ * have no handler and are not here.
  */
 export const IPC_CHANNELS = [
   CH_FILE_OPEN,
@@ -127,5 +153,8 @@ export const IPC_CHANNELS = [
   CH_EXPORT_SAVE,
   CH_SCHEDULE_FILE_OPEN,
   CH_UPDATE_CHECK,
-  CH_UPDATE_OPEN
+  CH_UPDATE_OPEN,
+  CH_PROJECT_SNAPSHOT,
+  CH_PROJECT_DIRTY,
+  CH_PROJECT_CLOSE
 ] as const

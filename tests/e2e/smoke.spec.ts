@@ -100,7 +100,13 @@ test('opens on the landing page, under the production CSP, with the pinned prelo
       'openVee',
       'closeVee',
       'checkUpdate',
-      'openUpdatePage'
+      'openUpdatePage',
+      'onProjectSnapshotRequest',
+      'answerProjectSnapshot',
+      'onProjectOpened',
+      'onProjectSaved',
+      'setProjectDirty',
+      'closeProject'
     ])
 
     // 3b — the renderer can learn whether a key is stored, and nothing else about it.

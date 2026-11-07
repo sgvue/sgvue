@@ -30,6 +30,7 @@ import {
   MAX_VIEWPOINTS,
   normaliseAbsolute,
   PROJECT_MAX_BYTES,
+  carryForward,
   projectOf,
   projectText,
   readProject,
@@ -318,7 +319,9 @@ function synContext(g: Gen, models: readonly SynModel[], win: boolean): ProjectC
       sha256: m.sha256,
       size: g.int(0, 600_000_000),
       label: m.key,
-      colour: MC[m.slot % MC.length]
+      colour: MC[m.slot % MC.length],
+      // 2026-11-07 (D12): some rows show a colour the open project assigned.
+      ...(g.bool(0.3) ? { assigned: true } : {})
     })),
     offset: [g.int(-40_000, 40_000), g.int(-40_000, 40_000), g.int(-100, 100)],
     elementRef: (id) => {
@@ -328,9 +331,15 @@ function synContext(g: Gen, models: readonly SynModel[], win: boolean): ProjectC
   }
 }
 
-/** The state a source is expected to come back as: the restored shape of the same review. */
-const expectedOf = (s: ProjectSource): ProjectRestore => ({
+/**
+ * The state a source is expected to come back as: the restored shape of the same review. A colour
+ * the project assigned comes back as assigned — unless the user picked one, which wins (D12).
+ */
+const expectedOf = (s: ProjectSource, ctx: ProjectContext): ProjectRestore => ({
   ...s,
+  assignedColors: Object.fromEntries(
+    ctx.models.filter((m) => m.assigned && !s.modelColors[m.key]).map((m) => [m.key, m.colour])
+  ),
   hidden: Object.fromEntries(Object.keys(s.hidden).map((k) => [k, true])),
   views: s.views as RestoredViewpoint[],
   spots: s.spots as ProjectRestore['spots'],
@@ -349,7 +358,7 @@ function read(text: string): ProjectFile {
 
 describe('round trip: 500 seeded review states', () => {
   it('write → read → plan gives back the same state, and a re-save is the same text', () => {
-    const kinds = { own: 0, ownGrey: 0, notOwn: 0 }
+    const kinds = { own: 0, ownGrey: 0, notOwn: 0, assigned: 0 }
     for (let seed = 1; seed <= 500; seed++) {
       const g = new Gen(mulberry32(seed))
       const models = synModels(g)
@@ -367,15 +376,17 @@ describe('round trip: 500 seeded review states', () => {
       expect(plan.missing, `seed ${seed}`).toEqual([])
       expect(plan.unmatched, `seed ${seed}`).toEqual({})
       expect(plan.models, `seed ${seed}`).toEqual(Object.fromEntries(models.map((m, i) => [`m${i + 1}`, m.key])))
-      expect(plan.state, `seed ${seed}`).toEqual(expectedOf(source))
+      expect(plan.state, `seed ${seed}`).toEqual(expectedOf(source, ctx))
       for (const m of back.models) {
+        expect(m.own && m.assigned, `seed ${seed}`).toBeFalsy()
+        if (m.assigned) kinds.assigned++
         if (!m.own) kinds.notOwn++
         else if (m.colour === MC[0]) kinds.ownGrey++
         else kinds.own++
       }
     }
     // The generator made all three kinds, many times over.
-    expect(Math.min(kinds.own, kinds.ownGrey, kinds.notOwn)).toBeGreaterThan(50)
+    expect(Math.min(kinds.own, kinds.ownGrey, kinds.notOwn, kinds.assigned)).toBeGreaterThan(50)
   })
 
   it('a model with no colour of the user’s comes back with none, and keeps the accent for its cut', () => {
@@ -659,6 +670,23 @@ describe('hostile files are refused with a message and never throw', () => {
       const p = validProject()
       firstModel(p).own = own
       refused(JSON.stringify(p), /own/)
+    }
+  })
+
+  it('a colour that is both the user’s own and assigned, or an `assigned` that is not a boolean', () => {
+    const both = validProject()
+    Object.assign(firstModel(both), { own: true, assigned: true })
+    refused(JSON.stringify(both), /both the user’s own colour and an assigned one/)
+    for (const assigned of ['yes', 1, null, {}]) {
+      const p = validProject()
+      Object.assign(firstModel(p), { own: false, assigned })
+      refused(JSON.stringify(p), /assigned/)
+    }
+    // Absent and false both read as "not assigned".
+    for (const assigned of [undefined, false]) {
+      const p = validProject()
+      Object.assign(firstModel(p), { own: false, assigned })
+      expect(readProject(JSON.stringify(p)).ok).toBe(true)
     }
   })
 
@@ -1038,5 +1066,67 @@ describe('leastUsedColour', () => {
   it('compares without case and ignores a colour the palette does not have', () => {
     expect(leastUsedColour(['#AABBCC', '#112233'], ['#aabbcc', '#FFFFFF'])).toBe('#112233')
     expect(leastUsedColour([], ['#aabbcc'])).toBeNull()
+  })
+})
+
+/* ────────────────────────────── carried models (phase 2) ────────────────────────────── */
+
+describe('carryForward — a model the project names and is not open survives a save', () => {
+  /** A seeded project of three models, written; then the same review opened with only the first. */
+  function setup(seed: number) {
+    const g = new Gen(mulberry32(seed))
+    const models = synModels(g).slice(0, 3)
+    while (models.length < 3) models.push(...synModels(g).slice(0, 3 - models.length))
+    const source = synSource(g, models)
+    const ctx = synContext(g, models, false)
+    const opened = read(projectText(projectOf(source, ctx).project))
+    // The one model still there is the first, the second or the third: a carried model's id is
+    // then below, around or above the id the open one is written under.
+    const open = models[seed % 3]
+    const plan = restorePlanOf(opened, fedOf([open]), { offset: ctx.offset })
+    const openCtx = { ...ctx, models: ctx.models.filter((m) => m.key === open.key) }
+    return { g, models, source, ctx: openCtx, opened, plan }
+  }
+  const refsOf = (refs: readonly (readonly [string, string])[], ids: ReadonlySet<string>) =>
+    refs.filter(([m]) => ids.has(m))
+
+  it('writes the missing models back byte for byte, with every reference to them', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { models, ctx, opened, plan } = setup(seed)
+      const carriedIds = new Set(plan.missing)
+      expect(plan.missing.length, `seed ${seed}`).toBeGreaterThan(0)
+      // What a save writes: the open model, under the state the restore gave the store.
+      const state = plan.state
+      const source: ProjectSource = { ...state, views: opened.viewpoints.map((v, i) => ({ ...state.views[i], id: v.id })) }
+      const carried = opened.models
+        .filter((m) => carriedIds.has(m.id))
+        .map((m) => ({ id: m.id, key: modelKeyOf(m.name) }))
+      const written = projectOf(source, { ...ctx, carried }).project
+      const saved = read(projectText(carryForward(written, opened, plan.missing)))
+      const pick = (p: ProjectFile) => p.models.filter((m) => carriedIds.has(m.id)).map((m) => JSON.stringify(m))
+      expect(pick(saved), `seed ${seed}`).toEqual(pick(opened))
+      expect(refsOf(saved.visibility.hidden, carriedIds), `seed ${seed}`).toEqual(
+        refsOf(opened.visibility.hidden, carriedIds)
+      )
+      opened.viewpoints.forEach((v, i) => {
+        expect(refsOf(saved.viewpoints[i].hidden, carriedIds), `seed ${seed}`).toEqual(refsOf(v.hidden, carriedIds))
+        for (const id of carriedIds) expect(saved.viewpoints[i].modelVis[id], `seed ${seed}`).toBe(v.modelVis[id])
+      })
+      // A `Model` rule that named a missing model still names it, tagged by the same id.
+      const tags = (p: ProjectFile) =>
+        JSON.stringify(p.visibility.stack.flatMap((x) => x.rules.map((r) => r.val)).filter((v) => typeof v === 'object' && v && carriedIds.has((v as { model: string }).model)))
+      expect(tags(saved), `seed ${seed}`).toBe(tags(opened))
+      // The loaded model took an id the carried ones do not use.
+      expect(new Set(saved.models.map((m) => m.id)).size, `seed ${seed}`).toBe(saved.models.length)
+      void models
+    }
+  })
+
+  it('carries nothing that is open again, or that the opened file does not have', () => {
+    const { opened, ctx, plan } = setup(3)
+    const written = projectOf({ ...plan.state, views: [] }, ctx).project
+    expect(carryForward(written, opened, [])).toBe(written)
+    expect(carryForward(written, opened, [written.models[0].id])).toBe(written)
+    expect(carryForward(written, opened, ['m99'])).toBe(written)
   })
 })

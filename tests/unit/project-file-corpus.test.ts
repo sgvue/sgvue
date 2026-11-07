@@ -6,6 +6,9 @@
  *
  * The two models are opened here in the other order (STR on slot 0, ARC on slot 1) with express
  * ids the file never saw: the state below follows from GlobalIds alone.
+ *
+ * 2026-11-07 (phase 2, before v1 was released) — a third model, MEP, carries `assigned: true`: a
+ * colour the open project gave it (D12), restored as assigned, never as the user's own.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -19,11 +22,13 @@ const arc = (n: number): string => 'SynArc' + String(n).padStart(16, '0')
 const str = (n: number): string => 'SynStr' + String(n).padStart(16, '0')
 const ARC = 'Synthetic ARC'
 const STR = 'Synthetic STR'
+const MEP = 'Synthetic MEP'
 
 const live: ProjectFederation = {
   models: [
     { meta: { modelKey: STR, sha256: 'b'.repeat(64) } },
-    { meta: { modelKey: ARC, sha256: 'a'.repeat(64) } }
+    { meta: { modelKey: ARC, sha256: 'a'.repeat(64) } },
+    { meta: { modelKey: MEP, sha256: 'c'.repeat(64) } }
   ],
   elements: [
     { id: fedId(0, 201), guid: str(1), model: STR },
@@ -46,16 +51,17 @@ describe('the frozen v1 corpus', () => {
     if (!read.ok) return
     expect(read.outside).toEqual(['m2'])
     expect(read.project.savedBy).toBe('SGVue 1.4.0')
-    expect(read.project.models.map((m) => [m.id, m.relPath, m.visible, m.colour, m.own])).toEqual([
-      ['m1', 'models/Synthetic ARC.ifc', true, '#8A9492', false],
-      ['m2', '../shared/Synthetic STR.ifc', false, '#E8A33D', true]
+    expect(read.project.models.map((m) => [m.id, m.relPath, m.visible, m.colour, m.own, m.assigned])).toEqual([
+      ['m1', 'models/Synthetic ARC.ifc', true, '#8A9492', false, undefined],
+      ['m2', '../shared/Synthetic STR.ifc', false, '#E8A33D', true, undefined],
+      ['m3', 'models/Synthetic MEP.ifc', true, '#7B8CF0', false, true]
     ])
   })
 
   it('plans exactly this state', () => {
     if (!read.ok) throw new Error(read.message)
     const plan = restorePlanOf(read.project, live, { offset: [12345, 23456, 5] })
-    expect(plan.models).toEqual({ m1: ARC, m2: STR })
+    expect(plan.models).toEqual({ m1: ARC, m2: STR, m3: MEP })
     expect(plan.missing).toEqual([])
     expect(plan.unmatched).toEqual({})
 
@@ -67,6 +73,8 @@ describe('the frozen v1 corpus', () => {
       active: ARC,
       // ARC's grey is what its row showed, not the user's: not applied. STR's is the user's own.
       modelColors: { [STR]: '#E8A33D' },
+      // MEP's colour is the one the project assigned it: assigned again, not the user's own.
+      assignedColors: { [MEP]: '#7B8CF0' },
       nativeMats: false,
       treeMode: 'entity',
       grids: true,

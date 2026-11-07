@@ -147,7 +147,20 @@ describe('read-only guard', () => {
       // (`main/updates.ts`). `openUpdatePage` opens the product site in the browser — main
       // builds that URL from its own constant, so the renderer cannot name one.
       'checkUpdate',
-      'openUpdatePage'
+      'openUpdatePage',
+      // 2026-11-07 — the `.sgvue` project file (`main/projects.ts`, the fourth writer). None of
+      // these names a path or asks for a write: main pulls the project (`onProjectSnapshotRequest`
+      // → `answerProjectSnapshot`, its text and a default name for the Save dialog), reads it
+      // again with `readProject` and writes it where the user chose or the project it opened.
+      // `onProjectOpened` and `onProjectSaved` are one-way, main → renderer; `setProjectDirty`
+      // carries one boolean, for the title's `•` and the question on quit.
+      'onProjectSnapshotRequest',
+      'answerProjectSnapshot',
+      'onProjectOpened',
+      'onProjectSaved',
+      'setProjectDirty',
+      // …and `closeProject`, no payload: a fresh start replaced the open project.
+      'closeProject'
     ])
   })
 
@@ -173,14 +186,51 @@ describe('read-only guard', () => {
     expect(check![0]).toMatch(/event\.sender !== mainWindow\(\)\?\.webContents/)
   })
 
-  it('names exactly three writers, the third being exports', () => {
-    // 2026-09-25, phase 4: the owner-approved third writer. Changing this list is a decision
-    // recorded in CLAUDE.md and docs/DECISIONS.md, never a convenience.
+  it('names exactly four writers, the third being exports and the fourth projects', () => {
+    // 2026-09-25, phase 4: the owner-approved third writer; 2026-11-07, the project file's, the
+    // fourth (plan D11). Changing this list is a decision recorded in CLAUDE.md and
+    // docs/DECISIONS.md, never a convenience.
     expect([...FS_WRITER_ALLOW_LIST]).toEqual([
       'src/main/settings.ts',
       'src/main/sessions.ts',
-      'src/main/exports.ts'
+      'src/main/exports.ts',
+      'src/main/projects.ts'
     ])
+  })
+
+  /**
+   * 2026-11-07 — the fourth writer, pinned as the third is. `main/projects.ts` writes in one
+   * place, to the project this run opened or saved or to the path its own Save dialog returned
+   * in the same call; the page never names a path and never asks for a write — main pulls the
+   * project, and reads it again with `readProject` before a byte is written; both of the page's
+   * channels are refused, before their payload is read, unless the main window's page sent them.
+   */
+  it('lets projects.ts write only where its Save dialog pointed or the project it opened, from a text main re-reads', () => {
+    const code = stripComments(readFileSync(join(SRC, 'main/projects.ts'), 'utf8'))
+    // One write, defined once and called once — in `saveNow`, on a target that is `state.path`
+    // or the Save dialog's answer.
+    expect(code.match(/\bwriteAtomic\(/g)).toHaveLength(2)
+    const save = /async function saveNow\(as: boolean\)[\s\S]*?\n\}/.exec(code)
+    expect(save, 'projects.ts no longer declares `saveNow`').not.toBeNull()
+    expect(save![0]).toMatch(
+      /const target = saveTarget\(as, state\.path\) === 'current' \? state\.path! : await pickSavePath\(win, snap\.suggestedName\)/
+    )
+    expect(save![0]).toMatch(/await writeAtomic\(target, finaliseProject\(snap\.text, await realTarget\(target\), state\.openedFrom\)\)/)
+    // `state.path` is set to what was opened or written, and nowhere else but the resets.
+    const sets = [...code.matchAll(/state\.path = ([^\n]+)/g)].map((m) => m[1].trim()).sort()
+    expect(sets).toEqual(['null', 'null', 'null', 'null', 'path', 'target'])
+    // The text is read again before it is written: only a project file reaches the disk.
+    expect(code).toMatch(/export function finaliseProject[\s\S]*?const read = readProject\(text\)\s*if \(!read\.ok\) throw/)
+    // The sender is checked before the payload is read, on every channel.
+    for (const fn of ['answerSnapshot', 'setDirty', 'closeFromPage']) {
+      const body = new RegExp(`export function ${fn}\\(sender: WebContents, raw: unknown\\): void \\{\\s*fromMain\\(sender\\)\\n`).test(code)
+      expect([fn, body]).toEqual([fn, true])
+    }
+    expect(code).toMatch(/function fromMain\(sender: WebContents\): void \{\s*if \(sender !== mainContents\(\)\) throw/)
+    // The page reaches main on exactly those three channels, and names no path on any.
+    const preload = readFileSync(join(SRC, 'preload/index.ts'), 'utf8')
+    const invoked = [...preload.matchAll(/ipcRenderer\.invoke\((CH_PROJECT_[A-Z_]+)/g)].map((m) => m[1]).sort()
+    expect(invoked).toEqual(['CH_PROJECT_CLOSE', 'CH_PROJECT_DIRTY', 'CH_PROJECT_SNAPSHOT'])
   })
 
   it('exposes exactly the pinned Schedules preload API keys, and the main preload has neither', () => {

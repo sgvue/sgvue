@@ -376,6 +376,14 @@ export interface ShellState {
    */
   groundGrid: boolean
   modelColors: Record<string, string>
+  /**
+   * 2026-11-07 (plan D12) — the colour a model added to an **open project** was given: the palette
+   * colour its loaded neighbours' rows use least (`model/project.ts`). Not the user's pick — it is
+   * not in `modelColors`, so it never recolours the 3D model and an override still wins — but the
+   * colour its MODELS row and its section cut show in place of the library's or the slot's
+   * (`selectors/models.ts`). Empty while no project is open, and then nothing reads differently.
+   */
+  assignedColors: Record<string, string>
   nativeMats: boolean
   palette: string | null
   dims: boolean
@@ -692,7 +700,7 @@ export const setViewer = (v: Viewer | null): void => {
 let lastCutColors = ''
 function pushCutColors(force = false): void {
   const s = useShell.getState()
-  const map = modelSwatches(s.federation, s.library, s.modelColors, modelFiles())
+  const map = modelSwatches(s.federation, s.library, s.modelColors, modelFiles(), s.assignedColors)
   const k = JSON.stringify(map)
   if (!force && k === lastCutColors) return
   lastCutColors = k
@@ -995,6 +1003,7 @@ export const useShell = create<ShellState>((set, get) => ({
   shadows: DISPLAY_DEFAULTS.shadows,
   groundGrid: DISPLAY_DEFAULTS.groundGrid,
   modelColors: {},
+  assignedColors: {},
   nativeMats: DISPLAY_DEFAULTS.originalMaterials,
   palette: null,
   dims: DISPLAY_DEFAULTS.dims,
@@ -2078,6 +2087,7 @@ useShell.subscribe((s, prev) => {
   const changed =
     s.federation !== prev.federation ||
     s.library !== prev.library ||
-    s.modelColors !== prev.modelColors
+    s.modelColors !== prev.modelColors ||
+    s.assignedColors !== prev.assignedColors
   if (changed) pushCutColors()
 })

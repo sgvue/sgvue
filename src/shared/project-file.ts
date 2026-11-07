@@ -355,7 +355,17 @@ const ModelSchema = z.object({
    * `MC[0]` keeps the accent for its section cut (`cutSwatch`). Decided by this flag, never by hex.
    */
   own: z.boolean(),
+  /**
+   * 2026-11-07 (phase 2, plan D12) — `colour` is the one the project gave a model when it was
+   * added to an open project: the palette colour its neighbours used least. Restored as that
+   * again (the store's `assignedColors`), never as the user's own pick. Absent means `false`, so a
+   * file written before it reads as it did. Never `true` beside `own: true`.
+   */
+  assigned: z.boolean().optional(),
   visible: z.boolean()
+}).refine((m) => !(m.own && m.assigned), {
+  message: 'is both the user’s own colour and an assigned one',
+  path: ['assigned']
 })
 
 const Sides = z.object({ minus: finite.nullable(), plus: finite.nullable() })
@@ -659,6 +669,11 @@ export interface ProjectModelInfo {
   label: string
   /** The colour the MODELS row shows — written, not applied, when the user picked none. */
   colour: string
+  /**
+   * 2026-11-07 (D12) — `colour` is the one the open project assigned the model, not a colour by
+   * position: written as `assigned: true`, and restored. Ignored when the user picked a colour.
+   */
+  assigned?: boolean
 }
 
 export interface ProjectContext {
@@ -674,6 +689,14 @@ export interface ProjectContext {
   offset: readonly [number, number, number]
   /** A federation id's model key and GlobalId, or `null` when no loaded element has that id. */
   elementRef(id: number): { model: string; guid: string } | null
+  /**
+   * 2026-11-07 (phase 2) — the opened project's models that are **not** loaded (missing, refused,
+   * changed), by their id in that file and the model key a restore gave them (`modelKeyOf` of the
+   * file's name). Their ids are kept free, so `carryForward` can put their entries back under the
+   * same id, and a rule, an eye or `active` that names one of those keys is written as that id —
+   * the tag the file had. A key that is now loaded is the loaded model's.
+   */
+  carried?: readonly { id: string; key: string }[]
 }
 
 export interface ProjectWrite {
@@ -690,6 +713,10 @@ export interface ProjectWrite {
 }
 
 const clip = (s: string, max = MAX_TEXT): string => (s.length > max ? s.slice(0, max) : s)
+
+/** The one order of element references: by model id, then by GlobalId. */
+const byRef = (a: ProjectRef, b: ProjectRef): number =>
+  a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : a[0] < b[0] ? -1 : 1
 
 /**
  * An empty map with no prototype, for every map keyed by text from a file — a storey's name, a
@@ -712,6 +739,13 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
 
   const idOf = new Map<string, string>()
   const models: ProjectModel[] = []
+  // The carried models' ids stay theirs: a loaded model takes the next id that is free.
+  const reserved = new Set((ctx.carried ?? []).map((c) => c.id))
+  let nextId = 1
+  const freeId = (): string => {
+    while (reserved.has(`m${nextId}`)) nextId++
+    return `m${nextId++}`
+  }
   for (const m of ctx.models) {
     if (idOf.has(m.key)) continue
     const absPath = normaliseAbsolute(m.path)
@@ -723,13 +757,14 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
       m.size >= 0
     // A model the file cannot name — no absolute path, no digest — is left out, and so are its
     // elements' references; it is counted.
-    if (!usable || models.length >= MAX_MODELS) {
+    if (!usable || models.length + reserved.size >= MAX_MODELS) {
       dropped.items++
       continue
     }
-    const id = `m${models.length + 1}`
+    const id = freeId()
     idOf.set(m.key, id)
     const own = s.modelColors[m.key]
+    const assigned = !isColour(own) && m.assigned === true && isColour(m.colour)
     models.push({
       id,
       name: clip(m.name),
@@ -740,9 +775,11 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
       label: clip(m.label),
       colour: isColour(own) ? own : isColour(m.colour) ? m.colour : MC[0],
       own: isColour(own),
+      ...(assigned ? { assigned: true } : {}),
       visible: s.modelVis[m.key] !== false
     })
   }
+  for (const c of ctx.carried ?? []) if (!idOf.has(c.key)) idOf.set(c.key, c.id)
 
   const refsOf = (hidden: Record<number | string, boolean>): ProjectRef[] => {
     const seen = new Set<string>()
@@ -761,7 +798,7 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
       out.push([m, ref.guid])
     }
     // Order-free: the same view writes the same file whatever order the ids came in.
-    out.sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : a[0] < b[0] ? -1 : 1))
+    out.sort(byRef)
     return cap(out, MAX_REFS)
   }
 
@@ -921,6 +958,44 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
   return { project, dropped }
 }
 
+/**
+ * 2026-11-07 (phase 2) — **a project opened with models missing keeps them**: the entries of the
+ * opened file's models named by `ids` that are not open now (missing, refused, changed — the
+ * `carried` of `projectOf`'s context) are put back into a project just written, **exactly as the
+ * opened file had them** — the entry (path, digest, size, label, colour and its flags, eye) and
+ * every reference to one of their elements: in `hidden`, and in each viewpoint the written file
+ * has under the same id, with that viewpoint's eyes for them. The model stays missing; its data
+ * survives the save. A model the written file already has (its id taken, or loaded again) is not
+ * carried. Pure, and bounded as the writer is.
+ */
+export function carryForward(written: ProjectFile, opened: ProjectFile, ids: readonly string[]): ProjectFile {
+  const taken = new Set(written.models.map((m) => m.id))
+  const want = new Set(ids)
+  const room = Math.max(0, MAX_MODELS - written.models.length)
+  const carried = opened.models.filter((m) => want.has(m.id) && !taken.has(m.id)).slice(0, room)
+  if (!carried.length) return written
+  const kept = new Set(carried.map((m) => m.id))
+  const merge = (mine: readonly ProjectRef[], theirs: readonly ProjectRef[]): ProjectRef[] => {
+    const out = [...mine, ...theirs.filter(([m]) => kept.has(m))] as ProjectRef[]
+    out.sort(byRef)
+    return out.slice(0, MAX_REFS)
+  }
+  const byId = new Map(opened.viewpoints.map((v) => [v.id, v]))
+  return {
+    ...written,
+    models: [...written.models, ...carried],
+    visibility: { ...written.visibility, hidden: merge(written.visibility.hidden, opened.visibility.hidden) },
+    viewpoints: written.viewpoints.map((v) => {
+      const o = byId.get(v.id)
+      if (!o) return v
+      const modelVis = dict<boolean>()
+      for (const [m, on] of Object.entries(v.modelVis)) modelVis[m] = on
+      for (const [m, on] of Object.entries(o.modelVis)) if (kept.has(m)) modelVis[m] = on
+      return { ...v, hidden: merge(v.hidden, o.hidden), modelVis }
+    })
+  }
+}
+
 /* ────────────────────────────── the restore planner ────────────────────────────── */
 
 /** What the planner needs of the live federation — `Federation` has it. */
@@ -946,6 +1021,8 @@ export type RestoredViewpoint = Required<ProjectViewpoint>
 /** The restored state: `ProjectSource`'s shape, every id, key and point the live federation's. */
 export interface ProjectRestore extends Omit<ProjectSource, 'views' | 'spots' | 'measures'> {
   hidden: Record<string, boolean>
+  /** 2026-11-07 (D12) — the colours the project assigned, by live key: `assigned: true` models. */
+  assignedColors: Record<string, string>
   views: RestoredViewpoint[]
   spots: { p: [number, number, number] }[]
   measures: (ProjectMeasure & { p: [number, number, number] })[]
@@ -1048,10 +1125,12 @@ export function restorePlanOf(
 
   const modelVis = dict<boolean>()
   const modelColors = dict<string>()
+  const assignedColors = dict<string>()
   for (const m of project.models) {
     const k = keyOf.get(m.id)
     if (k === undefined) continue
     if (m.own) modelColors[k] = m.colour
+    else if (m.assigned) assignedColors[k] = m.colour
     if (!m.visible) modelVis[k] = false
   }
 
@@ -1087,6 +1166,7 @@ export function restorePlanOf(
     modelVis,
     active: activeOf(project.visibility.active),
     modelColors,
+    assignedColors,
     nativeMats: v.nativeMats,
     treeMode: v.treeMode,
     grids: v.grids,

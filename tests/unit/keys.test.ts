@@ -42,6 +42,14 @@ describe('onKey', () => {
     expect(act('Home')).toEqual({ kind: 'view', name: 'iso' })
   })
 
+  it('leaves ⌘S / Ctrl+S and ⇧⌘S to File › Save Project: the snap is S alone', () => {
+    expect(act('s', {}, { metaKey: true })).toBeNull()
+    expect(act('s', {}, { ctrlKey: true })).toBeNull()
+    expect(act('S', {}, { metaKey: true, shiftKey: true })).toBeNull()
+    expect(act('S', {}, { ctrlKey: true, shiftKey: true })).toBeNull()
+    expect(act('S', {}, { shiftKey: true })).toEqual({ kind: 'toggleSnap' })
+  })
+
   it('distinguishes shift-H (show all) from h (hide the selection)', () => {
     expect(act('H')).toEqual({ kind: 'showAll' })
     expect(act('H', { selCount: 3 })).toEqual({ kind: 'showAll' })

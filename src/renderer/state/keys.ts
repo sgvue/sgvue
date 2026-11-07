@@ -55,7 +55,9 @@ export function keyAction(e: KeyEventLike, s: KeyState): KeyAction | null {
     return { kind: 'deselect' }
   }
   if ((k === 'z' || k === 'Z') && (e.metaKey || e.ctrlKey)) return { kind: 'step', back: !e.shiftKey }
-  if (k === 's' || k === 'S') return { kind: 'toggleSnap' }
+  // ⌘S / Ctrl+S and ⇧⌘S are File › Save Project and Save Project As… (2026-11-07): on Windows a
+  // menu accelerator's key still reaches the page first, and must not also flip the snap.
+  if ((k === 's' || k === 'S') && !e.metaKey && !e.ctrlKey) return { kind: 'toggleSnap' }
   if (k === 'm' || k === 'M') return { kind: 'tool', tool: 'measure' }
   if (k === 'c' || k === 'C') return { kind: 'tool', tool: 'spot' }
   if (k === 'g' || k === 'G') return { kind: 'toggleGrids' }

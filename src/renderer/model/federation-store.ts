@@ -44,8 +44,11 @@ export interface BatchItem {
    * The file it came from, for the session and the share link. Recorded when the model
    * **joins**, not when it parses: a replacement parses under the key of the model still on
    * screen, and that model's file is the one a session saved in between must name.
+   *
+   * 2026-11-07 — with its size in bytes, which the project file records (`projectFiles`) and a
+   * session does not (`sessionFiles` leaves it out, so no session or link changes).
    */
-  file?: SessionFile
+  file?: SessionFile & { size?: number }
 }
 
 /** A chosen file, its bytes already streamed over `sgvue-file://` (`main/file-protocol.ts`). */
@@ -143,7 +146,7 @@ export class FederationController {
   private readonly sql = new SqlBridge()
   private readonly indexes: ModelIndex[] = []
   /** modelKey → the file it came from, for the session and the share link. */
-  private readonly files = new Map<string, SessionFile>()
+  private readonly files = new Map<string, SessionFile & { size?: number }>()
   /**
    * The first model's first mesh fixes this; every later model is streamed against it. It is
    * whole metres and only keeps float32 vertices near zero — since 2026-11-07 every model is
@@ -402,7 +405,15 @@ export class FederationController {
 
   /** What the session remembers about each loaded model — `shared/session-codec.ts`. */
   sessionFiles(): SessionFile[] {
-    const out: SessionFile[] = []
+    return this.projectFiles().map(({ size: _size, ...file }) => file)
+  }
+
+  /**
+   * 2026-11-07 — `sessionFiles()` with each file's size in bytes, for the project file
+   * (`model/project.ts`). `size` is absent for a file parsed without one.
+   */
+  projectFiles(): (SessionFile & { size?: number })[] {
+    const out: (SessionFile & { size?: number })[] = []
     for (const m of this.federation.models) {
       const file = this.files.get(m.meta.modelKey)
       // The slot is what the element ids in the same session are numbered by (P5).
@@ -610,7 +621,7 @@ export class FederationController {
       index,
       chunks,
       offset: summary.offset,
-      file: { key: modelKey, path: file.path, name: file.name, sha256: index.sha256 }
+      file: { key: modelKey, path: file.path, name: file.name, sha256: index.sha256, size: file.blob.size }
     }
   }
 

@@ -12,6 +12,7 @@
  * has no handler at all (`tests/readonly-guard.test.ts` holds the two to each other).
  */
 import { z } from 'zod'
+import { PROJECT_MAX_BYTES } from './project-file'
 import type { RejectReason } from './upload'
 
 // The channel names live in their own module so the sandboxed preload can import them without
@@ -348,4 +349,65 @@ export const UpdateOpenRequest = z.undefined()
 /** What `update:check` answers when a newer version is out: its number, without a leading `v`. */
 export interface UpdateInfo {
   latest: string
+}
+
+/* ────────────────────────────── the project file (2026-11-07, phase 2) ────────────────────────────── */
+
+/** Main's request for the project as it stands: a number the answer must carry back. */
+export interface ProjectSnapshotRequest {
+  n: number
+}
+
+/**
+ * `project:snapshot` — the page's answer: the project's text (`shared/project-file.ts`'s
+ * `projectText`), or `null` when there is nothing to save; and a name for the Save dialog's
+ * default, which main puts in a folder of its own choosing — never a path. Main reads the text
+ * again with `readProject` before it writes a byte, so only a project file can be written.
+ */
+/**
+ * Why a snapshot has no text: no model open (`no-models` — then nothing is unsaved), the project's
+ * models still loading, none of the open models has a file (the demo), too large, or it could not
+ * be built. `null` beside a text.
+ */
+export const ProjectNothing = z.enum(['no-models', 'loading', 'no-files', 'too-large', 'failed'])
+export type ProjectNothing = z.infer<typeof ProjectNothing>
+
+export const ProjectSnapshot = z
+  .object({
+    n: z.number().int().nonnegative(),
+    text: z.string().max(PROJECT_MAX_BYTES).nullable(),
+    reason: ProjectNothing.nullable(),
+    suggestedName: z
+      .string()
+      .max(120)
+      .regex(/^[^<>:"/\\|?*\u0000-\u001f]*$/)
+  })
+  .strict()
+export type ProjectSnapshot = z.infer<typeof ProjectSnapshot>
+
+/** `project:close` carries nothing: the page closed the open project (a fresh start replaced it). */
+export const ProjectClose = z.undefined()
+
+/** `project:dirty` — the open project has, or has not, changes since it was opened or saved. */
+export const ProjectDirty = z.object({ dirty: z.boolean() }).strict()
+export type ProjectDirty = z.infer<typeof ProjectDirty>
+
+/** One of an opened project's models: the file main admitted for it, or why none was. */
+export interface ProjectModelFile {
+  /** The model's id in the project file (`m1` …). */
+  id: string
+  /** Admitted by `admit()` — the same checks as a Recent pill — or `null`. */
+  file: PickedFile | null
+  /** A file that is there and was turned down for a reason the drop zone gives (over 600 MB …). */
+  refused: RefusedFile | null
+}
+
+/** `project:opened` — what File › Open Project… read, or why it could not. */
+export type ProjectOpened =
+  | { ok: true; name: string; text: string; models: ProjectModelFile[] }
+  | { ok: false; name: string; message: string }
+
+/** `project:saved` — the snapshot numbered `n` is now the project on disk. */
+export interface ProjectSaved {
+  n: number
 }

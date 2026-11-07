@@ -22,13 +22,16 @@ export const FORBIDDEN_IFC_WRITE_API = [
 ] as const
 
 /**
- * The only modules allowed to write to disk — settings; sessions with recents; and, since
- * 2026-09-25 (phase 4 of the Schedules port, owner-approved), exports, which writes only to a
- * path the user picked in the native Save dialog in the same call (`CLAUDE.md` rules). A fourth
- * is a design change, not a convenience.
+ * The only modules allowed to write to disk — settings; sessions with recents; since 2026-09-25
+ * (phase 4 of the Schedules port, owner-approved), exports, which writes only to a path the user
+ * picked in the native Save dialog in the same call; and, since 2026-11-07 (the `.sgvue` project
+ * file, plan D11, owner-approved), projects, which writes only to a path the user picked in its
+ * Save dialog in the same call or to the project file this run opened or saved (`CLAUDE.md`
+ * rules). A fifth is a design change, not a convenience.
  */
 export const FS_WRITER_ALLOW_LIST = [
   'src/main/settings.ts',
   'src/main/sessions.ts',
-  'src/main/exports.ts'
+  'src/main/exports.ts',
+  'src/main/projects.ts'
 ] as const

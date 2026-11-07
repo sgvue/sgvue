@@ -13,6 +13,7 @@
  */
 import { copyLink, payloadFromCode, payloadFromUrl, probeFiles, startAutosave } from './session'
 import { libraryOf, openPaths, openRecent, disposeUploads, showRefused } from './upload-pipeline'
+import { installProject } from './project'
 import { setOutsideActions, useShell } from '../state/shell'
 import type { SessionPayload } from '../../shared/session-codec'
 import { api } from '../api'
@@ -80,10 +81,13 @@ export function installBoot(): () => void {
   if (fromHash) void openPayload(fromHash)
 
   const stopAutosave = startAutosave()
+  // 2026-11-07 — the `.sgvue` project file: File › Save Project and Open Project… (`./project`).
+  const stopProject = installProject()
 
   return () => {
     offLink?.()
     stopAutosave()
+    stopProject()
     disposeUploads()
     setOutsideActions(null)
   }
