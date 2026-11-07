@@ -76,6 +76,21 @@
   "overrides": {
     "exceljs": {
       "uuid": "^11.1.1"
+    },
+    "eslint": {
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
+    },
+    "@eslint/config-array": {
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
+    },
+    "app-builder-lib": {
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
+    },
+    "@electron/universal": {
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
     }
   }
 }

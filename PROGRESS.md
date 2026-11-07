@@ -4,6 +4,17 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — Dependabot #27 cleared: minimatch forced to 11 where 9 and 10 were used
+
+**Did.** Five scoped `overrides` in `package.json` move the vulnerable `minimatch` copies (10.2.6
+under ESLint, typescript-eslint and electron-builder; 9.0.9 under `@electron/universal`) to
+11.0.5. The 3.x and 5.x copies, outside the advisory's range, are untouched. Dev-only: nothing in
+the shipped app changes.
+
+**Verified.** `npm audit` 14 moderate → 0; ESLint's results over 436 files and the packaged
+`app.asar` are byte-identical with the old and new versions; typecheck, lint, 3 534 unit tests,
+build, privacy and the asar-contents test pass; `npm ci` reproduces the tree. Reviewer PASS.
+
 ## 2026-11-08 — the project e2e runs, and passes
 
 **Did.** Ran `tests/e2e/project.spec.ts` through the guard, on the owner's yes. The Locate… test
