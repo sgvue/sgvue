@@ -2214,6 +2214,29 @@ test('the bottom edge is one row: the bars, the hint, the reset pill and the Ask
     expect(gap.length).toBeGreaterThan(10)
     expect(gap).not.toContain(true)
 
+    // 1b — the stage and its overlay are `overflow:clip`, not scroll containers (2026-11-07):
+    // the design's always-laid-out tooltips reach past the stage (the Ask pill's, 100 × 17 px at
+    // 1264 × 755), and while the stage was `overflow:hidden` a scroll moved every overlay by
+    // that much. Nothing — a script, `scrollIntoView` or a focus — can scroll either now.
+    const scrolled = await page.evaluate(() => {
+      const boxes = ['stage', 'overlay'].map((r) => document.querySelector<HTMLElement>(`[data-role="${r}"]`)!)
+      for (const b of boxes) {
+        b.scrollLeft = 500
+        b.scrollTop = 500
+      }
+      document.querySelector('button[data-tip^="Ask the assistant"]')!.scrollIntoView({ block: 'end', inline: 'end' })
+      document.querySelector('[data-role="statusbar"]')!.scrollIntoView({ block: 'start', inline: 'start' })
+      return boxes.map((b) => [getComputedStyle(b).overflow, b.scrollLeft, b.scrollTop])
+    })
+    expect(scrolled).toEqual([
+      ['clip', 0, 0],
+      ['clip', 0, 0]
+    ])
+    // And nothing moved: the Ask pill, and the status bar's corner (its width follows the fps).
+    const after = await bottomBoxes(page)
+    expect(after.ask).toEqual(rest.ask)
+    expect([after.status!.x, after.status!.y]).toEqual([rest.status!.x, rest.status!.y])
+
     // 2 — the reset pill alone stands on the stage's centre line at `bottom:14px`, as designed.
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
     const [cx, cy] = [vp.x + vp.width / 2, vp.y + vp.height / 2]

@@ -4,6 +4,17 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the stage cannot be scrolled
+
+**Did.** The owner, of a stage that a script or `scrollIntoView` could scroll: *"Yes, fix it"*. The design's
+always-laid-out tooltips reach past the stage — measured 100 × 17 px at 1264 × 755, the Ask pill's — and the stage, being
+`overflow:hidden`, was a scroll container, so a scroll moved every overlay. The stage and its label overlay are now
+`overflow:clip` (`App.tsx`): the same clip, not a scroll container. An e2e step (smoke, bottom row, 1b) pins it.
+
+**Verified.** Headless Chromium on the built renderer: `hidden` scrolled to 100 × 17, `clip` stays 0 × 0; captures
+without the canvas and the fps field are byte-identical. `npm run typecheck`, `npm run build`, `npm test`.
+**Owed:** the e2e step has not been run (it opens a window).
+
 ## 2026-11-07 — Ask Vee in its own window
 
 **Did.** The owner: *"bring vee out as a separate window and always on top of our app window."*

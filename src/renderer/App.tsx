@@ -629,11 +629,17 @@ export default function App(): React.JSX.Element {
     >
       {panelOpen ? <Sidebar /> : <Rail />}
 
+      {/* `overflow:clip` where the design has `overflow:hidden` (`SGVue.dc.html:218`, and the
+          overlay's `:220` below): the same clip, painted identically, but not a scroll
+          container — the design's always-laid-out `[data-tip]::after` tooltips reach past the
+          stage (100 × 17 px at 1264 × 755), and a `scrollLeft`, a `scrollIntoView` or a focus
+          scroll used to move every overlay by that much. Nothing reads or scrolls either box.
+          `docs/DECISIONS.md`, 2026-11-07. */}
       <main
         data-role="stage"
         ref={stage}
         style={s(
-          `flex:1;position:relative;min-width:0;overflow:hidden;background:var(--ground);--rlane:${rlane(hasCard, vpW)};--abar:${abar(hasActions)};--brow:${brow(rowLane)}`
+          `flex:1;position:relative;min-width:0;overflow:clip;background:var(--ground);--rlane:${rlane(hasCard, vpW)};--abar:${abar(hasActions)};--brow:${brow(rowLane)}`
         )}
       >
         <canvas
@@ -650,7 +656,7 @@ export default function App(): React.JSX.Element {
         <div
           data-role="overlay"
           ref={overlay}
-          style={s('position:absolute;inset:0;pointer-events:none;overflow:hidden')}
+          style={s('position:absolute;inset:0;pointer-events:none;overflow:clip')}
         />
         <Toolbar />
         <ProjectCard />
