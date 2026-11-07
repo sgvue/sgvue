@@ -1302,6 +1302,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **a synthetic reference model and its IfcOpenShell truth are committed** (`tests/fixtures/reference.ifc` from `scripts/make-reference-ifc.py`, byte-identical on every run; `reference.expected.json`, the one expected.json `.gitignore` lets through): both conformance tests always run on it, in CI too, and on a `samples/` model beside it when one is present.
 - 2026-11-07 — **`design-reference/` is pinned file by file** (`tests/design-reference.sha256`, checked by `tests/unit/design-reference-pin.test.ts` in `npm test`): a changed, added or removed file fails by name; `node scripts/design-reference-pin.cjs --write` updates the list, only with an owner's new handoff, in the same commit.
 - 2026-11-07 — **the privacy search is `npm run privacy`** (`scripts/privacy.cjs`, a CI step and a release-job step): e-mail addresses outside a reasoned allow-list, home paths that are not placeholders, private names by SHA-256 only (`--hash "<text>"` adds one; the text never enters the repository), and a coordinate-band check that names no real site; findings masked unless `--show`; `--commits <range>` before a push.
+- 2026-11-07 — **`release.yml` is gated**: each job runs the privacy scan, lint and the unit tests before it builds, and then the `app.asar` test on every unpacked app it built (`SGVUE_ASAR=<path>`, which makes a missing archive a failure, not a skip).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

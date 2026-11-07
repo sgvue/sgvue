@@ -19,17 +19,27 @@
  * asserted here is an archive that was just built rather than one left over from another
  * platform's run. `files` is one list for every platform, so whichever archive is present
  * settles the rule for all three.
+ *
+ * **`SGVUE_ASAR=<path to app.asar>`** (2026-11-07, core protection #10) points it at one archive
+ * and makes it required: the release workflow builds the installers and then runs this against
+ * each unpacked app it built — `dist/win-unpacked`, and on macOS both `dist/mac-arm64` and
+ * `dist/mac` (x64) — so an archive that is missing **fails** rather than skips. Without the
+ * variable it is `npm test`'s optional check, as before.
  */
 import { closeSync, existsSync, openSync, readFileSync, readSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = join(__dirname, '..', '..')
 const WIN = process.platform === 'win32'
-const ASAR = join(
-  ROOT,
-  WIN ? 'dist/win-unpacked/resources/app.asar' : 'dist/mac-arm64/SGVue.app/Contents/Resources/app.asar'
-)
+/** The archive the release workflow names; when set, a missing archive is a failure. */
+const FORCED = process.env.SGVUE_ASAR
+const ASAR = FORCED
+  ? resolve(ROOT, FORCED)
+  : join(
+      ROOT,
+      WIN ? 'dist/win-unpacked/resources/app.asar' : 'dist/mac-arm64/SGVue.app/Contents/Resources/app.asar'
+    )
 
 /** `out/` is the build, `package.json` is `main` and the version, `node_modules` the deps. */
 const ALLOWED = ['node_modules', 'out', 'package.json']
@@ -68,7 +78,13 @@ function packagesIn(nodeModules: AsarEntry): string[] {
   return names.sort()
 }
 
-if (!existsSync(ASAR)) {
+if (FORCED && !existsSync(ASAR)) {
+  describe('app.asar contents', () => {
+    it('finds the archive SGVUE_ASAR names', () => {
+      throw new Error(`SGVUE_ASAR names ${ASAR}, and there is no archive there — the build did not write it.`)
+    })
+  })
+} else if (!existsSync(ASAR)) {
   process.stderr.write(
     `[asar] skipped: no packaged app at ${ASAR} — run ` +
       (WIN

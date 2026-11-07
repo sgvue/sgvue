@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — release builds run lint, the tests and the app.asar test
+
+**Did.** Core protection, plan item 10. `release.yml`: both jobs run `npm run privacy`, `npm run lint` and `npm test` after `npm ci` and before `dist:*`; after the build, `tests/unit/asar-contents.test.ts` runs with `SGVUE_ASAR` on `dist/win-unpacked/resources/app.asar`, and on `dist/mac-arm64/…` and `dist/mac/…` (the x64 app, never checked before). The test takes `SGVUE_ASAR` as its archive and fails when it is missing; without it nothing changed. `docs/COMMANDS.md` has the command.
+
+**Verified.** Both workflows parse (js-yaml); actionlint is not installed, not run. `electron-builder --mac dir --arm64 --x64` (no Electron started): both archives pass under `SGVUE_ASAR`. Probes, removed: the real arm64 archive repacked with a `reports/` folder failed the top-level test; a hand-made archive with `.claude/` and `vitest` failed both; a missing path failed. `dist/` deleted afterwards. The workflow itself and the Windows path run only on GitHub.
+
 ## 2026-11-07 — the privacy search is npm run privacy
 
 **Did.** Core protection, plan item 12. `scripts/privacy.cjs` scans every tracked file for e-mail addresses (allow-list with a reason each, reserved example domains), home paths that are not placeholders, private names and accounts compared by peppered SHA-256 of normalised words and runs of two or three (eight entries: the owner's name in its spellings, the private address's local part, the macOS account as a path segment), and coordinates in the SVY21 / Singapore longitude band other than the synthetic set and the design's mock. Masked output, `--show`, `--commits <range>`, `--hash`. `npm run privacy` in `package.json`, a step in `ci.yml` (after `npm ci`); `tests/unit/privacy.test.ts` holds the rules with inputs built from pieces. `docs/COMMANDS.md` has the command.

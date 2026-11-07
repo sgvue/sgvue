@@ -3,6 +3,12 @@
 # build-provenance attestation. A release is made by hand on sgvue/releases once the builds
 # have been tested (docs/RELEASING.md). Every action is pinned to a full commit SHA, with its
 # version in a comment.
+#
+# The release gate (2026-11-07, core protection #10): each job runs the privacy scan, lint and
+# the unit tests on its own platform before it builds anything (`dist:*` type-checks as part of
+# `npm run build`), so an installer is never built from a commit those checks reject — a tag
+# can be pushed on a commit CI never saw. After the build, the `app.asar` contents test runs against every unpacked
+# app the job built, through `SGVUE_ASAR`, which turns that test's skip into a failure.
 name: Release builds
 
 on:
@@ -39,7 +45,21 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # The release gate: the privacy scan, lint and the unit tests, on the platform being
+      # built for.
+      - run: npm run privacy
+      - run: npm run lint
+      # The unit tests download Electron's binary on first use (one test imports `electron`).
+      - run: npm test
       - run: npm run dist:win
+      # What the installer packed, read out of the archive it was built from: exactly
+      # node_modules, out and package.json, and no development dependency. The NSIS installer is
+      # made from dist/win-unpacked, so this is its archive.
+      - name: app.asar holds only what the app reads
+        shell: bash
+        env:
+          SGVUE_ASAR: dist/win-unpacked/resources/app.asar
+        run: npx vitest run tests/unit/asar-contents.test.ts
       - name: SHA-256 into the summary
         shell: bash
         run: |
@@ -75,6 +95,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # The release gate: the privacy scan, lint and the unit tests, on the platform being
+      # built for.
+      - run: npm run privacy
+      - run: npm run lint
+      # The unit tests download Electron's binary on first use (one test imports `electron`).
+      - run: npm test
       # Electron 44.3.0 has no install script, so `npm ci` leaves node_modules/electron/dist/
       # without Electron — and electron-builder.yml copies Electron's LICENSE and
       # LICENSES.chromium.html into each app from there. electron-builder packs its own download
@@ -100,6 +126,16 @@ jobs:
             done
           done
           exit "$missing"
+      # Both disk images' archives, each read out of the app it was packed from: exactly
+      # node_modules, out and package.json, and no development dependency.
+      - name: app.asar holds only what the app reads (arm64)
+        env:
+          SGVUE_ASAR: dist/mac-arm64/SGVue.app/Contents/Resources/app.asar
+        run: npx vitest run tests/unit/asar-contents.test.ts
+      - name: app.asar holds only what the app reads (x64)
+        env:
+          SGVUE_ASAR: dist/mac/SGVue.app/Contents/Resources/app.asar
+        run: npx vitest run tests/unit/asar-contents.test.ts
       - name: SHA-256 into the summary
         run: |
           {
