@@ -15,6 +15,7 @@
 import {
   federate,
   localIdRefusal,
+  modelKeyOf,
   removeModel,
   EMPTY_FEDERATION,
   type Federation
@@ -56,14 +57,8 @@ export interface PreparedFile {
   key?: string
 }
 
-/**
- * A model's key: the file's stem. It is the identity the federation, the store, the worker
- * and the session all key on, and a path would leak into the sidebar rows. Since 2026-09-24 a
- * pick whose key is already open or loading is **confirmed and replaces it** rather than
- * joining as `name (2)`; only a second file of the same stem **within one pick** gets ` (2)`.
- */
-export const modelKeyOf = (fileName: string): string =>
-  fileName.replace(/\.[^.]+$/, '') || fileName
+/** A model's key: the file's stem — `shared/federate.ts`, where the rule lives. */
+export { modelKeyOf }
 
 /**
  * What `addModel` needs from an index to place grids and storeys in scene coordinates.

@@ -1299,6 +1299,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **a review is saved as a `.sgvue` project file** (owner-approved, `docs/plans/project-file.md`): it names the IFC files (relative path, absolute fallback, SHA-256) and never contains them; elements by (model id, GlobalId); everything but Preferences, theme, sizes, selection and the chat; changed models open with a warning, missing ones get Locate…; colours live in it. Not `.sgv` — StarOffice's and CCTV's.
 - 2026-11-07 — **a fourth disk writer, `src/main/projects.ts`**: the project file only, to a path the user picked in Save As or a `.sgvue` they opened this run (⌘S re-saves it without a dialog), atomic, ≤ 16 MB.
 - 2026-11-07 — **the core is protected by headless CI checks** (owner-approved, `docs/plans/core-protection.md`, Tier 1); visual baselines, a performance budget and the full e2e run on the owner's yes before a release.
+- 2026-11-07 — **the `.sgvue` format v1 is `shared/project-file.ts`** (phase 1, headless): one zod schema, bounds shared by reader and writer, model ids `m1…` and null-prototype maps; elements `[modelId, GlobalId]`, a `Model` rule tagged `{model}`; colours carry `own` and only the user's are restored (*"Stay teal"*); coordinates are world; `readProject` never throws. The corpus `tests/fixtures/project/v1-synthetic.sgvue` must always read to the same state.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

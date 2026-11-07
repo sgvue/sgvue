@@ -4,6 +4,18 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — `.sgvue` project file, phase 1: format and codec
+
+**Did.** `src/shared/project-file.ts`: the v1 schema, `readProject`, `projectOf` (writer),
+`restorePlanOf` (GlobalId → live ids, unmatched counted), POSIX / Windows path helpers and
+`leastUsedColour`. `modelKeyOf` moved to `shared/federate.ts`. Owner's choice on colours: *"Stay
+teal"* — the file records which colours are the user's (`own`), and only those are restored. No UI,
+IPC or writer yet.
+
+**Verified.** 48 new tests (500-seed round trip, re-export simulation, hostile files, frozen corpus);
+typecheck, lint, 3 191 unit tests pass. Deep review: FAIL in round 1 (prototype pollution through a
+model id value; colour provenance), PASS in round 2.
+
 ## 2026-11-07 — a real file's MODELS row takes its Recent pill's colour
 
 **Did.** A loaded model's library entry is now found by its file path (`libraryEntry`, `pathOf`,

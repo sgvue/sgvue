@@ -102,6 +102,17 @@ export function localIdRefusal(ids: Iterable<number>): string | null {
   return null
 }
 
+/**
+ * A model's key: the file's stem. It is the identity the federation, the store, the worker
+ * and the session all key on, and a path would leak into the sidebar rows. Since 2026-09-24 a
+ * pick whose key is already open or loading is **confirmed and replaces it** rather than
+ * joining as `name (2)`; only a second file of the same stem **within one pick** gets ` (2)`.
+ * Here (2026-11-07) rather than in `renderer/model/federation-store.ts`, which re-exports it, so
+ * the project file (`shared/project-file.ts`) names a model that is not open by the same rule.
+ */
+export const modelKeyOf = (fileName: string): string =>
+  fileName.replace(/\.[^.]+$/, '') || fileName
+
 /** Two storeys count as the same level when their elevations agree to this, in metres. */
 export const STOREY_ELEVATION_TOLERANCE = 0.001
 

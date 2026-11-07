@@ -39,13 +39,13 @@ Most of the state already has a writer and a reader — the session payload
       "relPath": "models/Tower A - ARC.ifc",   // relative to the .sgvue file — tried first
       "absPath": "…",                          // fallback only
       "sha256": "…", "size": 123456789,
-      "label": "ARC", "colour": "#35C4B6", "visible": true }
+      "label": "ARC", "colour": "#35C4B6", "own": false, "visible": true }
   ],
   "view":       { /* camera, sections, display switches, units, tree mode, storey eyes, Original materials */ },
   "visibility": { "hidden": [["m1", "2O2Fr$t4X7Zf8NOew3FLOH"], …], "active": "m1", "stack": [ /* filter steps, as today */ ] },
   "viewpoints": [ /* today's Viewpoint, with GlobalIds in place of ids */ ],
   "filterSets": [ /* today's FilterSet */ ],
-  "schedules":  [ /* today's ScheduleDef v1, as `.schedule.json` already writes it */ ],
+  "schedules":  { "saved": [ /* name, def, savedAt */ ], "open": null /* or a ScheduleDef */ },
   "markups":    { "spots": [ /* world coordinates */ ], "measures": [ … ] }
 }
 ```
@@ -70,7 +70,7 @@ already uses).
 | **D9** | Where viewpoints / filter sets / schedules live while a project is open | **In the project** (no project open: as today) | Otherwise they leak between projects with the same building name. |
 | **D10** | Double-click to open | **Yes**: register `.sgvue` in both installers (macOS `open-file`, Windows argv), and the drop zone also takes a `.sgvue` | No new element: the drop zone keeps its look and copy. |
 | **D11** | The disk-writer rule (today: exactly three writers; a new one is "a design change") | A **fourth writer, `src/main/projects.ts`**: writes only to a path the user picked in Save As or opened this run, atomically (temp + rename), capped at 16 MB | ⌘S writing to the already-chosen file without a dialog is the one stretch of today's export rule; it needs your yes. |
-| **D12** | Model colours | **Stored in the project.** A model added to a project for the first time takes the colour its loaded neighbours use least. The Recent pills keep the design's colours by position. | Stable and distinct. Replaces both the "colour by position" and the "colour by path hash" options; the path-matching fix is kept, the hash is dropped. |
+| **D12** | Model colours | **Stored in the project.** A model added to a project for the first time takes the colour its loaded neighbours use least. The Recent pills keep the design's colours by position. | *Amended in phase 1, the owner: "Stay teal"* — each colour carries `own`; only the user's own are restored, so the grey model keeps the cut's accent. Replaces both the "colour by position" and the "colour by path hash" options; the path-matching fix is kept, the hash is dropped. |
 
 ### What is saved (D5)
 
@@ -104,3 +104,13 @@ already uses).
 ## Recorded with it
 
 An "Allowed desktop deviations" entry (the File menu items, the title marker, the quit question, the drop zone taking `.sgvue`), the `Only three modules may write to disk` rule amended, Decisions lines and `docs/DECISIONS.md` rows.
+
+## Phase 2 must handle (from the phase-1 deep review)
+
+1. Resolve `relPath`, then `absPath`, only through main's `admit()` — never open the string: `absPath` may be a UNC or `\\?\` device path, and `relPath` may climb (`outside[]`).
+2. Restored measurements: re-measure (`placeMeasure` re-fires along the plan axes) or draw from the stored lengths — decide.
+3. Viewpoints saved before 2026-10-09 (`idStride` absent): renumber through `viewpointHidden` before writing.
+4. D12: apply `leastUsedColour` when a model is added.
+5. A surface for `outside[]`, `dropped` and `unmatched` (phase 4's wording).
+6. Use `Object.hasOwn` / `in` on the restored maps — they are null-prototype.
+7. Write the file as UTF-8.

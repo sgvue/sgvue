@@ -1,0 +1,275 @@
+{
+  "format": "sgvue-project",
+  "version": 1,
+  "savedBy": "SGVue 1.4.0",
+  "savedAt": "2026-11-07T09:45:00.000Z",
+  "models": [
+    {
+      "id": "m1",
+      "name": "Synthetic ARC.ifc",
+      "relPath": "models/Synthetic ARC.ifc",
+      "absPath": "/projects/synthetic/review/models/Synthetic ARC.ifc",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 123456,
+      "label": "Synthetic ARC",
+      "colour": "#8A9492",
+      "own": false,
+      "visible": true
+    },
+    {
+      "id": "m2",
+      "name": "Synthetic STR.ifc",
+      "relPath": "../shared/Synthetic STR.ifc",
+      "absPath": "/projects/synthetic/shared/Synthetic STR.ifc",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size": 654321,
+      "label": "Synthetic STR",
+      "colour": "#E8A33D",
+      "own": true,
+      "visible": false
+    }
+  ],
+  "view": {
+    "camera": {
+      "theta": -0.7853981633974483,
+      "phi": 1.05,
+      "dist": 60,
+      "half": 12,
+      "target": [
+        12345.457,
+        23456.766,
+        5.05
+      ],
+      "proj": "persp"
+    },
+    "preset": "iso",
+    "sections": {
+      "grid": {
+        "name": "C",
+        "offset": 500,
+        "flip": true,
+        "cut": true
+      },
+      "level": {
+        "name": "",
+        "offset": 0,
+        "flip": false,
+        "cut": false
+      }
+    },
+    "grids": true,
+    "levels": false,
+    "groundGrid": false,
+    "shadows": true,
+    "dims": false,
+    "snap": true,
+    "units": "mm",
+    "treeMode": "entity",
+    "storeyVis": {
+      "L2": false,
+      "Roof": true
+    },
+    "nativeMats": false
+  },
+  "visibility": {
+    "hidden": [
+      [
+        "m1",
+        "SynArc0000000000000001"
+      ],
+      [
+        "m1",
+        "SynArc0000000000000002"
+      ],
+      [
+        "m2",
+        "SynStr0000000000000001"
+      ]
+    ],
+    "active": "m1",
+    "stack": [
+      {
+        "id": "f1",
+        "on": true,
+        "action": "hide",
+        "color": "#E8A33D",
+        "rules": [
+          {
+            "prop": "Model",
+            "op": "=",
+            "val": {
+              "model": "m2"
+            },
+            "join": "and"
+          },
+          {
+            "prop": "IfcEntity",
+            "op": "=",
+            "val": "IfcColumn"
+          },
+          {
+            "prop": "Model",
+            "op": "=",
+            "val": "m1",
+            "join": "or"
+          }
+        ]
+      }
+    ]
+  },
+  "viewpoints": [
+    {
+      "id": 1762508700000,
+      "name": "Lobby",
+      "sub": "grid C + level L2 · 1 hidden",
+      "camera": {
+        "theta": 0,
+        "phi": 1.2,
+        "dist": 30,
+        "half": 8,
+        "target": [
+          12350,
+          23460,
+          6.05
+        ],
+        "proj": "ortho"
+      },
+      "sections": {
+        "grid": {
+          "name": "C",
+          "offset": 0,
+          "flip": false,
+          "cut": true
+        },
+        "level": {
+          "name": "L2",
+          "offset": 1200,
+          "flip": false,
+          "cut": false
+        }
+      },
+      "hidden": [
+        [
+          "m1",
+          "SynArc0000000000000003"
+        ]
+      ],
+      "storeyVis": {},
+      "modelVis": {
+        "m2": false
+      },
+      "stack": [],
+      "active": null,
+      "grids": true,
+      "levels": true
+    }
+  ],
+  "filterSets": [
+    {
+      "id": 1762508600000,
+      "label": "STR columns",
+      "stack": [
+        {
+          "id": "f2",
+          "on": true,
+          "action": "isolate",
+          "color": "#35C4B6",
+          "rules": [
+            {
+              "prop": "Model",
+              "op": "=",
+              "val": {
+                "model": "m2"
+              }
+            },
+            {
+              "prop": "IfcEntity",
+              "op": "=",
+              "val": "IfcColumn",
+              "join": "and"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "schedules": {
+    "saved": [
+      {
+        "name": "Wall Schedule",
+        "def": {
+          "version": 1,
+          "name": "Wall Schedule",
+          "entity": [
+            "IfcWall"
+          ],
+          "columns": [
+            {
+              "field": {
+                "kind": "core",
+                "key": "name"
+              }
+            }
+          ],
+          "filters": [],
+          "sort": [],
+          "itemize": true,
+          "grandTotal": false
+        },
+        "savedAt": "2026-11-07T09:40:00.000Z"
+      }
+    ],
+    "open": {
+      "version": 1,
+      "name": "Column Schedule",
+      "entity": [
+        "IfcColumn"
+      ],
+      "columns": [
+        {
+          "field": {
+            "kind": "core",
+            "key": "name"
+          },
+          "heading": "Mark"
+        }
+      ],
+      "filters": [],
+      "sort": [],
+      "itemize": false,
+      "grandTotal": true
+    }
+  },
+  "markups": {
+    "spots": [
+      {
+        "at": [
+          12345.457,
+          23456.766,
+          5.05
+        ]
+      }
+    ],
+    "measures": [
+      {
+        "at": [
+          12346,
+          23457,
+          6.5
+        ],
+        "x": 4.2,
+        "z": 3,
+        "sides": {
+          "x": {
+            "minus": 1.2,
+            "plus": 3
+          },
+          "z": {
+            "minus": null,
+            "plus": 3
+          }
+        }
+      }
+    ]
+  }
+}
