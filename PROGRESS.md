@@ -4,6 +4,12 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — Float64 at 32.5 km is a test
+
+**Did.** Core protection, plan item 8. `tests/unit/float64-far-origin.test.ts` generates a tiny IFC4 model on the synthetic site whose building, storey and two cubes are placed 32.5 km from the origin (every written number outside the privacy scan's coordinate band), streams it through web-ifc under Node and `streamGeometry`, and checks that each cube's centre as drawn — the Float32 `matrix16` times its own vertices — is within 0.1 mm of the value worked out in Float64 from the file, with the offset the streamer picks and with a shared origin handed in. A fourth test passes web-ifc's placements through a `Float32Array` first and requires the miss to exceed 0.1 mm, so the check is shown able to fail.
+
+**Verified.** Misses 0.001–0.008 mm. Probe, reverted: `composed` as a `Float32Array` in `geometry-streamer.ts` — both checks failed, 0.33–0.92 mm on x and y. The test file scans clean with the privacy rules. typecheck, lint, `npm test`, build, privacy clean.
+
 ## 2026-11-07 — the inline style strings are held to the design
 
 **Did.** Core protection, plan item 3. `tests/unit/design-style-strings.test.ts` reads every `s(…)` call in `src/renderer/app/` and `src/renderer/App.tsx` with the TypeScript parser, follows names to their `const` (in scope, or imported), parameters to their callers' arguments, joins, branches and one-expression style functions, and requires each resulting string to be one whole `style="…"` value of `SGVue.dc.html` — a `${…}` only where the design has a `{{ … }}`. A string the design does not have must be in `DEVIATIONS`, keyed by file and string, naming the dated CLAUDE.md entry that changed it; a listed string no longer in the code fails as stale; a call it cannot read must be listed in `COMPUTED` (none today).
