@@ -4,6 +4,27 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — 21 Dependabot security alerts cleared, six Dependabot PRs folded in
+
+**Did.** Exact pins bumped in `package.json`: Electron 44.3.0 → 44.10.0 (#15), zod 4.6.5 →
+4.6.7 (#18), and #14's group — `@anthropic-ai/sdk` 0.133.0 → 0.137.0, `@playwright/test`
+1.64.1, electron-builder 26.18.0, react / react-dom 19.3.1, sql.js 1.15.1, vitest 5.0.5,
+zustand 5.0.16. The transitive fixes land without an override: node-gyp's undici 6.29.1 (#16)
+and ajv's fast-uri 3.1.9 (#17) came with the install, and `@electron/get`'s optional undici
+went to 7.30.2 with `npm update undici`. The `exceljs` › `uuid` override is unchanged. #10's
+Actions pins applied as its diff has them: setup-node v7.1.0, upload-artifact v7.0.2.
+`THIRD_PARTY_NOTICES.md` regenerated: SDK 0.137 ships one new package, `@opentelemetry/api`
+1.10.0 (Apache-2.0, a LICENSE and no NOTICE), and sql.js 1.15.1 is SQLite 3.54.0. The stack
+lines name sql.js 1.15 and the SDK 0.137; 44.10.0 still has no install script, so the binary
+still needs `node node_modules/electron/install.js`. No file under `src/` changed.
+
+**Verified** on macOS, Node 24.17.0: `npm test` (2 998 passed / 4 skipped), `npm run build`,
+`npm run test:e2e` (59 passed / 11 skipped / 1 failed; peak 1 203 MB; `clean:`). The one
+failure is "a viewpoint is renamed by double-click", with the same (288, 100) as on `main`.
+`npm audit`: 6 moderate left, all the minimatch advisory GHSA-g3hv-75wg-m249 under
+electron-builder and exceljs, which no release of minimatch 9 or 10 fixes (only 11.0.1+);
+it is not among the 21 and is left as found.
+
 ## 2026-11-07 — the private history's Mac test fixes and its Goal section brought over
 
 **Did.** Two commits of the private repository ported by hand, the public files' newer content
