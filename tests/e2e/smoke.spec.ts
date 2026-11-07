@@ -106,7 +106,10 @@ test('opens on the landing page, under the production CSP, with the pinned prelo
       'onProjectOpened',
       'onProjectSaved',
       'setProjectDirty',
-      'closeProject'
+      'closeProject',
+      'locateProjectModel',
+      'openDroppedProject',
+      'projectReady'
     ])
 
     // 3b — the renderer can learn whether a key is stored, and nothing else about it.

@@ -4,6 +4,18 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — the full e2e suite before 1.4.0
+
+**Did.** `npm run test:e2e`, the whole suite, under the guard: 66 passed, 9 skipped (Windows-only
+GPU specs, `SGVUE_SHOTS` / `SGVUE_IFC` runs), 1 failed — `smoke.spec.ts`'s pinned preload keys,
+which had not gained phase 4 and 5's `locateProjectModel`, `openDroppedProject` and `projectReady`
+(the read-only guard had). The list now matches the guard's and `src/preload/index.ts`'s order.
+
+**Verified.** `smoke.spec.ts` again: 32 of 32 (a first rerun was stopped at once by the guard on
+system memory pressure level 2, with SGVue at 0 MB; it ran once the level was back to 1). Peak
+footprint 1 190 MB in the full run, 1 113 MB in the rerun; nothing survived either. Still owed: a
+real `.sgvue` double-click in Finder and Explorer.
+
 ## 2026-11-08 — 1.4.0 prepared: the version and the release notes
 
 **Did.** `docs/RELEASING.md` step 1, the part before any build: version **1.4.0** in
