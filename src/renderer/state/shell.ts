@@ -232,6 +232,11 @@ export interface UploadRow {
   done?: boolean
   error?: boolean
   dismiss?: boolean
+  /**
+   * 2026-11-08 (project phase 4, plan D4) — the id (`m1` …) of the open project's model no file
+   * was admitted for: the row offers `Locate…` (`model/project.ts`, `locateModel`).
+   */
+  locate?: string
 }
 
 export { VIS_KEYS }

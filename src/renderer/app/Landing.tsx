@@ -47,6 +47,7 @@ import type { UpdateInfo } from '../../shared/ipc-contract'
 import { openAllLabel } from '../../shared/upload'
 import { FADE_SECONDS } from '../viewer/materials'
 import * as pipeline from '../model/upload-pipeline'
+import { LOCATE_LABEL, locateModel } from '../model/project'
 import { pick, useShell, type LibraryFile } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
 import { uploadRows } from '../state/selectors/uploads'
@@ -438,6 +439,19 @@ export default function Landing(): React.JSX.Element | null {
                     <span style={s(`font:400 11px/1.3 var(--mono);color:${u.stageColor}`)}>
                       {u.stage}
                     </span>
+                    {/* 2026-11-08 (project phase 4, D4) — a missing model's Locate…: the native Open
+                        dialog for one IFC. The style string is "open all N as a federation →"'s,
+                        verbatim. */}
+                    {u.locate !== undefined && (
+                      <button
+                        onClick={() => void locateModel(u.locate!)}
+                        style={s(
+                          'align-self:flex-start;font:500 12px/1 var(--sans);color:var(--accent-ink);padding:2px 0'
+                        )}
+                      >
+                        {LOCATE_LABEL}
+                      </button>
+                    )}
                   </span>
                   <span
                     style={s(

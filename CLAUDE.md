@@ -1048,6 +1048,23 @@ Anything not on this list is a defect.
   page's `S` (snap) no longer fires with ⌘ or Ctrl held. **No designed surface changes, and no new
   element or control in the window.** Not yet seen in a window: `tests/e2e/project.spec.ts` waits
   for the owner's yes.
+  *(Amended 2026-11-08 — phase 4, plan D3 and D4, owner-approved with the plan: "Open it anyway,
+  warn once, re-apply by GlobalId, say how many items no longer matched" and "Open the rest, and
+  say which are missing with a Locate… button (native Open dialog)". A model whose file changed
+  since the project was saved opens anyway, restored by GlobalId; its designed error row says once
+  `changed since the project was saved — N saved items no longer match` (`— 1 saved item no longer
+  matches`; nothing appended when everything matches), and the project is unsaved until saved. A
+  model for which no file was admitted gets a designed error row with **one new control**, a
+  `Locate…` text button in the row's text column, no icon, an existing style string verbatim in
+  each place — the landing page's upload list: "open all N as a federation →"'s
+  (`align-self:flex-start;font:500 12px/1 var(--sans);color:var(--accent-ink);padding:2px 0`); the
+  sidebar: the palette's `reset` (`SGVue.dc.html:121`, `font:500 11px/1 var(--sans);color:var(--accent-ink);padding:3px 2px;white-space:nowrap`).
+  It opens the native Open dialog (`Locate "<name>"`, one `.ifc` / `.ifczip`); the pick goes
+  through `admit()` and loads into the open project as that model — same id, key and label,
+  references restored, unsaved. A pick already open, or already being located, loads nothing
+  (`already open in this project`). When every model was missing, the first one located boots the
+  viewer. A row dismissed with × loses its Locate… until the project is reopened. No other
+  element was added.)*
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1323,6 +1340,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-07 — **the `.sgvue` format v1 is `shared/project-file.ts`** (phase 1, headless): one zod schema, bounds shared by reader and writer, model ids `m1…` and null-prototype maps; elements `[modelId, GlobalId]`, a `Model` rule tagged `{model}`; colours carry `own` and only the user's are restored (*"Stay teal"*); coordinates are world; `readProject` never throws. The corpus `tests/fixtures/project/v1-synthetic.sgvue` must always read to the same state.
 - 2026-11-07 — **Save and Open a `.sgvue` project, phase 2** (`main/projects.ts`, the fourth writer; `model/project.ts`): main pulls the project from the page (`project:snapshotRequest` → `project:snapshot`), re-reads it with `readProject`, computes `relPath` against the real folder it writes to (a carried model's re-based, `relPathFor`) and writes atomically to the open project or the Save dialog's answer, UTF-8, ≤ 16 MiB, `.sgvue` forced. Open Project… admits each model path through `admit()` (relPath, then absPath; a network path only on the project's own share or where the user has been); a project replaces what is open, restored through `applySession`. **A model the project names and could not open is never dropped by a save** (`carryForward`). Dirty is by value (`projectStateKey`); close, quit and Open ask (`closeAction`, `afterQuestionSave`). A fresh start that is not the project's own closes it (`project:close`); the project's own load, even with no file admitted, does not. D12: `assignedColors`, under the override and over the library and slot colours, from `MC` less its grey, written `assigned: true`. Viewpoints, filter sets, schedules and markups are written now, restored in phase 3.
 - 2026-11-07 — **while a project is open its viewpoints, filter sets and saved schedules are its own** (phase 3; `setProjectLists`; Schedules over `projectSchedules` / `projectSaved`, fitted by `portableSavedList`, a refused list leaves the window writing nowhere); closing brings `localStorage`'s back untouched, a first Save As imports; markups stay carried until placed; a measurement stores an optional unit `normal` and re-fires from it, else fires only the directions it read; one on a missing model is carried; a self-chosen schedule (`fromDefault`) is not the project's; viewpoints pair with the file's by an explicit map, not by id.
+- 2026-11-08 — **project phase 4 (D3, D4)**: a changed model opens, is restored by GlobalId, and its error row says `changed since the project was saved — N saved items no longer match` (`project.stale` until saved). A missing model's row offers `Locate…` — `project:locate` (a name in, main's Open dialog, `admit()`) and `locateFile` (the project's key and name, never a fresh start; a file already open is refused). `restoreOnto` binds every located model that has joined and `restoreLocated` waits while the project loads, so either order converges; then a full restore when all were missing, else `mergeLocated`. Opened, changed and located models keep their ids (`ProjectModelInfo.id`).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

@@ -124,6 +124,13 @@ export const CH_PROJECT_CLOSE = 'project:close'
 export const CH_PROJECT_OPENED = 'project:opened'
 /** Main → main window: the snapshot numbered `n` is what is now on disk. */
 export const CH_PROJECT_SAVED = 'project:saved'
+/**
+ * 2026-11-08 (phase 4, plan D4) — main window → main: a missing model's `Locate…`. `{ name }`, the
+ * model's file name for the dialog's title, never a path. Main shows its native Open dialog for one
+ * IFC and answers the file `admit()` let through, or why it refused it, or `null` (cancelled, or no
+ * project open).
+ */
+export const CH_PROJECT_LOCATE = 'project:locate'
 
 /**
  * Every channel main registers a handler for, for `SYSTEM_SPEC.md` §10 and the guard test.
@@ -156,5 +163,6 @@ export const IPC_CHANNELS = [
   CH_UPDATE_OPEN,
   CH_PROJECT_SNAPSHOT,
   CH_PROJECT_DIRTY,
-  CH_PROJECT_CLOSE
+  CH_PROJECT_CLOSE,
+  CH_PROJECT_LOCATE
 ] as const

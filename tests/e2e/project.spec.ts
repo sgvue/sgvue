@@ -10,13 +10,18 @@
  * 2026-11-07 (phase 3): a saved viewpoint and a spot coordinate come back too — the viewpoint in
  * the project's own list, the spot placed again through the viewer's own commit.
  *
- * The two native dialogs are answered from the environment in a development build, as the IFC
- * Open dialog is (`SGVUE_OPEN_PATHS`): `SGVUE_SAVE_PROJECT_PATH` for Save Project As… and
- * `SGVUE_OPEN_PROJECT_PATH` for Open Project… (`src/main/projects.ts`; a packaged build has
- * neither). The menu items are clicked by their ids, as a person's click runs the same handler.
+ * 2026-11-08 (phase 4, D4): a project whose model was moved opens with that model's designed row
+ * offering `Locate…`; the file picked there joins the open project as that model, the title marks
+ * the project unsaved, and Save Project writes the model's new path under the same id.
+ *
+ * The native dialogs are answered from the environment in a development build, as the IFC
+ * Open dialog is (`SGVUE_OPEN_PATHS`): `SGVUE_SAVE_PROJECT_PATH` for Save Project As…,
+ * `SGVUE_OPEN_PROJECT_PATH` for Open Project… and `SGVUE_LOCATE_MODEL_PATH` for Locate…
+ * (`src/main/projects.ts`; a packaged build has none of them). The menu items are clicked by
+ * their ids, as a person's click runs the same handler.
  */
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { actionText, DROP_COPY, HIGH_FIRST, launch, statusText, TINY } from './helpers'
@@ -151,6 +156,77 @@ test('Save Project, quit, Open Project: the models, a colour and a hidden storey
       await expect(page.getByText('Viewpoint 1', { exact: true })).toBeVisible()
       await page.locator('button[data-tip="Saved viewpoints"]').click()
       await expect.poll(() => windowTitle(app, page)).toBe('review — SGVue')
+    } finally {
+      await app.close()
+    }
+  }
+})
+
+test('a moved model: its row offers Locate…, and the file picked there joins the open project as that model', async () => {
+  const project = join(dir, 'moved.sgvue')
+  const models = join(dir, 'models')
+  const elsewhere = join(dir, 'elsewhere')
+  await mkdir(models)
+  await mkdir(elsewhere)
+  const tiny = join(models, 'tiny.ifc')
+  const high = join(models, 'high-first.ifc')
+  await copyFile(TINY, tiny)
+  await copyFile(HIGH_FIRST, high)
+  const moved = join(elsewhere, 'high-first.ifc')
+  type Saved = { models: { id: string; name: string; absPath: string }[] }
+
+  // ── first run: two models, saved as a project ──
+  let ids: Saved['models'] = []
+  {
+    const { app, page } = await launch(join(dir, 'profile'), {
+      SGVUE_OPEN_PATHS: `${tiny}:::${high}`,
+      SGVUE_SAVE_PROJECT_PATH: project
+    })
+    try {
+      await page.getByText(DROP_COPY).click()
+      await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+      await expect(page.locator('aside div.hv-step', { hasText: 'high-first.ifc' })).toBeVisible()
+      await menu(app, 'project-save')
+      await expect.poll(() => stat(project).then(() => true, () => false), { timeout: 20_000 }).toBe(true)
+      ids = (JSON.parse(await readFile(project, 'utf8')) as Saved).models
+      expect(ids.map((m) => m.name).sort()).toEqual(['high-first.ifc', 'tiny.ifc'])
+    } finally {
+      await app.close()
+    }
+  }
+
+  // The folder moved: high-first.ifc is no longer where the project says it is.
+  await rename(high, moved)
+  const highId = ids.find((m) => m.name === 'high-first.ifc')!.id
+
+  // ── second run: open the project, locate the moved model, save ──
+  {
+    const { app, page } = await launch(join(dir, 'profile-2'), {
+      SGVUE_OPEN_PROJECT_PATH: project,
+      SGVUE_LOCATE_MODEL_PATH: moved
+    })
+    try {
+      await menu(app, 'project-open')
+      await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+      await expect(page.locator('aside div.hv-step', { hasText: 'tiny.ifc' })).toBeVisible()
+      await expect(page.getByText('not found where the project says it is')).toBeVisible()
+      await expect.poll(() => windowTitle(app, page)).toBe('moved — SGVue')
+
+      await page.getByRole('button', { name: 'Locate…' }).click()
+      await expect(page.locator('aside div.hv-step', { hasText: 'high-first.ifc' })).toBeVisible({ timeout: 60_000 })
+      await expect(page.getByRole('button', { name: 'Locate…' })).toHaveCount(0)
+      await expect(page.getByText('not found where the project says it is')).toHaveCount(0)
+      // The file on disk still names the old path: unsaved.
+      await expect.poll(() => windowTitle(app, page), { timeout: 10_000 }).toBe('moved • — SGVue')
+
+      await menu(app, 'project-save')
+      await expect.poll(() => windowTitle(app, page), { timeout: 10_000 }).toBe('moved — SGVue')
+      const saved = (JSON.parse(await readFile(project, 'utf8')) as Saved).models
+      expect(saved).toHaveLength(2)
+      const high2 = saved.find((m) => m.id === highId)!
+      expect(high2.name).toBe('high-first.ifc')
+      // `admit()` gives the real path (on macOS the temporary folder is a link into /private).
+      expect(high2.absPath).toBe(await realpath(moved))
     } finally {
       await app.close()
     }

@@ -61,7 +61,8 @@ const {
   relPathFor,
   afterQuestionSave,
   NOTHING_REASON,
-  closeFromPage
+  closeFromPage,
+  locateModel
 } = projects
 
 
@@ -569,6 +570,62 @@ describe('admitProjectModels', () => {
   })
 })
 
+/* ────────────────────────────── Locate… (phase 4, D4) ────────────────────────────── */
+
+describe('project:locate — a missing model’s Locate…', () => {
+  const pick = (path: string | undefined) =>
+    dialog.showOpenDialog.mockResolvedValueOnce({ canceled: !path, filePaths: path ? [path] : [] })
+  async function openOne(): Promise<void> {
+    const file = join(review, 'locate.sgvue')
+    writeFileSync(file, projectAt())
+    pick(file)
+    await openProject()
+    dialog.showOpenDialog.mockReset()
+  }
+
+  it('answers the main window’s page alone, before the payload is read, and takes a name — never a path or anything more', async () => {
+    await openOne()
+    const other = { ...page.contents }
+    await expect(locateModel(other as never, { name: 'STR.ifc' })).rejects.toThrow('not available')
+    await expect(locateModel(page.contents as never, { name: 'STR.ifc', path: STR })).rejects.toThrow()
+    await expect(locateModel(page.contents as never, { name: 'a\u0000b' })).rejects.toThrow()
+    expect(dialog.showOpenDialog).not.toHaveBeenCalled()
+  })
+
+  it('with no project open: no dialog, and nothing', async () => {
+    expect(await locateModel(page.contents as never, { name: 'STR.ifc' })).toBeNull()
+    expect(dialog.showOpenDialog).not.toHaveBeenCalled()
+  })
+
+  it('the native Open dialog for one IFC; the pick through admit(): a file, a reason, or nothing — and null when cancelled', async () => {
+    await openOne()
+    pick(STR)
+    expect(await locateModel(page.contents as never, { name: 'STR.ifc' })).toEqual({
+      file: { path: STR, name: 'STR.ifc', size: readFileSync(STR).length },
+      refused: null
+    })
+    const opts = dialog.showOpenDialog.mock.calls[0][1] as { title: string; properties: string[]; filters: unknown[] }
+    expect(opts.title).toBe('Locate "STR.ifc"')
+    expect(opts.properties).toEqual(['openFile'])
+    expect(opts.filters).toEqual([{ name: 'IFC models', extensions: ['ifc', 'ifczip'] }])
+
+    const empty = join(models, 'EMPTY-locate.ifc')
+    writeFileSync(empty, '')
+    pick(empty)
+    const refused = await locateModel(page.contents as never, { name: 'STR.ifc' })
+    expect(refused?.file).toBeNull()
+    expect(refused?.refused).toEqual({ name: 'EMPTY-locate.ifc', reason: expect.any(String) })
+
+    pick(join(root, 'nowhere', 'STR.ifc'))
+    expect(await locateModel(page.contents as never, { name: 'STR.ifc' })).toEqual({ file: null, refused: null })
+
+    pick(undefined)
+    expect(await locateModel(page.contents as never, { name: 'STR.ifc' })).toBeNull()
+    // It wrote nothing: the project file is the one that was opened.
+    expect(readFileSync(join(review, 'locate.sgvue'), 'utf8')).toBe(projectAt())
+  })
+})
+
 /* ────────────────────────────── closing and quitting ────────────────────────────── */
 
 describe('afterQuestionSave — Save chosen in the question', () => {
@@ -600,6 +657,11 @@ describe('the question on close', () => {
     return event
   }
   const settle = () => new Promise((r) => setTimeout(r, 10))
+  /**
+   * 2026-11-08 — until `check` holds: the question, the save and its real disk write run on their
+   * own, and a fixed 10 ms was not always enough on a loaded machine (seen at phase 3's HEAD too).
+   */
+  const until = (check: () => void) => vi.waitFor(check, { timeout: 3000, interval: 5 })
 
   it('with no project, or none unsaved, a close goes through with no question', async () => {
     attachProjectWindow(page.win as never)
@@ -615,6 +677,7 @@ describe('the question on close', () => {
     await dirtyProject()
     dialog.showMessageBox.mockResolvedValueOnce({ response: 2 })
     expect(close().preventDefault).toHaveBeenCalled()
+    await until(() => expect(dialog.showMessageBox).toHaveBeenCalledTimes(1))
     await settle()
     const box = dialog.showMessageBox.mock.calls[0][1] as { buttons: string[]; cancelId: number }
     expect(box.buttons).toEqual(['Save', "Don't Save", 'Cancel'])
@@ -626,8 +689,7 @@ describe('the question on close', () => {
     await dirtyProject()
     dialog.showMessageBox.mockResolvedValueOnce({ response: 1 })
     close()
-    await settle()
-    expect(page.win.close).toHaveBeenCalledTimes(1)
+    await until(() => expect(page.win.close).toHaveBeenCalledTimes(1))
     expect(dialog.showSaveDialog).toHaveBeenCalledTimes(1)
 
     page = fakeWindow()
@@ -637,9 +699,8 @@ describe('the question on close', () => {
     writeFileSync(join(review, 'q.sgvue'), 'stale')
     dialog.showMessageBox.mockResolvedValueOnce({ response: 0 })
     close()
-    await settle()
+    await until(() => expect(page.win.close).toHaveBeenCalledTimes(1))
     expect(savedTo(join(review, 'q.sgvue')).format).toBe('sgvue-project')
-    expect(page.win.close).toHaveBeenCalledTimes(1)
   })
 
   it('Save with nothing to save because a project is still loading: the box says why, and the window stays', async () => {
@@ -647,6 +708,7 @@ describe('the question on close', () => {
     page.answer({ text: null, reason: 'loading' })
     dialog.showMessageBox.mockResolvedValueOnce({ response: 0 }).mockResolvedValueOnce({ response: 0 })
     close()
+    await until(() => expect(dialog.showMessageBox).toHaveBeenCalledTimes(2))
     await settle()
     expect(page.win.close).not.toHaveBeenCalled()
     const box = dialog.showMessageBox.mock.calls[1][1] as { title: string; message: string; detail: string }
@@ -659,9 +721,8 @@ describe('the question on close', () => {
     page.answer({ text: null, reason: 'no-models' })
     dialog.showMessageBox.mockResolvedValueOnce({ response: 0 })
     close()
-    await settle()
+    await until(() => expect(page.win.close).toHaveBeenCalledTimes(1))
     expect(dialog.showMessageBox).toHaveBeenCalledTimes(1)
-    expect(page.win.close).toHaveBeenCalledTimes(1)
   })
 
 })

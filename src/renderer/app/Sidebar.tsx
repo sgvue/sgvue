@@ -20,6 +20,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { federation as fed } from '../model/federation-store'
 import { openDialog, openLibrary } from '../model/upload-pipeline'
+import { LOCATE_LABEL, locateModel } from '../model/project'
 import { uploadRows } from '../state/selectors/uploads'
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
@@ -885,6 +886,19 @@ export default function Sidebar(): React.JSX.Element {
                     >
                       {u.stage}
                     </span>
+                    {/* 2026-11-08 (project phase 4, D4) — a missing model's Locate…, in the style
+                        string of the palette's own text button, `reset` (`SGVue.dc.html:121`),
+                        verbatim. */}
+                    {u.locate !== undefined && (
+                      <button
+                        onClick={() => void locateModel(u.locate!)}
+                        style={s(
+                          'font:500 11px/1 var(--sans);color:var(--accent-ink);padding:3px 2px;white-space:nowrap'
+                        )}
+                      >
+                        {LOCATE_LABEL}
+                      </button>
+                    )}
                   </span>
                   <span
                     style={s(

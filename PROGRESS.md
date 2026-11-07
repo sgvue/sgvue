@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — `.sgvue` project file, phase 4: changed and missing models
+
+**Did.** A model whose file changed since the project was saved opens anyway: its references come
+back by GlobalId, its row says how many saved items no longer match, and the project is unsaved
+until saved. A missing model's row offers Locate… — main's Open dialog, the pick admitted, the file
+loaded into the open project as that model (same id and label, references restored). A file already
+open is not loaded twice. When every model is missing, the first one located boots the viewer with
+the project open; a pick that lands while the project's own models are still joining is bound with
+them. Models keep their ids across saves.
+
+**Verified.** 21 new unit tests and 23 probes, each seen failing; typecheck, lint, 3 307 unit tests
+(twice) and the build pass. Two phase-2 close-question tests that flaked under load were made
+condition-based. Deep review PASS, then its four fixes PASS. The e2e, extended for one moved model
+located, is **not run** — it needs a window.
+
 ## 2026-11-07 — `.sgvue` project file, phase 3: lists and markups live in the project
 
 **Did.** While a project is open, its viewpoints, named filter sets and saved schedules are its

@@ -411,3 +411,22 @@ export type ProjectOpened =
 export interface ProjectSaved {
   n: number
 }
+
+/**
+ * 2026-11-08 (phase 4, plan D4) — `project:locate`: the missing model's file name, for the Open
+ * dialog's title. A name, never a path; no control characters.
+ */
+export const ProjectLocateRequest = z
+  .object({ name: z.string().min(1).max(1000).regex(/^[^\u0000-\u001f\u007f]*$/) })
+  .strict()
+export type ProjectLocateRequest = z.infer<typeof ProjectLocateRequest>
+
+/**
+ * `project:locate`'s answer when the user picked a file: the file `admit()` let through, or — when
+ * it refused it for a reason the drop zone gives — that reason; both `null` when it was refused for
+ * none. `null` instead of this when the dialog was cancelled or no project is open.
+ */
+export interface ProjectLocated {
+  file: PickedFile | null
+  refused: RefusedFile | null
+}

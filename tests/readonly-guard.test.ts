@@ -160,7 +160,11 @@ describe('read-only guard', () => {
       'onProjectSaved',
       'setProjectDirty',
       // …and `closeProject`, no payload: a fresh start replaced the open project.
-      'closeProject'
+      'closeProject',
+      // 2026-11-08 (phase 4, D4) — a missing model's Locate…: the model's file name goes in, for
+      // the dialog's title, never a path; main shows its own Open dialog and answers only what
+      // `admit()` let through of the user's pick.
+      'locateProjectModel'
     ])
   })
 
@@ -230,7 +234,16 @@ describe('read-only guard', () => {
     // The page reaches main on exactly those three channels, and names no path on any.
     const preload = readFileSync(join(SRC, 'preload/index.ts'), 'utf8')
     const invoked = [...preload.matchAll(/ipcRenderer\.invoke\((CH_PROJECT_[A-Z_]+)/g)].map((m) => m[1]).sort()
-    expect(invoked).toEqual(['CH_PROJECT_CLOSE', 'CH_PROJECT_DIRTY', 'CH_PROJECT_SNAPSHOT'])
+    expect(invoked).toEqual(['CH_PROJECT_CLOSE', 'CH_PROJECT_DIRTY', 'CH_PROJECT_LOCATE', 'CH_PROJECT_SNAPSHOT'])
+    // Phase 4: Locate… sends a name, never a path, and main checks the sender first, reads the path
+    // from its own Open dialog alone, and lets it through only by `admit()`.
+    expect(preload).toMatch(/locateProjectModel: \(name: string\): Promise<ProjectLocated \| null> => ipcRenderer\.invoke\(CH_PROJECT_LOCATE, \{ name \}\)/)
+    const locate = /export async function locateModel\(sender: WebContents, raw: unknown\)[\s\S]*?\n\}/.exec(code)
+    expect(locate, 'projects.ts no longer declares `locateModel`').not.toBeNull()
+    expect(locate![0]).toMatch(/^[^\n]*\n\s*fromMain\(sender\)\n/)
+    expect(locate![0]).toMatch(/const path = await pickModelPath\(win, name\)/)
+    expect(locate![0]).toMatch(/await admit\(\[path\], 'any', refused\)/)
+    expect(locate![0]).not.toMatch(/writeAtomic/)
   })
 
   it('exposes exactly the pinned Schedules preload API keys, and the main preload has neither', () => {

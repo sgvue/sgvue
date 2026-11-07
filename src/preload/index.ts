@@ -18,6 +18,7 @@ import {
   CH_LINK_OPEN,
   CH_PROJECT_CLOSE,
   CH_PROJECT_DIRTY,
+  CH_PROJECT_LOCATE,
   CH_PROJECT_OPENED,
   CH_PROJECT_SAVED,
   CH_PROJECT_SNAPSHOT,
@@ -46,6 +47,7 @@ import type {
   AiToolResult,
   AiTurnStart,
   LinkOpen,
+  ProjectLocated,
   ProjectOpened,
   ProjectSaved,
   ProjectSnapshot,
@@ -221,7 +223,13 @@ const api = {
   },
   setProjectDirty: (dirty: boolean): Promise<void> => ipcRenderer.invoke(CH_PROJECT_DIRTY, { dirty }),
   /** The page closed the open project (a fresh start replaced it). No payload. */
-  closeProject: (): Promise<void> => ipcRenderer.invoke(CH_PROJECT_CLOSE)
+  closeProject: (): Promise<void> => ipcRenderer.invoke(CH_PROJECT_CLOSE),
+  /**
+   * 2026-11-08 (phase 4, plan D4) — a missing model's `Locate…`: its file name, for the dialog's
+   * title, and never a path. Main shows the native Open dialog for one IFC and answers what
+   * `admit()` let through, or `null`.
+   */
+  locateProjectModel: (name: string): Promise<ProjectLocated | null> => ipcRenderer.invoke(CH_PROJECT_LOCATE, { name })
 }
 
 contextBridge.exposeInMainWorld('sgvue', api)

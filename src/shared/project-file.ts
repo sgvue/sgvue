@@ -692,6 +692,13 @@ export interface ProjectModelInfo {
    * position: written as `assigned: true`, and restored. Ignored when the user picked a colour.
    */
   assigned?: boolean
+  /**
+   * 2026-11-08 (phase 4) — the id this model has in the project that is open (`m1` …): kept when
+   * it is a valid id that no carried model and no earlier model has, else the model takes the next
+   * free one. A model the project opened, found changed (D3) or located (D4) keeps its id, so
+   * every reference to it stays the same across saves; a model new to the project has none.
+   */
+  id?: string
 }
 
 export interface ProjectContext {
@@ -757,11 +764,16 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
 
   const idOf = new Map<string, string>()
   const models: ProjectModel[] = []
-  // The carried models' ids stay theirs: a loaded model takes the next id that is free.
-  const reserved = new Set((ctx.carried ?? []).map((c) => c.id))
+  // The carried models' ids stay theirs, and so does a loaded model's own id (phase 4): any other
+  // loaded model takes the next id that is free.
+  const carriedIds = new Set((ctx.carried ?? []).map((c) => c.id))
+  const ownId = (id: string | undefined): id is string =>
+    id !== undefined && /^m[1-9][0-9]{0,5}$/.test(id) && !carriedIds.has(id)
+  const reserved = new Set([...carriedIds, ...ctx.models.map((m) => m.id).filter(ownId)])
+  const usedIds = new Set<string>()
   let nextId = 1
   const freeId = (): string => {
-    while (reserved.has(`m${nextId}`)) nextId++
+    while (reserved.has(`m${nextId}`) || usedIds.has(`m${nextId}`)) nextId++
     return `m${nextId++}`
   }
   for (const m of ctx.models) {
@@ -775,11 +787,12 @@ export function projectOf(s: ProjectSource, ctx: ProjectContext): ProjectWrite {
       m.size >= 0
     // A model the file cannot name — no absolute path, no digest — is left out, and so are its
     // elements' references; it is counted.
-    if (!usable || models.length + reserved.size >= MAX_MODELS) {
+    if (!usable || models.length + carriedIds.size >= MAX_MODELS) {
       dropped.items++
       continue
     }
-    const id = freeId()
+    const id = ownId(m.id) && !usedIds.has(m.id) ? m.id : freeId()
+    usedIds.add(id)
     idOf.set(m.key, id)
     const own = s.modelColors[m.key]
     const assigned = !isColour(own) && m.assigned === true && isColour(m.colour)

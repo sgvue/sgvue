@@ -119,5 +119,5 @@ An "Allowed desktop deviations" entry (the File menu items, the title marker, th
 
 - ~~Phase 3: `carryForward` merging viewpoints by id~~ — done: an explicit pairing map.
 - ~~Phase 3: re-measure or draw from stored lengths~~ — done: re-fired from a stored normal, else the directions that read.
-- Phase 4: with an all-missing project open, a new pick on the landing page closes it (the file is untouched) — Locate… is the way in.
+- Phase 4 — done: Locate… is the way into an all-missing project; other landing picks still close it (the file is untouched).
 - Before release: on macOS ⌘Q, the Vee and Schedules child windows may close before the main window's question, and stay closed on Cancel — check in the e2e run.

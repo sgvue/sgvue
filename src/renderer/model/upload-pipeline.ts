@@ -57,7 +57,17 @@ export interface ChosenFile {
    * error row with that reason (`rejectOf`).
    */
   refused?: up.RejectReason
+  /**
+   * 2026-11-08 (project phase 4, D4) — a file located for a project's missing model: it loads under
+   * that model's key, `modelKeyOf` of the project's file name (the key a restore already gave the
+   * model's `Model` rules), and is named as the project named it, whatever the picked file is
+   * called. A key already open is asked about as any pick's is ("Replace model?").
+   */
+  as?: { key: string; name: string }
 }
+
+/** The model key a chosen file asks for: the project's, for a located file, else its stem. */
+const keyOfChosen = (f: ChosenFile): string => f.as?.key ?? modelKeyOf(f.name)
 
 /** Why a chosen file gets the designed error row instead of a load — `null` when it loads. */
 const rejectOf = (f: ChosenFile): up.RejectReason | null => f.refused ?? up.validate(f.name, f.size)
@@ -109,6 +119,21 @@ export interface AfterJoin {
   order: readonly string[]
   then: () => Promise<void>
 }
+
+/**
+ * 2026-11-08 (phase 4) — a second `AfterJoin` for the same batch (a model located while the
+ * project's own models still load) runs after the first: both orders, both restores, in turn.
+ */
+export const chainAfter = (a: AfterJoin | null, b: AfterJoin): AfterJoin =>
+  a
+    ? {
+        order: [...a.order, ...b.order],
+        then: async () => {
+          await a.then().catch((err: unknown) => console.error('[sgvue] project restore failed —', err))
+          await b.then()
+        }
+      }
+    : b
 let pendingAfter: AfterJoin | null = null
 
 /** Timers started by `queue`'s 500 ms stagger, so a dispose can cancel them. */
@@ -184,9 +209,9 @@ export async function confirmPick(
   const kept: ChosenFile[] = []
   const keptKeys = new Set<string>()
   for (const f of files) {
-    const key = modelKeyOf(f.name)
+    const key = keyOfChosen(f)
     const valid = !rejectOf(f)
-    if (valid && !keptKeys.has(key) && isBusy(key) && !(await ask(f.name))) continue
+    if (valid && !keptKeys.has(key) && isBusy(key) && !(await ask(f.as?.name ?? f.name))) continue
     if (valid) keptKeys.add(key)
     kept.push(f)
   }
@@ -197,10 +222,13 @@ export async function confirmPick(
  * Each file's model key: its stem, or — for a second file of the same stem in one pick —
  * ` (2)`, ` (3)`, … whichever is free. The one place a suffix is still given.
  */
-export function keysFor(files: readonly { name: string }[], isBusy: (key: string) => boolean): string[] {
+export function keysFor(
+  files: readonly { name: string; as?: { key: string } }[],
+  isBusy: (key: string) => boolean
+): string[] {
   const used = new Set<string>()
   return files.map((f) => {
-    const stem = modelKeyOf(f.name)
+    const stem = f.as?.key ?? modelKeyOf(f.name)
     let key = stem
     for (let n = 2; used.has(key) || (key !== stem && isBusy(key)); n++) key = `${stem} (${n})`
     used.add(key)
@@ -237,15 +265,19 @@ export function queue(files: readonly ChosenFile[]): number {
   return n
 }
 
-/** `SGVue.dc.html:1167`. */
-export function addError(name: string, msg: string): void {
+/**
+ * `SGVue.dc.html:1167`. 2026-11-08 (project phase 4, D4): `locate`, the id of a project's model no
+ * file was admitted for — the row then offers `Locate…`.
+ */
+export function addError(name: string, msg: string, locate?: string): void {
   useShell.getState().addUpload({
     id: up.uploadId('e'),
     name,
     stage: msg,
     pct: 0,
     error: true,
-    dismiss: true
+    dismiss: true,
+    ...(locate !== undefined ? { locate } : {})
   })
 }
 
@@ -287,7 +319,8 @@ function startUpload(chosen: ChosenFile, key: string, own: Claim, prior: Promise
       if (own.superseded) return fed.forget(key)
       own.item = item
       pending.push(item)
-      pendingNames[item.index.modelKey] = chosen.name
+      // A located file is named as the project named its model (phase 4, D4).
+      pendingNames[item.index.modelKey] = chosen.as?.name ?? chosen.name
       if (!chosen.unadmitted) {
         void api()
           ?.addRecent({
@@ -551,16 +584,28 @@ function forgetDemoView(): void {
  * in between. After boot: a native "Replace model?" for each file whose model is already open
  * or loading, then the queue.
  */
-async function begin(files: readonly ChosenFile[], session?: SessionPayload, after?: AfterJoin): Promise<void> {
-  if (!useShell.getState().booted || demoShown) freshStart(after !== undefined)
+async function begin(
+  files: readonly ChosenFile[],
+  session?: SessionPayload,
+  after?: AfterJoin,
+  join = false
+): Promise<number> {
+  // `join` (a located model, phase 4) never starts fresh: it joins what is loading and leaves the
+  // landing page's rows — the other missing models and their Locate… — where they are.
+  if (join && !useShell.getState().booted) {
+    /* nothing to replace: a pick that is not the project's would have closed it */
+  } else if (!useShell.getState().booted || demoShown) freshStart(after !== undefined)
   else files = await confirmPick(files, busy, askReplace)
   if (session) pendingSession = session
-  if (after) pendingAfter = after
+  const before = pendingAfter
+  if (after) pendingAfter = join ? chainAfter(before, after) : after
   // A session whose every file was rejected must not be left waiting for the *next* upload.
-  if (!queue(files)) {
+  const n = queue(files)
+  if (!n) {
     if (session) pendingSession = null
-    if (after) pendingAfter = null
+    if (after) pendingAfter = join ? before : null
   }
+  return n
 }
 
 /**
@@ -577,6 +622,19 @@ let dialogs = 0
  * `request_user_action` asks this first.
  */
 export const openDialogUp = (): boolean => dialogs > 0
+
+/**
+ * 2026-11-08 (project phase 4) — another Open dialog of the app's, counted as `openDialog`'s is:
+ * a missing model's Locate…, which main shows (`model/project.ts`).
+ */
+export async function inOpenDialog<T>(ask: () => Promise<T>): Promise<T> {
+  dialogs++
+  try {
+    return await ask()
+  } finally {
+    dialogs--
+  }
+}
 
 /**
  * The designed `upload` control and the drop zone, behind Electron's native Open dialog.
@@ -699,6 +757,23 @@ export async function openProjectFiles(
 ): Promise<boolean> {
   await begin([...files.map(chosenOf), ...refused.map(refusedOf)], undefined, after)
   return files.length > 0
+}
+
+/**
+ * 2026-11-08 (phase 4, plan D4) — a file the user located for a project's missing model, loading
+ * **into the open project as that model**: under the model's key and name (`ChosenFile.as`), and
+ * never as a fresh start — on the landing page it starts the boot without clearing the other
+ * missing models' rows, and while the project's own models still load it joins their batch, its
+ * `after` run behind theirs (`chainAfter`). After boot it is a pick like any other: it joins the
+ * federation, and "Replace model?" is asked if its key is taken. `after` binds and restores it
+ * once it has joined. Resolves `false` when nothing was queued.
+ */
+export async function locateFile(
+  file: PickedFile,
+  as: { key: string; name: string },
+  after: AfterJoin
+): Promise<boolean> {
+  return (await begin([{ ...chosenOf(file), as }], undefined, after, true)) > 0
 }
 
 /**

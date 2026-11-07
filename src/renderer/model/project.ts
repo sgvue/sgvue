@@ -19,12 +19,30 @@
  * page is never handed a path from the file that `admit()` did not pass. A project **replaces
  * what is open** (`startOver`, the landing page's fresh start), its models load through the
  * upload pipeline like any pick, and once they have joined `restorePlanOf` maps the file onto
- * them by GlobalId and the store's own `applySession` puts the state back (`RESTORE_ORDER`). For
- * now a model that is missing, refused, or changed (another size, or another SHA-256 once
- * parsed) is left out and named — in the landing page's banner when nothing could be opened, in
- * the designed error row otherwise. Locate… and the full wording are phase 4. **Such a model is
- * never dropped by a save**: its entry and every reference to it are carried forward from the
- * opened file, exactly as that file had them (`Carried`, `carryForward`).
+ * them by GlobalId and the store's own `applySession` puts the state back (`RESTORE_ORDER`). A
+ * model no file was admitted for (missing, or refused for a reason the drop zone gives) is left
+ * out and named — in the landing page's banner when nothing could be opened, and in its designed
+ * error row, which offers `Locate…` (below). **Such a model is never dropped by a save**: its
+ * entry and every reference to it are carried forward from the opened file, exactly as that file
+ * had them (`Carried`, `carryForward`).
+ *
+ * **A changed model (phase 4, plan D3)** — another size, or another SHA-256 once parsed — is
+ * opened anyway, and the project's references to it are put back by GlobalId as for any model.
+ * Its designed error row says, once, that it changed since the project was saved and how many of
+ * the saved items naming it no longer matched (`changedText`, from `restorePlanOf`'s `unmatched`).
+ * The project is then unsaved (`project.stale`), because the file on disk still names the old
+ * bytes and the next save writes the new hash and size.
+ *
+ * **Locate… (phase 4, plan D4).** A missing model's row offers `Locate…`; a click opens main's
+ * native Open dialog for one IFC, main admits the pick through `admit()`, and the file loads
+ * **into the open project as that model** (`locateModel`, the pipeline's `locateFile`): under the
+ * key and name the project gave it, keeping its id; once it has joined, the project's references
+ * to it are put back by GlobalId (`restoreLocated`), it leaves `carried`, its row goes, and the
+ * project is unsaved — the next save writes its new paths, hash and size, under the same id. A
+ * located file whose bytes differ from the saved ones is a changed model (D3). When every model
+ * was missing, the first one located boots the viewer with the whole project restored onto it.
+ * Every model the project opened, changed or located keeps its id in every save (`project.bound`,
+ * `ProjectModelInfo.id`).
  *
  * **The project's own lists (phase 3, plan D9).** While a project is open its saved viewpoints and
  * named filter sets are the store's lists (`setProjectLists`) and its saved schedule setups and
@@ -58,14 +76,14 @@ import { MC } from '../../shared/colors'
 import type { LaserDirection } from '../../shared/annotate'
 import { turnXY } from '../../shared/plan-rotation'
 import { ID_STRIDE, modelKeyOf } from '../../shared/federate'
+import { thin } from '../../shared/fmt'
 import { IDENTITY_FRAME_KEY } from '../../shared/georef'
 import type {
   PickedFile,
   ProjectModelFile,
   ProjectNothing,
   ProjectOpened,
-  ProjectSnapshot,
-  RefusedFile
+  ProjectSnapshot
 } from '../../shared/ipc-contract'
 import {
   carryForward,
@@ -94,7 +112,7 @@ import { getViewer, useShell, type ShellState } from '../state/shell'
 import { api } from '../api'
 import { afterPaint, federation as fed } from './federation-store'
 import { onProjectSchedules, openSchedule, projectSchedules, setProjectSchedules } from './schedule-link'
-import { addError, onFreshStart, openProjectFiles, startOver } from './upload-pipeline'
+import { addError, inOpenDialog, locateFile, onFreshStart, openProjectFiles, startOver } from './upload-pipeline'
 
 /** A loaded model's file, as the project records it (`federation.projectFiles()`). */
 export type ProjectFileInfo = SessionFile & { size?: number }
@@ -106,6 +124,11 @@ export interface SnapshotInputs {
   files: readonly ProjectFileInfo[]
   schedules: readonly ProjectSavedSchedule[]
   openSchedule: ScheduleDef | null
+  /**
+   * 2026-11-08 (phase 4) — model key → the id the open project has for it (`m1` …), kept by the
+   * writer (`ProjectModelInfo.id`). Not part of the state key: an id is the file's bookkeeping.
+   */
+  ids?: ReadonlyMap<string, string>
 }
 
 /** The palette D12 assigns from: the design's model palette less its neutral grey, as the Recent pills' is. */
@@ -114,6 +137,24 @@ export const ASSIGN_PALETTE: readonly string[] = MC.slice(1)
 /** The copy of the designed error row for a model a project names and could not open. */
 export const MODEL_MISSING = 'not found where the project says it is'
 export const MODEL_CHANGED = 'changed since the project was saved'
+
+/**
+ * 2026-11-08 (phase 4, D3) — the designed error row's line for a model opened although its bytes
+ * changed: `MODEL_CHANGED`, then how many of the project's saved items naming it (hidden elements,
+ * and the elements its viewpoints hide) no longer matched an element by GlobalId.
+ */
+export function changedText(unmatched: number): string {
+  if (unmatched <= 0) return MODEL_CHANGED
+  return unmatched === 1
+    ? `${MODEL_CHANGED} — 1 saved item no longer matches`
+    : `${MODEL_CHANGED} — ${thin(unmatched)} saved items no longer match`
+}
+
+/** 2026-11-08 — the designed error row's line for a Locate… pick that is already open, or already being located. */
+export const LOCATE_ALREADY_OPEN = 'already open in this project'
+
+/** The copy of the button a missing model's row offers (plan D4). */
+export const LOCATE_LABEL = 'Locate…'
 
 /* ────────────────────────────── the snapshot (pure) ────────────────────────────── */
 
@@ -159,13 +200,19 @@ export function projectSourceOf(i: SnapshotInputs): ProjectSource {
 }
 
 /** Each loaded model with a file, as `projectOf` takes it: the MODELS row's label and colour. */
-export function projectModelsOf(s: ShellState, files: readonly ProjectFileInfo[]): ProjectModelInfo[] {
+export function projectModelsOf(
+  s: ShellState,
+  files: readonly ProjectFileInfo[],
+  ids?: ReadonlyMap<string, string>
+): ProjectModelInfo[] {
   const byKey = new Map(s.federation.models.map((m) => [m.meta.modelKey, m]))
   return files.flatMap((f) => {
     const m = byKey.get(f.key)
     if (!m) return []
+    const id = ids?.get(f.key)
     return [
       {
+        ...(id !== undefined ? { id } : {}),
         key: f.key,
         path: f.path,
         name: f.name,
@@ -191,13 +238,14 @@ export function projectContextOf(
   s: ShellState,
   files: readonly ProjectFileInfo[],
   savedAt: string,
-  savedBy: string
+  savedBy: string,
+  ids?: ReadonlyMap<string, string>
 ): ProjectContext {
   return {
     projectPath: '',
     savedBy,
     savedAt,
-    models: projectModelsOf(s, files),
+    models: projectModelsOf(s, files, ids),
     offset: s.offset,
     elementRef: (id) => {
       const el = s.byId.get(id)
@@ -242,7 +290,7 @@ export function buildProject(i: SnapshotInputs, savedAt: string, savedBy: string
     .filter((m) => carried!.ids.includes(m.id))
     .map((m) => ({ id: m.id, key: modelKeyOf(m.name) }))
     .filter((c) => !loaded.has(c.key))
-  const ctx = { ...projectContextOf(i.state, i.files, savedAt, savedBy), carried: keep }
+  const ctx = { ...projectContextOf(i.state, i.files, savedAt, savedBy, i.ids), carried: keep }
   const built = projectOf(projectSourceOf(i), ctx)
   if (!carried) return built
   let project = built.project
@@ -444,7 +492,7 @@ export const lastProjectRestore = (): MarkupRestore | null => lastRestore
  * collapsed.
  */
 export function placeMarkups(
-  file: ProjectFile,
+  file: Pick<ProjectFile, 'markups'>,
   elements: readonly { model: string; bbox?: readonly number[] }[],
   anyMissing: boolean
 ): {
@@ -546,8 +594,19 @@ const project = {
   /** What main was last told. */
   dirty: false,
   /** An upload row of this project's has appeared — so "no row left" means its load is over. */
-  sawRows: false
+  sawRows: false,
+  /**
+   * 2026-11-08 (phase 4) — unsaved whatever the state key says: a model was opened changed (D3) or
+   * located (D4), so the file on disk names bytes or a path that are no longer the model's. Cleared
+   * by a save.
+   */
+  stale: false,
+  /** 2026-11-08 (phase 4) — the project's models that are open, by id: id → model key. */
+  bound: new Map<string, string>()
 }
+
+/** 2026-11-08 (phase 4) — models picked with Locate… that have not joined yet: id → admitted path. */
+const locating = new Map<string, string>()
 
 /** The opened project's models that are not open, carried into every save (`buildProject`). */
 let carried: Carried | null = null
@@ -575,7 +634,8 @@ const liveInputs = (): SnapshotInputs => ({
   state: useShell.getState(),
   cam: getViewer()?.getCamera() ?? null,
   files: fed.projectFiles(),
-  ...liveSchedules()
+  ...liveSchedules(),
+  ids: new Map([...project.bound].map(([id, key]) => [key, id]))
 })
 
 /** The things the key is computed from, by reference: while none changed the key cannot have. */
@@ -600,7 +660,7 @@ function liveKey(force = false): string {
 /** Tell main whether the open project has unsaved changes — when that flips, or when `force`d. */
 function checkDirty(force = false): void {
   if (!project.open || project.loading) return
-  const dirty = liveKey() !== project.baseline
+  const dirty = project.stale || liveKey() !== project.baseline
   if (dirty === project.dirty && !force) return
   project.dirty = dirty
   void api()?.setProjectDirty(dirty).catch(() => undefined)
@@ -686,6 +746,7 @@ function onSaved(n: number): void {
   if (!project.open) importLists()
   project.open = true
   project.loading = false
+  project.stale = false
   project.baseline = snap.key
   for (const k of snap.keys) project.known.add(k)
   watch()
@@ -721,20 +782,27 @@ async function restoreOnto(file: ProjectFile, admittedAs: ReadonlyMap<string, st
     const key = keyOfPath.get(path)
     if (key !== undefined) bind.set(id, key)
   }
-  // A model whose bytes differ from the ones the project was saved with is left out, for now
-  // (phase 4 opens it anyway and says what no longer matched, D3).
-  for (const m of file.models) {
-    const key = bind.get(m.id)
-    const live = key !== undefined ? files.find((f) => f.key === key) : undefined
-    if (key === undefined || !live || live.sha256 === m.sha256) continue
-    bind.delete(m.id)
-    await fed.removeModel(key)
-    addError(m.name, MODEL_CHANGED)
+  // A model located while the project's own models loaded, and already joined, is the project's
+  // too (D4): bound here with the rest, whichever of the two joins finished first — its own
+  // restore waits for this one while the project loads (`restoreLocated`).
+  const folded: string[] = []
+  for (const [id, path] of locating) {
+    const key = keyOfPath.get(path)
+    if (key === undefined || bind.has(id) || !file.models.some((m) => m.id === id)) continue
+    bind.set(id, key)
+    locating.delete(id)
+    folded.push(id)
   }
+  if (folded.length) project.stale = true
   useShell.setState({ assignedColors: {} })
   const f = fed.current
   const plan = restorePlanOf(file, { models: f.models, elements: f.elements }, { bind, offset: useShell.getState().offset })
   if (Object.keys(plan.unmatched).length) console.info('[sgvue] project references that matched nothing:', plan.unmatched)
+  project.bound = new Map(Object.entries(plan.models))
+  for (const id of folded) dropLocateRows(id)
+  // D3 — a model whose bytes differ from the ones the project was saved with is open anyway, and
+  // restored by GlobalId with the rest; its row says so once, with what no longer matched.
+  sayChanged(file, plan, bind, files)
   // The project's lists, now that its viewpoints' elements can be named by the ids they have.
   const views = enterLists(plan, true)
   // What is not open — missing, refused, changed — is carried into every save, unchanged.
@@ -765,6 +833,180 @@ function enterLists(plan: RestorePlan, show: boolean): Map<number, number> {
   return new Map(views.map((v, i) => [v.id, i]))
 }
 
+/**
+ * D3 — for each of `ids`' models whose live bytes are not the saved ones: the designed error row,
+ * once, with how many saved items naming it matched nothing (`changedText`), and the project is
+ * unsaved. Returns how many were changed.
+ */
+function sayChanged(
+  file: ProjectFile,
+  plan: RestorePlan,
+  ids: ReadonlyMap<string, string>,
+  files: readonly ProjectFileInfo[]
+): number {
+  let n = 0
+  for (const m of file.models) {
+    const key = ids.get(m.id)
+    const live = key !== undefined ? files.find((f) => f.key === key) : undefined
+    // A size the parse did not record is no evidence of a change; the digest decides then.
+    if (!live || (live.sha256 === m.sha256 && (live.size === undefined || live.size === m.size))) continue
+    const u = Object.hasOwn(plan.unmatched, m.id) ? plan.unmatched[m.id] : null
+    addError(m.name, changedText(u ? u.hidden + u.viewpoints : 0))
+    project.stale = true
+    n++
+  }
+  return n
+}
+
+/** The designed error rows that offer Locate… for the model `id`, gone: it is open now. */
+function dropLocateRows(id: string): void {
+  const s = useShell.getState()
+  for (const u of s.uploads) if (u.locate === id) s.dropUpload(u.id)
+}
+
+/**
+ * A missing model's `Locate…` (plan D4): main's native Open dialog for one IFC, the pick admitted
+ * by main's `admit()`, and the file loaded into the open project as that model (`locateFile`) —
+ * restored once it has joined (`restoreLocated`). Cancelled, nothing changes and the row stays; a
+ * pick `admit()` refuses for a reason the drop zone gives gets the designed error row with that
+ * reason, and the row stays. Does nothing unless the model is one the open project is carrying.
+ */
+export async function locateModel(id: string): Promise<void> {
+  const c = carried
+  if (!project.open || !c || !c.ids.includes(id)) return
+  const m = c.file.models.find((x) => x.id === id)
+  const bridge = api()
+  if (!m || !bridge) return
+  // The dialog's title only; `ProjectLocateRequest` takes no control character.
+  const name = m.name.replace(/[\u0000-\u001f\u007f]/g, '') || 'model'
+  const answer = await inOpenDialog(() => bridge.locateProjectModel(name)).catch((err: unknown) => {
+    console.error('[sgvue] Locate… failed —', err)
+    return null
+  })
+  // Cancelled — or, while the dialog was up, the project closed, another opened, or this model
+  // was located already: nothing to do.
+  if (!answer || !project.open || carried?.file !== c.file || !carried.ids.includes(id)) return
+  if (!answer.file) {
+    if (answer.refused) addError(answer.refused.name, answer.refused.reason)
+    return
+  }
+  // A file that is already one of the open models, or already being located for another: loading it
+  // again would show one file twice. Nothing loads; the row says why, and Locate… stays.
+  const path = answer.file.path
+  if (fed.projectFiles().some((f) => f.path === path) || [...locating.values()].includes(path)) {
+    addError(answer.file.name, LOCATE_ALREADY_OPEN)
+    return
+  }
+  const key = modelKeyOf(m.name)
+  locating.set(id, answer.file.path)
+  // The project's own model: never given a D12 colour as a newcomer when it joins.
+  project.known.add(key)
+  await locateFile(answer.file, { key, name: m.name }, { order: [answer.file.path], then: restoreLocated })
+}
+
+/**
+ * The located models that have joined, bound to their ids and restored by GlobalId (plan D4). With
+ * nothing of the project on screen before — every model was missing — this is the project's boot,
+ * and the whole project is restored onto it (`restore`). Otherwise only what names the located
+ * models is put back (`mergeLocated`). Either way they leave `carried`, their rows go, a changed
+ * one says so (D3), and the project is unsaved. Exported for the tests.
+ */
+export async function restoreLocated(): Promise<void> {
+  const c = carried
+  // While the project's own models are loading, its own restore is still to come and binds every
+  // located model that has joined by then (`restoreOnto`): a full restore here first would bind
+  // this one alone, and the project's would then leave it out.
+  if (!project.open || project.loading || !c || !locating.size) return
+  const files = fed.projectFiles()
+  const keyOfPath = new Map(files.map((f) => [f.path, f.key]))
+  const found = new Map<string, string>()
+  for (const [id, path] of locating) if (c.ids.includes(id) && keyOfPath.has(path)) found.set(id, path)
+  if (!found.size) return
+  for (const id of found.keys()) locating.delete(id)
+  if (!project.bound.size) await restore(c.file, found)
+  else await mergeLocated(c, found, keyOfPath, files)
+  for (const id of found.keys()) dropLocateRows(id)
+  project.stale = true
+  checkDirty(true)
+}
+
+/**
+ * Put back what the opened file says of the located models — and nothing else, so the review as
+ * it stands is kept: their hidden elements, their eyes, the user's own and the project's assigned
+ * colours for them, and in each of the project's viewpoints that is still the file's
+ * (`Carried.views`) the elements it hides of them and their eyes. Markups carried because they
+ * stood on a missing model are measured again. Activate mode is not changed.
+ */
+async function mergeLocated(
+  c: Carried,
+  found: ReadonlyMap<string, string>,
+  keyOfPath: ReadonlyMap<string, string>,
+  files: readonly ProjectFileInfo[]
+): Promise<void> {
+  const bind = new Map(project.bound)
+  const fresh = new Map<string, string>()
+  for (const [id, path] of found) {
+    const key = keyOfPath.get(path)!
+    bind.set(id, key)
+    fresh.set(id, key)
+  }
+  const f = fed.current
+  const plan = restorePlanOf(c.file, { models: f.models, elements: f.elements }, { bind, offset: useShell.getState().offset })
+  const keys = new Set(fresh.values())
+  const s = useShell.getState()
+  const ofFresh = (hidden: Readonly<Record<string, boolean>>): Record<string, boolean> => {
+    const out: Record<string, boolean> = {}
+    for (const id of Object.keys(hidden)) {
+      const el = s.byId.get(Number(id))
+      if (el && keys.has(el.model)) out[id] = true
+    }
+    return out
+  }
+  const modelVis = { ...s.modelVis }
+  for (const k of keys) if (Object.hasOwn(plan.state.modelVis, k)) modelVis[k] = plan.state.modelVis[k]
+  // Restored, as the open restored the rest: not a step on the undo stack.
+  s.up({ hidden: { ...s.hidden, ...ofFresh(plan.state.hidden) }, modelVis }, true)
+
+  const modelColors = { ...s.modelColors }
+  const assignedColors = { ...s.assignedColors }
+  for (const k of keys) {
+    if (Object.hasOwn(plan.state.modelColors, k)) modelColors[k] = plan.state.modelColors[k]
+    if (Object.hasOwn(plan.state.assignedColors, k)) assignedColors[k] = plan.state.assignedColors[k]
+    else delete assignedColors[k]
+  }
+  useShell.setState({ modelColors, assignedColors })
+  getViewer()?.setModelColors(modelColors, useShell.getState().nativeMats)
+
+  if (c.views?.size) {
+    const pairs = c.views
+    const views = useShell.getState().views.map((v) => {
+      const at = pairs.get(v.id)
+      const pv = at !== undefined ? plan.state.views[at] : undefined
+      if (!pv) return v
+      const mv = { ...v.modelVis }
+      for (const k of keys) if (Object.hasOwn(pv.modelVis, k)) mv[k] = pv.modelVis[k]
+      return { ...v, hidden: { ...v.hidden, ...ofFresh(pv.hidden) }, modelVis: mv }
+    })
+    useShell.setState({ views })
+  }
+
+  project.bound = bind
+  for (const k of keys) project.known.add(k)
+  carried = { ...c, ids: c.ids.filter((id) => !found.has(id)) }
+  sayChanged(c.file, plan, fresh, files)
+
+  // The measurements that stood on a missing model, measured again now there may be one under them.
+  if (c.measures?.length || c.spots?.length) {
+    await afterPaint()
+    const placed = placeMarkups(
+      { markups: { spots: [...(c.spots ?? [])], measures: [...(c.measures ?? [])] } },
+      fed.current.elements,
+      carried.ids.length > 0
+    )
+    carried = { ...carried, measures: placed.carried, spots: placed.spots }
+  }
+}
+
 /** Loading is over, restored or not: from here the state is the project's as opened. */
 function settle(): void {
   // Closed while it loaded (a fresh start that was not the project's own): nothing to settle.
@@ -790,6 +1032,9 @@ export function closeProject(): void {
   project.baseline = ''
   project.dirty = false
   project.sawRows = false
+  project.stale = false
+  project.bound = new Map()
+  locating.clear()
   carried = null
   snapshots.clear()
   useShell.setState({ assignedColors: {} })
@@ -817,6 +1062,9 @@ export async function openProjectMessage(msg: ProjectOpened): Promise<void> {
   project.known = new Set()
   project.baseline = ''
   project.sawRows = false
+  project.stale = false
+  project.bound = new Map()
+  locating.clear()
   snapshots.clear()
   startOver()
   useShell.setState({ assignedColors: {} })
@@ -835,23 +1083,25 @@ export async function openProjectMessage(msg: ProjectOpened): Promise<void> {
 
   const sent = new Map<string, ProjectModelFile>(msg.models.map((m) => [m.id, m]))
   const files: PickedFile[] = []
-  const refused: RefusedFile[] = []
-  const left: { name: string; why: string }[] = []
+  // No file admitted — missing, or refused for a reason the drop zone gives: each gets its
+  // designed error row, offering Locate… (D4). A file of another size loads, and is a changed
+  // model once parsed (D3).
+  const left: { id: string; name: string; row: string; why: string }[] = []
   const admittedAs = new Map<string, string>()
   for (const m of file.models) {
     const got = sent.get(m.id)
-    if (got?.file && got.file.size === m.size) {
+    if (got?.file) {
       files.push(got.file)
       admittedAs.set(m.id, got.file.path)
-    } else if (got?.file) left.push({ name: m.name, why: MODEL_CHANGED })
-    else if (got?.refused) refused.push(got.refused)
-    else left.push({ name: m.name, why: MODEL_MISSING })
+    } else if (got?.refused) left.push({ id: m.id, name: m.name, row: got.refused.name, why: got.refused.reason })
+    else left.push({ id: m.id, name: m.name, row: m.name, why: MODEL_MISSING })
   }
-  const queued = await openProjectFiles(files, refused, {
+  const queued = await openProjectFiles(files, [], {
     order: files.map((f) => f.path),
     then: () => restore(file, admittedAs)
   })
-  for (const l of left) addError(l.name, l.why)
+  // A model located while the load ran (D4) is open already: no row for it.
+  for (const l of left) if (!project.bound.has(l.id)) addError(l.row, l.why, l.id)
   if (!queued) {
     if (left.length) {
       const names = left.map((l) => l.name).join(', ')

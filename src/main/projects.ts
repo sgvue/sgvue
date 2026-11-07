@@ -45,7 +45,9 @@ import {
 import {
   ProjectClose,
   ProjectDirty,
+  ProjectLocateRequest,
   ProjectSnapshot,
+  type ProjectLocated,
   type ProjectNothing,
   type ProjectModelFile,
   type ProjectOpened,
@@ -600,6 +602,52 @@ export async function openProject(): Promise<void> {
   state.busy = true
   try {
     await openNow()
+  } finally {
+    state.busy = false
+  }
+}
+
+/* ────────────────────────────── Locate… (phase 4, D4) ────────────────────────────── */
+
+/** The Open dialog for a missing model: one IFC, attached to the main window; `null` when cancelled. */
+async function pickModelPath(win: BrowserWindow, name: string): Promise<string | null> {
+  // A native dialog cannot be driven by an automated test: a development build takes its answer
+  // from the environment, as Open Project… does. A shipped build has no such path.
+  const injected = !app.isPackaged ? process.env.SGVUE_LOCATE_MODEL_PATH : undefined
+  if (injected) return injected
+  const title = `Locate "${name}"`
+  const { canceled, filePaths } = await openDialog(win, {
+    title,
+    message: title,
+    buttonLabel: 'Open',
+    properties: ['openFile'],
+    filters: [{ name: 'IFC models', extensions: ['ifc', 'ifczip'] }]
+  })
+  return canceled || !filePaths[0] ? null : filePaths[0]
+}
+
+/**
+ * `project:locate` — a missing model's `Locate…` (plan D4). Only the main window's page may ask,
+ * checked before the payload is read, and only while a project is open and nothing else of this
+ * module is under way. The page sends the model's file name, for the dialog's title — never a path:
+ * the path is the one the user picks in the native Open dialog, and it goes through `admit()` like
+ * any pick from the Open dialog (the user browsed there). The answer is what `admit()` let through,
+ * or the reason it refused the file; `null` when the dialog was cancelled, or the project that
+ * asked is no longer the open one.
+ */
+export async function locateModel(sender: WebContents, raw: unknown): Promise<ProjectLocated | null> {
+  fromMain(sender)
+  const { name } = ProjectLocateRequest.parse(raw)
+  const win = mainWindow()
+  if (!win || !state.path || state.busy) return null
+  const asked = state.path
+  state.busy = true
+  try {
+    const path = await pickModelPath(win, name)
+    if (!path || state.path !== asked) return null
+    const refused: RefusedFile[] = []
+    const [file] = await admit([path], 'any', refused)
+    return { file: file ?? null, refused: file ? null : (refused[0] ?? null) }
   } finally {
     state.busy = false
   }
