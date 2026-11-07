@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "name": "Walls — by level",
+  "entity": [
+    "IfcWall",
+    "IfcWallStandardCase"
+  ],
+  "columns": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "typeName"
+      }
+    },
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Length"
+      },
+      "align": "right",
+      "format": {
+        "display": "ft",
+        "decimals": 2,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Width"
+      },
+      "heading": "Thickness",
+      "align": "right",
+      "format": {
+        "display": "in",
+        "decimals": 1,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Height"
+      },
+      "align": "right",
+      "format": {
+        "display": "in",
+        "decimals": 1,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "NetSideArea"
+      },
+      "heading": "Area",
+      "align": "right",
+      "format": {
+        "display": "ft²",
+        "decimals": 2,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "NetVolume"
+      },
+      "heading": "Volume",
+      "align": "right",
+      "format": {
+        "display": "ft³",
+        "decimals": 2,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "FireRating"
+      },
+      "align": "left"
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "IsExternal"
+      },
+      "align": "center",
+      "format": {
+        "boolStyle": "Yes/No"
+      }
+    }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      },
+      "dir": "asc",
+      "header": true,
+      "footer": "count"
+    }
+  ],
+  "itemize": false,
+  "grandTotal": false,
+  "appearance": {
+    "showTitle": true,
+    "gridLines": true,
+    "zebra": true,
+    "fontSize": 13,
+    "headerBold": true
+  },
+  "meta": {
+    "notes": "SGVue template — Wall Schedule"
+  }
+}

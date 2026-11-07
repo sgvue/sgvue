@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "name": "Door Schedule",
+  "entity": [
+    "IfcDoor"
+  ],
+  "columns": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "mark"
+      }
+    },
+    {
+      "field": {
+        "kind": "core",
+        "key": "typeName"
+      }
+    },
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Width"
+      },
+      "align": "right",
+      "format": {
+        "display": "mm",
+        "decimals": 0,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Height"
+      },
+      "align": "right",
+      "format": {
+        "display": "mm",
+        "decimals": 0,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "FireRating"
+      },
+      "align": "left"
+    }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      },
+      "dir": "asc",
+      "header": true,
+      "footer": "count"
+    }
+  ],
+  "itemize": true,
+  "grandTotal": false,
+  "appearance": {
+    "showTitle": true,
+    "gridLines": true,
+    "zebra": true,
+    "fontSize": 13,
+    "headerBold": true
+  },
+  "meta": {
+    "notes": "SGVue template — Door Schedule"
+  }
+}
