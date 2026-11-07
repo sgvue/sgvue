@@ -996,7 +996,9 @@ const SIDEBAR = `((restoreOld) => {
     treeRows: treeRows.length, treeRowsFullyVisible: fully(treeRows, tree),
     // Nothing may hang out of the aside.
     overflowPx: Math.max(0, Math.round(box(tree).bottom - a.bottom)),
-    lastChildBottom: Math.round(box(aside.lastElementChild).bottom - a.bottom)
+    // The tree, not \`aside.lastElementChild\`: since 2026-11-07 that is the column under the
+    // MODELS header, which is \`display:contents\` and has no box of its own.
+    lastChildBottom: Math.round(box(tree).bottom - a.bottom)
   });
 })`
 

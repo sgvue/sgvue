@@ -4,6 +4,27 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — the sidebar's MODELS section folds, and expanded it is always full
+
+**Did.** The owner: *"make it collapsible instead, but when expand always show full."* The
+MODELS header's label is a `<button>` with the tree's chevron after it (`disclosure`,
+`selectors/tree.ts`); the store's `modelsOpen` (session-only, default `true`, `toggleModels`)
+draws or drops the whole rows wrapper — rows, uploads, library, palette, unload strip, Original
+materials — and collapsing puts the popovers away; `askRemove`, opening the library and a new
+upload row expand it. The MODELS↔STOREYS handle, `sideModels`, the first drag's pinning and
+`MODEL_ROWS_SCROLL` are gone; `setSideStoreys` replaces `setSideSize`, and the tree's floor is
+`treeMinFor`. Because MODELS no longer gives way, a sidebar that cannot fit is *tight*
+(`sidebarTight`, measured from natural sizes and floors): the column under the MODELS header,
+otherwise `display:contents`, scrolls, and the tree's floor becomes its flex basis with three
+rows kept (`tightTree`). Recorded as an allowed deviation and a decision; `smoke.spec.ts`'s
+handle test reads one handle, and a new e2e test toggles MODELS by mouse and keyboard;
+`scripts/shell-sanity.cjs`'s `SIDEBAR` reads the tree's bottom, not the aside's last child.
+
+**Verified:** `npm run typecheck`, `npm test` (149 files passed / 3 skipped; 3 009 tests passed /
+4 skipped), and the flex arithmetic on a box model of the aside in headless Chromium (the
+numbers are in `docs/DECISIONS.md`). **Not run:** the e2e suite and the app itself — the two
+e2e tests and a look at the sidebar with many models and twelve storeys are owed.
+
 ## 2026-11-07 — 21 Dependabot security alerts cleared, six Dependabot PRs folded in
 
 **Did.** Exact pins bumped in `package.json`: Electron 44.3.0 → 44.10.0 (#15), zod 4.6.5 →

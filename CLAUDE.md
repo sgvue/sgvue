@@ -83,6 +83,9 @@ Anything not on this list is a defect.
 - **2026-09-20 — above six storeys the element tree keeps 40 % of the sidebar's height, and the
   STOREYS and MODELS lists scroll inside themselves.** The user's own rule, for the case where
   twelve storeys left the tree one row tall. At six or fewer, every style string is the design's.
+  *(Amended 2026-11-07: MODELS no longer scrolls — it is collapsible and, expanded, always full;
+  when that does not fit, the tree's 40 % gives way to three rows and the column under the
+  MODELS header scrolls — below.)*
 - **2026-09-20 — the Filter card's operator control gains exactly one entry, `empty`.**
   User-approved ("yes to all five"). The design's five operators cannot say *"this property has
   no value"* — a missing attribute matches only `!=`, which also matches every element carrying
@@ -157,6 +160,9 @@ Anything not on this list is a defect.
   automatic. Sizes live for the session only. **Undragged, every style string is exactly as
   before, the >6-storey rule included** — measured: the sidebar is pixel-identical to the
   previous build in both themes, and again after a drag and double-click reset.
+  *(Amended 2026-11-07: the MODELS↔STOREYS handle is gone — MODELS is collapsible instead,
+  below. The STOREYS↔ELEMENTS handle is unchanged; with no second list to pin, its drag sizes
+  STOREYS alone, and the tree's floor is then three rows at any storey count.)*
 - **2026-09-24 — the Ask SGVue suggestions take one line, and fold once the conversation
   starts.** Asked for by the user in these words: *"The ASK SGVUE AI suggestion are great but
   take up too many space."* — then, of the options offered, *"one line + hide after start"*.
@@ -934,10 +940,34 @@ Anything not on this list is a defect.
   default window (1264 × 755) by 22 px (it fitted exactly before), and with the update notice by
   24 px at 1280 × 820 (fitted before) and 89 px at 1264 × 755 (34 before). The default viewer is
   byte-identical to the build before, in both themes.
+- **2026-11-07 — the sidebar's MODELS section folds behind its header, and expanded it is
+  always its full height.** Asked for by the owner in these words: *"I think the left panel
+  model management are quite messy, make it collapsible instead, but when expand always show
+  full."* Our reading, which the owner may still correct: the MODELS header is the section's
+  toggle, and "instead" replaces the 2026-09-24 handle under it. **Added — one control:** the
+  header's `Models` label is now a `<button>` (`aria-expanded`, `aria-controls` the rows, Enter /
+  Space) holding the label and, after it, the element tree's own `GroupChevron` with the group
+  row's rule (`disclosure`: a quarter turn and `--accent-ink` open, `--faint` closed, `.15s`);
+  the label keeps its x, and the chip, the rule, `upload` and `library` keep their markup and
+  handlers and do not toggle. Expanded by default; session-only, in no session, link or
+  viewpoint, and not an assistant tool. **Collapsed**, only the header shows: the model rows,
+  the upload rows, the library popover, the palette, the unload strip and Original materials
+  are the section, and collapsing puts the three popovers away; opening the library, a new
+  upload row and the unload strip (the assistant's `unload_model` too) expand it. **Removed:**
+  the MODELS↔STOREYS handle and the models rows' >6-storey scroll tail. **Unchanged:** the
+  STOREYS↔ELEMENTS handle, the >6-storey rule for STOREYS, and every other style string while
+  the sidebar fits. **When it
+  does not fit** — full MODELS rows, STOREYS at its floor and the tree at its floor over the
+  aside's height — the tree's floor becomes the height it prefers and gives way to three rows,
+  and only then does everything under the MODELS header scroll as one column; the header,
+  search and project block stay put. That column is the one new element besides the control;
+  while the sidebar fits it is `display:contents` and lays out nothing. The numbers are in
+  `docs/DECISIONS.md`.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
-2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's and 2026-10-09's.
+2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's
+and 2026-11-07's.
 
 ### No visible additions
 
@@ -1035,7 +1065,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-09-24 — **after boot, a pick whose model key is already open or loading is confirmed in a native message box and then replaces it** — *"Just ask user to confirm then remove the old version."* Cancel drops that file silently; Replace removes the old model only once the new one has parsed, right before it joins, under the same key, with no reframe; a failed parse leaves the old one. A newer pick of a key still loading wins, and parses once the older parse has run out (one worker holds every open file, so a single parse cannot be cancelled). ` (2)` survives only for two files of one stem in **one** pick.
 - 2026-09-24 — **Help › About shows `SGVue`, the version and the owner's story** (`ABOUT_STORY`, one constant in `src/main/about.ts`): the native panel's `credits` on macOS, a native message box on Windows.
 - 2026-09-24 — **the landing page shows `v<version>` on the left of the theme toggle's strip**, from `package.json` at build time (`__APP_VERSION__`), with no preload key.
-- 2026-09-24 — **the sidebar's MODELS and STOREYS lists can be sized by dragging the boundary under them**; the tree takes the rest, sizes are session-only, a double-click resets, and undragged every style string is the design's.
+- 2026-09-24 — **the sidebar's MODELS and STOREYS lists can be sized by dragging the boundary under them**; the tree takes the rest, sizes are session-only, a double-click resets, and undragged every style string is the design's. *(Amended 2026-11-07: STOREYS only — the MODELS handle and `sideModels` are gone; below.)*
 - 2026-09-24 — **the assistant's suggestions are one scrolling line, folded behind a `suggestions` chip after the first user message**; same source, same cap.
 - 2026-09-24 — **a gridline is drawn on to its bubbles' centres**; `p0` / `p1` stay the clipped ends every rule reads.
 - 2026-09-24 — **dimensions between adjacent parallel gridlines, at each family's start end, a fixed screen distance inward of the bubbles**: pure geometry in `shared/annotate.ts` (`gridDimRuns`, `gridDimStandoffPx`), placed per drawn frame *before* `renderer.render`; labels decided after every bubble in the same sweep and occlusion-tested; a run is drawn only while its label is (`gridDimsStale` asks for the frame that catches up).
@@ -1187,6 +1217,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-09 — **the landing page's georeferencing line is one constant, `GEOREF_NOTE`** (`shared/upload.ts`, beside the page's other copy), drawn as `<span data-role="georef-note">` after the drop zone and its upload rows and before the "or" divider, in the drop zone caption's own style string; it says the other models are placed *relative to* the first, not *to match* it — each stands where its own map position puts it (2026-10-08).
 - 2026-10-09 — **local folders, build output and IFC files are kept out of `app.asar`** (`electron-builder.yml` `files`, still a deny-list): the root folders a maintainer's `.git/info/exclude` keeps out of git — `reports/`, `research_notes/`, `reference/` — and `dist/`, `out-baseline/`, `tmp/` and `**/*.{ifc,ifczip}`. The first 1.3.0 package carried `reports/` and `research_notes/`, local notes holding a home path, until `tests/unit/asar-contents.test.ts` failed on it; electron-builder leaves out only its own output directory, so a build into `dist/<name>` packs the rest of `dist/`; a release built on GitHub never has these folders, a local `dist:win` does.
 - 2026-10-17 — **`package.json`'s `overrides` forces exceljs's `uuid` to `^11.1.1`** (`{ "exceljs": { "uuid": "^11.1.1" } }`) for GHSA-w5hq-g745-h8pq: exceljs 4.4.0, the latest, declares `uuid: ^8.3.0`, so Dependabot's security update cannot reach it; exceljs calls only `v4()`, with no buffer, never the vulnerable path. It changes the lockfile and the Node-side copy only — the renderer bundles exceljs's prebuilt browser build, which carries its own uuid, so `out/` is byte-identical before and after (94 files, `exceljs.min-Qns6GaRS.js` included). Remove it when exceljs declares a `uuid` ≥ 11.1.1.
+- 2026-11-07 — **the sidebar's MODELS section is collapsible and, expanded, always full** (owner-requested; our reading): the header's label is a `<button>` with the tree's chevron (`disclosure`, `selectors/tree.ts`), the store's `modelsOpen` (session-only, default `true`, `toggleModels` puts the section's popovers away; `askRemove`, `toggleAdd` and `addUpload` expand it); the MODELS handle, `sideModels` and the models scroll tail are gone (`setSideStoreys` replaces `setSideSize`); when full MODELS + STOREYS' floor + the tree's floor exceed the aside (`sidebarTight`, measured from natural sizes and floors only), the column under the MODELS header — `display:contents` otherwise — scrolls, and the tree's floor becomes its flex basis with three rows kept (`tightTree`).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

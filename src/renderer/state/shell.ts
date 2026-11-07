@@ -403,12 +403,18 @@ export interface ShellState {
    */
   chatSuggestOpen: boolean
   /**
-   * 2026-09-24 — the sidebar's MODELS and STOREYS rows, sized by hand with their drag handles
+   * 2026-09-24 — the sidebar's STOREYS rows, sized by hand with their drag handle
    * (`selectors/sidebar.ts`): the height and the one-row floor, or `null` for the design's
-   * automatic layout. For this app session only; never written to disk.
+   * automatic layout. For this app session only; never written to disk. (The MODELS rows had
+   * one too until 2026-11-07, when MODELS became collapsible instead — `modelsOpen`.)
    */
-  sideModels: SideSize | null
   sideStoreys: SideSize | null
+  /**
+   * 2026-11-07 — whether the sidebar's MODELS section is expanded (its header's toggle). `true`
+   * at start; for this app session only — never in a session, a share link or a viewpoint, and
+   * not an assistant tool.
+   */
+  modelsOpen: boolean
   vpW: number
   units: Units
   canUndo: boolean
@@ -547,7 +553,13 @@ export interface ShellState {
   /** What one corner drag settles on. `:1132`. */
   setChatSize: (chatW: number, chatH: number) => void
   setChatSuggestOpen: (open: boolean) => void
-  setSideSize: (which: 'models' | 'storeys', size: SideSize | null) => void
+  setSideStoreys: (size: SideSize | null) => void
+  /**
+   * 2026-11-07 — the MODELS header's toggle. Collapsing also puts away what lives in the
+   * section — the library popover, a model's colour palette, the unload confirmation — so
+   * nothing stays open where it cannot be seen.
+   */
+  toggleModels: () => void
   /** Push the user turn and take the pre-turn snapshot. Returns it. `:1599`. */
   chatBegin: (text: string, quote?: { who: string; text: string } | null) => TurnSnapshot
   chatFinish: (reply: string, result: ChatResult, before: TurnSnapshot) => void
@@ -969,8 +981,8 @@ export const useShell = create<ShellState>((set, get) => ({
   chatW: 330,
   chatH: 420,
   chatSuggestOpen: false,
-  sideModels: null,
   sideStoreys: null,
+  modelsOpen: true,
   vpW: 0,
   units: 'mm',
   canUndo: false,
@@ -1319,8 +1331,12 @@ export const useShell = create<ShellState>((set, get) => ({
 
   togglePalette: (key) =>
     set({ palette: get().palette === key ? null : key, confirmRemove: null }),
+  // 2026-11-07: the confirmation is a strip in the MODELS rows, so asking it expands MODELS —
+  // the assistant's `request_user_action` `unload_model` comes through here too.
   askRemove: (key) =>
-    set({ confirmRemove: get().confirmRemove === key ? null : key, palette: null }),
+    get().confirmRemove === key
+      ? set({ confirmRemove: null, palette: null })
+      : set({ confirmRemove: key, palette: null, modelsOpen: true }),
   cancelRemove: () => set({ confirmRemove: null }),
 
   /** `SGVue.dc.html:1209`. */
@@ -1330,7 +1346,8 @@ export const useShell = create<ShellState>((set, get) => ({
     viewer?.setModelColors(get().modelColors, native)
   },
 
-  toggleAdd: () => set({ addOpen: !get().addOpen }),
+  // 2026-11-07: the library popover is in the MODELS rows, so opening it expands MODELS.
+  toggleAdd: () => set(get().addOpen ? { addOpen: false } : { addOpen: true, modelsOpen: true }),
 
   /** `SGVue.dc.html:1049`. One model owns the lists and the picker; the rest stay inert. */
   activate: (key) => {
@@ -1567,7 +1584,13 @@ export const useShell = create<ShellState>((set, get) => ({
   setChatReplyTo: (chatReplyTo) => set({ chatReplyTo }),
   setChatSize: (chatW, chatH) => set({ chatW, chatH }),
   setChatSuggestOpen: (chatSuggestOpen) => set({ chatSuggestOpen }),
-  setSideSize: (which, size) => set(which === 'models' ? { sideModels: size } : { sideStoreys: size }),
+  setSideStoreys: (sideStoreys) => set({ sideStoreys }),
+  toggleModels: () =>
+    set(
+      get().modelsOpen
+        ? { modelsOpen: false, addOpen: false, palette: null, confirmRemove: null }
+        : { modelsOpen: true }
+    ),
 
   /**
    * `SGVue.dc.html:1599`. The accumulators are reset by the caller (`ai/bridge.ts` holds them);
@@ -1896,7 +1919,9 @@ export const useShell = create<ShellState>((set, get) => ({
   setInitErr: (initErr) => set({ initErr }),
 
   /** `SGVue.dc.html:1167`, `:1179`. */
-  addUpload: (row) => set({ uploads: [...get().uploads, row] }),
+  // 2026-11-07: an upload's row — its progress, or why it was refused — is in the MODELS rows,
+  // so a new one expands MODELS.
+  addUpload: (row) => set({ uploads: [...get().uploads, row], modelsOpen: true }),
 
   /** `SGVue.dc.html:1174`. */
   patchUpload: (id, patch) =>

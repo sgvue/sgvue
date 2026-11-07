@@ -994,9 +994,10 @@ test('the landing page shows an update notice with a link when a newer version i
 })
 
 /**
- * 2026-09-24 — the sidebar's drag handles. Undragged, the STOREYS rows carry the design's
+ * 2026-09-24 — the sidebar's drag handle. Undragged, the STOREYS rows carry the design's
  * style string and nothing else; dragging the handle under them grows them by the drag and
- * the element tree gives up the same; a double-click puts them back.
+ * the element tree gives up the same; a double-click puts them back. Since 2026-11-07 it is the
+ * only handle — MODELS is collapsible instead.
  */
 test('a sidebar handle resizes the section above it, and a double-click resets it', async () => {
   const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: TINY })
@@ -1007,10 +1008,10 @@ test('a sidebar handle resizes the section above it, and a double-click resets i
     await expect(side.getByText('Level 2', { exact: true })).toBeVisible()
 
     const handles = side.locator('[role="separator"]')
-    await expect(handles).toHaveCount(2)
+    await expect(handles).toHaveCount(1)
     const read = (): Promise<{ rows: number; tree: number; style: string }> =>
       page.evaluate(() => {
-        const handle = document.querySelectorAll('aside [role="separator"]')[1]
+        const handle = document.querySelectorAll('aside [role="separator"]')[0]
         const rows = handle.parentElement!.previousElementSibling as HTMLElement
         const tree = document.querySelector('aside [role="tree"]') as HTMLElement
         return {
@@ -1023,7 +1024,7 @@ test('a sidebar handle resizes the section above it, and a double-click resets i
     expect(before.style).not.toContain('flex:')
     expect(before.style).not.toContain('overflow')
 
-    const box = (await handles.nth(1).boundingBox())!
+    const box = (await handles.nth(0).boundingBox())!
     const x = box.x + box.width / 2
     const y = box.y + box.height / 2
     await page.mouse.move(x, y)
@@ -1037,9 +1038,48 @@ test('a sidebar handle resizes the section above it, and a double-click resets i
       })
       .toEqual([40, 40])
 
-    await handles.nth(1).dblclick()
+    await handles.nth(0).dblclick()
     await expect.poll(async () => Math.round((await read()).rows)).toBe(Math.round(before.rows))
     expect((await read()).style).not.toContain('flex:')
+  } finally {
+    await app.close()
+  }
+})
+
+/**
+ * 2026-11-07 — the MODELS header folds the section. Its label is a button with
+ * `aria-expanded`; collapsed, the model rows and "Original materials" are not drawn, and the
+ * keyboard brings them back. Expanded is the default.
+ */
+test('the MODELS header collapses and expands the section, by mouse and by keyboard', async () => {
+  const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: TINY })
+  try {
+    await page.getByText(DROP_COPY).click()
+    await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+    const side = page.locator('aside')
+    const toggle = side.getByRole('button', { name: 'Models', exact: true })
+    const native = side.getByText('Original materials', { exact: true })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(native).toBeVisible()
+    const rowsId = await toggle.getAttribute('aria-controls')
+    expect(rowsId).toBeTruthy()
+    expect(await side.locator(`[id="${rowsId}"]`).count()).toBe(1)
+
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(native).toHaveCount(0)
+    await expect(side.locator('button[title="Show / hide model"]')).toHaveCount(0)
+    // The rest of the header is untouched by the fold: upload is still there.
+    await expect(side.getByText('upload', { exact: true })).toBeVisible()
+
+    await toggle.focus()
+    await page.keyboard.press('Enter')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(native).toBeVisible()
+    await page.keyboard.press('Space')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await page.keyboard.press('Space')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
   } finally {
     await app.close()
   }
