@@ -4,8 +4,9 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 /**
- * Production CSP. Must stay byte-identical to the meta tag in both pages —
- * src/renderer/index.html and, since 2026-09-25, src/renderer/schedule.html.
+ * Production CSP. Must stay byte-identical to the meta tag in every page —
+ * src/renderer/index.html, since 2026-09-25 src/renderer/schedule.html, and since 2026-11-07
+ * src/renderer/vee.html.
  */
 const CSP =
   "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self' sgvue-file: blob:; object-src 'none'; base-uri 'none'"
@@ -27,19 +28,22 @@ export default defineConfig({
   // The same build-time version as the renderer, so About and the landing page agree even
   // when a dev or e2e launch makes `app.getVersion()` report Electron's own.
   main: { define: { __APP_VERSION__: JSON.stringify(APP_VERSION) } },
-  // Two preloads: the main window's, and the Schedules window's (2026-09-25), which exposes
-  // nothing and only hands its page the private port (`src/preload/schedule.ts`).
-  // Each must build to ONE standalone file: a module both import would be hoisted into
-  // `preload/chunks/`, which a **sandboxed** preload cannot `require`, and both windows would
-  // lose their bridge silently. So the Schedules preload imports nothing but `electron`
-  // (`tests/unit/schedule/preload.test.ts` holds it there). electron-vite's `isolatedEntries`
+  // Three preloads: the main window's, the Schedules window's (2026-09-25), which hands its page
+  // the private port (`src/preload/schedule.ts`), and the Ask Vee window's (2026-11-07), which
+  // does only that (`src/preload/vee.ts`).
+  // Each must build to ONE standalone file: a module two import would be hoisted into
+  // `preload/chunks/`, which a **sandboxed** preload cannot `require`, and the windows would
+  // lose their bridge silently. So the Schedules and Vee preloads import nothing but `electron`
+  // (`tests/unit/schedule/preload.test.ts` and `tests/unit/vee-window.test.ts` hold them there). electron-vite's `isolatedEntries`
   // would lift the restriction, but in 5.0.0 it throws whenever stdout is not a TTY.
   preload: {
     build: {
       rollupOptions: {
         input: {
           index: resolve('src/preload/index.ts'),
-          schedule: resolve('src/preload/schedule.ts')
+          schedule: resolve('src/preload/schedule.ts'),
+          // 2026-11-07 — the Ask Vee window's: re-posts its port, imports only `electron`.
+          vee: resolve('src/preload/vee.ts')
         }
       }
     }
@@ -61,11 +65,13 @@ export default defineConfig({
      */
     build: {
       minify: 'esbuild',
-      // Two pages: the viewer, and the Schedules window (2026-09-25).
+      // Three pages: the viewer, the Schedules window (2026-09-25) and the Ask Vee window
+      // (2026-11-07).
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
-          schedule: resolve('src/renderer/schedule.html')
+          schedule: resolve('src/renderer/schedule.html'),
+          vee: resolve('src/renderer/vee.html')
         }
       }
     },
@@ -79,7 +85,7 @@ export default defineConfig({
       {
         name: 'sgvue-dev-csp',
         apply: 'serve',
-        // Every page the dev server serves — index.html and schedule.html — must carry the
+        // Every page the dev server serves — index.html, schedule.html, vee.html — must carry the
         // constant, or it would load without the dev relaxation and fail on HMR.
         transformIndexHtml(html: string, ctx: { path: string }) {
           if (!html.includes(CSP)) {

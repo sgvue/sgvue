@@ -117,14 +117,69 @@ export function tableCsv(table: ChatTable, unit: DisplayUnit = 'mm'): string {
 export const BUBBLE_RADIUS = '11px 11px 11px 3px'
 
 /**
+ * 2026-11-07 — a message as the Ask Vee window has it: what the panel draws of it, and nothing
+ * else. The chat panel is a window of its own since then (`main/vee-window.ts`), and the
+ * conversation still runs in the main window, which sends it this (`model/vee-link.ts`,
+ * `shared/vee-messages.ts`). What it leaves out is what only the main window may use: the
+ * snapshot a `revert` puts back, the request behind `apply`, and the element ids behind a chip
+ * or a row — an act on one of those names its place, and the main window looks it up.
+ *
+ * `id` is the identity of the main window's message object, and `pending.id` that of the request
+ * it holds: an act carries them back, so one on a row the transcript has since replaced does
+ * nothing. Ids may be absent here, as in a `ChatMessage`; the snapshot carries none.
+ */
+export interface ChatMessageView {
+  id: number
+  role: 'user' | 'assistant'
+  text: string
+  quote: { who: string; text: string } | null
+  chips: { label: string; ids?: readonly number[] }[]
+  table:
+    | (Pick<ChatTable, 'groupBy' | 'clash' | 'units'> & {
+        rows: { k: string; n: number; area?: number; volume?: number; vol?: number; ids?: readonly number[] }[]
+      })
+    | null
+  pending: { id: number; label: string } | null
+  canRevert: boolean
+  reverted: boolean
+  trace: { status: string; wide: boolean; noun: string; rows: { label: string; n: number }[] } | null
+}
+
+/**
+ * `ChatMessage` → `ChatMessageView`. `id` and `pending` are the identities the caller gave the
+ * message and its request. Whether it offers `revert` is decided here, once: a reply that changed
+ * something a revert can put back — since 2026-10-02 a markup it placed counts, as it is taken
+ * away (`ChatMessage.placed`).
+ */
+export function messageView(m: ChatMessage, id = 0, pending = 0): ChatMessageView {
+  const trace = m.role === 'user' ? null : (m.trace ?? null)
+  return {
+    id,
+    role: m.role,
+    text: m.text,
+    quote: m.quote ?? null,
+    chips: m.chips ?? [],
+    table: m.table ?? null,
+    pending: m.pending ? { id: pending, label: m.pending.label } : null,
+    canRevert: (!!m.undoSnap || !!m.placed?.length) && !m.reverted,
+    reverted: !!m.reverted,
+    trace: trace && { status: trace.status, wide: trace.wide, noun: trace.noun, rows: trace.rows }
+  }
+}
+
+/**
  * `:2015`. `mine` decides the colour and how wide the bubble may grow. Until 2026-10-01 it also
  * decided the side (`flex-end`) and the corner the notch is on (`11px 11px 3px 11px`); the
  * owner's handoff puts `You` on the left with the assistant's corner.
  */
-export function chatRow(m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): ChatRow {
+export const chatRow = (m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): ChatRow =>
+  viewRow(messageView(m), i, unit)
+
+/** `chatRow` for a message as the Ask Vee window has it (2026-11-07). */
+export function viewRow(m: ChatMessageView, i: number, unit: DisplayUnit = 'mm'): ChatRow {
   const mine = m.role === 'user'
-  const table = m.table ?? null
-  const trace = mine ? null : (m.trace ?? null)
+  const table = m.table
+  const trace = mine ? null : m.trace
   return {
     key: i,
     who: authorOf(m),
@@ -139,7 +194,7 @@ export function chatRow(m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): Ch
     hasQuote: !!m.quote,
     quoteWho: m.quote ? m.quote.who : '',
     quoteText: m.quote ? m.quote.text : '',
-    hasChips: !!(m.chips ?? []).length,
+    hasChips: !!m.chips.length,
     hasTable: !!table,
     tableTitle: table ? table.groupBy : '',
     tableClash: !!(table && table.clash),
@@ -148,14 +203,12 @@ export function chatRow(m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): Ch
           k: r.k,
           n: String(r.n),
           q: tableQuantity(table, r, unit),
-          ids: r.ids
+          ids: r.ids ?? []
         }))
       : [],
     hasPending: !!m.pending,
     pendingLabel: m.pending ? m.pending.label : '',
-    // 2026-10-02: a reply that placed a markup changed something a revert can put back — by
-    // taking it away — even when it changed nothing else (`ChatMessage.placed`).
-    canRevert: (!!m.undoSnap || !!m.placed?.length) && !m.reverted,
+    canRevert: m.canRevert,
     traced: !!trace,
     status: trace ? trace.status : '',
     wide: !!trace && trace.wide
@@ -168,7 +221,10 @@ export function chatRow(m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): Ch
  * the boot audit, which no turn produced. (The reply being written takes its state from the
  * trace; the header's sprite and the pill's are always `idle`.)
  */
-export const veeStateOf = (msgs: readonly ChatMessage[], i: number): VeeState =>
+export const veeStateOf = (
+  msgs: readonly { role: ChatMessage['role']; trace?: object | null }[],
+  i: number
+): VeeState =>
   i === msgs.length - 1 && msgs[i]?.role === 'assistant' && !!msgs[i].trace ? 'done' : 'idle'
 
 /** How long the send button ignores clicks after it has stopped a turn. */
@@ -196,7 +252,7 @@ export const plainOf = (m: Pick<ChatMessage, 'role' | 'text'>): string =>
 
 /** `:2037–2039`. Who the composer is replying to, and the line it shows. */
 export function replyStrip(
-  msgs: readonly ChatMessage[],
+  msgs: readonly Pick<ChatMessage, 'role' | 'text'>[],
   replyTo: number | null
 ): { replying: boolean; who: string; text: string } {
   const target = replyTo == null ? undefined : msgs[replyTo]
@@ -234,7 +290,7 @@ export const chatExamples = (s: SuggestState): string[] =>
   chatSuggest(suggestInput(s)).slice(0, CHAT_EXAMPLE_CAP)
 
 /** 2026-09-24 — whether the conversation has a user turn yet; the fold chip exists only then. */
-export const chipsStarted = (msgs: readonly ChatMessage[]): boolean =>
+export const chipsStarted = (msgs: readonly Pick<ChatMessage, 'role'>[]): boolean =>
   msgs.some((m) => m.role === 'user')
 
 /**
@@ -243,39 +299,5 @@ export const chipsStarted = (msgs: readonly ChatMessage[]): boolean =>
  * chip unless that chip has it open. A new or cleared conversation has no user turn, so it
  * starts unfolded again.
  */
-export const chipsFolded = (msgs: readonly ChatMessage[], open: boolean): boolean =>
+export const chipsFolded = (msgs: readonly Pick<ChatMessage, 'role'>[], open: boolean): boolean =>
   !open && chipsStarted(msgs)
-
-/** `:1133–1134`. The panel never goes under this, in either direction. */
-export const CHAT_MIN = 240
-
-/**
- * `:1127`. Dragging the top-left corner grows the panel leftward and upward, clamped to the
- * stage: never under 240 px, never wider than the stage minus its own right offset and 12 px,
- * never taller than the stage minus `cardTop` and 64 px. The `Math.max(240, …)` inside the
- * upper bound is the design's own — on a stage too small for 240 px it wins, and the panel
- * keeps its minimum rather than inverting.
- *
- * `brow` (2026-10-01) is the bottom row's lane, `--brow` on the stage (`selectors/lanes.ts`):
- * the panel's foot stands that much higher, so its height may be that much less. With `0`,
- * which is whenever the row is one line, the bound is the design's.
- */
-export function clampChatSize(
-  start: { w: number; h: number; x: number; y: number },
-  at: { x: number; y: number },
-  stage: { width: number; height: number },
-  lane: number,
-  cardTop: number,
-  brow = 0
-): { chatW: number; chatH: number } {
-  return {
-    chatW: Math.max(
-      CHAT_MIN,
-      Math.min(Math.max(CHAT_MIN, stage.width - lane - 12), start.w + (start.x - at.x))
-    ),
-    chatH: Math.max(
-      CHAT_MIN,
-      Math.min(Math.max(CHAT_MIN, stage.height - cardTop - 64 - brow), start.h + (start.y - at.y))
-    )
-  }
-}

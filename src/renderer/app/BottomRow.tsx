@@ -50,7 +50,7 @@ import {
   HINT_MIN,
   type CentrePlace
 } from '../state/selectors/lanes'
-import { ChatPill } from './ChatPanel'
+import { ChatPill } from './ChatPill'
 import HintBar from './HintBar'
 import StatusBar, { ActionBar } from './StatusBar'
 import { ResetPill } from './VisibilityFrame'

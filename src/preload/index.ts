@@ -20,6 +20,9 @@ import {
   CH_RECENTS_LIST,
   CH_SCHEDULE_PORT,
   CH_SCHEDULES_OPEN,
+  CH_VEE_CLOSE,
+  CH_VEE_OPEN,
+  CH_VEE_PORT,
   CH_SESSION_CLEAR,
   CH_SESSION_SAVE,
   CH_SETTINGS_CLEAR_KEY,
@@ -42,7 +45,8 @@ import type {
   SessionEnvelope,
   SettingsPatch,
   SettingsView,
-  UpdateInfo
+  UpdateInfo,
+  VeeTheme
 } from '../shared/ipc-contract'
 
 // The renderer's entire view of the outside world. Its key names are pinned by
@@ -156,6 +160,13 @@ const api = {
    */
   openSchedules: (): Promise<void> => ipcRenderer.invoke(CH_SCHEDULES_OPEN),
   /**
+   * 2026-11-07 — the Ask Vee window: open it (or bring it forward) in the main window's theme,
+   * and close it, as the chat panel opens and closes. Nothing back. The conversation goes over a
+   * private port (below), never through main.
+   */
+  openVee: (theme: VeeTheme): Promise<void> => ipcRenderer.invoke(CH_VEE_OPEN, { theme }),
+  closeVee: (): Promise<void> => ipcRenderer.invoke(CH_VEE_CLOSE),
+  /**
    * 2026-10-01 — the landing page's update notice. Main asks GitHub for the newest version at
    * most once per run (`main/updates.ts`; never in a development build) and answers `{ latest }`
    * when it is newer than this build, else `null`. Nothing goes in.
@@ -175,6 +186,11 @@ contextBridge.exposeInMainWorld('sgvue', api)
 // documented pattern for a context-isolated page. No port means the Schedules window closed.
 ipcRenderer.on(CH_SCHEDULE_PORT, (event) => {
   window.postMessage(CH_SCHEDULE_PORT, '*', event.ports)
+})
+
+// 2026-11-07 — the Ask Vee window's, the same way (`renderer/model/vee-link.ts` takes it).
+ipcRenderer.on(CH_VEE_PORT, (event) => {
+  window.postMessage(CH_VEE_PORT, '*', event.ports)
 })
 
 export type SGVueApi = typeof api

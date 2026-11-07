@@ -30,6 +30,8 @@
  * user's place in the page must not be lost to a copy.
  */
 export async function copyText(text: string): Promise<boolean> {
+  // Read before anything awaits: a caller inside `copyingIn` reaches here synchronously.
+  if (route) return route(text)
   try {
     await navigator.clipboard.writeText(text)
     return true
@@ -51,5 +53,28 @@ export async function copyText(text: string): Promise<boolean> {
     ta.remove()
     if (had instanceof HTMLElement && had.isConnected) had.focus({ preventScroll: true })
     return ok
+  }
+}
+
+/**
+ * **2026-11-07 — a copy is made in the window that was clicked.** The chat panel is a window of
+ * its own since then (`main/vee-window.ts`), but the conversation, the pending row's request and
+ * `copyTable` still run here, in the main window — where the click on Apply or `copy csv` gave no
+ * activation, so `execCommand('copy')` would refuse. `copyingIn(copier, run)` sends every copy
+ * made while `run` runs to `copier` instead: `model/vee-link.ts` hands the text to the Ask Vee
+ * window, which copies it under its own click's activation and says whether it could. Each copy
+ * this module is asked for is made synchronously inside its caller (`copyGuid`, `copyLink` and
+ * `copyTable` call this before they await anything), so the route is read on the same stack.
+ */
+let route: ((text: string) => Promise<boolean>) | null = null
+
+/** Run `run` with every `copyText` it makes going to `copier`; then as before. */
+export function copyingIn<T>(copier: (text: string) => Promise<boolean>, run: () => T): T {
+  const was = route
+  route = copier
+  try {
+    return run()
+  } finally {
+    route = was
   }
 }

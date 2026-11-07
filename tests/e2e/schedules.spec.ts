@@ -27,7 +27,9 @@ import {
   ROOT,
   TINY,
   tool as liveTool,
-  toolResults
+  toolResults,
+  veeIsOpen,
+  veeWindow
 } from './helpers'
 
 const CSP =
@@ -1275,11 +1277,13 @@ function tool(app: ElectronApplication, name: string, input: unknown): Promise<T
  * one thing, so each call gets a turn of its own. The panel has to be open and `holdTurns`
  * called first.
  */
-async function inTurn(app: ElectronApplication, page: Page, name: string, input: unknown): Promise<ToolAnswer> {
-  const send = page.locator('button[data-part="send"]')
+async function inTurn(app: ElectronApplication, _page: Page, name: string, input: unknown): Promise<ToolAnswer> {
+  // Since 2026-11-07 the panel is the Ask Vee window: the question is typed there.
+  const vee = await veeWindow(app)
+  const send = vee.locator('button[data-part="send"]')
   const before = (await toolResults(app)).length
-  await page.locator('[data-role="chatinput"]').fill('Do it.')
-  await page.locator('[data-role="chatinput"]').press('Enter')
+  await vee.locator('[data-role="chatinput"]').fill('Do it.')
+  await vee.locator('[data-role="chatinput"]').press('Enter')
   await expect(send).toHaveAttribute('aria-label', 'Stop')
   await liveTool(app, name, input)
   await expect.poll(async () => (await toolResults(app)).length).toBe(before + 1)
@@ -1291,12 +1295,21 @@ async function inTurn(app: ElectronApplication, page: Page, name: string, input:
 
 const ASK = 'button[data-tip^="Ask the assistant"]'
 
-/** The chat panel open and main's turn handlers held: what `inTurn` needs. */
+/** The chat panel — the Ask Vee window, since 2026-11-07 — open and main's turn handlers held: what `inTurn` needs. */
 async function openChat(app: ElectronApplication, page: Page): Promise<void> {
   await page.locator(ASK).click()
-  await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
+  await veeWindow(app)
   await holdTurns(app)
 }
+
+/** Put the panel away: the Ask Vee window's own ×. */
+async function closeChat(app: ElectronApplication): Promise<void> {
+  await (await veeWindow(app)).locator('button[aria-label="Close"]').click()
+  await expect.poll(() => veeIsOpen(app)).toBe(false)
+}
+
+/** The windows but the Ask Vee window: the main window and, when it is open, Schedules. */
+const windowsButVee = (app: ElectronApplication): Page[] => app.windows().filter((w) => !/\/vee\.html(?:[?#]|$)/.test(w.url()))
 
 /**
  * `inTurn` with the panel opened for it and put away again — for a step whose assertions are
@@ -1305,10 +1318,9 @@ async function openChat(app: ElectronApplication, page: Page): Promise<void> {
  */
 async function inTurnAside(app: ElectronApplication, page: Page, name: string, input: unknown): Promise<ToolAnswer> {
   await page.locator(ASK).click()
-  await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
+  await veeWindow(app)
   const answer = await inTurn(app, page, name, input)
-  await page.locator('button[aria-label="Close"]').click()
-  await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
+  await closeChat(app)
   return answer
 }
 
@@ -1334,7 +1346,8 @@ test('the assistant makes a schedule, sees it, and changes it keeping the user�
       message: 'The turn was stopped, so nothing was changed.',
       applied: false
     })
-    expect(app.windows()).toHaveLength(1)
+    // (The Ask Vee window is open beside the main window since 2026-11-07; no Schedules window.)
+    expect(windowsButVee(app)).toHaveLength(1)
 
     // 1 — make_schedule with the window closed: it opens, showing that schedule, on the window's
     // own toast; the model reads back the rows and totals it shows.
@@ -1513,8 +1526,7 @@ test('the assistant exports the open schedule through its Save dialog, and colou
     expect(saves[1]).toMatchObject({ attached: true, title: 'Export to CSV' })
     expect(await readdir(out)).toEqual(['from-chat.xlsx'])
     // The export steps are done: the panel is put away, and the rest is the main window's.
-    await page.locator('button[aria-label="Close"]').click()
-    await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
+    await closeChat(app)
 
     // 5 — colour 3D by the Level column from its heading menu, then from chat: the same legend —
     // title, values, counts and colours — and the same swatches in the table.
@@ -1595,7 +1607,7 @@ test('the assistant works the Schedules window’s own controls: undo and redo, 
       done: false,
       open: false
     })
-    expect(app.windows()).toHaveLength(1)
+    expect(windowsButVee(app)).toHaveLength(1)
     const opening = app.waitForEvent('window')
     const open = await manage('open')
     const sched = await opening

@@ -8,6 +8,7 @@
  */
 import type { Tool } from '../viewer/viewer-core'
 import { getViewer, useShell, type ShellState } from './shell'
+import { isFieldTarget } from '../dom'
 
 export type KeyAction =
   | { kind: 'closeCtx' }
@@ -42,9 +43,8 @@ export interface KeyEventLike {
   shiftKey?: boolean
 }
 
-/** The design's own guard: a key typed into a field is not a shortcut. `:1081`. */
-export const isFieldTarget = (tagName: string | undefined): boolean =>
-  !!tagName && /INPUT|SELECT|TEXTAREA/.test(tagName)
+/** The design's own guard (`:1081`), in `../dom.ts` since 2026-11-07 so the Ask Vee window shares it. */
+export { isFieldTarget }
 
 export function keyAction(e: KeyEventLike, s: KeyState): KeyAction | null {
   const k = e.key

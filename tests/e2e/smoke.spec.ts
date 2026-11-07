@@ -29,7 +29,9 @@ import {
   ROOT,
   settledShot,
   statusText,
-  TINY
+  TINY,
+  veeIsOpen,
+  veeWindow
 } from './helpers'
 
 let dir = ''
@@ -633,24 +635,49 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     const pill = page.locator(
       'button[data-tip="Ask the assistant to filter, isolate, hide or navigate the model"]'
     )
+    // 2026-11-07 — the panel is a window of its own, the Ask Vee window: none is open yet, and
+    // the main window draws no panel at all.
+    expect(veeIsOpen(app)).toBe(false)
     await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
     // 2026-10-01 — the assistant is Vee: the pill says so, and carries its mascot — a canvas
     // sprite, something drawn on it — in a pill the design's own height.
     await expect(pill).toHaveText('Ask Vee')
     await expect(pill.locator('[data-role="vee"] canvas')).toHaveCount(1)
     expect((await pill.boundingBox())!.height).toBe(32)
+    const unlit = await pill.evaluate((b) => getComputedStyle(b).borderColor)
     await pill.click()
-    const log = page.locator('[data-role="chatlog"]')
+    const vee = await veeWindow(app)
+    const log = vee.locator('[data-role="chatlog"]')
     await expect(log).toBeVisible()
+    // …lit while the window is open, as it was while the panel was.
+    await expect.poll(() => pill.evaluate((b) => getComputedStyle(b).borderColor)).not.toBe(unlit)
+    // The window: a child of the main window — above it, not above other apps — titled
+    // `Ask Vee`, at the panel's size.
+    const shape = await app.evaluate(({ BrowserWindow }) => {
+      const all = BrowserWindow.getAllWindows()
+      const w = all.find((x) => /\/vee\.html(#|$)/.test(x.webContents.getURL()))!
+      const [width, height] = w.getContentSize()
+      return {
+        child: w.getParentWindow() !== null && /\/index\.html(#|$)/.test(w.getParentWindow()!.webContents.getURL()),
+        top: w.isAlwaysOnTop(),
+        modal: w.isModal(),
+        title: w.getTitle(),
+        width,
+        height
+      }
+    })
+    expect(shape).toEqual({ child: true, top: false, modal: false, title: 'Ask Vee', width: 330, height: 420 })
     // …the panel's title too, with the mascot where the design's sparkle was; the header is the
     // height it had (11 + 24 + 11 px, and its rule).
-    const title = page.locator('#sgvue-chat-title')
+    const title = vee.locator('#sgvue-chat-title')
     await expect(title).toHaveText('Ask Vee')
     const header = title.locator('xpath=..')
     await expect(header.locator('[data-role="vee"] canvas')).toHaveCount(1)
     await expect(header.locator('svg')).toHaveCount(1) // the close button's ×, and no sparkle
     expect((await header.boundingBox())!.height).toBe(47)
-    await expect(page.getByText('Ask SGVue')).toHaveCount(0)
+    await expect(vee.getByText('Ask SGVue')).toHaveCount(0)
+    // Opening the window gave its composer the keyboard.
+    await expect(vee.locator('[data-role="chatinput"]')).toBeFocused()
 
     // 2 — the boot audit is already the first turn, with its own chips (`:1642`).
     await expect(log.getByText('1 model, 6 elements, 2 storeys.', { exact: false })).toBeVisible()
@@ -664,17 +691,20 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     ])
     await expect(seedLabel.locator(':scope > [data-role="vee"] canvas')).toHaveCount(1)
     expect((await seedLabel.boundingBox())!.height).toBe(10)
-    // Every sprite is decorative, and every one has been painted: opaque pixels on its canvas.
-    const painted = await page.locator('[data-role="vee"]').evaluateAll((slots) =>
-      slots.map((slot) => {
-        const canvas = slot.querySelector('canvas')!
-        const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
-        let opaque = 0
-        for (let i = 3; i < data.length; i += 4) if (data[i] === 255) opaque++
-        // Whole device pixels to a cell: the backing store is 16 cells of them.
-        return { hidden: slot.getAttribute('aria-hidden'), cells: canvas.width / 16, square: canvas.width === canvas.height, opaque }
-      })
-    )
+    // Every sprite is decorative, and every one has been painted: opaque pixels on its canvas —
+    // the header's and the reply's in the Vee window, the pill's in the main window.
+    const paintedIn = (where: Page) =>
+      where.locator('[data-role="vee"]').evaluateAll((slots) =>
+        slots.map((slot) => {
+          const canvas = slot.querySelector('canvas')!
+          const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+          let opaque = 0
+          for (let i = 3; i < data.length; i += 4) if (data[i] === 255) opaque++
+          // Whole device pixels to a cell: the backing store is 16 cells of them.
+          return { hidden: slot.getAttribute('aria-hidden'), cells: canvas.width / 16, square: canvas.width === canvas.height, opaque }
+        })
+      )
+    const painted = [...(await paintedIn(vee)), ...(await paintedIn(page))]
     expect(painted).toHaveLength(3)
     for (const sprite of painted) {
       expect(sprite.hidden).toBe('true')
@@ -687,16 +717,17 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     expect(await chips.count()).toBeGreaterThan(0)
     expect(await chips.count()).toBeLessThanOrEqual(6)
 
-    // 3 — a chip selects what it names: the property card opens on the elements behind it.
+    // 3 — a chip selects what it names: the property card opens on the elements behind it, in
+    // the main window.
     await chips.first().click()
     await expect(page.locator('[data-role="propcard"]')).toBeVisible()
 
     // 3b — the context menu's "Ask about this" (`:1650`) pre-fills the composer and focuses
     // it with the caret at the end, so the question can be finished by typing.
-    // The panel is closed first, so the right-click below reaches the viewport rather than a
-    // bubble — and so this also proves `askAbout` **opens** the panel, as the design does.
+    // The panel is closed first — the window goes — so this also proves `askAbout` **opens**
+    // the panel, as the design does.
     await pill.click()
-    await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
+    await expect.poll(() => veeIsOpen(app)).toBe(false)
     const side = page.locator('aside')
     await side.getByText('IfcWall', { exact: true }).click()
     // Select the one row first: the menu acts on the whole selection when the target is part
@@ -711,14 +742,16 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     await settledShot(page)
     await page.locator('[data-role="viewport"]').click({ button: 'right' })
     await page.getByText('Ask about this', { exact: true }).click()
-    await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
-    await expect(page.locator('[data-role="chatinput"]')).toHaveValue(/^About Wall L1-1 \(IfcWall/)
-    await expect(page.locator('[data-role="chatinput"]')).toBeFocused()
+    const asking = await veeWindow(app)
+    await expect(asking.locator('[data-role="chatinput"]')).toHaveValue(/^About Wall L1-1 \(IfcWall/)
+    await expect(asking.locator('[data-role="chatinput"]')).toBeFocused()
+    const input = asking.locator('[data-role="chatinput"]')
+    const chat = asking.locator('[data-role="chatlog"]')
 
     // 3c — 2026-09-24: before the first user turn the suggestions are one unfolded line,
     // with no fold chip.
-    const suggest = page.locator('[data-role="chatsuggest"]')
-    const fold = page.getByRole('button', { name: /suggestions$/ })
+    const suggest = asking.locator('[data-role="chatsuggest"]')
+    const fold = asking.getByRole('button', { name: /suggestions$/ })
     await expect(suggest).toBeVisible()
     expect(await suggest.locator('button').count()).toBeGreaterThan(0)
     expect((await suggest.boundingBox())!.height).toBeLessThan(30)
@@ -726,14 +759,14 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
 
     // 4 — Enter sends, and with no key the turn fails into the designed error row with the
     // sentence main produced — not a hang, and not a silent nothing.
-    await page.locator('[data-role="chatinput"]').fill('how many walls?')
-    await page.locator('[data-role="chatinput"]').press('Enter')
-    await expect(log.getByText(/Preferences/)).toBeVisible({ timeout: 30_000 })
+    await input.fill('how many walls?')
+    await input.press('Enter')
+    await expect(chat.getByText(/Preferences/)).toBeVisible({ timeout: 30_000 })
     // The composer emptied and the busy row is gone: `chatBegin` then `chatFail` (`:1602`).
-    await expect(page.locator('[data-role="chatinput"]')).toHaveValue('')
-    await expect(log.getByText('reading the model')).toHaveCount(0)
+    await expect(input).toHaveValue('')
+    await expect(chat.getByText('reading the model')).toHaveCount(0)
     // The question stays in the transcript as the user's: labelled `You`, and no mascot on it.
-    const asked = log.locator(':scope > div').filter({ hasText: 'how many walls?' })
+    const asked = chat.locator(':scope > div').filter({ hasText: 'how many walls?' })
     await expect(asked).toHaveCount(1)
     await expect(asked.locator(':scope > div').first().locator(':scope > span').first()).toHaveText('You')
     await expect(asked.locator('[data-role="vee"]')).toHaveCount(0)
@@ -748,29 +781,26 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     const firstSuggestion = suggest.locator('button').first()
     const picked = (await firstSuggestion.textContent())!
     await firstSuggestion.click()
-    await expect(page.locator('[data-role="chatinput"]')).toHaveValue(picked)
+    await expect(input).toHaveValue(picked)
     await expect(suggest).toHaveCount(0)
-    await page.locator('[data-role="chatinput"]').fill('')
+    await input.fill('')
 
-    // 4b — the top-left corner stroke resizes the panel: width grows leftward, height upward,
-    // by exactly the drag (`:1127`). The handle is the 34 px `nwse-resize` square at its
-    // corner, so the drag starts inside it.
-    const panel = page.locator('[data-role="chatlog"]').locator('..')
-    const before = (await panel.boundingBox())!
-    await page.mouse.move(before.x + 10, before.y + 10)
-    await page.mouse.down()
-    await page.mouse.move(before.x - 50, before.y - 30, { steps: 8 })
-    await page.mouse.up()
-    await expect
-      .poll(async () => {
-        const b = (await panel.boundingBox())!
-        return [Math.round(b.width - before.width), Math.round(b.height - before.height)]
-      })
-      .toEqual([60, 40])
+    // 4b — 2026-11-07: the panel fills its window — the window's own edges size it, so the
+    // design's top-left resize corner is not drawn.
+    const panel = chat.locator('..')
+    const box = (await panel.boundingBox())!
+    expect([box.x, box.y, box.width, box.height]).toEqual([0, 0, 330, 420])
+    await expect(asking.locator('.hv-grab')).toHaveCount(0)
 
-    // 5 — the pill closes it again, and nothing else on the stage changed.
-    await pill.click()
-    await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
+    // 5 — Esc in the composer is the field's, as the design's keys leave a field alone: the
+    // window stays. Outside a field, Esc closes it, as the panel's × does, and the pill is unlit.
+    await input.press('Escape')
+    await asking.waitForTimeout(300)
+    expect(veeIsOpen(app)).toBe(true)
+    await input.evaluate((el) => (el as HTMLInputElement).blur())
+    await asking.keyboard.press('Escape')
+    await expect.poll(() => veeIsOpen(app)).toBe(false)
+    await expect.poll(() => pill.evaluate((b) => getComputedStyle(b).borderColor)).toBe(unlit)
   } finally {
     await app.close()
   }
@@ -2135,11 +2165,10 @@ test('the bottom edge is one row: the bars, the hint, the reset pill and the Ask
     ])
 
     // 3b — 2026-10-01, the row's lane. The centre zone is two levels tall here — the reset pill
-    // over the hint — and the design stops the chat panel 52 px, and the property card 56 px,
-    // above the stage's foot, which is room for one. So the row declares what it stands above
-    // that line as `--brow`, and the four things that used to meet no longer do: an element
-    // selected (its card), the assistant's panel open (in the card's lane), the laser's hint and
-    // something hidden (the pill above the hint).
+    // over the hint — and the design stops the property card 56 px above the stage's foot, which
+    // is room for one. So the row declares what it stands above that line as `--brow`, and the
+    // card clears it. (Until 2026-11-07 the assistant's panel cleared it too; since then the panel
+    // is the Ask Vee window, a window of its own, and nothing of it stands on the stage.)
     const tall = Math.ceil(st.y + st.height - five.pill!.y + 6 - 52)
     expect(tall).toBeGreaterThan(0)
     expect(await lane()).toBe(`${tall}px`)
@@ -2150,32 +2179,21 @@ test('the bottom edge is one row: the bars, the hint, the reset pill and the Ask
     const card = page.locator('[data-role="propcard"]')
     await expect(card).toBeVisible()
     await page.locator(BOTTOM.ask).click()
-    const panel = page.locator('[data-role="chatlog"]').locator('xpath=..')
-    await expect(panel).toBeVisible()
-    // With the row one line again — the hint went with the laser tool — both are the design's:
-    // the panel `bottom:52px` and no taller than the stage less `cardTop` and 64 px, the card no
-    // taller than the stage less 240 px.
-    const cardTop = Math.round((await page.locator('[data-role="toolbar"]').boundingBox())!.height) + 24
-    const panelStyle = (): Promise<string[]> =>
-      panel.evaluate((e) => [getComputedStyle(e).bottom, getComputedStyle(e).maxHeight])
+    await veeWindow(app)
+    await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
+    // With the row one line again — the hint went with the laser tool — the card is the design's:
+    // no taller than the stage less 240 px.
     const cardStyle = (): Promise<string> => card.evaluate((e) => getComputedStyle(e).maxHeight)
     expect(await lane()).toBe('0px')
-    expect(await panelStyle()).toEqual(['52px', `calc(100% - ${cardTop + 64}px)`])
     expect(await cardStyle()).toBe('calc(100% - 240px)')
     await page.locator('button[data-tip^="Laser meter"]').click()
     await expect(page.locator(BOTTOM.hint)).toHaveText(/^Click a surface — the laser reads X, Y and Z/)
     await expect.poll(lane).toBe(`${tall}px`)
-    // Both panels are settled (each fades in over 150 ms) before their boxes are read.
-    for (const box of [panel, card]) await box.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)))
-    const four = { ...(await bottomBoxes(page)), panel: (await panel.boundingBox())!, card: (await card.boundingBox())! }
+    // The card is settled (it fades in over 150 ms) before its box is read.
+    await card.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)))
+    const four = { ...(await bottomBoxes(page)), card: (await card.boundingBox())! }
     expect(Object.values(four).every(Boolean)).toBe(true)
     expect(meetings(four)).toEqual([])
-    // The panel stops the design's 6 px above the pill (the lane is whole pixels, so up to 7),
-    // and the card the 4 px further up it always stopped.
-    const overPill = four.pill!.y - (four.panel.y + four.panel.height)
-    expect(overPill).toBeGreaterThanOrEqual(6)
-    expect(overPill).toBeLessThan(7)
-    expect(await panelStyle()).toEqual([`${52 + tall}px`, `calc(100% - ${cardTop + 64 + tall}px)`])
     expect(await cardStyle()).toBe(`calc(100% - ${240 + tall}px)`)
     // The row itself is as it was: the lane feeds nothing back into what it was measured from.
     expect([four.hint!.y, four.hint!.height, four.pill!.y, four.pill!.height]).toEqual([
@@ -2190,9 +2208,9 @@ test('the bottom edge is one row: the bars, the hint, the reset pill and the Ask
       rest.ask!.x,
       rest.ask!.y
     ])
-    // Put back: the panel closed and nothing selected, the laser tool still active.
+    // Put back: the Ask Vee window closed and nothing selected, the laser tool still active.
     await page.locator(BOTTOM.ask).click()
-    await expect(page.locator('[data-role="chatlog"]')).toHaveCount(0)
+    await expect.poll(() => veeIsOpen(app)).toBe(false)
     await card.locator('button[title="Close (Esc)"]').click()
     await expect(card).toHaveCount(0)
 
@@ -2606,12 +2624,15 @@ test('Vee blinks at rest, no two sprites together, and holds still under reduced
   try {
     await openDemo(page)
     await page.locator(BOTTOM.ask).click()
-    await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
-    // The header's, the boot audit's label's and the pill's.
-    await expect(page.locator('[data-role="vee"] canvas')).toHaveCount(3)
+    // 2026-11-07 — the panel is the Ask Vee window: the header's and the boot audit's label's
+    // sprites are there, the pill's in the main window. Each window has its own sprite clock, so
+    // "never together" is held for the two that share one — the pill blinks on a clock of its own.
+    const vee = await veeWindow(app)
+    await expect(vee.locator('[data-role="vee"] canvas')).toHaveCount(2)
+    await expect(page.locator('[data-role="vee"] canvas')).toHaveCount(1)
     test.skip(
-      await page.evaluate(() => document.hidden),
-      'the window is not visible, so the sprite clock is stopped by its own rule'
+      (await page.evaluate(() => document.hidden)) || (await vee.evaluate(() => document.hidden)),
+      'a window is not visible, so its sprite clock is stopped by its own rule'
     )
 
     // The sprite is drawn in the theme's own colours and follows a theme switch by itself: the
@@ -2630,8 +2651,8 @@ test('Vee blinks at rest, no two sprites together, and holds still under reduced
     await expect.poll(rim).toEqual([0x35, 0xc4, 0xb6, 255])
 
     /** What the sprites showed over `ms`: every sample, and each sprite's distinct pictures. */
-    const watch = (ms: number): Promise<{ pictures: string[][]; samples: string[][] }> =>
-      page.evaluate(async (span) => {
+    const watch = (ms: number, where: Page = vee): Promise<{ pictures: string[][]; samples: string[][] }> =>
+      where.evaluate(async (span) => {
         const all = [...document.querySelectorAll('[data-role="vee"] canvas')] as HTMLCanvasElement[]
         const samples: string[][] = []
         const end = performance.now() + span
@@ -2642,8 +2663,9 @@ test('Vee blinks at rest, no two sprites together, and holds still under reduced
         return { pictures: all.map((_, i) => [...new Set(samples.map((s) => s[i]))]), samples }
       }, ms)
 
-    // 1 — four seconds at rest: more than one whole 28-frame cycle.
-    const moving = await watch(4000)
+    // 1 — four seconds at rest: more than one whole 28-frame cycle — the pill too.
+    const [moving, pillMoving] = await Promise.all([watch(4000), watch(4000, page)])
+    expect(pillMoving.pictures[0]).toHaveLength(2)
     for (const shown of moving.pictures) expect(shown).toHaveLength(2)
     // Each sprite's open face is the picture it shows most; the other is its blink.
     const open = moving.pictures.map((shown, i) => {
@@ -2660,9 +2682,9 @@ test('Vee blinks at rest, no two sprites together, and holds still under reduced
     }
 
     // 2 — reduced motion: the clock does not run, and every sprite holds its open face.
-    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await vee.emulateMedia({ reducedMotion: 'reduce' })
     await expect
-      .poll(() => page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+      .poll(() => vee.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
       .toBe(true)
     // The page's own listener hears the change with its next frame, not at once: a sprite that
     // was mid-blink stays shut until then. So wait for the open faces, then watch them hold.
@@ -2671,7 +2693,7 @@ test('Vee blinks at rest, no two sprites together, and holds still under reduced
     expect(still.pictures).toEqual(open.map((p) => [p]))
 
     // 3 — and it starts again when motion is allowed again.
-    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await vee.emulateMedia({ reducedMotion: 'no-preference' })
     await expect
       .poll(async () => (await watch(400)).pictures.some((shown, i) => shown.length > 1 || shown[0] !== open[i]), {
         timeout: 8_000

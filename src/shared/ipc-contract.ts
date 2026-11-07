@@ -289,6 +289,14 @@ export type ApiKeyPayload = z.infer<typeof ApiKeyPayload>
 /** `schedules:open` carries nothing: the toolbar button asks for the window, and that is all. */
 export const SchedulesOpenRequest = z.undefined()
 
+/**
+ * 2026-11-07 — the Ask Vee window: open (or bring forward), with the main window's theme so the
+ * new window's first paint is already in it; and close, which takes no payload.
+ */
+export const VeeOpenRequest = z.object({ theme: z.enum(['dark', 'light']) }).strict()
+export type VeeTheme = z.infer<typeof VeeOpenRequest>['theme']
+export const VeeCloseRequest = z.undefined()
+
 /* ────────────────────────────── Schedules files (2026-09-25, phase 4) ────────────────────────────── */
 
 /**

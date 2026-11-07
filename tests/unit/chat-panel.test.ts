@@ -23,12 +23,10 @@ import {
   ASSISTANT,
   authorOf,
   BUBBLE_RADIUS,
-  CHAT_MIN,
   chatExamples,
   chatRow,
   chipsFolded,
   chipsStarted,
-  clampChatSize,
   replyStrip,
   sendClick,
   STOP_GUARD_MS,
@@ -304,56 +302,6 @@ describe('the contextual suggestions', () => {
       stackLive: false,
       hiddenCount: 0
     })
-  })
-})
-
-/* ────────────────────────────── the corner drag (`:1127`) ────────────────────────────── */
-
-describe('the resize clamp', () => {
-  const stage = { width: 1200, height: 800 }
-  const start = { w: 330, h: 420, x: 900, y: 400 }
-
-  it('grows leftward and upward by exactly the drag', () => {
-    expect(clampChatSize(start, { x: 820, y: 330 }, stage, 12, 60)).toEqual({
-      chatW: 410,
-      chatH: 490
-    })
-  })
-
-  it('never goes under 240 px in either direction', () => {
-    expect(clampChatSize(start, { x: 1400, y: 900 }, stage, 12, 60)).toEqual({
-      chatW: CHAT_MIN,
-      chatH: CHAT_MIN
-    })
-  })
-
-  it('never grows past the stage, and the lane it has to clear', () => {
-    const wide = clampChatSize(start, { x: 0, y: 0 }, stage, 344, 60)
-    expect(wide.chatW).toBe(1200 - 344 - 12)
-    expect(wide.chatH).toBe(800 - 60 - 64)
-  })
-
-  it('keeps the minimum on a stage too small to hold it', () => {
-    const tiny = clampChatSize(start, { x: 0, y: 0 }, { width: 300, height: 260 }, 344, 60)
-    expect(tiny).toEqual({ chatW: CHAT_MIN, chatH: CHAT_MIN })
-  })
-
-  /**
-   * 2026-10-01 — the bottom row's lane (`--brow`). The panel's foot stands that much higher, so
-   * the tallest it may be dragged is that much less; the width is not its business.
-   */
-  it('stops that much shorter of the toolbar while the bottom row has a lane', () => {
-    const at = { x: 0, y: 0 }
-    expect(clampChatSize(start, at, stage, 344, 60, 43)).toEqual({
-      chatW: 1200 - 344 - 12,
-      chatH: 800 - 60 - 64 - 43
-    })
-    // No lane — the row is one line — is the design's own bound, with the argument or without.
-    expect(clampChatSize(start, at, stage, 344, 60, 0)).toEqual(clampChatSize(start, at, stage, 344, 60))
-    // A drag short of the bound is untouched by the lane.
-    expect(clampChatSize(start, { x: 820, y: 330 }, stage, 12, 60, 43)).toEqual({ chatW: 410, chatH: 490 })
-    // And the 240 px floor still wins on a stage the lane leaves too little of.
-    expect(clampChatSize(start, at, { width: 1200, height: 420 }, 12, 60, 121).chatH).toBe(CHAT_MIN)
   })
 })
 

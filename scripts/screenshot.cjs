@@ -427,13 +427,14 @@ const APP_ONLY_STATES = {
   'trace-08-done': `${traceAt(CUE.answer + 3)}`,
 
   /* ── 2026-10-08: a reply's own format — one chain, in order, on a fresh window per theme, at
-   * `SGVUE_SIZE=1280x820 SGVUE_DPR=1`, the sprite clock pinned at 0. The panel is first dragged
-   * taller — `chatH`, the store field its corner sets — so the whole formatted reply is in view.
+   * `SGVUE_SIZE=1280x820 SGVUE_DPR=1`, the sprite clock pinned at 0. (The panel was first made
+   * 640 px tall through the store's `chatH`; since 2026-11-07 it is the Ask Vee window, whose
+   * size is the window's, and the store has no such field.)
    * On a build from before 2026-10-08 the same states draw that reply as it was drawn then.
    * ──────────────────────────────────────────────────────────────────────────── */
   // A turn with no tool, answered in one plain sentence: its bubble hugs its text.
   'fmt-plain':
-    `${VEE_PIN} ${traceAt(-1)}; click(chatPill()); await sleep(400); D.chat.setState({ chatH: 640 });` +
+    `${VEE_PIN} ${traceAt(-1)}; click(chatPill()); await sleep(400);` +
     ` ${traceAt(0)}; D.chat.step.begin(${JSON.stringify(FMT.plain.question)}); ${traceAt(1.5)};` +
     ` D.chat.step.done(${JSON.stringify(FMT.plain.reply)}); ${traceAt(4.5)}`,
   // A second turn answered with a sentence, a bulleted list and a table — 0.9 s into the answer,

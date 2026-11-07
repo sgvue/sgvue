@@ -199,6 +199,27 @@ export const VEE_PALETTE: Readonly<Record<'dark' | 'light', Readonly<Record<VeeR
 export const VEE_SLOT = { header: 21, label: 19, pill: 16 } as const
 
 /**
+ * The margins that fit each of the sprite's slots (`VEE_SLOT`) into the row the design already
+ * has. The 16 × 16 grid is larger than the 12 × 12 body in it — three empty rows above for the
+ * hop and the `!`, one below, two columns either side — so a slot overhangs its row and is
+ * pulled in by negative margins, as the reference's are (`ask-thinking-hex.jsx:315`, `:367`).
+ * The top margin is the larger one: it lifts the grid by about a cell, which is what puts the
+ * **body** on the row's centre line. (Moved here from `ChatPanel.tsx` on 2026-11-07, when the
+ * panel left the main window and the pill stayed: both still read them.)
+ *
+ *   header  21 px, 15 px of flow — the sparkle's 15, so the title starts where it did. The slot
+ *           spans 11–32 px from the panel's edge; the reference's, 11.5–32.8.
+ *   label   19 px, 10 px of flow each way — the row keeps its 10 px of height, and the slot's
+ *           left edge is on the header slot's.
+ *   pill    16 px, 14 px of flow — the sparkle's 14, so the label starts where it did.
+ */
+export const VEE_MARGIN = {
+  header: '-4px -4px -1px -2px',
+  label: '-6px -4px -3px -5px',
+  pill: '-3px -1px -1px -1px'
+} as const
+
+/**
  * The frame offsets that keep the idle sprites from blinking in unison: the reference's
  * `hexF + 5`, `+ 11` and `+ 17` (the same three lines).
  */

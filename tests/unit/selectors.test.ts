@@ -38,7 +38,6 @@ import {
   BOTTOM_GAP,
   cardTopFrom,
   centrePlace,
-  chatRight,
   HINT_MIN,
   rlane,
   ROW_CLEAR,
@@ -640,8 +639,6 @@ describe('toolbar, status bar and lanes', () => {
     expect(rlane(true, 420)).toBe('332px')
     expect(rlane(true, 419)).toBe('0px')
     expect(rlane(false, 1000)).toBe('0px')
-    expect(chatRight(true, 1000)).toBe(344)
-    expect(chatRight(false, 1000)).toBe(12)
     expect(cardTopFrom(40)).toBe(64)
     expect(cardTopFrom(40.4)).toBe(64)
     expect(cardTopFrom(75)).toBe(99)

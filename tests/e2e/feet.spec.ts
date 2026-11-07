@@ -21,7 +21,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { THIN_SPACE as T } from '../../src/shared/fmt'
-import { DROP_COPY, emit, holdTurns, launch, readSession, ROOT, statusText, tool, toolResults } from './helpers'
+import { DROP_COPY, emit, holdTurns, launch, readSession, ROOT, statusText, tool, toolResults, veeIsOpen, veeWindow } from './helpers'
 
 const FEET = join(ROOT, 'tests/fixtures/feet.ifc')
 const ASK = 'button[data-tip^="Ask the assistant"]'
@@ -84,14 +84,15 @@ test('a model in feet boots in ft, every readout follows, and the card’s mm pu
     await expect.poll(async () => (await overlayTexts(page)).some((t) => t.includes('Level 2') && t.includes(`+10'-6"`))).toBe(true)
 
     // ── a laser measurement from the top of the ground slab, in feet and inches ──
+    // (Since 2026-11-07 the chat is the Ask Vee window; the model stays in this one.)
     await page.locator(ASK).click()
-    await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
+    const vee = await veeWindow(app)
     await holdTurns(app)
-    const [found] = (await turn(app, page, 'Where is the slab?', [
+    const [found] = (await turn(app, vee, 'Where is the slab?', [
       ['query_sql', { sql: "SELECT e.id FROM element e WHERE e.name = 'Slab L1' LIMIT 1" }]
     ])) as { rows: number[][] }[]
     const id = found.rows[0][0]
-    const [placed] = (await turn(app, page, 'Measure from the top of it.', [
+    const [placed] = (await turn(app, vee, 'Measure from the top of it.', [
       ['manage_markups', { op: 'place_measure', id, at: 'top' }]
     ])) as { placed: boolean; measure: Record<string, unknown> }[]
     expect(placed.placed).toBe(true)
@@ -102,6 +103,7 @@ test('a model in feet boots in ft, every readout follows, and the card’s mm pu
       expect([reading, labels.includes(reading)]).toEqual([reading, true])
     }
     await page.locator(ASK).click()
+    await expect.poll(() => veeIsOpen(app)).toBe(false)
 
     // ── the Markups card: ft is the lit button, and its row reads feet and inches ──
     await page.locator('[data-role="actionbar"] button', { hasText: '1 measures' }).click()

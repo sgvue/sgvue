@@ -136,6 +136,11 @@ describe('read-only guard', () => {
       // Schedules window or brings it forward. The two windows then talk over a private
       // MessagePort main hands them, which is not a bridge key (`preload/schedule.ts`).
       'openSchedules',
+      // 2026-11-07 — the Ask Vee window (the chat panel, in a window of its own): open it or
+      // bring it forward, and close it. No payload in, nothing out. The conversation goes over
+      // a private MessagePort main hands both pages, which is not a bridge key (`preload/vee.ts`).
+      'openVee',
+      'closeVee',
       // 2026-10-01 — the landing page's update notice (owner-chosen: "Check at every start").
       // Neither takes an argument. `checkUpdate` answers `{ latest }` or `null`: main asks
       // GitHub for a version number at most once per run, and never in a development build
@@ -532,11 +537,34 @@ describe('read-only guard', () => {
 
     // `applyPending` is the one door, and exactly two things call it: the pending row's Apply
     // button, and the dev harness's `chat.apply` (dropped from a production bundle).
+    //
+    // 2026-11-07 — the pending row is drawn in the Ask Vee window, a page of its own, while the
+    // conversation stays in the main window. So the button's click sends one intent, `apply`,
+    // naming the message and the request it showed, and the main window's end of the port calls
+    // `applyPending` for it — once, and only while that very request still waits on that very
+    // message. The Vee window's code names no performer at all.
     const callers = FILES.filter(({ text }) => /\.applyPending\(/.test(stripComments(text))).map(({ path }) => path)
-    expect(callers.sort()).toEqual(['src/renderer/App.tsx', 'src/renderer/app/ChatPanel.tsx'])
+    expect(callers.sort()).toEqual(['src/renderer/App.tsx', 'src/renderer/model/vee-link.ts'])
     const panel = code('src/renderer/app/ChatPanel.tsx')
-    expect(panel.match(/\.applyPending\(/g)).toHaveLength(1)
-    expect(panel).toMatch(/onClick=\{\(\) => st\.applyPending\(i\)\}/)
+    expect(panel).not.toMatch(/\bapplyPending\b/)
+    expect(panel.match(/type: 'apply'/g)).toHaveLength(1)
+    expect(panel).toMatch(/onClick=\{\(\) => post\(\{ type: 'apply', \.\.\.at!, pending: message!\.pending!\.id \}\)\}/)
+    const link = code('src/renderer/model/vee-link.ts')
+    expect(link.match(/\.applyPending\(/g)).toHaveLength(1)
+    const applyCase = /case 'apply': \{[\s\S]*?\n {6}return\n {4}\}/.exec(link)
+    expect(applyCase, 'vee-link no longer handles `apply` in its own case').not.toBeNull()
+    // …after the check that the request is the one the user saw, and with the copy made where
+    // the click was (`copyingIn`, `../clipboard.ts`).
+    expect(applyCase![0]).toMatch(/if \(!m\?\.pending \|\| pendingId\(m\.pending\) !== i\.pending\) return\n\s*copyingIn\(copyInVee, \(\) => s\.applyPending\(i\.index\)\)/)
+    expect(link.indexOf('.applyPending(')).toBeGreaterThan(link.indexOf("case 'apply':"))
+    // The Vee window's own code reaches no gated action, and no store.
+    const veeCode = FILES.filter(({ path }) => path.startsWith('src/renderer/vee/') || path === 'src/renderer/app/ChatPanel.tsx')
+    expect(veeCode.length).toBeGreaterThan(2)
+    for (const { path, text } of veeCode) {
+      const c = stripComments(text)
+      expect([path, /\b(applyPending|performGated|dismissPending|revertTurn|setOutsideActions|useShell)\b/.test(c)]).toEqual([path, false])
+      expect([path, /from '\.\.\/(\.\.\/)?state\/shell'|from '\.\.\/ai\/bridge'/.test(c)]).toEqual([path, false])
+    }
     // The harness's is behind the dev-tools block, which a production build drops.
     const app = code('src/renderer/App.tsx')
     expect(app.match(/\.applyPending\(/g)).toHaveLength(1)

@@ -1,0 +1,352 @@
+/**
+ * The main window's end of the Ask Vee window's private port — 2026-11-07.
+ *
+ * The owner: *"Also bring vee out as a separate window and always on top of our app window.
+ * because when the vee panel and properties panel show up together, they blocked my model
+ * view."* The chat panel is a child window of its own (`main/vee-window.ts`). **The conversation
+ * still runs here**: the store's chat slice, the turn (`ai/bridge.ts`), every tool, the trace's
+ * facts, the pending row's request, `revertTurn`, `applyPending`. The Vee window only draws it.
+ *
+ * This module is the seam, built on the Schedules window's pattern (`schedule-link.ts`): main
+ * hands this page one end of a `MessageChannelMain` pair when the Vee window has loaded (the
+ * preload re-posts it as `CH_VEE_PORT`), and an empty post means the window closed. While a
+ * port is held:
+ *
+ *   · to the window, `update` — the snapshot of what the panel draws (`shared/vee-messages.ts`,
+ *     bounded, no element ids) and the trace's changes (`ai/trace-store.ts`, `onTraceChange`),
+ *     batched to one post per task and in the order they happened, so that a reply and its
+ *     trace arrive together, as they changed together here. Trace times cross on this page's
+ *     clock, with where it starts (`origin`).
+ *   · from the window, an **intent** — what the user did, validated (`VeeIntent`) and then done
+ *     here through the action the panel's control always called.
+ *
+ * **Consent stays the user's click.** `apply` names the message *and* the request it showed
+ * (`messageId`, `pendingId` — the identities of the main window's own objects, given out as the
+ * snapshot is built). It is applied only while that very request is still waiting on that very
+ * message; otherwise nothing happens. It is the one call of `applyPending` here, and nothing
+ * else in this module reaches a gated action.
+ *
+ * **A copy is made where the click was.** `execCommand('copy')` copies only under the user's
+ * activation, and the click on Apply or `copy csv` was in the Vee window. So the two intents that
+ * can copy run inside `copyingIn` (`../clipboard.ts`): the text is sent back to the Vee window,
+ * which copies it and says whether it could (`copied`); a refusal is the store's own
+ * `CLIPBOARD_REFUSED`, as before.
+ *
+ * **`chatOpen` is still the panel's state**, and the window follows it: set, the window is
+ * opened (or brought forward); cleared, it is closed. A window that closes by itself — its own
+ * close button, or the main window's reload — clears it.
+ */
+import { CH_VEE_PORT } from '../../shared/ipc-channels'
+import {
+  VeeIntent,
+  VEE_COPY_MS,
+  VEE_MAX_INPUT,
+  VEE_MAX_LABEL,
+  VEE_MAX_TABLE_ROWS,
+  VEE_MAX_TEXT,
+  type ToVee,
+  type VeeSnapshot
+} from '../../shared/vee-messages'
+import { abortChat, sendChat } from '../ai/bridge'
+import { onTraceChange, traceEpoch, traceSnapshot, type TraceChange } from '../ai/trace-store'
+import { api } from '../api'
+import { copyingIn } from '../clipboard'
+import { chatExamples, messageView } from '../state/selectors/chat'
+import { useShell, type ChatMessage, type ShellState } from '../state/shell'
+
+let port: MessagePort | null = null
+let unsubscribe: (() => void) | null = null
+
+/* ────────────────────────────── identities ────────────────────────────── */
+
+let nextId = 1
+const ids = new WeakMap<object, number>()
+/** A number for this very object, the same every time it is asked: a message, or its request. */
+const idOf = (o: object): number => {
+  let id = ids.get(o)
+  if (id === undefined) ids.set(o, (id = nextId++))
+  return id
+}
+export const messageId = (m: ChatMessage): number => idOf(m)
+export const pendingId = (p: NonNullable<ChatMessage['pending']>): number => idOf(p)
+
+/* ────────────────────────────── the composer ────────────────────────────── */
+
+/** The composer text the Vee window last said it holds. */
+let echo = ''
+/** Moves whenever the store's `chatInput` changes and the Vee window did not change it. */
+let composerRev = 0
+
+/* ────────────────────────────── the snapshot ────────────────────────────── */
+
+/** A label cut to the snapshot's bound, so that no one long string can make a whole snapshot invalid. */
+const cut = (text: string): string => text.slice(0, VEE_MAX_LABEL)
+
+/** A message as the snapshot carries it: no ids behind a chip or a row, and no request. */
+function sent(m: ChatMessage): VeeSnapshot['msgs'][number] {
+  const v = messageView(m, messageId(m), m.pending ? pendingId(m.pending) : 0)
+  return {
+    id: v.id,
+    role: v.role,
+    text: v.text.slice(0, VEE_MAX_TEXT),
+    quote: v.quote && { who: cut(v.quote.who), text: cut(v.quote.text) },
+    chips: v.chips.slice(0, 6).map((c) => ({ label: cut(c.label) })),
+    table: v.table && {
+      groupBy: cut(v.table.groupBy),
+      ...(v.table.clash !== undefined ? { clash: v.table.clash } : {}),
+      ...(v.table.units ? { units: { ...v.table.units } } : {}),
+      rows: v.table.rows.slice(0, VEE_MAX_TABLE_ROWS).map((r) => ({
+        k: cut(r.k),
+        n: r.n,
+        ...(r.area !== undefined ? { area: r.area } : {}),
+        ...(r.volume !== undefined ? { volume: r.volume } : {}),
+        ...(r.vol !== undefined ? { vol: r.vol } : {})
+      }))
+    },
+    pending: v.pending && { id: v.pending.id, label: cut(v.pending.label) },
+    canRevert: v.canRevert,
+    reverted: v.reverted,
+    trace: v.trace && {
+      status: cut(v.trace.status),
+      wide: v.trace.wide,
+      noun: cut(v.trace.noun),
+      rows: v.trace.rows.slice(0, 8).map((r) => ({ label: cut(r.label), n: r.n }))
+    }
+  }
+}
+
+/** What the panel draws, as it stands. Exported for the unit tests. */
+export function snapshotOf(s: ShellState): VeeSnapshot {
+  return {
+    theme: s.theme,
+    units: s.units,
+    busy: s.chatBusy,
+    err: cut(s.chatErr),
+    replyTo: s.chatReplyTo,
+    suggestOpen: s.chatSuggestOpen,
+    suggestions: chatExamples(s).slice(0, 4).map((t) => t.slice(0, 500)),
+    composer: { text: s.chatInput.slice(0, VEE_MAX_INPUT), rev: composerRev },
+    msgs: s.chatMsgs.map(sent)
+  }
+}
+
+/** The store fields the snapshot is built from: a change to any of them sends a new one. */
+const SNAP_KEYS: readonly (keyof ShellState)[] = [
+  'theme', 'units', 'chatBusy', 'chatErr', 'chatReplyTo', 'chatSuggestOpen', 'chatInput', 'chatMsgs',
+  // …and what the suggestions read (`chatExamples`).
+  'sel', 'byId', 'stack', 'hidden', 'loaded', 'library'
+]
+
+/* ────────────────────────────── the outbox ────────────────────────────── */
+
+let snapDirty = false
+let traceOut: TraceChange[] = []
+let queued = false
+
+/** A trace change, made ready to cross: with no element ids. */
+function crossing(c: TraceChange): TraceChange {
+  const strip = <T extends { rules: { rows: { ids: number[] }[] } | null }>(facts: T): T =>
+    facts.rules ? { ...facts, rules: { ...facts.rules, rows: facts.rules.rows.map((r) => ({ ...r, ids: [] })) } } : facts
+  if (c.kind === 'event' && c.ev.type === 'tool_exec') return { ...c, ev: { ...c.ev, facts: strip(c.ev.facts) } }
+  if (c.kind === 'sync' && c.timeline) {
+    return { ...c, timeline: { ...c.timeline, calls: c.timeline.calls.map((k) => ({ ...k, facts: strip(k.facts) })) } }
+  }
+  return c
+}
+
+function flush(): void {
+  queued = false
+  if (!port || (!snapDirty && !traceOut.length)) return
+  // `ToVee`'s `update`; the Vee window validates it, as it validates everything it is sent.
+  const message = {
+    type: 'update' as const,
+    // Where this page's trace clock starts on the wall clock: the Vee window's starts elsewhere.
+    origin: traceEpoch(),
+    ...(snapDirty ? { snap: snapshotOf(useShell.getState()) } : {}),
+    trace: traceOut
+  }
+  snapDirty = false
+  traceOut = []
+  port.postMessage(message)
+}
+
+/** Post at the end of this task — whatever else changes in it goes in the same post. */
+function queue(): void {
+  if (queued) return
+  queued = true
+  queueMicrotask(flush)
+}
+
+/* ────────────────────────────── copying in the Vee window ────────────────────────────── */
+
+let copyN = 0
+const copies = new Map<number, (ok: boolean) => void>()
+
+/** Copy `text` in the Vee window, where the click was; resolves whether it reached the clipboard. */
+function copyInVee(text: string): Promise<boolean> {
+  if (!port) return Promise.resolve(false)
+  const n = ++copyN
+  const sentTo = port
+  return new Promise((resolve) => {
+    const done = (ok: boolean): void => {
+      clearTimeout(giveUp)
+      copies.delete(n)
+      resolve(ok)
+    }
+    const giveUp = setTimeout(() => done(false), VEE_COPY_MS)
+    copies.set(n, done)
+    sentTo.postMessage({ type: 'copy', n, text } satisfies ToVee)
+  })
+}
+
+/* ────────────────────────────── the user's intents ────────────────────────────── */
+
+/** The message the intent names — only while it is still that very message. */
+function named(s: ShellState, index: number, msg: number): ChatMessage | null {
+  const m = s.chatMsgs[index]
+  return m && messageId(m) === msg ? m : null
+}
+
+/**
+ * One intent from the Vee window. Anything that fails its schema is ignored, and so is an act on
+ * a message — or a request — the transcript no longer holds. Exported for the unit tests.
+ */
+export function receive(data: unknown): void {
+  const parsed = VeeIntent.safeParse(data)
+  if (!parsed.success) return
+  const i = parsed.data
+  const s = useShell.getState()
+  switch (i.type) {
+    case 'send':
+      echo = i.text
+      s.setChatInput(i.text)
+      void sendChat(i.text)
+      return
+    case 'stop':
+      abortChat()
+      return
+    case 'input':
+      echo = i.text
+      s.setChatInput(i.text)
+      return
+    case 'apply': {
+      // The user's click on Apply, for the request they saw — and nothing else.
+      const m = named(s, i.index, i.msg)
+      if (!m?.pending || pendingId(m.pending) !== i.pending) return
+      copyingIn(copyInVee, () => s.applyPending(i.index))
+      return
+    }
+    case 'cancel': {
+      const m = named(s, i.index, i.msg)
+      if (!m?.pending || pendingId(m.pending) !== i.pending) return
+      s.dismissPending(i.index)
+      return
+    }
+    case 'revert':
+      if (named(s, i.index, i.msg)) s.revertTurn(i.index)
+      return
+    case 'reply':
+      if (named(s, i.index, i.msg)) s.setChatReplyTo(i.index)
+      return
+    case 'unreply':
+      s.setChatReplyTo(null)
+      return
+    case 'suggest':
+      echo = i.text
+      s.setChatInput(i.text)
+      s.setChatSuggestOpen(false)
+      return
+    case 'suggestOpen':
+      s.setChatSuggestOpen(i.open)
+      return
+    case 'pick': {
+      const m = named(s, i.index, i.msg)
+      if (!m) return
+      const ids =
+        i.what === 'chip' ? m.chips?.[i.j]?.ids : i.what === 'table' ? m.table?.rows[i.j]?.ids : m.trace?.rows[i.j]?.ids
+      if (ids) s.select([...ids], i.zoom)
+      return
+    }
+    case 'copyCsv': {
+      const table = named(s, i.index, i.msg)?.table
+      if (table) copyingIn(copyInVee, () => void s.copyTable(table))
+      return
+    }
+    case 'copied':
+      copies.get(i.n)?.(i.ok)
+      return
+    case 'close':
+      s.setChatOpen(false)
+      return
+  }
+}
+
+/* ────────────────────────────── the port ────────────────────────────── */
+
+/** Take a port (or `null`: the window closed). Exported for the unit tests. */
+export function connect(next: MessagePort | null): void {
+  unsubscribe?.()
+  unsubscribe = null
+  for (const done of [...copies.values()]) done(false)
+  port?.close()
+  port = next
+  snapDirty = false
+  traceOut = []
+  if (!port) {
+    // The window has gone — by its own close button, or with a reload — so the panel is closed.
+    if (useShell.getState().chatOpen) useShell.getState().setChatOpen(false)
+    return
+  }
+
+  port.onmessage = (event: MessageEvent): void => receive(event.data)
+  echo = useShell.getState().chatInput
+  const offTrace = onTraceChange((change) => {
+    traceOut.push(crossing(change))
+    queue()
+  })
+  const offStore = useShell.subscribe((s, prev) => {
+    // The Vee window's own keystroke, coming back: it already shows this text.
+    const echoed = s.chatInput !== prev.chatInput && s.chatInput === echo
+    if (s.chatInput !== prev.chatInput && !echoed) {
+      composerRev++
+      echo = s.chatInput
+      // "Ask about this" while the window is open: bring it forward, the composer focused.
+      if (s.chatInput && s.chatOpen) {
+        void api()?.openVee(s.theme)
+        port?.postMessage({ type: 'focus' } satisfies ToVee)
+      }
+    }
+    const changed = SNAP_KEYS.filter((k) => s[k] !== prev[k])
+    // Nothing to send when the one change is that echo: no snapshot per keystroke.
+    if (changed.length && !(echoed && changed.length === 1)) {
+      snapDirty = true
+      queue()
+    }
+  })
+  unsubscribe = () => {
+    offTrace()
+    offStore()
+  }
+  // A window that is there is an open panel.
+  if (!useShell.getState().chatOpen) useShell.getState().setChatOpen(true)
+  snapDirty = true
+  traceOut = [crossing(traceSnapshot())]
+  flush()
+}
+
+/** Tests only: whether a port is held. */
+export const veeConnected = (): boolean => port !== null
+
+/** Listen for the port, and open and close the window as the panel opens and closes. Called once. */
+export function installVeeLink(): void {
+  window.addEventListener('message', (event: MessageEvent) => {
+    // Only the preload's own re-post: same window, the channel's name as the data.
+    if (event.source !== window || event.data !== CH_VEE_PORT) return
+    connect(event.ports[0] ?? null)
+  })
+  useShell.subscribe((s, prev) => {
+    if (s.chatOpen === prev.chatOpen) return
+    if (s.chatOpen) void api()?.openVee(s.theme)
+    else void api()?.closeVee()
+  })
+}

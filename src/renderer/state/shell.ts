@@ -395,9 +395,6 @@ export interface ShellState {
   chatErr: string
   /** Index of the message a reply is aimed at, or null. `:1595`. */
   chatReplyTo: number | null
-  /** The panel's own size, dragged by its top-left corner. `:850`, `:1127`. */
-  chatW: number
-  chatH: number
   /**
    * 2026-09-24 — the suggestion row, once the conversation has a user turn, folds behind one
    * `suggestions` chip; this is whether that chip has it open. `chipsFolded` decides.
@@ -545,8 +542,6 @@ export interface ShellState {
   setChatOpen: (open: boolean) => void
   setChatInput: (text: string) => void
   setChatReplyTo: (index: number | null) => void
-  /** What one corner drag settles on. `:1132`. */
-  setChatSize: (chatW: number, chatH: number) => void
   setChatSuggestOpen: (open: boolean) => void
   setSideSize: (which: 'models' | 'storeys', size: SideSize | null) => void
   /** Push the user turn and take the pre-turn snapshot. Returns it. `:1599`. */
@@ -971,8 +966,6 @@ export const useShell = create<ShellState>((set, get) => ({
   chatBusy: false,
   chatErr: '',
   chatReplyTo: null,
-  chatW: 330,
-  chatH: 420,
   chatSuggestOpen: false,
   sideModels: null,
   sideStoreys: null,
@@ -1546,23 +1539,15 @@ export const useShell = create<ShellState>((set, get) => ({
   },
 
   /**
-   * `SGVue.dc.html:1650–1656`. The menu item opens the panel with the composer pre-filled, and
-   * 60 ms later — after the panel has mounted — focuses it with the caret at the end, so the
-   * question can be finished by typing. The element is found by the `data-role` the port keeps
-   * verbatim, which is the design's own `el('chatinput')` (`:855`).
+   * `SGVue.dc.html:1650–1656`. The menu item opens the panel with the composer pre-filled. Since
+   * 2026-11-07 the composer is in the Ask Vee window, which focuses it with the caret at the end
+   * (`renderer/vee/link.ts`, `focusComposer`), so the question can be finished by typing.
    */
   askAbout: (ids) => {
     const s = get()
     const els = ids.map((i) => s.byId.get(i)).filter(Boolean) as FederatedElement[]
     if (!els.length) return
     set({ chatOpen: true, ctx: null, chatInput: askAboutText(els) })
-    setTimeout(() => {
-      const input = el('chatinput')
-      if (input instanceof HTMLInputElement) {
-        input.focus()
-        input.setSelectionRange(input.value.length, input.value.length)
-      }
-    }, 60)
   },
 
   /* ────────────────────────────── the assistant (`:1591–1649`) ────────────────────────────── */
@@ -1570,7 +1555,6 @@ export const useShell = create<ShellState>((set, get) => ({
   setChatOpen: (chatOpen) => set({ chatOpen }),
   setChatInput: (chatInput) => set({ chatInput }),
   setChatReplyTo: (chatReplyTo) => set({ chatReplyTo }),
-  setChatSize: (chatW, chatH) => set({ chatW, chatH }),
   setChatSuggestOpen: (chatSuggestOpen) => set({ chatSuggestOpen }),
   setSideSize: (which, size) => set(which === 'models' ? { sideModels: size } : { sideStoreys: size }),
 

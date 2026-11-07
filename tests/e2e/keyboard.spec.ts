@@ -13,7 +13,7 @@ import { test, expect, type ElectronApplication, type Page } from '@playwright/t
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DROP_COPY, launch, TINY } from './helpers'
+import { DROP_COPY, launch, TINY, veeWindow } from './helpers'
 
 /** What the browser says has focus, as `<role>:<data-tree-key or text>`. */
 const focused = (page: Page): Promise<string> =>
@@ -224,21 +224,25 @@ test('the canvas has a text alternative that says what is loaded', async () => {
 
 test('the chat transcript is a live log with a labelled composer', async () => {
   // The pill, by its own copy — `Ask Vee` since 2026-10-01, when the assistant got its name.
+  // Since 2026-11-07 it opens the Ask Vee window, where the panel is.
   await page.getByText('Ask Vee', { exact: true }).click()
-  const log = page.locator('[data-role="chatlog"]')
+  const vee = await veeWindow(app)
+  const log = vee.locator('[data-role="chatlog"]')
   await expect(log).toHaveAttribute('role', 'log')
   await expect(log).toHaveAttribute('aria-live', 'polite')
   await expect(log).toHaveAttribute('aria-labelledby', 'sgvue-chat-title')
-  await expect(page.locator('#sgvue-chat-title')).toHaveText('Ask Vee')
+  await expect(vee.locator('#sgvue-chat-title')).toHaveText('Ask Vee')
   // The mascot beside the title, in each reply's label and on the pill is decoration: every
   // one is hidden from the accessibility tree, and the name next to it is the text.
-  const sprites = page.locator('[data-role="vee"]')
-  expect(await sprites.count()).toBeGreaterThanOrEqual(3)
-  expect(await sprites.evaluateAll((all) => all.every((e) => e.getAttribute('aria-hidden') === 'true'))).toBe(true)
-  const input = page.locator('[data-role="chatinput"]')
+  const sprites = [vee.locator('[data-role="vee"]'), page.locator('[data-role="vee"]')]
+  expect((await sprites[0].count()) + (await sprites[1].count())).toBeGreaterThanOrEqual(3)
+  for (const s of sprites) {
+    expect(await s.evaluateAll((all) => all.every((e) => e.getAttribute('aria-hidden') === 'true'))).toBe(true)
+  }
+  const input = vee.locator('[data-role="chatinput"]')
   await expect(input).toHaveAttribute('aria-labelledby', 'sgvue-chat-title')
   // The send button is named by the design's own tooltip.
-  await expect(page.locator('button[data-tip="Send (Enter)"]')).toHaveAttribute(
+  await expect(vee.locator('button[data-tip="Send (Enter)"]')).toHaveAttribute(
     'aria-label',
     'Send (Enter)'
   )

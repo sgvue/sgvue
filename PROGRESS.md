@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-07 — Ask Vee in its own window
+
+**Did.** The owner: *"bring vee out as a separate window and always on top of our app window."*
+The chat panel is a child window of the main window (330 × 420, resizable, OS chrome, opened in
+the current theme, position kept for the run only). The conversation stays in the main window;
+the Vee window renders the existing panel from a bounded snapshot plus the mirrored trace, and
+sends back 14 strict intents. Apply is still only the Apply click, checked against the row's
+identity; copies are made in the clicked window. Esc closes it unless focus is in a field. The
+old panel-size code is removed. Seven e2e specs now drive the new window.
+
+**Verified.** `npm run typecheck`, `npm run build`, `npm test` (3 033 passed / 4 skipped);
+reviewer-deep PASS, then a second review round PASS on its follow-up fixes.
+**Owed:** an e2e run of the seven specs (needs the owner's yes), and the parity harness's chat
+states (`scripts/screenshot.cjs` `fmt-*` / `trace-*`) reworked for the new window.
+
 ## 2026-11-07 — gridlines and the canvas grid off by default
 
 **Did.** The owner: *"Make gridlines and canvas off by default."* `DISPLAY_DEFAULTS` now has

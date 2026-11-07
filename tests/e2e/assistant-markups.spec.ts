@@ -25,7 +25,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { signedF3 } from '../../src/shared/fmt'
-import { actionText, emit, holdTurns, launch, statusText, tool, toolResults, type ToolAnswer } from './helpers'
+import { actionText, emit, holdTurns, launch, statusText, tool, toolResults, veeWindow, type ToolAnswer } from './helpers'
 
 const DEMO = 'try the demo building →'
 const ASK = 'button[data-tip^="Ask the assistant"]'
@@ -72,7 +72,9 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
     await expect.poll(() => statusText(page), { timeout: 20_000 }).toContain('412 / 412')
     await page.locator(ASK).click()
-    await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
+    // Since 2026-11-07 the chat is the Ask Vee window; the model, its overlay and the cards stay here.
+    const vee = await veeWindow(app)
+    await vee.emulateMedia({ reducedMotion: 'reduce' })
     await holdTurns(app)
     const overlay = page.locator('[data-role="overlay"]')
     const folded = overlay.locator(':scope > div[title="Show E, N and Z"]')
@@ -82,7 +84,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     // ── the element, and its box, as the model would read them ──
     const found = await turn(
       app,
-      page,
+      vee,
       'Where is the ground slab?',
       [
         [
@@ -102,7 +104,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     // ── 1. a spot on top of it: one call, and it is in the overlay, the bar and the card ──
     const spot = await turn(
       app,
-      page,
+      vee,
       'Put a spot coordinate on top of it.',
       [['manage_markups', { op: 'place_spot', id, at: 'top' }]],
       'Placed spot coordinate C1 on top of the Ground Slab’s bounding box.'
@@ -140,7 +142,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     expect((await folded.textContent())!.trim()).toBe(signedF3(z1))
 
     // ── 2. the tag's two states, set by name — a click on the tag, and idempotent ──
-    const full = await turn(app, page, 'Show its full coordinates.', [['manage_markups', { op: 'show', name: 'C1', show: 'full' }]], 'C1 shows E, N and Z now.')
+    const full = await turn(app, vee, 'Show its full coordinates.', [['manage_markups', { op: 'show', name: 'C1', show: 'full' }]], 'C1 shows E, N and Z now.')
     expect(full.results[0].result).toEqual({ message: 'C1 now shows the full E, N and Z.', show: 'full', changed: 1 })
     await expect(open).toHaveCount(1)
     await expect(folded).toHaveCount(0)
@@ -148,7 +150,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     const xyz = (await open.locator('span').last().textContent())!.split(', ').map(Number)
     expect(xyz[2]).toBe(Math.round(z1 * 1000))
     expect(xyz[0]).toBe(Math.round(((x0 + x1) / 2) * 1000))
-    const again = await turn(app, page, 'And again.', [['manage_markups', { op: 'show', name: 'C1', show: 'full' }]], 'It already does.')
+    const again = await turn(app, vee, 'And again.', [['manage_markups', { op: 'show', name: 'C1', show: 'full' }]], 'It already does.')
     expect((again.results[0].result as { changed: number }).changed).toBe(0)
     // The user's own click on the tag folds it again: one state, two hands.
     await open.click()
@@ -157,7 +159,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     // ── 3. a laser measurement from the same place: the laser tool's own rays ──
     const laser = await turn(
       app,
-      page,
+      vee,
       'Now measure from there.',
       [['manage_markups', { op: 'place_measure', id, at: 'top' }]],
       'Placed laser measurement M1 on top of the Ground Slab’s bounding box.'
@@ -175,7 +177,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     await expect.poll(() => actionText(page)).toBe('1 measuresclear·1 spotsclear')
 
     // ── 4. the Markups card lists both, as it lists the ones a click places ──
-    const listed = await turn(app, page, 'What markups are there?', [['manage_markups', { op: 'list' }]], 'One of each.')
+    const listed = await turn(app, vee, 'What markups are there?', [['manage_markups', { op: 'list' }]], 'One of each.')
     expect(listed.results[0].result).toMatchObject({
       measuresTotal: 1,
       spotsTotal: 1,
@@ -189,7 +191,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     await expect(card).toContainText('C1')
 
     // ── 5. and it is deleted the way any markup is: asked for, behind the user's Apply ──
-    const del = await turn(app, page, 'Delete the spot.', [['manage_markups', { op: 'delete', name: 'C1' }]], 'I have asked to delete C1. Click Apply to confirm.')
+    const del = await turn(app, vee, 'Delete the spot.', [['manage_markups', { op: 'delete', name: 'C1' }]], 'I have asked to delete C1. Click Apply to confirm.')
     expect(del.results[0].result).toMatchObject({ applied: false, pending: true })
     expect(await actionText(page)).toBe('1 measuresclear·1 spotsclear')
     await del.row.getByRole('button', { name: 'apply', exact: true }).click()
@@ -203,7 +205,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     // nothing to remove: no markup goes, and nothing is said. The reply is closed all the same.
     // (The panel's status line: the one line the log shows under its rows, only when there is
     // something to say.)
-    const status = page.locator('[data-role="chatlog"] > span:not(.sr-only)')
+    const status = vee.locator('[data-role="chatlog"] > span:not(.sr-only)')
     await expect(revertSpot).toHaveCount(1)
     await revertSpot.click()
     await expect(revertSpot).toHaveCount(0)
@@ -230,7 +232,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     // The assistant places another, after it: C2 — in the bar's count, the overlay and the card.
     const second = await turn(
       app,
-      page,
+      vee,
       'Put another spot on top of the slab.',
       [['manage_markups', { op: 'place_spot', id, at: 'top' }]],
       'Placed spot coordinate C2 on top of the Ground Slab’s bounding box.'

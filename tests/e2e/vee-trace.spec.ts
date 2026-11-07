@@ -24,10 +24,9 @@ import { test, expect, type ElectronApplication, type Page } from '@playwright/t
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { emit, holdTurns, launch, tool, type Held } from './helpers'
+import { emit, holdTurns, launch, openVee, tool, type Held } from './helpers'
 
 const DEMO = 'try the demo building →'
-const ASK = 'button[data-tip^="Ask the assistant"]'
 const QUESTION = 'Which walls have no thermal transmittance?'
 const ANSWER = '**24 of 80 walls** have no Thermal Transmittance. Every `EW 200 Brick` wall carries one.'
 const WALLS = {
@@ -53,16 +52,23 @@ test.afterEach(async () => {
 const stops = (app: ElectronApplication): Promise<string[]> =>
   app.evaluate(() => (globalThis as unknown as { __turn: Held }).__turn.aborted)
 
-/** The demo building open, the panel open, and main's turn handlers held. */
-async function ready(media?: { reducedMotion: 'reduce' }): Promise<{ app: ElectronApplication; page: Page }> {
-  const { app, page } = await launch(dir)
+/**
+ * The demo building open, the panel open, and main's turn handlers held. Since 2026-11-07 the
+ * panel is the Ask Vee window: `page` is that window, where every chat control and the trace
+ * are, and `main` the main window, where the model, the property card and the toolbar are.
+ */
+async function ready(
+  media?: { reducedMotion: 'reduce' }
+): Promise<{ app: ElectronApplication; main: Page; page: Page }> {
+  const { app, page: main } = await launch(dir)
+  if (media) await main.emulateMedia(media)
+  await main.getByRole('button', { name: DEMO }).click()
+  await expect(main.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+  const page = await openVee(app, main)
+  // Each window asks for reduced motion on its own: the trace is drawn in the Vee window.
   if (media) await page.emulateMedia(media)
-  await page.getByRole('button', { name: DEMO }).click()
-  await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
-  await page.locator(ASK).click()
-  await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
   await holdTurns(app)
-  return { app, page }
+  return { app, main, page }
 }
 
 /**
@@ -186,7 +192,7 @@ const ask = async (page: Page, text = QUESTION): Promise<void> => {
 }
 
 test('a turn is drawn as it happens: Thinking, Reading, Filtering, Checking — then the answer and its rows', async () => {
-  const { app, page } = await ready()
+  const { app, main, page } = await ready()
   try {
     const log = page.locator('[data-role="chatlog"]')
     const send = page.locator('button[data-part="send"]')
@@ -320,10 +326,10 @@ test('a turn is drawn as it happens: Thinking, Reading, Filtering, Checking — 
 
     // 5 — a row is a button: it selects the elements it counts.
     await reply.locator('[data-part="row"]').nth(4).click()
-    await expect(page.locator('[data-role="propcard"]')).toBeVisible()
-    await expect(page.locator('[data-role="propcard"]').getByText('4 selected · showing last')).toBeVisible()
+    await expect(main.locator('[data-role="propcard"]')).toBeVisible()
+    await expect(main.locator('[data-role="propcard"]').getByText('4 selected · showing last')).toBeVisible()
     await reply.locator('[data-part="row"]').first().click()
-    await expect(page.locator('[data-role="propcard"]').getByText('5 selected · showing last')).toBeVisible()
+    await expect(main.locator('[data-role="propcard"]').getByText('5 selected · showing last')).toBeVisible()
 
     // 6 — and the log, which now scrolls, does not scroll sideways: nothing in it is wider
     // than it is — not the reply's chip, not a tooltip waiting to be shown.
@@ -586,7 +592,7 @@ test('with reduced motion every state shows at its end, and nothing in between',
 })
 
 test('the next turn leaves the reply before it finished and at rest, however soon it is sent', async () => {
-  const { app, page } = await ready()
+  const { app, main, page } = await ready()
   try {
     const log = page.locator('[data-role="chatlog"]')
     const input = page.locator('[data-role="chatinput"]')
@@ -680,7 +686,7 @@ test('the next turn leaves the reply before it finished and at rest, however soo
 
     // An older reply's rows still select what they count.
     await first.locator('[data-part="row"]').nth(4).click()
-    await expect(page.locator('[data-role="propcard"]').getByText('4 selected · showing last')).toBeVisible()
+    await expect(main.locator('[data-role="propcard"]').getByText('4 selected · showing last')).toBeVisible()
 
     // The second turn answers with no tool: its own reply settles, and the first has not changed.
     await emit(app, { type: 'done', text: 'There are 12 doors.', rounds: 1 })
@@ -694,20 +700,21 @@ test('the next turn leaves the reply before it finished and at rest, however soo
 })
 
 test('revert puts back everything that reply changed — theme, camera, visibility — and only that', async () => {
-  const { app, page } = await ready()
+  const { app, main, page } = await ready()
   try {
     const log = page.locator('[data-role="chatlog"]')
     const send = page.locator('button[data-part="send"]')
     const rows = log.locator(':scope > [data-row]')
     const REVERT = 'button[data-tip="Undo just this step"]'
-    const html = page.locator('html')
-    const proj = page.locator('button[data-tip="Perspective / orthographic"]')
-    const plan = page.locator('[data-role="toolbar"] button[data-tip="Plan"]')
-    const north = page.locator('[data-role="toolbar"] button[data-tip="North elevation"]')
-    const iso = page.locator('[data-role="toolbar"] button[data-tip="3D perspective (Home)"]')
-    const grids = page.locator('button[data-tip="Gridlines (G)"]')
-    const count = page.locator('[data-role="statusbar"] [title="visible / total elements"]')
-    const clearAll = page.getByRole('button', { name: 'Clear all' })
+    // The main window's: the model's theme, camera, toolbar and status bar.
+    const html = main.locator('html')
+    const proj = main.locator('button[data-tip="Perspective / orthographic"]')
+    const plan = main.locator('[data-role="toolbar"] button[data-tip="Plan"]')
+    const north = main.locator('[data-role="toolbar"] button[data-tip="North elevation"]')
+    const iso = main.locator('[data-role="toolbar"] button[data-tip="3D perspective (Home)"]')
+    const grids = main.locator('button[data-tip="Gridlines (G)"]')
+    const count = main.locator('[data-role="statusbar"] [title="visible / total elements"]')
+    const clearAll = main.getByRole('button', { name: 'Clear all' })
     const colour = (button: typeof plan): Promise<string> => button.evaluate((b) => getComputedStyle(b).color)
     /** One whole turn: the question, the calls, the answer — and the reply's row once it rests. */
     const turn = async (question: string, calls: [string, unknown][], settled: () => Promise<void>) => {
@@ -804,7 +811,7 @@ test('revert puts back everything that reply changed — theme, camera, visibili
     await expect(proj).toHaveText('persp')
     await expect(cut.locator(REVERT)).toHaveCount(0)
     // ⌘Z walks the revert's visibility back, exactly as before the widening.
-    await page.locator('[data-role="actionbar"] button[data-tip^="Undo the last visibility change"]').click()
+    await main.locator('[data-role="actionbar"] button[data-tip^="Undo the last visibility change"]').click()
     await expect(count).toHaveText('92 / 412')
   } finally {
     await app.close()

@@ -944,6 +944,22 @@ Anything not on this list is a defect.
   The defaults are one list, `DISPLAY_DEFAULTS` (`shared/ai-schema.ts`), which the store reads
   and the assistant's sparse view state compares against. **No new element and no new control.**
   Not yet measured in a window; parity captures now need both switched on to match the design.
+- **2026-11-07 — Ask Vee is a window of its own, above the SGVue window.** Asked for by the owner
+  in these words: *"Also bring vee out as a separate window and always on top of our app window.
+  because when the vee panel and properties panel show up together, they blocked my model
+  view."* The chat panel is a child window of the main window (`parent`): it stays above SGVue
+  and not above other apps, and on macOS it moves with it. OS chrome, the title `Ask Vee`,
+  resizable, it opens at the panel's 330 × 420 where the panel stood, in the current theme (no
+  flash), and comes back where it was left for the run only. The pill, "Ask about this" and the
+  dev harness open it; the pill, × or Esc (when focus is not in a text field) close it; closing
+  it stops nothing. Every style string of the panel is the design's except its placement: it
+  fills the window, so its position, size, border, radius, shadow, fade-in and resize corner are
+  the OS window's. The conversation still runs in the main window; the window is its view, over
+  a private port (`shared/vee-messages.ts`). Apply is still only the Apply click, for the request
+  the row showed, and a copy is made in the window that was clicked. The main window's 3D view,
+  property card, legend and bottom row are unchanged. **No new element and no new control.** The
+  mascots' "no two blink together" now holds within each window. Not yet seen in a window: the
+  e2e specs that drive it and the parity harness's chat states are owed.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1198,6 +1214,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-10-09 — **local folders, build output and IFC files are kept out of `app.asar`** (`electron-builder.yml` `files`, still a deny-list): the root folders a maintainer's `.git/info/exclude` keeps out of git — `reports/`, `research_notes/`, `reference/` — and `dist/`, `out-baseline/`, `tmp/` and `**/*.{ifc,ifczip}`. The first 1.3.0 package carried `reports/` and `research_notes/`, local notes holding a home path, until `tests/unit/asar-contents.test.ts` failed on it; electron-builder leaves out only its own output directory, so a build into `dist/<name>` packs the rest of `dist/`; a release built on GitHub never has these folders, a local `dist:win` does.
 - 2026-10-17 — **`package.json`'s `overrides` forces exceljs's `uuid` to `^11.1.1`** (`{ "exceljs": { "uuid": "^11.1.1" } }`) for GHSA-w5hq-g745-h8pq: exceljs 4.4.0, the latest, declares `uuid: ^8.3.0`, so Dependabot's security update cannot reach it; exceljs calls only `v4()`, with no buffer, never the vulnerable path. It changes the lockfile and the Node-side copy only — the renderer bundles exceljs's prebuilt browser build, which carries its own uuid, so `out/` is byte-identical before and after (94 files, `exceljs.min-Qns6GaRS.js` included). Remove it when exceljs declares a `uuid` ≥ 11.1.1.
 - 2026-11-07 — **the IFC gridlines and the canvas grid start off** (owner-requested): `DISPLAY_DEFAULTS` reads `grids: false`, `groundGrid: false`, and the store's seven display switches take their first values from it, so there is one list of defaults, not two; the read-back prompt line and the `op-canvas-grid` eval case (now "turn it on") follow.
+- 2026-11-07 — **the Ask Vee panel is a child window (`main/vee-window.ts`) and a view only**: the conversation, the gate and the trace's facts stay in the main renderer. Over a private `MessagePort` main never reads, the main window sends `update {origin, snap, trace}` once per task (bounded, no element ids), `copy` and `focus`; the window sends 14 strict intents. `apply` is checked against the identities of the message and request it showed before `model/vee-link.ts` calls `applyPending`; copies are made in the Vee window through `copyingIn`. `vee:open {theme}` / `vee:close` drive the window, for the main window only; the new preload imports only `electron` and exposes nothing.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

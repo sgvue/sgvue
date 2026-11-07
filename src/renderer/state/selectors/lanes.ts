@@ -12,9 +12,6 @@ export const RIGHT_LANE = 332
 /** Below this stage width there is no room for the lane, so it collapses. `:2049`. */
 export const RIGHT_LANE_MIN_STAGE = 420
 
-/** The chat panel's own right offset when the lane is live. `:2049`. */
-export const CHAT_RIGHT = 344
-
 /** Measured toolbar height plus this is every left-lane card's `top`. `:873`. */
 export const CARD_TOP_GAP = 24
 
@@ -24,10 +21,6 @@ export const CARD_TOP_GAP = 24
  */
 export const rlane = (hasSelection: boolean, stageWidth: number): string =>
   hasSelection && stageWidth >= RIGHT_LANE_MIN_STAGE ? `${RIGHT_LANE}px` : '0px'
-
-/** The chat panel's `right`, the same decision one step over. `:2049`. */
-export const chatRight = (hasSelection: boolean, stageWidth: number): number =>
-  hasSelection && stageWidth >= RIGHT_LANE_MIN_STAGE ? CHAT_RIGHT : 12
 
 /**
  * The action bar's lane, in CSS pixels (2026-10-01): the bar's own 27 px — the status bar's

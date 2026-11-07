@@ -54,7 +54,6 @@ import BottomRow from './app/BottomRow'
 import ColorLegend from './app/ColorLegend'
 import ContextMenu from './app/ContextMenu'
 import Preferences from './app/Preferences'
-import ChatPanel from './app/ChatPanel'
 import CoordsCard from './app/CoordsCard'
 import FilterCard from './app/FilterCard'
 import Landing from './app/Landing'
@@ -81,7 +80,7 @@ import { s } from './app/css'
 type ChatPatch = Partial<
   Pick<
     ShellState,
-    'chatOpen' | 'chatMsgs' | 'chatInput' | 'chatBusy' | 'chatErr' | 'chatReplyTo' | 'chatW' | 'chatH'
+    'chatOpen' | 'chatMsgs' | 'chatInput' | 'chatBusy' | 'chatErr' | 'chatReplyTo'
   >
 > & { chatStage?: string }
 
@@ -668,8 +667,8 @@ export default function App(): React.JSX.Element {
         <PropertyCard />
         {/* `:412` — the legend sits between the property card and the chat panel. */}
         <ColorLegend />
-        {/* `:430` — the assistant's panel. Its pill (`:536`) is in the bottom row too. */}
-        <ChatPanel />
+        {/* `:430` — the assistant's panel is a window of its own since 2026-11-07 (the Ask Vee
+            window, `main/vee-window.ts`); its pill (`:536`) is in the bottom row. */}
         {/* `:541`, `:582`, `:605`, `:687` — the design's own order after the property card. */}
         <MarkupsCard />
         <SectionCard />

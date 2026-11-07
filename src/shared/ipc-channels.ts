@@ -61,6 +61,19 @@ export const CH_SCHEDULES_OPEN = 'schedules:open'
  */
 export const CH_SCHEDULE_PORT = 'schedule:port'
 
+/* ────────────────────────────── the Ask Vee window (2026-11-07) ────────────────────────────── */
+
+/** Main window → main: open the Ask Vee window, or bring it forward. No payload. */
+export const CH_VEE_OPEN = 'vee:open'
+/** Main window → main: close the Ask Vee window, if it is open. No payload. */
+export const CH_VEE_CLOSE = 'vee:close'
+/**
+ * Main → each window: one end of the private `MessagePort` joining the main window and the Ask
+ * Vee window — the Schedules port's pattern. Sent with **no** port, it tells the main window the
+ * Ask Vee window has closed.
+ */
+export const CH_VEE_PORT = 'vee:port'
+
 /* ────────────────────────────── Schedules files (2026-09-25, phase 4) ────────────────────────────── */
 
 /**
@@ -90,7 +103,7 @@ export const CH_UPDATE_OPEN = 'update:open'
 /**
  * Every channel main registers a handler for, for `SYSTEM_SPEC.md` §10 and the guard test.
  * The main → renderer sends (`link:open`, `ai:event`, `ai:tool:exec`, `settings:open`,
- * `schedule:port`) have no handler and are not here.
+ * `schedule:port`, `vee:port`) have no handler and are not here.
  */
 export const IPC_CHANNELS = [
   CH_FILE_OPEN,
@@ -109,6 +122,8 @@ export const IPC_CHANNELS = [
   CH_SETTINGS_SET_KEY,
   CH_SETTINGS_CLEAR_KEY,
   CH_SCHEDULES_OPEN,
+  CH_VEE_OPEN,
+  CH_VEE_CLOSE,
   CH_EXPORT_SAVE,
   CH_SCHEDULE_FILE_OPEN,
   CH_UPDATE_CHECK,

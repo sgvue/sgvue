@@ -50,13 +50,21 @@
  * that is not showing is not generated (`styles/vee.css`), and the log's own overflow is
  * vertical only.
  *
- * **And one lane the design does not declare**: `--brow` on the stage (`selectors/lanes.ts`) is
- * what the bottom row's centre zone stands above its one-line row. The panel's `bottom`, its
- * `max-height` and its resize clamp take it, so the panel stops above a reset pill that stands
- * over a hint instead of covering it; with the lane at `0px` all three are the design's.
+ * **2026-11-07 — the panel is a window of its own.** The owner: *"Also bring vee out as a
+ * separate window and always on top of our app window. because when the vee panel and properties
+ * panel show up together, they blocked my model view."* This component is now the whole page of
+ * the Ask Vee window (`renderer/vee/main.tsx`, `main/vee-window.ts`), a child of the main window.
+ * **The conversation still runs in the main window**; this is its view. It reads the main
+ * window's snapshot (`vee/store.ts`, under the names it read from the shell store) and the
+ * trace, which its own page's trace store mirrors; every control sends one intent back
+ * (`vee/link.ts`, `post`) and does nothing else — the composer, which is typed here, aside.
+ * Every style string is the design's, but the panel's place in the stage: it fills the window,
+ * so its `position`, `right`, `bottom`, `z-index`, width, height, `max-height`, border, radius,
+ * shadow, fade-in and `right` transition are the OS window's now, and so is the top-left resize
+ * corner and its clamp — the window is resized by its own edges. (The `--brow` lane the panel
+ * cleared, which the property card still clears, is the bottom row's own.)
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { abortChat, sendChat } from '../ai/bridge'
 import {
   answerHeight,
   LABEL_RISE,
@@ -70,23 +78,21 @@ import {
   type TraceFrame
 } from '../ai/trace'
 import { onTrace, traceNow, traceState } from '../ai/trace-store'
-import { pick, useShell, type ChatMessage } from '../state/shell'
-import { useShallow } from 'zustand/react/shallow'
-import { chatRight } from '../state/selectors/lanes'
+import type { VeeMessage } from '../../shared/vee-messages'
 import {
   ASSISTANT,
   BUBBLE_RADIUS,
-  chatExamples,
-  chatRow,
   chipsFolded,
   chipsStarted,
-  clampChatSize,
   replyStrip,
   sendClick,
   veeStateOf,
+  viewRow,
   type ChatRow
 } from '../state/selectors/chat'
 import { el } from '../dom'
+import { focusComposer, post } from '../vee/link'
+import { useVee } from '../vee/store'
 import { s } from './css'
 import { Cross, ReplyArrow, Revert, SendArrow } from './icons'
 import {
@@ -101,43 +107,15 @@ import {
   TraceStatus
 } from './Trace'
 import { Vee } from './Vee'
-import { VEE_OFFSET, VEE_SLOT, veeLabelOffset, type VeeState } from './vee-grid'
+import { VEE_MARGIN, VEE_OFFSET, VEE_SLOT, veeLabelOffset, type VeeState } from './vee-grid'
 
 /** `:495` — the empty state, one string so it diffs against the design's own line. */
 const EMPTY_COPY =
   'Ask what you want to see or what you want to know — filter, isolate, section, quantities, audits, interference checks. Review only: SGVue never writes to your model.'
 
-const focusComposer = (): void => {
-  const input = el('chatinput')
-  if (input instanceof HTMLInputElement) input.focus()
-}
-
-/**
- * The margins that fit each of the sprite's slots (`VEE_SLOT`) into the row the design already
- * has. The 16 × 16 grid is larger than the 12 × 12 body in it — three empty rows above for the
- * hop and the `!`, one below, two columns either side — so a slot overhangs its row and is
- * pulled in by negative margins, as the reference's are (`ask-thinking-hex.jsx:315`, `:367`).
- * The top margin is the larger one: it lifts the grid by about a cell, which is what puts the
- * **body** on the row's centre line.
- *
- *   header  21 px, 15 px of flow — the sparkle's 15, so the title starts where it did. The slot
- *           spans 11–32 px from the panel's edge; the reference's, 11.5–32.8.
- *   label   19 px, 10 px of flow each way — the row keeps its 10 px of height, and the slot's
- *           left edge is on the header slot's.
- *   pill    16 px, 14 px of flow — the sparkle's 14, so the label starts where it did.
- */
-const VEE_MARGIN = {
-  header: '-4px -4px -1px -2px',
-  label: '-6px -4px -3px -5px',
-  pill: '-3px -1px -1px -1px'
-} as const
-
 /** `:2051`'s suggestion pill, verbatim — shared by the suggestions and the fold chip. */
 const CHIP_STYLE =
   'font:400 10.5px/1 var(--mono);color:var(--muted);padding:5px 8px;border:1px solid var(--border);border-radius:999px'
-
-/** The store fields this component reads — it re-renders when one of them changes. */
-const SUGGEST_KEYS = pick('chatMsgs', 'chatSuggestOpen', 'setChatSuggestOpen')
 
 /**
  * 2026-09-24 — the owner: *"The ASK SGVUE AI suggestion are great but take up too many
@@ -148,7 +126,7 @@ const SUGGEST_KEYS = pick('chatMsgs', 'chatSuggestOpen', 'setChatSuggestOpen')
  * suggestion fills the composer and folds it again. What is suggested is unchanged.
  */
 function SuggestRow({ items, onPick }: { items: string[]; onPick: (t: string) => void }): React.JSX.Element {
-  const st = useShell(useShallow(SUGGEST_KEYS))
+  const st = useVee()
   const row = useRef<HTMLDivElement>(null)
   const [fade, setFade] = useState(false)
   const started = chipsStarted(st.chatMsgs)
@@ -173,7 +151,7 @@ function SuggestRow({ items, onPick }: { items: string[]; onPick: (t: string) =>
     <div style={s('display:flex;align-items:center;gap:5px;min-width:0')}>
       {started && (
         <button
-          onClick={() => st.setChatSuggestOpen(folded)}
+          onClick={() => post({ type: 'suggestOpen', open: folded })}
           aria-expanded={!folded}
           className="hv-accent-both"
           style={s(CHIP_STYLE + ';flex:none')}
@@ -392,8 +370,9 @@ function applySend(n: Parts, f: SendFrame | null, panel: HTMLElement | null): vo
       setText(n.lift, n.youText!.textContent ?? '')
       n.lift.style.display = 'block'
       n.lift.style.width = px(to.width)
-      n.lift.style.left = px(to.left + (from.left + 11 - to.left) * (1 - f!.lift) - origin.left - 1)
-      n.lift.style.top = px(fromTop + (to.top - fromTop) * f!.lift - origin.top - 1)
+      // (Measured from the panel's edge: since 2026-11-07 the window is the panel, with no border.)
+      n.lift.style.left = px(to.left + (from.left + 11 - to.left) * (1 - f!.lift) - origin.left)
+      n.lift.style.top = px(fromTop + (to.top - fromTop) * f!.lift - origin.top)
     }
   }
 }
@@ -468,14 +447,6 @@ function applyFrame(n: Parts, f: TraceFrame, canvasH: number): void {
 
 /* ────────────────────────────── the panel (`:430`) ────────────────────────────── */
 
-/** The store fields this component reads — it re-renders when one of them changes. */
-const PANEL_KEYS = pick(
-  'applyPending', 'byId', 'cardTop', 'chatBusy', 'chatErr', 'chatH', 'chatInput', 'chatMsgs',
-  'chatOpen', 'chatReplyTo', 'chatSuggestOpen', 'chatW', 'copyTable', 'dismissPending',
-  'revertTurn', 'sel', 'selIds', 'select', 'setChatInput', 'setChatOpen', 'setChatReplyTo',
-  'setChatSuggestOpen', 'vpW', 'stack', 'hidden', 'loaded', 'library', 'units'
-)
-
 /** A running turn with no trace to draw: everything of the send at rest, the button a stop. */
 const STOP_ONLY: SendFrame = { lift: 1, press: 1, bubble: 1, you: 1, placeholder: 1, busy: 1, settled: true }
 
@@ -487,8 +458,14 @@ const LIVE_ROW: Pick<ChatRow, 'who' | 'fg' | 'bg' | 'radius'> = {
   radius: BUBBLE_RADIUS
 }
 
+/** The composer's text, typed here and kept in step with the main window's `chatInput`. */
+const setInput = (text: string): void => {
+  useVee.setState({ chatInput: text })
+  post({ type: 'input', text })
+}
+
 export default function ChatPanel(): React.JSX.Element | null {
-  const st = useShell(useShallow(PANEL_KEYS))
+  const st = useVee()
   const trace = useSyncExternalStore(onTrace, traceState)
   const panel = useRef<HTMLDivElement>(null)
   const log = useRef<HTMLDivElement>(null)
@@ -605,42 +582,18 @@ export default function ChatPanel(): React.JSX.Element | null {
   // transcript or the target changes, never again at every keystroke in the composer.
   const reply = useMemo(() => replyStrip(st.chatMsgs, st.chatReplyTo), [st.chatMsgs, st.chatReplyTo])
 
-  if (!st.chatOpen) return null
+  // Opening the window gives its composer the keyboard.
+  useEffect(() => {
+    if (st.ready) focusComposer(true)
+  }, [st.ready])
 
-  const right = chatRight(st.sel != null && st.byId.has(st.sel), st.vpW)
+  if (!st.ready) return null
 
-  /**
-   * `:1127` — drag the top-left corner: width grows leftward, height upward, both clamped to
-   * the stage. The lane here is `selIds.length && width >= 420` (`:1130`), which is the
-   * design's own expression at this site; `:2049` decides the panel's `right` from the derived
-   * card instead. They differ only for a selected id the federation no longer carries.
-   */
-  const onChatResize = (e: React.PointerEvent): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    const stage = el('stage')
-    if (!stage) return
-    const r = stage.getBoundingClientRect()
-    const lane = chatRight(st.selIds.length > 0, r.width)
-    const start = { w: st.chatW, h: st.chatH, x: e.clientX, y: e.clientY }
-    const move = (ev: PointerEvent): void => {
-      const now = useShell.getState()
-      const next = clampChatSize(start, ev, r, lane, now.cardTop, now.brow)
-      now.setChatSize(next.chatW, next.chatH)
-    }
-    const up = (): void => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
-  /** `:2013` — Enter sends, Shift+Enter does not. During a turn `sendChat` itself does nothing. */
+  /** `:2013` — Enter sends, Shift+Enter does not. During a turn the main window's `sendChat` does nothing. */
   const onChatKey = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      void sendChat()
+      post({ type: 'send', text: st.chatInput })
     }
   }
 
@@ -653,13 +606,15 @@ export default function ChatPanel(): React.JSX.Element | null {
     const act = sendClick(st.chatBusy, now, stoppedAt.current)
     if (act === 'stop') {
       stoppedAt.current = now
-      abortChat()
-    } else if (act === 'send') void sendChat()
+      post({ type: 'stop' })
+    } else if (act === 'send') post({ type: 'send', text: st.chatInput })
   }
 
   /** One row of the transcript: a message, or — `message` null — the reply being written. */
-  const row = (message: ChatMessage | null, i: number): React.JSX.Element => {
-    const m = message ? chatRow(message, i, st.units) : null
+  const row = (message: VeeMessage | null, i: number): React.JSX.Element => {
+    const m = message ? viewRow(message, i, st.units) : null
+    /** Where an act on this message is sent: its place, and the identity the snapshot gave it. */
+    const at = message ? { index: i, msg: message.id } : null
     const look = m ?? LIVE_ROW
     const mine = message?.role === 'user'
     /** A turn's reply — written, or being written: the trace's bubble, and a status by the name. */
@@ -702,7 +657,7 @@ export default function ChatPanel(): React.JSX.Element | null {
           {message ? (
             <button
               onClick={() => {
-                st.setChatReplyTo(i)
+                post({ type: 'reply', ...at! })
                 focusComposer()
               }}
               data-tip="Reply to this message"
@@ -717,7 +672,7 @@ export default function ChatPanel(): React.JSX.Element | null {
           ) : null}
           {m?.canRevert ? (
             <button
-              onClick={() => st.revertTurn(i)}
+              onClick={() => post({ type: 'revert', ...at! })}
               data-tip="Undo just this step"
               className="hv-accent-ink"
               style={s(
@@ -759,7 +714,7 @@ export default function ChatPanel(): React.JSX.Element | null {
             // The bubble a trace opens is full width; while the turn runs that is still to be seen.
             wide={!m || m.wide}
             base={bubbleStyle(look.fg, look.bg, look.radius, '100%')}
-            onPick={(ids) => st.select(ids, false)}
+            onPick={(j) => at && post({ type: 'pick', ...at, what: 'row', j, zoom: false })}
           />
         ) : (
           <span data-part="bubble" style={s(bubbleStyle(m!.fg, m!.bg, m!.radius, m!.maxW))}>
@@ -775,8 +730,8 @@ export default function ChatPanel(): React.JSX.Element | null {
             {(message!.chips ?? []).map((c, j) => (
               <button
                 key={`${c.label}-${j}`}
-                onClick={() => st.select(c.ids, false)}
-                onDoubleClick={() => st.select(c.ids, true)}
+                onClick={() => post({ type: 'pick', ...at!, what: 'chip', j, zoom: false })}
+                onDoubleClick={() => post({ type: 'pick', ...at!, what: 'chip', j, zoom: true })}
                 data-tip="Click to select · double-click to zoom"
                 style={s(
                   'font:500 10.5px/1 var(--mono);color:var(--sel-ink);background:var(--sel-bg);border:1px solid var(--accent);border-radius:999px;padding:5px 9px;white-space:nowrap'
@@ -807,9 +762,10 @@ export default function ChatPanel(): React.JSX.Element | null {
                 {m.tableTitle}
               </span>
               <button
-                // `:2029`. The store's own copy (`copyText`): the design's line called the
+                // `:2029`. The main window's store copies (`copyTable`), and the text is put on the
+                // clipboard here, under this click (`vee/link.ts`): the design's line called the
                 // clipboard API this app always refuses, and copied nothing.
-                onClick={() => void st.copyTable(message!.table!)}
+                onClick={() => post({ type: 'copyCsv', ...at! })}
                 style={s('font:500 10px/1 var(--mono);color:var(--accent-ink)')}
               >
                 copy csv
@@ -818,7 +774,7 @@ export default function ChatPanel(): React.JSX.Element | null {
             {m.tableRows.map((r, j) => (
               <button
                 key={`${r.k}-${j}`}
-                onClick={() => st.select([...r.ids], true)}
+                onClick={() => post({ type: 'pick', ...at!, what: 'table', j, zoom: true })}
                 className="hv-step"
                 style={s(
                   'display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:baseline;padding:5px 9px;border-top:1px solid var(--border)'
@@ -863,7 +819,8 @@ export default function ChatPanel(): React.JSX.Element | null {
             </span>
             <div style={s('display:flex;align-items:center;gap:8px')}>
               <button
-                onClick={() => st.applyPending(i)}
+                // The user's click on Apply, for the request this row shows — and nothing else.
+                onClick={() => post({ type: 'apply', ...at!, pending: message!.pending!.id })}
                 className="hv-card"
                 style={s(
                   'font:500 11px/1 var(--sans);color:var(--warn-ink);padding:5px 11px;border:1px solid var(--warn-line);border-radius:999px'
@@ -872,7 +829,7 @@ export default function ChatPanel(): React.JSX.Element | null {
                 apply
               </button>
               <button
-                onClick={() => st.dismissPending(i)}
+                onClick={() => post({ type: 'cancel', ...at!, pending: message!.pending!.id })}
                 style={s('font:500 11px/1 var(--sans);color:var(--muted);padding:5px 6px')}
               >
                 cancel
@@ -887,23 +844,9 @@ export default function ChatPanel(): React.JSX.Element | null {
   return (
     <div
       ref={panel}
-      style={s(
-        `position:absolute;right:${right}px;bottom:calc(52px + var(--brow, 0px));z-index:12;width:max(240px, min(${st.chatW}px, calc(100% - ${right}px - 12px)));height:${st.chatH}px;max-height:calc(100% - ${st.cardTop}px - 64px - var(--brow, 0px));display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border-strong);border-radius:12px;box-shadow:var(--shadow);animation:fadein .15s ease-out;transition:right .18s ease`
-      )}
+      // The window is the panel: it fills it (2026-11-07). The design's string from `display` on.
+      style={s('position:fixed;inset:0;display:flex;flex-direction:column;background:var(--card)')}
     >
-      <div
-        onPointerDown={onChatResize}
-        className="hv-grab"
-        style={s(
-          'position:absolute;left:0;top:0;width:34px;height:34px;cursor:nwse-resize;z-index:2;border-top-left-radius:12px'
-        )}
-      >
-        <span
-          style={s(
-            'position:absolute;left:9px;top:9px;width:17px;height:17px;border-top:2px solid var(--grab, var(--border-strong));border-left:2px solid var(--grab, var(--border-strong));border-top-left-radius:7px;transition:border-color .15s ease'
-          )}
-        />
-      </div>
 
       <div
         style={s(
@@ -920,7 +863,7 @@ export default function ChatPanel(): React.JSX.Element | null {
           Ask Vee
         </span>
         <button
-          onClick={() => st.setChatOpen(false)}
+          onClick={() => post({ type: 'close' })}
           aria-label="Close"
           className="hv-step-ink"
           style={s(
@@ -994,7 +937,7 @@ export default function ChatPanel(): React.JSX.Element | null {
               </span>
             </span>
             <button
-              onClick={() => st.setChatReplyTo(null)}
+              onClick={() => post({ type: 'unreply' })}
               title="Cancel reply"
               className="hv-card-ink"
               style={s(
@@ -1007,10 +950,10 @@ export default function ChatPanel(): React.JSX.Element | null {
         ) : null}
 
         <SuggestRow
-          items={chatExamples(st)}
+          items={st.suggestions}
           onPick={(t) => {
-            st.setChatInput(t)
-            st.setChatSuggestOpen(false)
+            useVee.setState({ chatInput: t })
+            post({ type: 'suggest', text: t })
           }}
         />
 
@@ -1019,7 +962,7 @@ export default function ChatPanel(): React.JSX.Element | null {
             data-role="chatinput"
             type="text"
             value={st.chatInput}
-            onChange={(e) => st.setChatInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value)}
             onKeyDown={onChatKey}
             aria-labelledby="sgvue-chat-title"
             placeholder="How many doors on L2?"
@@ -1065,40 +1008,5 @@ export default function ChatPanel(): React.JSX.Element | null {
         />
       </div>
     </div>
-  )
-}
-
-/* ────────────────────────────── the pill (`:536`) ────────────────────────────── */
-
-/**
- * `:2041` — it lights while the panel is open, and is the only way to open it.
- *
- * Since 2026-10-01 it is the right zone of the stage's bottom row (`app/BottomRow.tsx`), which
- * stands it where the design's `position:absolute;right:12px;bottom:14px` did; the rest of the
- * string is the design's. `z-index:12` still applies: the button is `position:relative`, as
- * every `[data-tip]` is.
- *
- * The same day it took the assistant's name: its label reads `Ask Vee` (the design's: `Ask`) and
- * the mascot stands where the sparkle did, in the sparkle's own 14 px of flow. So the pill is
- * 88.9 px wide where it was 66.6 — the label, and nothing else: its height, colours, tip and
- * offsets are the design's.
- */
-export function ChatPill(): React.JSX.Element {
-  const chatOpen = useShell((st) => st.chatOpen)
-  const setChatOpen = useShell((st) => st.setChatOpen)
-  const fg = chatOpen ? 'var(--sel-ink)' : 'var(--muted)'
-  const line = chatOpen ? 'var(--accent)' : 'var(--border)'
-  return (
-    <button
-      onClick={() => setChatOpen(!chatOpen)}
-      data-tip="Ask the assistant to filter, isolate, hide or navigate the model"
-      className="hv-accent-line"
-      style={s(
-        `z-index:12;display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;background:var(--card);border:1px solid ${line};border-radius:999px;box-shadow:var(--shadow);color:${fg};pointer-events:auto`
-      )}
-    >
-      <Vee slot={VEE_SLOT.pill} margin={VEE_MARGIN.pill} offset={VEE_OFFSET.pill} />
-      <span style={s('font:500 11.5px/1 var(--sans);white-space:nowrap')}>Ask Vee</span>
-    </button>
   )
 }

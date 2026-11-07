@@ -50,6 +50,7 @@ import {
   statusText,
   tool,
   toolResults,
+  veeWindow,
   type ToolAnswer
 } from './helpers'
 
@@ -115,11 +116,17 @@ async function turn(
   return { row, results: (await toolResults(app)).slice(before) }
 }
 
-/** The panel open and main's turn handlers held. */
-async function openChat(app: ElectronApplication, page: Page): Promise<void> {
+/**
+ * The panel open and main's turn handlers held. Since 2026-11-07 the panel is the Ask Vee
+ * window: it is returned, and every chat control is clicked there — the copy a click there asks
+ * for is made there too, under that click (`renderer/clipboard.ts`, `copyingIn`).
+ */
+async function openChat(app: ElectronApplication, page: Page): Promise<Page> {
   await page.locator(ASK).click()
-  await expect(page.locator('[data-role="chatlog"]')).toBeVisible()
+  const vee = await veeWindow(app)
+  await vee.emulateMedia({ reducedMotion: 'reduce' })
   await holdTurns(app)
+  return vee
 }
 
 /**
@@ -128,11 +135,17 @@ async function openChat(app: ElectronApplication, page: Page): Promise<void> {
  */
 const idle = (page: Page): Promise<void> => page.waitForTimeout(7_000)
 
-/** A click nobody made: a script's own `click()`, run from main with no user gesture. */
-const clickFromMain = (app: ElectronApplication, pick: string): Promise<boolean> =>
+/**
+ * A click nobody made: a script's own `click()`, run from main with no user gesture — in the
+ * main window, or (2026-11-07) in the Ask Vee window, where the chat's controls are.
+ */
+const clickFromMain = (app: ElectronApplication, pick: string, where: 'main' | 'vee' = 'main'): Promise<boolean> =>
   app.evaluate(
-    ({ BrowserWindow }, code) => BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(code, false),
-    `(() => { const b = ${pick}; if (!b) return false; b.click(); return true })()`
+    ({ BrowserWindow }, [code, page]) =>
+      BrowserWindow.getAllWindows()
+        .find((w) => (page === 'vee' ? /\/vee\.html(#|$)/ : /\/index\.html(#|$)/).test(w.webContents.getURL()))!
+        .webContents.executeJavaScript(code, false),
+    [`(() => { const b = ${pick}; if (!b) return false; b.click(); return true })()`, where] as const
   )
 
 test('the clipboard: the designed copy really copies, a click nobody made copies nothing, and a request waits for the user’s Apply', async () => {
@@ -167,10 +180,10 @@ test('the clipboard: the designed copy really copies, a click nobody made copies
     await expect(copy).toHaveText('copy link to this state')
 
     // ── 3. the assistant asks: the designed row, and the clipboard exactly as it was ──
-    await openChat(app, page)
+    const vee = await openChat(app, page)
     const first = await turn(
       app,
-      page,
+      vee,
       'Copy a link to this view.',
       [['request_user_action', { action: 'copy_link' }]],
       'I have asked to copy a link to this view. Click Apply and it is copied.'
@@ -190,30 +203,30 @@ test('the clipboard: the designed copy really copies, a click nobody made copies
     // gate's — and the panel says so instead of leaving the user to think it was copied. The
     // request is spent all the same: it is taken once, by whatever clicked.
     await idle(page)
-    expect(await clickFromMain(app, LAST_APPLY)).toBe(true)
+    expect(await clickFromMain(app, LAST_APPLY, 'vee')).toBe(true)
     await page.waitForTimeout(600)
     expect(await clipboard()).toBe(SENTINEL)
-    await expect(page.getByText(REFUSED, { exact: true })).toBeVisible()
+    await expect(vee.getByText(REFUSED, { exact: true })).toBeVisible()
     await expect(apply(first.row)).toHaveCount(0)
     await expect(copy).toHaveText('copy link to this state')
 
     // ── 4. asked again, and this time the user clicks: now, and only now, it is copied ──
     const second = await turn(
       app,
-      page,
+      vee,
       'Ask me again.',
       [['request_user_action', { action: 'copy_link' }]],
       'I have asked again. Click Apply and the link is copied.'
     )
     expect(located(second.results)).toEqual([])
-    await expect(page.getByText(REFUSED, { exact: true })).toHaveCount(0)
+    await expect(vee.getByText(REFUSED, { exact: true })).toHaveCount(0)
     expect(await clipboard()).toBe(SENTINEL)
     await apply(second.row).click()
     // The Viewpoints card's own control ran: its flash, and a real link on the clipboard.
     await expect(copy).toHaveText('link copied')
     expect(await clipboard()).toMatch(LINK)
     await expect(apply(second.row)).toHaveCount(0)
-    await expect(page.getByText(REFUSED, { exact: true })).toHaveCount(0)
+    await expect(vee.getByText(REFUSED, { exact: true })).toHaveCount(0)
   } finally {
     await app.evaluate(({ clipboard }, text) => (text ? clipboard.writeText(text) : clipboard.clear()), kept)
     await app.close()
@@ -235,13 +248,13 @@ test('the chat table’s copy csv: the user’s click puts the table on the clip
     await page.getByRole('button', { name: DEMO }).click()
     await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
     await expect.poll(() => statusText(page), { timeout: 20_000 }).toContain('412 / 412')
-    await openChat(app, page)
+    const vee = await openChat(app, page)
     await setClipboard(SENTINEL)
 
     // A reply that carries a table: the design's own, from `summarize_elements`.
     const asked = await turn(
       app,
-      page,
+      vee,
       'How many elements are on each level?',
       [['summarize_elements', { groupBy: 'Level' }]],
       'Here they are, level by level.'
@@ -266,7 +279,7 @@ test('the chat table’s copy csv: the user’s click puts the table on the clip
     await expect(copy).toHaveCount(1)
     // The panel's status line: the one line the log shows under its rows, drawn only when there
     // is something to say.
-    const status = page.locator('[data-role="chatlog"] > span:not(.sr-only)')
+    const status = vee.locator('[data-role="chatlog"] > span:not(.sr-only)')
     await expect(status).toHaveCount(0)
     // The turn itself copied nothing.
     expect(await clipboard()).toBe(SENTINEL)
@@ -282,12 +295,12 @@ test('the chat table’s copy csv: the user’s click puts the table on the clip
     // No flash — the design gives this control none — and the status line stays empty.
     await expect(copy).toHaveText('copy csv')
     await expect(status).toHaveCount(0)
-    await expect(page.getByText(REFUSED, { exact: true })).toHaveCount(0)
+    await expect(vee.getByText(REFUSED, { exact: true })).toHaveCount(0)
 
     // ── 2. the same control, clicked by nobody: nothing copied, and the panel says so ──
     await setClipboard(SENTINEL)
     await idle(page)
-    expect(await clickFromMain(app, LAST_COPY_CSV)).toBe(true)
+    expect(await clickFromMain(app, LAST_COPY_CSV, 'vee')).toBe(true)
     await page.waitForTimeout(600)
     expect(await clipboard()).toBe(SENTINEL)
     await expect(status).toHaveText(REFUSED)
@@ -325,11 +338,11 @@ test('a recent file is asked for by name and loaded by the user’s Apply; an un
     await expect.poll(() => statusText(page), { timeout: 20_000 }).toContain('6 / 6')
     const side = page.locator('aside')
     await expect(side.getByText('high-first.ifc')).toHaveCount(0)
-    await openChat(app, page)
+    const vee = await openChat(app, page)
 
     const asked = await turn(
       app,
-      page,
+      vee,
       'Open the other model again.',
       [
         // A name the list does not have: the names it does have, and nothing asked.
@@ -363,7 +376,7 @@ test('a recent file is asked for by name and loaded by the user’s Apply; an un
     await expect(strip).toHaveCount(0)
     const unload = await turn(
       app,
-      page,
+      vee,
       'Unload high-first.',
       [['request_user_action', { action: 'unload_model', model: 'high-first' }]],
       'The sidebar is asking whether to unload high-first. Click delete there to confirm.'
@@ -389,11 +402,11 @@ test('the Open dialog is only raised: the user’s pick loads, and the tool is t
     await page.getByRole('button', { name: DEMO }).click()
     await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
     await expect.poll(() => statusText(page), { timeout: 20_000 }).toContain('412 / 412')
-    await openChat(app, page)
+    const vee = await openChat(app, page)
 
     const asked = await turn(
       app,
-      page,
+      vee,
       'Open my own model.',
       [['request_user_action', { action: 'open_files' }]],
       'The Open dialog is up. Pick the files to load there.'

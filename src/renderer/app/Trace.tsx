@@ -538,7 +538,7 @@ function TickerLine(): React.JSX.Element {
 export const textHeight = (text: HTMLElement | null): number => (text ? text.getBoundingClientRect().height : 0)
 
 /** A reply with no rows: one array, so that an effect keyed on the rows does not run again for nothing. */
-const NO_ROWS: ChatTrace['rows'] = []
+const NO_ROWS: readonly { label: string; n: number }[] = []
 
 /** The existing reply bubble's own style string (`ChatPanel`), which the trace's bubble starts from. */
 export const bubbleStyle = (fg: string, bg: string, radius: string, maxW: string): string =>
@@ -571,12 +571,14 @@ export function ReplyBubble({
 }: {
   /** The reply, or `null` while it is being written. */
   text: string | null
-  trace: ChatTrace | null
+  /** What its trace left: the rows under it and what they count (since 2026-11-07 without their ids). */
+  trace: (Pick<ChatTrace, 'noun'> & { rows: readonly { label: string; n: number }[] }) | null
   owned: boolean
   wide: boolean
   /** The existing bubble's style string. */
   base: string
-  onPick: (ids: number[]) => void
+  /** A row under the answer was clicked: its place (2026-11-07 — the main window has its ids). */
+  onPick: (row: number) => void
 }): React.JSX.Element {
   const bubble = useRef<HTMLSpanElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -670,7 +672,7 @@ export function ReplyBubble({
                   <button
                     key={L}
                     data-part="row"
-                    onClick={() => onPick(row.ids)}
+                    onClick={() => onPick(L)}
                     className="hv-card"
                     style={s(
                       `display:flex;align-items:center;width:100%;height:${ROW_H}px;font:400 10px/1 var(--mono);border-radius:3px`

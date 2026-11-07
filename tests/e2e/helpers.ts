@@ -95,6 +95,30 @@ export async function openSchedulesWindow(app: ElectronApplication, page: Page):
   return app.windows().find((w) => !before.includes(w))!
 }
 
+/**
+ * 2026-11-07 — the Ask Vee window: since then the chat panel is a window of its own, a child of
+ * the main window (`main/vee-window.ts`). Its page is `vee.html`.
+ */
+export const isVee = (w: Page): boolean => /\/vee\.html(?:[?#]|$)/.test(w.url())
+
+/** The Ask Vee window, once it is open and its panel is drawn. */
+export async function veeWindow(app: ElectronApplication): Promise<Page> {
+  await expect.poll(() => app.windows().some(isVee), { timeout: 15_000 }).toBe(true)
+  const vee = app.windows().find(isVee)!
+  await vee.waitForLoadState('domcontentloaded')
+  await expect(vee.locator('[data-role="chatlog"]')).toBeVisible()
+  return vee
+}
+
+/** Click the Ask Vee pill in the main window and return the window it opens. */
+export async function openVee(app: ElectronApplication, page: Page): Promise<Page> {
+  await page.locator('button[data-tip^="Ask the assistant"]').click()
+  return veeWindow(app)
+}
+
+/** Whether the Ask Vee window is open. */
+export const veeIsOpen = (app: ElectronApplication): boolean => app.windows().some(isVee)
+
 /** The session `main/sessions.ts` wrote into this profile. */
 export const readSession = async (userData: string): Promise<{ payload: Record<string, unknown> }> =>
   JSON.parse(await readFile(join(userData, 'sessions', 'last.json'), 'utf8'))

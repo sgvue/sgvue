@@ -220,9 +220,14 @@ describe('the chat table’s copy csv', () => {
     expect(useShell.getState().chatErr).toBe('Stopped.')
   })
 
-  it('is the panel’s one way to copy: the button calls the store, and the refused API is not named there', () => {
+  it('is the panel’s one way to copy: the button asks the main window’s store, and the refused API is not named there', () => {
+    // 2026-11-07 — the panel is the Ask Vee window: its button sends `copyCsv`, and the main
+    // window's store builds the CSV (`copyTable`) with the copy routed back to where the click
+    // was (`model/vee-link.ts`, `copyingIn`).
     const panel = readFileSync(join(process.cwd(), 'src/renderer/app/ChatPanel.tsx'), 'utf8')
-    expect(panel).toMatch(/onClick=\{\(\) => void st\.copyTable\(message!\.table!\)\}/)
+    expect(panel).toMatch(/onClick=\{\(\) => post\(\{ type: 'copyCsv', \.\.\.at! \}\)\}/)
     expect(panel).not.toMatch(/navigator\s*\.\s*clipboard|execCommand/)
+    const link = readFileSync(join(process.cwd(), 'src/renderer/model/vee-link.ts'), 'utf8')
+    expect(link).toMatch(/copyingIn\(copyInVee, \(\) => void s\.copyTable\(table\)\)/)
   })
 })

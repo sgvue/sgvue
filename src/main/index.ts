@@ -38,6 +38,7 @@ import { registerAiIpc } from './ai/session'
 import { installMenu } from './menu'
 import { lockNavigation, mainWindow, messageBox, openDialog, setMainWindow } from './window'
 import { closeSchedules, connectSchedules, openSchedules, schedulesWindow } from './schedules-window'
+import { closeVee, connectVee, openVee } from './vee-window'
 import { openScheduleFile, saveExport } from './exports'
 import { updatesUrl } from './about'
 import { checkForUpdate } from './updates'
@@ -66,8 +67,12 @@ import {
   CH_SETTINGS_SET_KEY,
   ConfirmReplaceRequest,
   CH_SCHEDULES_OPEN,
+  CH_VEE_CLOSE,
+  CH_VEE_OPEN,
   RecentAdd,
   SchedulesOpenRequest,
+  VeeCloseRequest,
+  VeeOpenRequest,
   SessionEnvelope,
   TokenRequest
 } from '../shared/ipc-contract'
@@ -116,6 +121,7 @@ function createWindow(): void {
   win.on('closed', () => {
     setMainWindow(null)
     closeSchedules()
+    closeVee()
   })
 
   win.on('ready-to-show', () => {
@@ -123,10 +129,12 @@ function createWindow(): void {
   })
 
   // A link the OS delivered before the window existed is sent once the renderer can hear it.
-  // A reload also drops the page's end of the Schedules port, so a new pair is made.
+  // A reload also drops the page's end of the Schedules port, so a new pair is made — and the
+  // Ask Vee window's (2026-11-07).
   win.webContents.on('did-finish-load', () => {
     flushPendingLink()
     connectSchedules()
+    connectVee()
   })
 
   // The GPU process is up by now: say which adapter is drawing, against the one asked for.
@@ -245,6 +253,19 @@ function registerIpc(): void {
     SchedulesOpenRequest.parse(raw)
     if (event.sender !== mainWindow()?.webContents) return
     openSchedules()
+  })
+
+  // 2026-11-07 — the Ask Vee window, opened and closed as the chat panel opens and closes.
+  // Opening carries the theme alone; only the main window may ask.
+  ipcMain.handle(CH_VEE_OPEN, (event, raw: unknown) => {
+    const { theme } = VeeOpenRequest.parse(raw)
+    if (event.sender !== mainWindow()?.webContents) return
+    openVee(theme)
+  })
+  ipcMain.handle(CH_VEE_CLOSE, (event, raw: unknown) => {
+    VeeCloseRequest.parse(raw)
+    if (event.sender !== mainWindow()?.webContents) return
+    closeVee()
   })
 
   // 2026-09-25, phase 4 — the Schedules window's two file channels. Only that window may ask:

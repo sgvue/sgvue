@@ -267,11 +267,8 @@ describe('the property card and the context menu — Phase 4 state', () => {
   })
 
   it('"Ask about this" opens the assistant with the designed pre-fill', () => {
-    // `askAbout` also starts the design's own 60 ms focus timer (`:1650`), whose callback
-    // reaches `document` — which this environment does not have. Left on real timers it fires
-    // while the file is still running and takes the whole run down with an unhandled
-    // `ReferenceError`; on fake ones it is never reached, and that it was *scheduled* is the
-    // part worth asserting without a DOM.
+    // Since 2026-11-07 the composer is in the Ask Vee window, which focuses it itself
+    // (`renderer/vee/link.ts`); `askAbout` schedules nothing.
     vi.useFakeTimers()
     const wall = full.elements.find((e) => e.type === 'IfcWall')!
     useShell.setState({ ctx: { x: 10, y: 10, id: wall.id } })
@@ -281,7 +278,7 @@ describe('the property card and the context menu — Phase 4 state', () => {
       ctx: null,
       chatInput: `About ${wall.name} (IfcWall, ${wall.objectType || '—'}, ${wall.storey}): `
     })
-    expect(vi.getTimerCount()).toBe(1)
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('"Ask about this" does nothing when every id is stale', () => {
