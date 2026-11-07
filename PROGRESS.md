@@ -118,6 +118,12 @@ by model key (`setCutColors`) whenever the federation, the library or an overrid
 (level 29.7 → 29.4 ms, grid 26.1 → 25.7, both 52.9 → 54.4, within noise). **Not checked in a
 window**: the parity capture of the section states, both themes, waits for the owner's yes.
 
+**Amended the same day.** A model whose row shows the neutral grey `MC[0]` (no override, no
+library swatch — a single real file, the demo's ARC) is cut in the theme's accent — the owner:
+*"Yes, keep accent"* (`cutSwatch`, `selectors/models.ts`). Unit tests for grey → accent in both
+themes, a user pick (grey included) and a palette colour; the e2e cut-colour test counts in the
+light theme now. Not run in a window.
+
 ## 2026-11-07 — 21 Dependabot security alerts cleared, six Dependabot PRs folded in
 
 **Did.** Exact pins bumped in `package.json`: Electron 44.3.0 → 44.10.0 (#15), zod 4.6.5 →

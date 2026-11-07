@@ -684,7 +684,8 @@ export const setViewer = (v: Viewer | null): void => {
 
 /**
  * The section cut's colours (2026-11-07, owner-requested): each model's outline in the swatch
- * its MODELS row shows — `modelSwatches`, the row's own rule. Pushed to the viewer when it is
+ * its MODELS row shows — `modelSwatches`, the row's own rule; a row showing the neutral grey is
+ * left out, so the viewer draws it in the accent ("Yes, keep accent"). Pushed to the viewer when it is
  * handed in and whenever the federation, the library or a model override changes, and only
  * when the map itself changed (`lastCutColors`).
  */

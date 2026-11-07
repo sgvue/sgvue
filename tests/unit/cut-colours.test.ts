@@ -8,16 +8,17 @@
  * none; and the store pushes the viewer exactly the swatch each MODELS row shows — the default
  * palette, a library swatch, an override — and nothing when that map has not changed.
  */
-import { MeshBasicMaterial } from 'three/webgpu'
+import { Color, MeshBasicMaterial } from 'three/webgpu'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { planeFromLevel } from '../../src/shared/annotate'
 import { MC } from '../../src/shared/colors'
 import { federate } from '../../src/shared/federate'
 import { SAMPLE_FILES, mockGeometryChunks, mockModelIndex } from '../../src/renderer/dev/mock-adapter'
-import { modelRows, modelSwatches } from '../../src/renderer/state/selectors/models'
+import { cutSwatch, modelRows, modelSwatches } from '../../src/renderer/state/selectors/models'
 import { setViewer, useShell } from '../../src/renderer/state/shell'
 import { createBatchStore } from '../../src/renderer/viewer/batches'
 import { createPartState } from '../../src/renderer/viewer/part-state'
+import { THEMES } from '../../src/renderer/viewer/materials'
 import { cutColours, sectionCut, type RGB } from '../../src/renderer/viewer/section-cut'
 import { resetShell, stubViewer } from './stub-viewer'
 
@@ -122,9 +123,10 @@ describe('the cut colours are the MODELS rows’ swatches', () => {
     )
 
   it('matches the row for the slot palette, a library swatch and an override', () => {
-    // No library: the design's model palette by slot.
-    expect(modelSwatches(federation, [], {})).toEqual(rowsOf([], {}))
-    expect(modelSwatches(federation, [], {})).toEqual({ ARC: MC[0], STR: MC[1], SIT: MC[2] })
+    // No library: the design's model palette by slot — but slot 0's neutral grey is no colour of
+    // its own, so ARC is left out and the viewer draws it in the accent (the next block).
+    expect(rowsOf([], {})).toEqual({ ARC: MC[0], STR: MC[1], SIT: MC[2] })
+    expect(modelSwatches(federation, [], {})).toEqual({ STR: MC[1], SIT: MC[2] })
     // The library's own swatches.
     expect(modelSwatches(federation, library, {})).toEqual(rowsOf(library, {}))
     expect(modelSwatches(federation, library, {})).toEqual({ ARC: '#D8D2C6', STR: '#9AA5A3', SIT: '#8FAE82' })
@@ -146,7 +148,7 @@ describe('the cut colours are the MODELS rows’ swatches', () => {
     it('when the viewer is handed in, the federation, the library or an override changes — and only then', () => {
       expect(pushed).toEqual([{}])
       useShell.getState().commitModels(federation)
-      expect(pushed.at(-1)).toEqual({ ARC: MC[0], STR: MC[1], SIT: MC[2] })
+      expect(pushed.at(-1)).toEqual({ STR: MC[1], SIT: MC[2] })
       useShell.getState().setLibrary(library)
       expect(pushed.at(-1)).toEqual({ ARC: '#D8D2C6', STR: '#9AA5A3', SIT: '#8FAE82' })
       useShell.getState().setModelColor('ARC', '#7B8CF0')
@@ -162,5 +164,53 @@ describe('the cut colours are the MODELS rows’ swatches', () => {
       const s = useShell.getState()
       expect(pushed.at(-1)).toEqual(rowsOf(s.library as typeof library, s.modelColors))
     })
+  })
+})
+
+describe('a model whose row shows the neutral grey is cut in the accent (owner: "Yes, keep accent")', () => {
+  // One real file at slot 0 — its row shows `MC[0]`, no colour of its own — beside the demo's
+  // STR at slot 1, whose row shows the palette's `MC[1]`.
+  const federation = federate([mockModelIndex('ARC'), mockModelIndex('STR')])
+  const cut = { count: 2, models: ['ARC', 'STR'], modelOf: new Uint16Array([0, 1]) }
+  /** The viewer's own path: `setCutColors`' map → working-space RGB → `cutColours` with the theme's accent. */
+  const drawn = (modelColors: Record<string, string>, theme: keyof typeof THEMES): { ARC: RGB; STR: RGB } => {
+    const map = modelSwatches(federation, [], modelColors)
+    const rgb = (hex: string | number): RGB => {
+      const c = new Color(hex)
+      return [c.r, c.g, c.b]
+    }
+    const out = cutColours(cut, (k) => (map[k] ? rgb(map[k]) : null), rgb(THEMES[theme].accent))
+    return { ARC: [out[0], out[1], out[2]], STR: [out[6], out[7], out[8]] }
+  }
+  /** As the instance buffer holds it: float32. */
+  const rgbOf = (hex: string | number): RGB => {
+    const c = new Color(hex)
+    const f = new Float32Array([c.r, c.g, c.b])
+    return [f[0], f[1], f[2]]
+  }
+
+  it('the default-grey row takes the accent, in either theme', () => {
+    expect(cutSwatch('ARC', 0, [], {})).toBeNull()
+    expect(cutSwatch('ARC', MC.length, [], {})).toBeNull()
+    for (const theme of ['dark', 'light'] as const) {
+      expect(drawn({}, theme).ARC).toEqual(rgbOf(THEMES[theme].accent))
+    }
+    expect(THEMES.dark.accent).not.toBe(THEMES.light.accent)
+  })
+
+  it('a user-picked colour is that colour — even the grey itself', () => {
+    for (const theme of ['dark', 'light'] as const) {
+      expect(drawn({ ARC: '#E05A6B' }, theme).ARC).toEqual(rgbOf('#E05A6B'))
+      expect(drawn({ ARC: MC[0] }, theme).ARC).toEqual(rgbOf(MC[0]))
+    }
+    expect(cutSwatch('ARC', 0, [], { ARC: MC[0] })).toBe(MC[0])
+  })
+
+  it('a palette colour of its own (the demo’s `MC[slot]`) or a library swatch is that colour', () => {
+    for (const theme of ['dark', 'light'] as const) {
+      expect(drawn({}, theme).STR).toEqual(rgbOf(MC[1]))
+    }
+    expect(cutSwatch('STR', 1, [], {})).toBe(MC[1])
+    expect(cutSwatch('ARC', 0, [{ key: 'ARC', name: 'A', file: 'A.ifc', swatch: '#D8D2C6' }], {})).toBe('#D8D2C6')
   })
 })

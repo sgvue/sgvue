@@ -77,8 +77,31 @@ export function rowSwatch(
 }
 
 /**
- * Every loaded model's row swatch, by model key (2026-11-07, owner-requested): what the viewer
- * draws each model's section-cut outline in (`viewer.setCutColors`).
+ * The colour a model's section-cut outline is drawn in (2026-11-07): its row's swatch when that
+ * is a colour of its own — the user's override, a library swatch, or a palette colour other than
+ * the design's neutral grey `MC[0]` — else `null`, and the viewer draws that model's outline in
+ * the theme's accent. The owner, of a single real model whose row shows the grey: *"Yes, keep
+ * accent"*. Decided by where the colour came from, never by comparing hex: a grey the user
+ * picked is their own and stays grey.
+ */
+export function cutSwatch(
+  key: string,
+  slot: number,
+  library: readonly LibraryFile[],
+  modelColors: Record<string, string>
+): string | null {
+  if (modelColors[key]) return modelColors[key]
+  const lib = library.find((f) => f.key === key)?.swatch
+  if (lib) return lib
+  const i = slot % MC.length
+  return i === 0 ? null : MC[i]
+}
+
+/**
+ * Every loaded model's cut colour, by model key (2026-11-07, owner-requested): what the viewer
+ * draws each model's section-cut outline in (`viewer.setCutColors`). A model whose row shows
+ * the neutral grey — no colour of its own (`cutSwatch`) — is left out, so the viewer draws it
+ * in the accent, re-read at each theme change.
  */
 export function modelSwatches(
   federation: Pick<Federation, 'models'>,
@@ -87,7 +110,8 @@ export function modelSwatches(
 ): Record<string, string> {
   const out: Record<string, string> = {}
   for (const m of federation.models) {
-    out[m.meta.modelKey] = rowSwatch(m.meta.modelKey, m.slot, library, modelColors)
+    const c = cutSwatch(m.meta.modelKey, m.slot, library, modelColors)
+    if (c) out[m.meta.modelKey] = c
   }
   return out
 }

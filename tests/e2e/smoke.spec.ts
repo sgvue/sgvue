@@ -1571,18 +1571,34 @@ test('a section outlines what it cuts in its model\'s colour; hide, preview, cle
   //
   // Counted in STR's colour: the floor slab hidden below is a STR element (the mock's
   // `STR_TYPES`), and STR is most of what grid C cuts. The colour is read off STR's row — the
-  // demo is never in the library, so it is the design's `MC[slot]`, which is the dark accent for
-  // STR's slot; the light theme is where the outline shows it follows the row, not the accent.
+  // demo is never in the library, so it is the design's `MC[slot]`. ARC, at slot 0, shows the
+  // neutral grey `MC[0]` — no colour of its own — so its outline is the theme's accent (the
+  // owner: "Yes, keep accent"). STR's `MC[1]` is the dark accent, so the counting is done in the
+  // light theme, where STR's colour and ARC's accent are two colours.
   const STR_FILE = 'SB_STR_R25.ifc'
+  const ARC_FILE = 'SB_ARC_R25.ifc'
+  const GREY = 0x8a9492
   const LIGHT_ACCENT = 0x0e8a80
   const { app, page } = await launch(dir)
   try {
     await openDemo(page)
     const str = await rowSwatchOf(page, STR_FILE)
+    expect(await rowSwatchOf(page, ARC_FILE)).toBe(GREY)
     // The outline counts were measured with the canvas grid on, off by default since 2026-11-07;
     // with it off the ground veil is not drawn, so below-grade outline shows and the slab is a
     // smaller share.
     await page.locator('button[data-tip="canvas grid"]').click()
+    const theme = page.locator('button[data-tip="Light / dark"]')
+    const toggleTheme = async (to: 'light' | 'dark'): Promise<void> => {
+      const tb = (await theme.boundingBox())!
+      await page.mouse.move(tb.x + tb.width / 2 - 20, tb.y + tb.height / 2)
+      await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2)
+      await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2)
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe(to)
+    }
+    await toggleTheme('light')
+    // The row keeps its colour in either theme.
+    expect(await rowSwatchOf(page, STR_FILE)).toBe(str)
     const overlay = page.locator('[data-role="overlay"]')
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
     // Right of the Section card (12 + 300 px), clear of the toolbar, the cube and the status bar.
@@ -1595,12 +1611,17 @@ test('a section outlines what it cuts in its model\'s colour; hide, preview, cle
     }
 
     const none = await count(str)
+    const noneAccent = await count(LIGHT_ACCENT)
     await page.locator('button[data-tip="Section from gridline / level"]').click()
     await page.getByRole('button', { name: 'C', exact: true }).click()
     // Grid C cut, the camera square to the plane: an elevation, outlined.
     const cut = await count(str)
     expect(cut).toBeGreaterThan(1000)
     expect(none).toBeLessThan(cut / 50)
+    // ARC's grey row: its outline is the accent.
+    const arc = await count(LIGHT_ACCENT)
+    expect(arc).toBeGreaterThan(100)
+    expect(noneAccent).toBeLessThan(arc / 20)
 
     // Hide one element the plane cuts — the L3 floor slab, cut across its whole width — and its
     // outline goes.
@@ -1622,22 +1643,16 @@ test('a section outlines what it cuts in its model\'s colour; hide, preview, cle
     await cutBtn.click()
     expect(Math.abs((await count(str)) - cut)).toBeLessThan(cut / 50)
 
-    // The theme: the row keeps its colour in either theme, and so does the outline — the light
-    // accent, which the outline was before 2026-11-07, is not drawn.
-    const theme = page.locator('button[data-tip="Light / dark"]')
-    const tb = (await theme.boundingBox())!
-    await page.mouse.move(tb.x + tb.width / 2 - 20, tb.y + tb.height / 2)
-    await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2)
-    await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2)
-    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('light')
-    const strLight = await rowSwatchOf(page, STR_FILE)
-    expect(strLight).toBe(str)
-    expect(await count(strLight)).toBeGreaterThan(cut / 2)
-    expect(await count(LIGHT_ACCENT)).toBeLessThan(cut / 50)
+    // The theme: STR's row and outline keep their colour; ARC's accent outline follows the theme
+    // — the light accent is no longer drawn, and in the dark theme ARC's accent is STR's `MC[1]`.
+    await toggleTheme('dark')
+    expect(await rowSwatchOf(page, STR_FILE)).toBe(str)
+    expect(await count(str)).toBeGreaterThan(cut / 2)
+    expect(await count(LIGHT_ACCENT)).toBeLessThan(arc / 20)
 
     // Cleared: gone.
     await gridBlock.getByRole('button', { name: 'Clear', exact: true }).click()
-    expect(await count(strLight)).toBeLessThan(cut / 50)
+    expect(await count(str)).toBeLessThan(cut / 50)
   } finally {
     await app.close()
   }
@@ -1678,6 +1693,8 @@ test('a gridline cut and a level cut are independent: own offset, cut, flip side
   try {
     await openDemo(page)
     // Since 2026-11-07 a model's outline is its MODELS row's colour; STR's is most of either cut.
+    // In this dark theme ARC's outline is the same colour: its row shows the neutral grey, so it is
+    // cut in the accent, which is STR's `MC[1]` — every pixel counted is still a cut outline.
     const STR = await rowSwatchOf(page, 'SB_STR_R25.ifc')
     const overlay = page.locator('[data-role="overlay"]')
     const vp = (await page.locator('[data-role="viewport"]').boundingBox())!
@@ -1934,7 +1951,7 @@ test('a share link written before there were two planes still restores its one s
     await expect(grid.offset).toHaveValue('0')
     // It really cuts: the plane's outline of the model is on the canvas, in the model's colour.
     // Since 2026-11-07 that is what its MODELS row shows. A real file's row starts in the design's
-    // grey (`MC[0]`), which the fixture's unstyled faces could match, so the row is given one of
+    // grey (`MC[0]`) — and is then cut in the accent, no colour of its own — so the row is given one of
     // the palette's colours first — with "Original materials" on, the faces keep the file's own —
     // and the outline is counted in the colour the row then shows.
     await page.locator('aside button[title="Override this model\'s colour"]').click()
