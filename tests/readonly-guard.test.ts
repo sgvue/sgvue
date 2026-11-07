@@ -693,11 +693,12 @@ describe('read-only guard', () => {
 
   /**
    * 2026-10-08 — the owner: *"Maybe just make the coordinates system toggle a read only, dont let
-   * user change anything."* The base point is the boot file's: the store writes `coords` in one
-   * place, `setOffset`, with the federation's frame, and the one module that calls that is the
+   * user change anything."* The base point is a loaded file's — since 2026-11-07 the one
+   * `georefSourceOf` picks, whatever the load order: the store writes `coords` in one place,
+   * `commitModels`, from the federation it is handed, and the one module that calls that is the
    * federation controller. No tool can reach it, and no other store write names the key.
    */
-  it('keeps the base point read-only: `coords` is written by the store’s setOffset alone', () => {
+  it('keeps the base point read-only: `coords` is written by the store’s commitModels alone', () => {
     /** Every call of `callee` in `code`, with its whole argument list. */
     const callsOf = (code: string, callee: RegExp): string[] =>
       [...code.matchAll(callee)].map((m) => {
@@ -715,11 +716,22 @@ describe('read-only guard', () => {
         .filter((args) => /\bcoords\b\s*[:,}]/.test(args))
         .map((args) => `${path} ${args.replace(/\s+/g, ' ')}`)
     )
-    expect(writes).toEqual(['src/renderer/state/shell.ts ({ offset, frame, bootGeoref, coords })'])
-    // …and that is the store's `setOffset`, which the federation controller alone calls.
-    const callers = FILES.filter(({ text }) => /\bsetOffset\(/.test(stripComments(text))).map(({ path }) => path)
-    expect(callers.sort()).toEqual(['src/renderer/model/federation-store.ts'])
-    expect(aiFilesNaming(/\bsetOffset\b|\bsetCoords?\b/)).toEqual([])
+    expect(writes).toEqual(['src/renderer/state/shell.ts ({ georefSource, georefSourceKey, coords })'])
+    // …and that is the store's `commitModels`, read off the federation's own files…
+    const shellText = stripComments(FILES.find((f) => f.path === 'src/renderer/state/shell.ts')!.text)
+    const commit = shellText.slice(shellText.indexOf('commitModels: (federation) =>'))
+    expect(commit.indexOf('set({ georefSource, georefSourceKey, coords })')).toBeGreaterThan(0)
+    expect(commit.slice(0, commit.indexOf('set({ georefSource, georefSourceKey, coords })'))).toMatch(
+      /georefSourceOf\(federation\.models\.map\(\(m\) => m\.meta\)\)/
+    )
+    // …which the federation controller alone calls, as it alone calls `setOffset`.
+    for (const action of [/\bcommitModels\(/, /\bsetOffset\(/]) {
+      const callers = FILES.filter(({ text }) => action.test(stripComments(text))).map(({ path }) => path)
+      expect(callers.filter((p) => p !== 'src/renderer/state/shell.ts').sort()).toEqual([
+        'src/renderer/model/federation-store.ts'
+      ])
+    }
+    expect(aiFilesNaming(/\bsetOffset\b|\bsetCoords?\b|\bcommitModels\b/)).toEqual([])
     // The design's `setCoord` is gone from the store, and the card's fields are `readOnly`.
     const shell = stripComments(FILES.find((f) => f.path === 'src/renderer/state/shell.ts')!.text)
     expect(shell).not.toMatch(/\bsetCoord\b/)

@@ -483,9 +483,8 @@ function freshStart(): void {
 
 /**
  * Refactor pass 2, P9 — the demo building is on screen. It is not the user's model, and a real
- * file joining it would join the demo's federation: the demo's offset, its frame and its
- * `frameKey`, which put the file's coordinates, its property-card numbers and every link cut
- * from it in the demo's frame. So a real pick **replaces** the demo, exactly as a pick on the
+ * file joining it would join the demo's federation: the demo's offset, its display unit and its
+ * review state, which every link cut from it would carry. So a real pick **replaces** the demo, exactly as a pick on the
  * landing page replaces whatever is still loading (`freshStart`) — no question asked, because
  * nothing of the user's is lost. Set once the demo has joined; cleared by that fresh start.
  */

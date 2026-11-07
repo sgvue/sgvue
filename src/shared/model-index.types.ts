@@ -143,7 +143,7 @@ export interface Storey {
    * It is **not** `elev`: `Elevation` is stated relative to whatever the storey is placed in,
    * so on a Revit shared-coordinates export — where the site placement carries a 5.05 m
    * elevation as well as the rotation — the two differ by exactly that. The level ring and the
-   * level section plane come from here, put through the project frame; the ladder keeps
+   * level section plane come from here, less the offset (2026-11-07: no frame); the ladder keeps
    * displaying the authored `Elevation`.
    */
   placement?: readonly [number, number, number]
@@ -248,8 +248,9 @@ export interface SiteGeoref {
  * The 3D `Model` context's `WorldCoordinateSystem` (2026-10-08), recorded only when it is not the
  * identity — which IFC says it normally is. Revit writes the chosen point's Easting, Northing and
  * Elevation as its `Location`, in project length units, whenever it writes no `IfcMapConversion`.
- * web-ifc does not apply it to any placement (`docs/TRAPS.md`), so it is applied — or, beside a
- * map conversion, undone — in `shared/georef.ts`'s `mapPlacement`.
+ * web-ifc does not apply it to any placement (`docs/TRAPS.md`), and since 2026-11-07 neither does
+ * the app: `shared/georef.ts`'s `mapPlacement` reads it as the file's map position (or, beside a
+ * map conversion, undoes it there), for the Coordinate-system card and its note only.
  */
 export interface WcsGeoref {
   /** Its `Location`, metres (the project length unit applied). */
@@ -408,8 +409,9 @@ export interface IfcElement {
   /** True for `IfcSpace`: recorded, but not a physical element. */
   isSpace?: boolean
   /**
-   * Axis-aligned bounding box in the **project frame**, metres, Z-up — the frame the scene is
-   * drawn in, before the federation offset is subtracted.
+   * Axis-aligned bounding box in the file's own **world** coordinates, metres, Z-up — the frame
+   * the scene is drawn in since 2026-11-07 (origin to origin), before the federation offset is
+   * subtracted.
    *
    * It is the union of the element's part boxes from the geometry stream, written onto the
    * index by `renderer/model/element-boxes.ts` as the chunks land and before the index is
@@ -466,14 +468,14 @@ export interface ModelIndexMeta {
   grids: readonly GridAxisRecord[]
   georef: Georeference
   /**
-   * 2026-10-08 — how far, in metres, the centre of what this model drew stands from the
-   * federation offset another model set, when that is past `FAR_PLACEMENT_METRES` (the geometry
-   * stream's `farPlacement` warning, `worker/geometry-streamer.ts`). Written by the renderer once
+   * 2026-11-07 — the centre of the box of everything this model drew, in its file's own world
+   * coordinates (metres, Z-up), which is where the scene draws it. Written by the renderer once
    * the model has streamed and before the index is frozen (`model/federation-store.ts`), as each
-   * element's `bbox` is. Absent when it is nearer, when this model set the offset itself, and
-   * before it has streamed. It is what says a model "sits 12.3 km from the others".
+   * element's `bbox` is; absent for a model that drew nothing, and before it has streamed. The
+   * Coordinate-system card's note puts it through the file's own map position
+   * (`shared/georef.ts`'s `mapShift`) to say how far that position is from where it is drawn.
    */
-  farPlacementMetres?: number
+  drawnCentre?: readonly [number, number, number]
   /** The seven design attributes plus every pset/qto key in this model. */
   propKeys: readonly string[]
   counts: ModelCounts

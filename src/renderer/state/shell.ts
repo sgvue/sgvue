@@ -68,13 +68,20 @@
  * system toggle a read only, dont let user change anything."* The design's `setCoord` (`:1039`)
  * is gone, and with it the card's `onChange`, the assistant's request to change the base point
  * and a session's or a reply's revert putting one back: `coords` is written in exactly one place,
- * `setOffset`, from `bootGeoref` — the boot model's georeferencing, the declaration that defined
- * the federation's frame — and stays right after any unload.
+ * `commitModels`, from `georefSource` — since 2026-11-07 the loaded model `georefSourceOf` picks,
+ * whatever order the files were opened in — so it follows the federation through every unload.
  */
 import { create } from 'zustand'
 import * as fstack from '../../shared/filter-stack'
 import type { FilterSet } from '../../shared/filter-stack'
-import { coordsFromGeoref, type BasePoint, type ProjectFrame } from '../../shared/georef'
+import {
+  IDENTITY_FRAME_KEY,
+  coordsFromGeoref,
+  georefSourceOf,
+  isLocated,
+  readoutCoords,
+  type BasePoint
+} from '../../shared/georef'
 import type { Georeference } from '../../shared/model-index.types'
 import { classColors, colorBy, colorByGroups, colorByIds, HL, type ColorByState } from '../../shared/colors'
 import {
@@ -95,10 +102,10 @@ import {
   sessionPatch,
   type SessionPayload
 } from '../../shared/session-codec'
-import { frameKey } from '../../shared/georef'
 import { NO_SECTIONS, type SecKind, type SecPlane, type Sections } from '../../shared/sections'
 import type { DisplayUnit } from '../../shared/units'
 import { sphericalOf } from '../../shared/view-angles'
+import { planRotationDeg } from '../../shared/plan-rotation'
 import { DISPLAY_DEFAULTS } from '../../shared/ai-schema'
 import {
   mergeUndo,
@@ -180,6 +187,14 @@ export type { SecKind, SecPlane, Sections }
  * Centroid row read the same four numbers through the same `toMap`.
  */
 export type CoordState = BasePoint
+
+/** The federation's plan rotation, degrees — `shared/plan-rotation.ts` over every loaded model. */
+export const planRotationOf = (federation: Federation): number =>
+  planRotationDeg(federation.models.map((m) => m.meta))
+
+/** The store's plan rotation in radians, which is what the camera's angles are said against. */
+export const planRotationRad = (s: Pick<ShellState, 'planRotationDeg'>): number =>
+  (s.planRotationDeg * Math.PI) / 180
 
 /** No base point: every field blank, never a zero. */
 const NO_COORDS: CoordState = { E: null, N: null, Z: null, angle: null }
@@ -293,32 +308,30 @@ export interface ShellState {
    * Whole metres the geometry pipeline subtracted from every placement so the scene sits near
    * the origin (`shared/geometry-contract.types.ts`). The design has no equivalent: its mock
    * federation is authored at the origin. Anything that reports an absolute coordinate — the
-   * property card's Base / top and Centroid rows — adds it back to reach the project frame.
+   * property card's Base / top and Centroid rows — adds it back to reach the files' own world
+   * coordinates, which since 2026-11-07 is what the scene is (origin to origin, no frame).
    */
   offset: readonly [number, number, number]
   /**
-   * The federation's frame, P: the boot model's project frame expressed in map coordinates —
-   * its own map operation over its spatial-root `IfcSite.ObjectPlacement`, project → map
-   * (`shared/georef.ts`'s `federationFrame`, 2026-10-08) — which the geometry pipeline undid so
-   * the scene stands square with the building. For a boot model whose map operation is the
-   * identity it is that site placement, as it always was. `null` is the identity.
-   *
-   * It is here, beside the offset, because the session, the share link and every saved
-   * viewpoint store a camera in **scene** coordinates — so each of them records which frame
-   * that was (`shared/georef.ts`'s `frameKey`) and a payload from another one restores
-   * everything except the camera.
+   * 2026-11-07 — the georeferencing the Coordinate-system card shows: the loaded model
+   * `shared/georef.ts`'s `georefSourceOf` picks — of the models that state one, the one with the
+   * most elements, ties by key — so it does not depend on the order the files were opened in,
+   * and it is recomputed at every commit. The base point (`coords`), the card's chip and caption,
+   * the status bar's CRS chip and `basePointSource` are all read off it. `null` while no loaded
+   * model states anything (the design's mock, the demo building). It is the file's declaration
+   * only: no model is placed by it.
    */
-  frame: ProjectFrame | null
+  georefSource: Georeference | null
+  /** The key of the model `georefSource` is read from, or `null` with it. */
+  georefSourceKey: string | null
   /**
-   * 2026-10-08 — the boot model's georeferencing: **the declaration that defined P** (`frame`),
-   * set with it and the offset at boot (`setOffset`) and kept after that model is unloaded, as the
-   * frame is. The base point (`coords`), the Coordinate-system card's chip and caption, the status
-   * bar's CRS chip and `basePointSource` are all read off it, so they describe the frame actually
-   * in use — after any unload, and after a boot model whose own geometry failed once another model
-   * stood in its frame. `null` while nothing is loaded, and for a federation with no file behind
-   * its boot model (the design's mock, the demo building).
+   * 2026-11-07 — the plan rotation ρ, degrees anticlockwise, in (−45°, 45°]: the angle the
+   * camera's plan frame stands at in the world so the grids run square on screen
+   * (`shared/plan-rotation.ts`). A function of every loaded model, whatever their order, set at
+   * every commit and handed to the viewer. Only the camera and what is drawn square with the plan
+   * follow it — no model moves and no readout changes. Not saved: it is the federation's.
    */
-  bootGeoref: Georeference | null
+  planRotationDeg: number
 
   /* ── the design's `state` (`:846–853`), in its own order ── */
   theme: Theme
@@ -476,8 +489,8 @@ export interface ShellState {
   fitView: (what: 'extents' | 'selection', zoom?: number) => void
   /**
    * 2026-10-02 — turn the camera to a direction, as the view cube does for its 26: azimuth and
-   * elevation in degrees, in the project frame (`shared/view-angles.ts`). One left `undefined`
-   * keeps the camera's own.
+   * elevation in degrees, in the plan frame — project north is the plan rotation's +Y
+   * (`shared/view-angles.ts`, `shared/plan-rotation.ts`). One left `undefined` keeps the camera's own.
    */
   aimCamera: (azimuthDeg: number | undefined, elevationDeg: number | undefined) => void
   openCard: (name: CardName) => void
@@ -512,7 +525,7 @@ export interface ShellState {
   /** `:2064`. Zoom to a markup. */
   focusPoint: (p: readonly number[]) => void
   /**
-   * 2026-10-02, phase 4 — a markup placed at a **project-frame** point (metres, Z up: the frame
+   * 2026-10-02, phase 4 — a markup placed at a **world** point (2026-11-07; metres, Z up: the frame
    * an element's box is reported in), for the assistant's `manage_markups`. It is the viewer's
    * own commit for a click with the spot tool or the laser meter (`viewer-core.ts`), at a point
    * that is named rather than clicked — so the record, its labels and its number are a click's.
@@ -644,16 +657,8 @@ export interface ShellState {
 
   /* ── federation plumbing (`buildFederation` / `boot` / `setModels`) ── */
   setLibrary: (files: readonly LibraryFile[]) => void
-  /**
-   * The federation's offset, its frame P and the declaration that defined P — fixed together at
-   * boot, and cleared together when nothing is loaded. **The one place `coords` is written**
-   * (2026-10-08, the read-only card): the base point is P read off `bootGeoref`.
-   */
-  setOffset: (
-    offset: readonly [number, number, number],
-    frame: ProjectFrame | null,
-    bootGeoref: Georeference | null
-  ) => void
+  /** The federation's offset — fixed at boot, and cleared when nothing is loaded. */
+  setOffset: (offset: readonly [number, number, number]) => void
   beginModels: (loadMsg: string) => void
   commitModels: (federation: Federation) => void
 
@@ -939,8 +944,9 @@ export const useShell = create<ShellState>((set, get) => ({
   loaded: [],
   library: [],
   offset: [0, 0, 0],
-  frame: null,
-  bootGeoref: null,
+  georefSource: null,
+  georefSourceKey: null,
+  planRotationDeg: 0,
 
   theme: 'dark',
   panelOpen: true,
@@ -1242,8 +1248,8 @@ export const useShell = create<ShellState>((set, get) => ({
    *   design's own `activate` calls `pushUndo()` for exactly this reason (`:1051`), and
    *   without it a restore is the one visibility change ⌘Z cannot walk back.
    *
-   * A viewpoint's camera is scene coordinates and the scene is the project frame, so one
-   * recorded against another frame — or before the frame was recorded at all — restores
+   * A viewpoint's camera is scene coordinates and the scene is the files' own world coordinates
+   * (2026-11-07), so one recorded against another frame — or before the frame was recorded at all — restores
    * everything *except* the camera and frames the extents instead. Pointing the camera at
    * numbers that meant something else is worse than showing the whole model.
    *
@@ -1275,7 +1281,7 @@ export const useShell = create<ShellState>((set, get) => ({
       vw.setLevels(v.levels)
       vw.setPickable(pickableFor(v.active))
       vw.setSections(sectionsConfigOf(sections))
-      if (v.cam && viewpointFrameMatches(v, s.frame)) vw.setCamera(v.cam)
+      if (v.cam && viewpointFrameMatches(v)) vw.setCamera(v.cam)
       else if (v.cam) vw.frameExtents()
       get().applyVis()
     })
@@ -1440,7 +1446,8 @@ export const useShell = create<ShellState>((set, get) => ({
   aimCamera: (azimuthDeg, elevationDeg) => {
     if (!viewer) return
     const cam = viewer.getCamera()
-    const to = sphericalOf(azimuthDeg ?? 0, elevationDeg ?? 0)
+    // Azimuth is said against project north: the plan rotation's +Y (2026-11-07).
+    const to = sphericalOf(azimuthDeg ?? 0, elevationDeg ?? 0, planRotationRad(get()))
     viewer.lookAlong(
       azimuthDeg === undefined ? cam.theta : to.theta,
       elevationDeg === undefined ? cam.phi : to.phi
@@ -1501,7 +1508,7 @@ export const useShell = create<ShellState>((set, get) => ({
   dropSpot: (id) => viewer?.dropSpot(id),
   focusPoint: (p) => viewer?.focusPoint([...p]),
 
-  // The scene stands whole metres off the project frame (`offset`): scene = project − offset.
+  // The scene stands whole metres off the files' own coordinates (`offset`): scene = world − offset.
   placeSpot: (p) => {
     if (!viewer) return false
     const o = get().offset
@@ -1861,9 +1868,9 @@ export const useShell = create<ShellState>((set, get) => ({
           frameExtents: () => v?.frameExtents(),
           visibility: () => get().applyVis()
         },
-        // The frame the live federation is in, which `commitModels` has already recorded: the
-        // models are loaded before a payload is applied.
-        frameKey(get().frame)
+        // The scene's frame — every file's own world coordinates since 2026-11-07, for every
+        // federation — so a payload recorded under another frame restores all but its camera.
+        IDENTITY_FRAME_KEY
       )
     )
   },
@@ -1942,11 +1949,7 @@ export const useShell = create<ShellState>((set, get) => ({
 
   setLibrary: (library) => set({ library }),
 
-  setOffset: (offset, frame, bootGeoref) => {
-    const coords = coordsFromGeoref(bootGeoref) ?? NO_COORDS
-    set({ offset, frame, bootGeoref, coords })
-    viewer?.setCoords(coords)
-  },
+  setOffset: (offset) => set({ offset }),
 
   beginModels: (loadMsg) => set({ ready: false, loadMsg }),
 
@@ -1979,6 +1982,23 @@ export const useShell = create<ShellState>((set, get) => ({
     const nextViewsKey = viewsKeyFor(federation.project.building)
     const viewsChanged = nextViewsKey !== viewsKey
     if (viewsChanged) viewsKey = nextViewsKey
+    // 2026-11-07 — the base point is the file's that `georefSourceOf` picks, whatever the order
+    // the files were opened in: recomputed for the federation as it now stands. **The one place
+    // `coords` is written** (2026-10-08, the read-only card). The viewer's readouts take world
+    // coordinates (`readoutCoords`), which is what the scene is — so they change only when a file
+    // starts or stops stating where it is, and only then is the viewer told.
+    const source = georefSourceOf(federation.models.map((m) => m.meta))
+    const georefSource = source?.georef ?? null
+    const georefSourceKey = source?.modelKey ?? null
+    const coords = coordsFromGeoref(georefSource) ?? NO_COORDS
+    set({ georefSource, georefSourceKey, coords })
+    if (isLocated(coords) !== isLocated(s.coords)) viewer?.setCoords(readoutCoords(coords))
+    // 2026-11-07 — the plan rotation, for the federation as it now stands: the camera's plan
+    // frame turns with it, never a model. The controller hands it to the viewer before a boot
+    // frames, too (`federation-store.ts`), so the boot framing is already square.
+    const planRotationDeg = planRotationOf(federation)
+    set({ planRotationDeg })
+    viewer?.setPlanRotation(planRotationDeg)
     set({
       federation,
       byId: federation.byId,

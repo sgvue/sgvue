@@ -24,7 +24,7 @@
  * **Placing** (phase 4): `place_spot` and `place_measure` are the user's click with the spot
  * tool or the laser meter, at a point that is named because a tool has no pointer — the middle
  * of an element's box top, of the box, or of its underside (`shared/annotate.ts`, `boxPlace`),
- * or a project-frame point. What is placed is made by the viewer's own commit for that click
+ * or a point in world metres (the files' own coordinates since 2026-11-07). What is placed is made by the viewer's own commit for that click
  * (the store's `placeSpot` / `placeMeasure`), so it is the same record, the same labels, the
  * same number in the card, and the laser's rays are the laser tool's. A markup drawn in the 3D
  * view is **session view state**, not a saved list as the viewpoints are, so **the reply's
@@ -306,7 +306,7 @@ function restore(view: Viewpoint, number: number, ctx: ToolContext): ToolOutcome
   const shown = after.federation.elements.filter(visFn(after)).length
   const section = sectionsLabel(after.sections)
   // The card's own rule (`restoreView`): a camera recorded against another frame is not used.
-  const reframed = !!view.cam && !viewpointFrameMatches(view, after.frame)
+  const reframed = !!view.cam && !viewpointFrameMatches(view)
   return {
     forModel: {
       message:
@@ -449,7 +449,7 @@ function clearMarkups(input: Record<string, unknown>, s: ShellState): ToolOutcom
 
 type Triple = [number, number, number]
 
-/** Where a markup is to go: a project-frame point, the face it sits on, and how to say it. */
+/** Where a markup is to go: a world point, the face it sits on, and how to say it. */
 interface Placement {
   p: Triple
   normal: Triple | null
@@ -488,7 +488,7 @@ function placementOf(input: Record<string, unknown>, s: ShellState): Placement |
     }
   }
   if (!hasId) {
-    return { error: 'Say where: pass the element’s id (and at: top, centre or base), or a point in project-frame metres.' }
+    return { error: 'Say where: pass the element’s id (and at: top, centre or base), or a point in world metres.' }
   }
   const el = s.byId.get(input.id as number)
   if (!el) return { error: `No element has id ${input.id as number} — ids are per session, so query again.` }
@@ -575,7 +575,7 @@ function placeMarkup(input: Record<string, unknown>, ctx: ToolContext, laser: bo
       name,
       ...(laser ? { measure: record } : { spot: record }),
       pointMetres: { x, y, z },
-      pointFrame: 'project',
+      pointFrame: 'world',
       ...place.fields,
       ...(place.hidden ? { elementHidden: true } : {})
     },

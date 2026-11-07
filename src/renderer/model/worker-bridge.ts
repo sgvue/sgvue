@@ -7,7 +7,6 @@
  * clears the *live* worker. Every handler here compares the session it was created with by
  * identity before touching anything shared.
  */
-import type { ProjectFrame } from '../../shared/georef'
 import type {
   FederationOffset,
   GeometryChunk,
@@ -186,10 +185,7 @@ export class ParseWorkerBridge {
 
   /**
    * Stream one parsed model's geometry. `offset` is the federation offset already in force;
-   * pass `null` for the first model and read the offset it chose off the summary. `frame` is
-   * this model's own frame against the federation's (M_i⁻¹ ∘ P, `shared/georef.ts`'s
-   * `modelFrame`), which the caller always has — it read this model's index before asking for
-   * its geometry.
+   * pass `null` for the first model and read the offset it chose off the summary.
    *
    * The model must already have been parsed by this bridge — the worker streams from the
    * model it still holds open, so nothing is re-read.
@@ -197,7 +193,6 @@ export class ParseWorkerBridge {
   geometry(
     modelKey: string,
     offset: FederationOffset | null,
-    frame: ProjectFrame | null,
     onChunk?: GeometryChunkListener
   ): Promise<GeometrySummary> {
     const session = this.open()
@@ -206,7 +201,7 @@ export class ParseWorkerBridge {
     }
     return new Promise<GeometrySummary>((resolve, reject) => {
       session.geometries.set(modelKey, { resolve, reject, onChunk })
-      this.send(session, { type: 'geometry', modelKey, offset, frame })
+      this.send(session, { type: 'geometry', modelKey, offset })
     })
   }
 

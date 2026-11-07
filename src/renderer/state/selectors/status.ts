@@ -8,7 +8,7 @@
  */
 import { filterIsLive } from '../../../shared/filter-stack'
 import { labelText } from '../../../shared/fmt'
-import { coordsFromGeoref, crsChip, mapPlacement } from '../../../shared/georef'
+import { MAP_SHIFT_METRES, coordsFromGeoref, crsChip, mapMisplaced, mapShift } from '../../../shared/georef'
 import type { Georeference } from '../../../shared/model-index.types'
 import type { ShellState } from '../shell'
 import { modelFile } from './models'
@@ -106,10 +106,10 @@ export interface StatusValues {
  * `''` when the file carries no georeferencing. When it is not empty the card's row gains
  * `flex-wrap:wrap`.
  *
- * `georef` is the store's `bootGeoref`: the declaration that defined the federation's frame,
- * whose base point the four fields are. Until 2026-10-08 the fields could be typed into, and the
- * caption had to stop naming the file the moment they stopped being its numbers; the card is
- * read-only since then, so the fields are always the file's and only the method is asked.
+ * `georef` is the store's `georefSource` (2026-11-07: the loaded model `georefSourceOf` picks,
+ * whatever the load order), whose base point the four fields are. Until 2026-10-08 the fields
+ * could be typed into, and the caption had to stop naming the file the moment they stopped being
+ * its numbers; the card is read-only since then, so only the method is asked.
  */
 export function coordsCaption(georef: Georeference | null): string {
   const method = georef?.method ?? 'none'
@@ -118,12 +118,12 @@ export function coordsCaption(georef: Georeference | null): string {
 
 /**
  * Whose the base point is, for the assistant's `get_view_state` (2026-10-02): `file` when the
- * declaration that defined the federation's frame states one — the only place it comes from since
+ * georeferencing the card shows (`georefSource`) states one — the only place it comes from since
  * 2026-10-08, when the Coordinate-system card became read-only — and `none` when it states none.
  * (`user`, for numbers typed into the card or applied from a reply, cannot happen any more.)
  */
-export function basePointSource(bootGeoref: Georeference | null): 'file' | 'none' {
-  return coordsFromGeoref(bootGeoref) ? 'file' : 'none'
+export function basePointSource(georefSource: Georeference | null): 'file' | 'none' {
+  return coordsFromGeoref(georefSource) ? 'file' : 'none'
 }
 
 /* ───────────────── the Coordinate-system card's note (2026-10-08, owner-chosen) ───────────────── */
@@ -131,7 +131,14 @@ export function basePointSource(bootGeoref: Georeference | null): 'file' | 'none
 /** A model's name as the note prints it: file text, through `labelText`, and clipped there. */
 export const LINE_UP_NAME_CHARS = 120
 
-/** One loaded model that could not be lined up with the others, and why. */
+/**
+ * One loaded model whose own map position is not where it is drawn (2026-11-07). The scene is
+ * every file's own world coordinates, origin to origin, so a file whose georeferencing would
+ * move it — an `IfcMapConversion` over a site at the file's zero, a `WorldCoordinateSystem` that
+ * is its map position, a turned conversion — stands where its coordinates put it, and that is not
+ * its place on the map: every map readout over it is its file coordinates, and a neighbour whose
+ * map position *is* its coordinates does not line up with it.
+ */
 export interface NotLinedUp {
   /** The model's key. */
   key: string
@@ -140,86 +147,78 @@ export interface NotLinedUp {
    * the picked file's, else the library's, else the index's) — file text, so through `labelText`.
    */
   name: string
-  /**
-   * `no map position` — its file states none (`placedBy` is `none`) while another loaded model's
-   * does; `far` — the geometry stream's `farPlacement`: it lands more than 5 km from the
-   * federation offset another model set.
-   */
-  reason: 'no map position' | 'far'
-  /** For `far`: how far it stands, in metres. */
-  metres?: number
+  /** How far its map position moves the centre of what it draws, in metres. */
+  metres: number
+  /** How far its map position turns it, in degrees, 0 to 180. */
+  degrees: number
 }
 
 /**
- * Which loaded models could not be lined up, and why — the fact the Coordinate-system card's note
- * says and `get_model_info` / `get_view_state` report (2026-10-08). Asked for by the owner: of the
- * ways offered to say so, *"One-line note on screen"*.
+ * The loaded models whose map position is not where they are drawn — the fact the
+ * Coordinate-system card's note says and `get_model_info` / `get_view_state` report. Per model,
+ * on its own: its file's map operation (`shared/georef.ts`'s `mapPlacement`) applied to the
+ * centre of what it drew (`drawnCentre`), against that centre, past a metre or a tenth of a
+ * degree (`mapMisplaced`). It does not depend on the other models or their order, and it holds
+ * with one model loaded too, since its map readouts are then its file coordinates. A model that
+ * drew nothing has nowhere to be misplaced.
  *
- * Nothing to say with one model loaded: lining up is about the others. Then, per model:
- *
- *  · **no map position** — its own declaration places it nowhere (`mapPlacement`'s `none`) while
- *    another loaded model's does. Its world coordinates were taken as map coordinates, which for
- *    a genuinely local file is the wrong place. This reason wins over `far`, which follows from it.
- *  · **far** — its geometry landed more than `FAR_PLACEMENT_METRES` from the federation offset
- *    (`ModelIndexMeta.farPlacementMetres`, the stream's own warning): a map position in another
- *    unit, a doubled offset, a datum from another survey.
- *
- * **When the boot model is the one without a map position**, the scene's origin is that model's
- * own, and every model that does have one lands kilometres from it: it is the boot model that is
- * named, and no distance is — a model that stands where its own map position puts it is not
- * the one that could not be lined up. `bootGeoref` is the declaration that defined the frame, so
- * this holds after the boot model is unloaded too.
+ * Until 2026-11-07 the federation was assembled in the boot model's map space and this said
+ * which models could not be put there (no map position while another had one, or more than 5 km
+ * from the offset); both reasons went with it.
  */
 export function notLinedUp(
-  s: Pick<ShellState, 'bootGeoref' | 'library' | 'uploadNames'> & {
+  s: Pick<ShellState, 'library' | 'uploadNames'> & {
     federation: Pick<ShellState['federation'], 'models'>
   }
 ): NotLinedUp[] {
-  const models = s.federation.models
-  if (models.length < 2) return []
-  const placed = (g: Georeference | null): boolean => mapPlacement(g).placedBy !== 'none'
-  const somePlaced = models.some((m) => placed(m.meta.georef))
-  const frameUnplaced = somePlaced && !placed(s.bootGeoref)
   const out: NotLinedUp[] = []
-  for (const { meta } of models) {
+  for (const { meta } of s.federation.models) {
+    if (!meta.drawnCentre) continue
+    const shift = mapShift(meta.georef, meta.drawnCentre)
+    if (!mapMisplaced(shift)) continue
     const file = modelFile(meta.modelKey, meta.fileName, s.library, s.uploadNames[meta.modelKey])
     const name = labelText(file || meta.modelKey, LINE_UP_NAME_CHARS)
-    if (somePlaced && !placed(meta.georef)) {
-      out.push({ key: meta.modelKey, name, reason: 'no map position' })
-    } else if (!frameUnplaced && meta.farPlacementMetres != null) {
-      out.push({ key: meta.modelKey, name, reason: 'far', metres: meta.farPlacementMetres })
-    }
+    out.push({ key: meta.modelKey, name, ...shift })
   }
   return out
 }
 
-/** A distance as the note says it: kilometres, to a tenth. */
-const km = (metres: number): string => (metres / 1000).toFixed(1)
+/** A displacement as the note says it: kilometres to a tenth from a kilometre, else metres to a tenth. */
+export const distanceText = (metres: number): string =>
+  metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${metres.toFixed(1)} m`
+
+/** A turn as the note says it, to a tenth of a degree. */
+const turnText = (degrees: number): string => `${degrees.toFixed(1)}°`
+
+/** One model's half of the note: how far, else how much turned. */
+const shiftText = (m: NotLinedUp): string =>
+  m.metres > MAP_SHIFT_METRES ? distanceText(m.metres) : `turned ${turnText(m.degrees)}`
 
 /**
  * The note's one line — `''` when there is nothing to say, and then the card draws nothing:
  *
- *   `Tower B.ifc could not be lined up — it has no map position.`
- *   `STR.ifc could not be lined up — it sits 12.3 km from the others.`
- *   `2 models could not be lined up: Tower B.ifc (no map position), STR.ifc (12.3 km away).`
+ *   `Tower B.ifc's map position is 12.3 km from where its file places it — ask for a Shared Coordinates export.`
+ *   `Tower B.ifc's map position is turned 30.0° from how its file places it — ask for a Shared Coordinates export.`
+ *   `2 models' map positions are not where their files place them: Tower B.ifc (12.3 km), STR.ifc (turned 30.0°) — ask for Shared Coordinates exports.`
+ *
+ * The distance is said whenever it is past a metre — a turn about the file's origin moves the
+ * building too, so a turn alone is said only for a model that it leaves within a metre.
  */
 export function lineUpNote(issues: readonly NotLinedUp[]): string {
   if (!issues.length) return ''
   if (issues.length === 1) {
     const [one] = issues
-    return one.reason === 'far'
-      ? `${one.name} could not be lined up — it sits ${km(one.metres ?? 0)} km from the others.`
-      : `${one.name} could not be lined up — it has no map position.`
+    return one.metres > MAP_SHIFT_METRES
+      ? `${one.name}'s map position is ${distanceText(one.metres)} from where its file places it — ask for a Shared Coordinates export.`
+      : `${one.name}'s map position is turned ${turnText(one.degrees)} from how its file places it — ask for a Shared Coordinates export.`
   }
-  const each = issues.map((m) =>
-    m.reason === 'far' ? `${m.name} (${km(m.metres ?? 0)} km away)` : `${m.name} (no map position)`
-  )
-  return `${issues.length} models could not be lined up: ${each.join(', ')}.`
+  const each = issues.map((m) => `${m.name} (${shiftText(m)})`)
+  return `${issues.length} models' map positions are not where their files place them: ${each.join(', ')} — ask for Shared Coordinates exports.`
 }
 
 export type StatusState = Pick<
   ShellState,
-  'stats' | 'visibleCount' | 'federation' | 'units' | 'bootGeoref'
+  'stats' | 'visibleCount' | 'federation' | 'units' | 'georefSource'
 >
 
 export function statusValues(s: StatusState): StatusValues {
@@ -229,7 +228,7 @@ export function statusValues(s: StatusState): StatusValues {
     visibleCount: s.visibleCount,
     total: s.federation.elements.length,
     units: s.units,
-    crs: crsChip(s.bootGeoref).short
+    crs: crsChip(s.georefSource).short
   }
 }
 

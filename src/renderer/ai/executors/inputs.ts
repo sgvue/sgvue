@@ -116,7 +116,7 @@ const ScheduleName = z
   .max(SCHEDULE_NAME_MAX, `at most ${SCHEDULE_NAME_MAX} characters`)
   .refine((name) => !name.trim() || isSafeName(name), 'a name with no control or direction characters in it')
 
-/** One coordinate of a point a markup is placed at, in project-frame metres: finite and bounded. */
+/** One coordinate of a point a markup is placed at, in world metres: finite and bounded. */
 const MarkupMetres = z
   .number()
   .min(-MARKUP_POINT_MAX, `between -${MARKUP_POINT_MAX} and ${MARKUP_POINT_MAX} metres`)

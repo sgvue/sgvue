@@ -197,7 +197,6 @@ describe('high-first.ifc — the first product streamed is the highest', () => {
     const summary = streamGeometry(src, modelID, {
       modelKey: 'HIGH',
       offset: null,
-      frame: null,
       onChunk: (chunk) => chunks.push(chunk)
     })
     const first = chunks[0].parts[0]

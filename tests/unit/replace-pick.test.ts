@@ -200,8 +200,7 @@ describe('a pick after boot, with the native box stubbed', () => {
     finishFirst({
       index: { modelKey: 'tiny', sha256: 'aa' } as ModelIndex,
       chunks: [],
-      offset: [0, 0, 0],
-      frame: null
+      offset: [0, 0, 0]
     })
     await vi.advanceTimersByTimeAsync(0)
     // The older result is discarded — closed in the worker — and only then does the newer parse.
@@ -229,7 +228,6 @@ describe('FederationController — the replacement joins in the old one’s plac
     index: mockModelIndex(key),
     chunks: mockGeometryChunks(key),
     offset: [0, 0, 0],
-    frame: null,
     file: { key, path, name: `${key}.ifc`, sha256: path }
   })
 
@@ -306,7 +304,6 @@ describe('FederationController — a batch whose join fails undoes itself', () =
     index: mockModelIndex(key),
     chunks: mockGeometryChunks(key),
     offset: [0, 0, 0],
-    frame: null,
     file: { key, path, name: `${key}.ifc`, sha256: path }
   })
 
@@ -442,8 +439,7 @@ describe('the pipeline with the controller live and the native box stubbed', () 
       booted: false,
       loaded: [],
       storeyVis: {},
-      offset: [0, 0, 0],
-      frame: null
+      offset: [0, 0, 0]
     })
     // Both planes are gone with the demo, not just one of them.
     expect(useShell.getState().sections).toEqual(NO_SECTIONS)
@@ -454,8 +450,7 @@ describe('the pipeline with the controller live and the native box stubbed', () 
     vi.spyOn(federation, 'prepare').mockResolvedValue({
       index: { ...mockModelIndex('ARC'), elements: [] },
       chunks: [],
-      offset: [0, 0, 0],
-      frame: null
+      offset: [0, 0, 0]
     })
     await dropFiles([file()])
     await vi.advanceTimersByTimeAsync(20_000)
@@ -473,8 +468,7 @@ describe('the pipeline with the controller live and the native box stubbed', () 
     vi.spyOn(federation, 'prepare').mockResolvedValue({
       index: mockModelIndex('ARC'),
       chunks: [],
-      offset: [0, 0, 0],
-      frame: null
+      offset: [0, 0, 0]
     })
     vi.spyOn(federation, 'addBatch').mockRejectedValue(new Error('out of memory'))
     await dropFiles([file()])

@@ -35,7 +35,7 @@
  *   · a model that is no longer loaded takes its ids, its eye, its colour and `active` with it —
  *     everything else is put back, and `lost.models` names it so the panel can say so;
  *   · the camera is scene coordinates, so it is put back only while the scene is the one it was
- *     recorded in — the project frame, and the whole-metre offset beside it. Otherwise it is
+ *     recorded in — the frame key, and the whole-metre offset beside it. Otherwise it is
  *     left where it is, and `lost.camera` says so.
  *
  * Not in any part, and never restored: `uploadNames`. It follows the federation, which only
@@ -66,7 +66,7 @@
  */
 import type { ColorByState } from '../../../shared/colors'
 import { slotOfId } from '../../../shared/federate'
-import { frameKey } from '../../../shared/georef'
+import { IDENTITY_FRAME_KEY } from '../../../shared/georef'
 import {
   renumberId,
   sessionPayload,
@@ -123,13 +123,13 @@ export interface TurnSnapshot {
   extra: TurnExtra
   /** Each loaded model's key, digest and slot — what the element ids in it are numbered by. */
   models: readonly SlotRecord[]
-  /** The whole metres the scene stands off the project frame; the camera is relative to them. */
+  /** The whole metres the scene stands off the files' own coordinates; the camera is relative to them. */
   offset: readonly [number, number, number]
 }
 
 export function turnSnapshot(s: ShellState, cam: SessionCamera | null): TurnSnapshot {
   return {
-    payload: sessionPayload(sessionSource(s), s.loaded, [], cam, frameKey(s.frame)),
+    payload: sessionPayload(sessionSource(s), s.loaded, [], cam, IDENTITY_FRAME_KEY),
     extra: {
       selIds: s.selIds,
       colorBy: s.colorBy,

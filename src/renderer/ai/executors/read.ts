@@ -25,6 +25,7 @@ import {
   coordsFromGeoref,
   isIdentityMapConversion,
   mapPlacement,
+  readoutCoords,
   toMap,
   type PlacedBy
 } from '../../../shared/georef'
@@ -67,8 +68,9 @@ import {
 export const MAP_UNIT_NAME_CHARS = 60
 
 /**
- * 2026-10-08 — how one model was put into the federation's map space, for `get_model_info`:
- * the declaration that placed it (`IfcMapConversion`, `ePset_MapConversion`,
+ * 2026-10-08 — how one model's file places it on the map, for `get_model_info` — since
+ * 2026-11-07 a reading only, since every model is drawn at its own file coordinates: the
+ * declaration that would place it (`IfcMapConversion`, `ePset_MapConversion`,
  * `WorldCoordinateSystem` — rule 4, where Revit writes the map position with no EPSG code —
  * `site placement` — its world coordinates are its map coordinates — or `none`); the unit its
  * Eastings, Northings and height were read in, with `assumedMetre` when the file names none or one
@@ -128,11 +130,12 @@ const slotOf = (s: ShellState, key: string): number =>
 /**
  * What one element's box says, for the tools that report it.
  *
- * Project-frame metres, Z-up, exactly as `IfcElement.bbox` is declared — so `size.z` is
- * height and `size.x` / `size.y` are the building's own axes. The centre is put through the
- * federation's base point with the design's own `toMap`, which is the same expression the
- * property card's Centroid row and the spot labels use, so a georeferenced model reports one
- * set of map coordinates and not two. `null` when the file states no base point.
+ * World metres, Z-up, exactly as `IfcElement.bbox` is declared — since 2026-11-07 the file's own
+ * coordinates, so `size.x` / `size.y` are along the file's world axes, which need not be the
+ * building's. The centre's map coordinates go through the design's own `toMap` with
+ * `readoutCoords`, the same expression the property card's Centroid row and the spot labels
+ * use: the world point itself, which is the map for every model the Coordinate-system card's
+ * note does not name. `null` when no loaded file states a base point.
  *
  * Every name here carries `box`, because that is what it is: the union of the element's placed
  * part boxes, never smaller than the solid and larger for a rotated one.
@@ -146,13 +149,13 @@ function boxReport(
   const size = { x: x1 - x0, y: y1 - y0, z: z1 - z0 }
   return {
     bboxMetres: bbox,
-    bboxFrame: 'project',
+    bboxFrame: 'world',
     boxSizeMetres: size,
     boxVolumeM3: size.x * size.y * size.z,
     boxCentreMetres: { x: centre[0], y: centre[1], z: centre[2] },
-    boxCentreMap: toMap(s.coords, centre[0], centre[1], centre[2]),
+    boxCentreMap: toMap(readoutCoords(s.coords), centre[0], centre[1], centre[2]),
     boxMethod:
-      'axis-aligned bounding box in the project frame — the union of the element’s placed part boxes, not solid geometry'
+      'axis-aligned bounding box in the file’s own world coordinates — the union of the element’s placed part boxes, not solid geometry'
   }
 }
 
@@ -354,8 +357,8 @@ export const clash_check: Executor = (input, ctx) => {
       candidates: pairs.length,
       capped: wasCapped,
       method:
-        'axis-aligned bounding boxes in the project frame, not solid geometry — candidates for review',
-      frame: 'project',
+        'axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — candidates for review',
+      frame: 'world',
       pairs: rows.map((p) => ({
         a: { id: p.a.id, name: p.a.name, type: p.a.type },
         b: { id: p.b.id, name: p.b.name, type: p.b.type },
@@ -465,7 +468,7 @@ export const get_element: Executor = (input, ctx) => {
         ? boxReport(s, e.bbox)
         : {
             bboxMetres: null,
-            bboxFrame: 'project',
+            bboxFrame: 'world',
             boxSizeMetres: null,
             boxVolumeM3: null,
             boxCentreMetres: null,
@@ -877,7 +880,7 @@ export const get_model_info: Executor = (input, ctx) => {
   const wanted = typeof input.model === 'string' ? input.model : null
   const models = s.federation.models.filter((m) => !wanted || m.meta.modelKey === wanted)
   if (!models.length) return notLoaded(wanted, s.loaded)
-  // 2026-10-08 — which loaded models could not be lined up: the Coordinate-system card's note.
+  // Which loaded models' map position is not where they are drawn: the Coordinate-system card's note.
   const issues = notLinedUp(s)
   return {
     forModel: {
@@ -939,14 +942,14 @@ export const get_model_info: Executor = (input, ctx) => {
           epsetName: meta.georef.epsetName ?? null,
           /**
            * The map coordinates of this model's project frame's origin and the total rotation
-           * from project north to true north. The Coordinate-system card shows the **boot**
-           * model's, which is the frame the whole federation is placed in.
+           * from project north to true north, as the file declares them. The Coordinate-system
+           * card shows one model's (`get_view_state`'s `basePoint.model`); no model is placed
+           * by it — every model is drawn at its own file coordinates.
            */
           projectBasePoint: coordsFromGeoref(meta.georef),
           ...placementReadout(meta.georef),
-          // 2026-10-08 — whether it lines up with the others, as the Coordinate-system card's
-          // note says: `null` when it does (and with one model loaded, when there is nothing to
-          // line up with).
+          // Whether its own map position is where it is drawn, as the Coordinate-system card's
+          // note says: `null` when it is (within a metre and a tenth of a degree).
           notLinedUp: lineUpOf(issues.find((x) => x.key === meta.modelKey)),
           corenetX: corenetReadout(meta.georef)
         },
@@ -968,18 +971,20 @@ export const get_model_info: Executor = (input, ctx) => {
 }
 
 /**
- * 2026-10-08 — one model's entry in the Coordinate-system card's note, as the assistant reads it:
- * why it could not be lined up — it states no map position while another model does, or it landed
- * far from the federation offset another model set — and how far, in kilometres. `null` when it
- * lines up.
+ * One model's entry in the Coordinate-system card's note, as the assistant reads it (2026-11-07):
+ * its file's own map position is not where the model is drawn — every model is drawn at its own
+ * file coordinates — by how far (kilometres, to a tenth of a metre) and how much turned. `null`
+ * when it is where it is drawn.
  */
 function lineUpOf(
   issue: NotLinedUp | undefined
-): { reason: 'it has no map position' | 'it sits far from the others'; km: number | null } | null {
+): { reason: 'its map position is not where its file places it'; km: number; turnedDeg: number } | null {
   if (!issue) return null
-  return issue.reason === 'far'
-    ? { reason: 'it sits far from the others', km: Math.round((issue.metres ?? 0) / 100) / 10 }
-    : { reason: 'it has no map position', km: null }
+  return {
+    reason: 'its map position is not where its file places it',
+    km: Math.round(issue.metres / 100) / 10,
+    turnedDeg: Math.round(issue.degrees * 10) / 10
+  }
 }
 
 /** Models `get_view_state` lists one by one. A federation has a handful; past this it says so. */
@@ -1014,14 +1019,16 @@ export const VIEW_MODEL_NAME_CHARS = 120
  * and since phase 3:
  *
  *   basePoint      the Coordinate-system card's four fields — E, N, Z in metres, `angle` the
- *                  true-north rotation in degrees — and `source`: `file` or `none`. Every
- *                  E / N / Z read-out is computed with it. (`user` too until 2026-10-08, when
- *                  the owner made the card read-only: the base point is the boot file's alone.)
+ *                  true-north rotation in degrees — `source`: `file` or `none`, and `model`:
+ *                  the loaded model they are read from (2026-11-07: picked whatever the load
+ *                  order). They are the file's declaration: the E / N / Z read-outs print world
+ *                  coordinates. (`user` too until 2026-10-08, when the card became read-only.)
  *
  * and since 2026-10-08:
  *
  *   notLinedUp     the loaded models the Coordinate-system card's note names — each one's key,
- *                  why it could not be lined up and how far — or `[]`
+ *                  and how far and how much turned its own map position is from where it is
+ *                  drawn — or `[]`
  *
  * `section` stays the one string it was (`grid C + level L2`): the evaluation suite grades it,
  * and `sectionPlanes` is where the detail is. It starts from `viewStateCore`, not from the
@@ -1097,19 +1104,23 @@ export interface BasePointState {
   /** True north, degrees clockwise from project north. */
   angle: number | null
   source: 'file' | 'none'
+  /** The loaded model the four fields are read from, or `null` when none states one. */
+  model: string | null
 }
 
 /**
  * `get_view_state`'s `basePoint` (2026-10-02). A field the file does not state is `null` — never
- * a zero, which would read as a coordinate. Since 2026-10-08 the four fields are always the boot
- * file's: the card is read-only and nothing can change them, so `source` is `file` or `none`.
+ * a zero, which would read as a coordinate. Since 2026-10-08 the four fields are always a file's:
+ * the card is read-only and nothing can change them, so `source` is `file` or `none`; since
+ * 2026-11-07 that file is `georefSourceOf`'s, named in `model`.
  */
 export const basePointState = (s: ShellState): BasePointState => ({
   E: s.coords.E,
   N: s.coords.N,
   Z: s.coords.Z,
   angle: s.coords.angle,
-  source: basePointSource(s.bootGeoref)
+  source: basePointSource(s.georefSource),
+  model: s.georefSourceKey
 })
 
 export const measure_between: Executor = (input, ctx) => {
@@ -1148,12 +1159,12 @@ export const measure_between: Executor = (input, ctx) => {
       boxGapMetres: { x: gap[0], y: gap[1], z: gap[2] },
       boxClearanceMetres: overlaps ? 0 : clearance,
       boxesOverlap: overlaps,
-      /** Both boxes are project-frame metres, Z-up, so `x` and `y` are the building's own axes. */
-      frame: 'project',
+      /** Both boxes are world metres, Z-up — the files' own coordinates, origin to origin. */
+      frame: 'world',
       // Said in structure as well as in the sentence, because the number is not a
       // surface-to-surface distance and a reader of the JSON alone must not take it for one.
       method:
-        'axis-aligned bounding boxes in the project frame — the union of each element’s placed part boxes, not solid geometry',
+        'axis-aligned bounding boxes in the files’ own world coordinates — the union of each element’s placed part boxes, not solid geometry',
       aBoxMetres: a.bbox,
       bBoxMetres: b.bbox
     }
@@ -1168,7 +1179,7 @@ export const measure_between: Executor = (input, ctx) => {
  * it — dominated the answer with no way to exclude it but another `WHERE`.
  *
  * It is box arithmetic and says so in the same words `measure_between` uses, because it is the
- * same arithmetic: the gap between two axis-aligned boxes in the project frame, never a
+ * same arithmetic: the gap between two axis-aligned boxes in world coordinates, never a
  * surface-to-surface distance.
  */
 export const find_nearby: Executor = (input, ctx) => {
@@ -1212,7 +1223,7 @@ export const find_nearby: Executor = (input, ctx) => {
   const noun = boxed.length === 1 ? boxed[0].name : `${boxed.length} elements`
   const head = `${total} element${total === 1 ? '' : 's'} within ${distance} m of ${noun}` +
     (withSpaces ? '' : ', IfcSpace excluded') +
-    `. Axis-aligned bounding boxes in the project frame, not solid geometry — neighbours to check, not contacts.` +
+    `. Axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — neighbours to check, not contacts.` +
     (truncated ? ` The ${items.length} nearest are listed.` : '') +
     (missing.length ? ` ${missing.length} of the ids given are not in the loaded federation.` : '') +
     (noBox.length ? ` ${noBox.length} of them carry no geometry and were skipped.` : '')
@@ -1236,9 +1247,9 @@ export const find_nearby: Executor = (input, ctx) => {
         gapMetres: n.gap,
         of: n.of
       })),
-      frame: 'project',
+      frame: 'world',
       method:
-        'axis-aligned bounding boxes in the project frame — the union of each element’s placed part boxes, not solid geometry. A gap of 0 means the boxes touch or overlap.'
+        'axis-aligned bounding boxes in the files’ own world coordinates — the union of each element’s placed part boxes, not solid geometry. A gap of 0 means the boxes touch or overlap.'
     },
     ui: { chips: items.length ? [{ label: `${total} within ${distance} m`, ids: items.map((n) => n.el.id) }] : [] }
   }

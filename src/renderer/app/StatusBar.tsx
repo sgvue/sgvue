@@ -8,8 +8,8 @@
  *   (plan §3.5 defect 4). The unit shown is that key, which the Markups card's mm / m toggle
  *   sets.
  * · `SVY21` — true of the design's own Singapore subject and a placeholder for any other file.
- *   `shared/georef.ts`'s `crsChip` names the `IfcProjectedCRS` the boot file declares (the store's
- *   `bootGeoref`, the declaration that defined the federation's frame), keeps the design's own
+ *   `shared/georef.ts`'s `crsChip` names the `IfcProjectedCRS` the Coordinate-system card's file
+ *   declares (the store's `georefSource`, picked whatever the load order), keeps the design's own
  *   chip when that CRS is SVY21 / EPSG:3414, and shows the em dash when there is none. (Until
  *   2026-10-08 a base point typed into the Coordinate-system card kept the design's chip too; the
  *   card is read-only since then.)
@@ -45,7 +45,7 @@ const LINK = 'font:400 11px/1 var(--mono);color:var(--accent-ink)'
 const CLEAR = 'font:500 11px/1 var(--sans);color:var(--accent-ink)'
 
 /** The store fields this component reads — it re-renders when one of them changes. */
-const KEYS = pick('stats', 'visibleCount', 'federation', 'units', 'bootGeoref')
+const KEYS = pick('stats', 'visibleCount', 'federation', 'units', 'georefSource')
 
 export default function StatusBar(): React.JSX.Element {
   const st = useShell(useShallow(KEYS))

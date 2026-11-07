@@ -413,6 +413,25 @@ describe('viewpoints', () => {
     expect(st().hidden).toEqual({})
   })
 
+  it('restores a viewpoint’s camera only when it was recorded in the identity frame (2026-11-07)', () => {
+    vi.stubGlobal('localStorage', memoryStorage())
+    const rec = recordViewer()
+    st().saveView()
+    const saved = st().views[0]
+    // Every viewpoint this build saves is in the files' own coordinates.
+    expect(saved.frame).toBe('identity')
+    // One a build before then saved under a boot model's P, or with no frame at all, restores
+    // all but its camera.
+    for (const frame of ['12345.457,23456.766,5.050@-43.4103', undefined]) {
+      rec.cameras.length = 0
+      st().restoreView({ ...saved, frame })
+      expect([frame, rec.cameras]).toEqual([frame, []])
+      expect(st().activeView).toBe(saved.id)
+    }
+    st().restoreView(saved)
+    expect(rec.cameras).toEqual([CAM])
+  })
+
   it('converts the card’s millimetres and its "level" to what the viewer wants', () => {
     vi.stubGlobal('localStorage', memoryStorage())
     const rec = recordViewer()

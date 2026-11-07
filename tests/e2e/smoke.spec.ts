@@ -9,14 +9,13 @@
  * which does not have it. Everything is asserted through what a person can see, plus the two
  * files `main/sessions.ts` writes.
  */
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ABOUT_STORY, SITE_URL } from '../../src/main/about'
 import { spotGridHtml } from '../../src/shared/annotate'
 import { signedF3 } from '../../src/shared/fmt'
-import { GEOREF_NOTE } from '../../src/shared/upload'
 import { BOTTOM_GAP, HINT_MIN } from '../../src/renderer/state/selectors/lanes'
 import {
   actionText,
@@ -62,21 +61,8 @@ test('opens on the landing page, under the production CSP, with the pinned prelo
     // No recents in a fresh profile, so the design's `hasSamples: false` branch.
     await expect(page.getByText('Recent', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Resume last session')).toHaveCount(0)
-    // 2026-10-09 — one line under the drop zone: the first model opened is the georeferencing
-    // reference. The drop zone caption's own style, a column gap below it, one or two lines.
-    const note = page.locator('[data-role="landing"] [data-role="georef-note"]')
-    await expect(note).toHaveText(GEOREF_NOTE)
-    const look = (l: Locator): Promise<string[]> =>
-      l.evaluate((e) => {
-        const c = getComputedStyle(e)
-        return [c.fontFamily, c.fontSize, c.fontWeight, c.lineHeight, c.color]
-      })
-    expect(await look(note)).toEqual(await look(page.getByText('.ifc · .ifcxml · .ifczip', { exact: true })))
-    const zone = (await page.getByText(DROP_COPY).locator('xpath=ancestor::label').boundingBox())!
-    const line = (await note.boundingBox())!
-    expect(line.x).toBeCloseTo(zone.x, 1)
-    expect(line.y - (zone.y + zone.height)).toBeCloseTo(22, 1)
-    expect(line.height).toBeLessThanOrEqual(2 * 12 * 1.4 + 0.5)
+    // 2026-11-07 — no georeferencing note: models line up origin to origin, whatever the order.
+    await expect(page.locator('[data-role="landing"] [data-role="georef-note"]')).toHaveCount(0)
 
     // 2 — the CSP meta tag, byte-identical to `electron.vite.config.ts`'s constant.
     const csp = await page.getAttribute('meta[http-equiv="Content-Security-Policy"]', 'content')
@@ -1437,20 +1423,22 @@ test('a spot shows its level only; a click on the tag shows E, N and Z, a second
 /**
  * 2026-10-08 — coordinates part 2. The Coordinate-system card is read-only (the owner: *"Maybe just
  * make the coordinates system toggle a read only, dont let user change anything."*), its caption
- * names the method that placed the boot file, and a one-line note under the caption names a
- * model that could not be lined up (the owner's choice: *"One-line note on screen"*). Two synthetic
- * fixtures that line up, then one of them beside `tiny.ifc`, which states no map position.
+ * names the method its file states, and a one-line note under the caption names a model — since
+ * 2026-11-07, origin to origin — whose own map position is not where its file coordinates put it
+ * (the owner's choice: *"One-line note on screen"*). The synthetic fixture (a), placed by its
+ * site, beside `tiny.ifc`, which states nothing — no note — then beside (b), the same building
+ * written as a map conversion over a site at the file's zero, which is named.
  */
-test('the Coordinate-system card is read-only, and names a model that could not be lined up', async () => {
+test('the Coordinate-system card is read-only, and names a model whose map position is not where it is drawn', async () => {
   const A = join(ROOT, 'tests/fixtures/georef/a-site-placement.ifc')
   const B = join(ROOT, 'tests/fixtures/georef/b-map-conversion.ifc')
   const caption = (page: Page) => page.locator('span', { hasText: /^project base point/ })
   const field = (page: Page, label: string) => page.locator('label', { hasText: label }).locator('input')
   const note = (page: Page) => page.locator('[data-role="coords-note"]')
 
-  // ── two files that line up: the file's base point, read-only, and no note ──
+  // ── a file placed by its site beside one that states nothing: (a)'s base point, read-only, and no note ──
   {
-    const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: `${A}:::${B}` })
+    const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: `${TINY}:::${A}` })
     try {
       await page.getByText(DROP_COPY).click()
       await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
@@ -1484,14 +1472,15 @@ test('the Coordinate-system card is read-only, and names a model that could not 
     }
   }
 
-  // ── one of them beside a file with no map position: the note, on one line, its title whole ──
+  // ── (b) beside (a), opened first: (b) is named, on one line, its title whole ──
   {
-    const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: `${A}:::${TINY}` })
+    const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: `${B}:::${A}` })
     try {
       await page.getByText(DROP_COPY).click()
       await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
       await page.locator('button[data-tip="Coordinate system & true north"]').click()
-      const text = 'tiny.ifc could not be lined up — it has no map position.'
+      const text =
+        "b-map-conversion.ifc's map position is 26.5 km from where its file places it — ask for a Shared Coordinates export."
       await expect(note(page)).toHaveText(text)
       await expect(note(page)).toHaveAttribute('title', text)
       const style = await note(page).evaluate((e) => {
@@ -1501,7 +1490,9 @@ test('the Coordinate-system card is read-only, and names a model that could not 
       expect(style.slice(0, 4)).toEqual(['nowrap', 'hidden', 'ellipsis', '12px'])
       // One line of 12 px text.
       expect(style[4]).toBeLessThan(20)
-      // The base point is still the boot file's, and still read-only.
+      // Both state the same base point; the card shows one file's — (a)'s, by key, though (b)
+      // was opened first — and it is still read-only.
+      await expect(caption(page)).toHaveText('project base point · IfcSite placement')
       await expect(field(page, 'Easting m')).toHaveValue('12345.457')
       await expect(field(page, 'Easting m')).toHaveAttribute('readonly', '')
     } finally {

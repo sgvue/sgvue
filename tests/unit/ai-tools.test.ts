@@ -846,10 +846,10 @@ describe('parity with the user — phase 2', () => {
     expect(d.startsWith('Move the camera to a named view and/or change projection.')).toBe(true)
     expect(d).toContain('Either argument may be given alone.')
     for (const said of [
-      'in degrees in the model’s project frame',
+      'in degrees in the model’s plan frame',
       'azimuth is the compass bearing the camera looks towards, clockwise from project north',
       '0 looks north, 90 east, 180 south, 270 west',
-      'project north is the model’s own +Y, not true north',
+      'project north is the plan’s +Y, which the app turns square with the loaded models’ gridlines',
       'elevation is how far it looks down from level: 0 level, 90 straight down, −90 straight up',
       'Either angle may be given alone and the other stays',
       'about what it is looking at, at its present distance',
@@ -1215,7 +1215,11 @@ describe('parity with the user — phase 3: the consent gate', () => {
     for (const said of [
       '(basePoint)',
       'E, N and Z in metres',
-      'file when the four are what the file states',
+      'file when the four are what a file states',
+      // 2026-11-07: whose they are, chosen whatever the load order, and never a placement.
+      'model, the loaded model they are read from',
+      'whatever the order they were opened in',
+      'no model is placed by it',
       // 2026-10-08: read-only, and the models the Coordinate-system card's note names.
       'nothing in the app can change it',
       '(notLinedUp)',
@@ -1485,7 +1489,7 @@ describe('parity with the user — phase 4: the Schedules window, and placing ma
     for (const said of [
       '"place_spot" and "place_measure" place one exactly as the user’s click with the spot tool or the laser meter does',
       'at: top, which is the default, centre or base',
-      'in the project-frame metres get_element reports a box in',
+      'in the world metres get_element reports a box in',
       // The brief's own requirement: it is the box, and the reply has to say so.
       'That box is axis-aligned and conservative, not a picked surface',
       'so report it as taken on the bounding box',

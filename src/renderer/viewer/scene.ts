@@ -21,6 +21,7 @@ import {
   Mesh,
   PCFShadowMap,
   PlaneGeometry,
+  Quaternion,
   Scene,
   Vector3,
   WebGPURenderer
@@ -31,6 +32,11 @@ import { THEMES } from './materials'
 import { DEVTOOLS } from '../dev/flags'
 
 export type Backend = 'WebGPU' | 'WebGL2'
+
+/** +Z, the axis the plan rotation turns about. */
+const PLAN_AXIS = new Vector3(0, 0, 1)
+/** The ground helper's own rotation: `rotation.x = π/2`, its Y-up grid laid in the XY plane. */
+const FLAT = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2)
 
 /**
  * What a caller may ask for. `'auto'` is what the app passes, and since 2026-09-17 it means
@@ -88,11 +94,11 @@ export const sceneScale = (bbox: Box3): number => {
 }
 
 /**
- * Where the ground stands (2026-10-01): at the **project frame's own zero** — `datumZ`, in scene
+ * Where the ground stands (2026-10-01): at the **files' own zero** — `datumZ`, in scene
  * coordinates — whenever the model's z range spans it, and otherwise at the **bottom** of that
  * range. Never at the top of it.
  *
- * Scene z = 0 is *not* that zero. The scene is the project frame less the whole-metre federation
+ * Scene z = 0 is *not* that zero. The scene is the files' own coordinates less the whole-metre federation
  * offset, and the offset's Z is the height of the first placement web-ifc happens to stream
  * (`worker/geometry-streamer.ts`) — near the file's zero in most exports, a member high in the
  * structure in a Tekla steel one. The ground stood at scene 0 until this rule, so such a file,
@@ -181,13 +187,18 @@ export interface SceneRig {
    * every rescale; both keep the flag, so it survives either.
    */
   setGroundGrid(on: boolean): void
+  /**
+   * 2026-11-07 — turn the fine ground grid by the plan rotation ρ (radians) about +Z, so its
+   * squares run with the building's grids; kept across a theme's rebuild of the helper.
+   */
+  setPlanRotation(rad: number): void
   /** Re-render the shadow map on the next frame. See `sun.shadow.autoUpdate` below. */
   invalidateShadows(): void
   dispose(): void
 }
 
 /**
- * `datumZ` is the project frame's own zero in scene coordinates — `0 − offset z`, which the
+ * `datumZ` is the files' own zero in scene coordinates — `0 − offset z`, which the
  * viewer holds — and is where the ground goes (`groundLevel`). It is 0 on the design's mock.
  */
 export function buildScene(
@@ -195,7 +206,8 @@ export function buildScene(
   materials: Materials,
   themeName: ThemeName,
   groundGrid = true,
-  datumZ = 0
+  datumZ = 0,
+  planRotation = 0
 ): SceneRig {
   const T = THEMES[themeName]
   const s = sceneScale(bbox)
@@ -272,6 +284,11 @@ export function buildScene(
 
   let gridHelper: GridHelper | null = null
   let gridOn = groundGrid
+  let plan = planRotation
+  /** Lay the helper flat (its own Y is up) and then turn it by ρ about the scene's +Z. */
+  const orient = (h: GridHelper): void => {
+    h.quaternion.setFromAxisAngle(PLAN_AXIS, plan).multiply(FLAT)
+  }
   const buildGridHelper = (name: ThemeName): void => {
     if (gridHelper) {
       scene.remove(gridHelper)
@@ -280,7 +297,7 @@ export function buildScene(
     }
     const t = THEMES[name]
     gridHelper = new GridHelper(240 * s, 120, t.grid1, t.grid2)
-    gridHelper.rotation.x = Math.PI / 2
+    orient(gridHelper)
     gridHelper.position.z = groundZ - 0.005 * s
     gridHelper.renderOrder = GRID_HELPER_ORDER
     gridHelper.visible = gridOn
@@ -298,6 +315,10 @@ export function buildScene(
       ;(scene.background as Color).set(THEMES[name].bg)
       buildGridHelper(name)
       sun.shadow.needsUpdate = true
+    },
+    setPlanRotation: (rad) => {
+      plan = rad
+      if (gridHelper) orient(gridHelper)
     },
     setGroundGrid: (on) => {
       gridOn = on

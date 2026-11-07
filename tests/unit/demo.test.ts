@@ -17,7 +17,6 @@ describe('the demo building', () => {
       expect(item.index.modelKey).toBe(key)
       expect(item.chunks.length).toBeGreaterThan(0)
       expect(item.offset).toEqual([0, 0, 0])
-      expect(item.frame).toBeNull()
     }
   })
 

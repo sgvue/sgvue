@@ -11,15 +11,12 @@
  *    constant rotation below is composed on the left of every placement and nothing else is
  *    rotated. Vertices are written in the geometry's own local space and the matrix carries
  *    the placement.
- *  · **The scene is the project frame.** A shared-coordinates export states its position and
- *    its rotation to true north on the spatial-root `IfcSite.ObjectPlacement`, so its world
- *    axes are map axes and the building stands at an angle to them. The inverse of the model's
- *    frame is composed on the left beside the axis swap, so everything downstream is square
- *    with the building. Since 2026-10-08 that frame is the model's own, M_i⁻¹ ∘ P
- *    (`shared/georef.ts`'s `modelFrame`): world → project is `P⁻¹ ∘ M_i`, through the model's
- *    own map conversion into map space and out into the boot model's project frame, so a model
- *    placed by its site and one placed by `IfcMapConversion` land together. This is still the
- *    only place the frames meet.
+ *  · **The scene is the file's own world coordinates** (2026-11-07, origin to origin, the way
+ *    Navisworks federates). Nothing a file declares about the map moves or turns it: the
+ *    placement web-ifc hands back — the `IfcSite` placement included — is what is drawn, so a
+ *    model's geometry is a function of its file alone and of the shared whole-metre offset,
+ *    never of which model was opened first. (From 2026-09-20 to then a frame was composed here,
+ *    the boot model's project frame and, from 2026-10-08, each model's map position against it.)
  *  · **Nothing stays on the wasm heap.** Every vertex and index array is `.slice()`d and
  *    every placement vector freed inside `ifc-source.ts` before this file sees it.
  *  · **Placements are composed in Float64.** Revit shared coordinates routinely put a model
@@ -37,7 +34,6 @@
  * (`design-reference/design/viewer-core.js:73`), so the face is still shaded correctly, and
  * reversing the winding would mean a second copy of a shared, instanced index buffer.
  */
-import { worldToProjectMatrix, type ProjectFrame } from '../shared/georef'
 import {
   EDGE_THRESHOLD_DEGREES,
   type FederationOffset,
@@ -54,9 +50,7 @@ export const PARTS_PER_CHUNK = 5000
 /** Vertices per chunk. */
 export const VERTICES_PER_CHUNK = 1_000_000
 
-/** A model's bbox centre further than this from the offset raises `farPlacement`. */
-export const FAR_PLACEMENT_METRES = 5_000
-/** Coordinates further than this from the project frame's origin raise `precision`. */
+/** Coordinates further than this from the file's own origin raise `precision`. */
 export const PRECISION_METRES = 10_000
 
 type Box6 = [number, number, number, number, number, number]
@@ -99,20 +93,6 @@ export function toZUp(m: ArrayLike<number>, out: Float64Array): Float64Array {
     out[c * 4 + 1] = -z
     out[c * 4 + 2] = y
     out[c * 4 + 3] = m[c * 4 + 3]
-  }
-  return out
-}
-
-/** `a × b`, both column-major 4×4, into `out`. `out` may not alias either input. */
-function multiply4(a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array): Float64Array {
-  for (let c = 0; c < 4; c++) {
-    const b0 = b[c * 4]
-    const b1 = b[c * 4 + 1]
-    const b2 = b[c * 4 + 2]
-    const b3 = b[c * 4 + 3]
-    for (let r = 0; r < 4; r++) {
-      out[c * 4 + r] = a[r] * b0 + a[4 + r] * b1 + a[8 + r] * b2 + a[12 + r] * b3
-    }
   }
   return out
 }
@@ -296,23 +276,10 @@ export interface GeometryStreamOptions {
    * translation rounded to whole metres becomes the offset, and the summary reports it so
    * the renderer can hand it to every later model.
    *
-   * It is chosen **after** the project frame is applied, so it is stated in the frame the
-   * scene, the grids, the storey ladder and every readout use.
+   * It is chosen after the Y-up → Z-up swap, so it is stated in the files' own Z-up world
+   * coordinates, which the grids, the storey ladder and every readout use too.
    */
   offset: FederationOffset | null
-  /**
-   * This model's frame, project → its own world: `modelFrame(boot, georef)`, M_i⁻¹ ∘ P, where
-   * P is the federation's frame — the boot model's project frame in map coordinates — and M_i
-   * this model's own world → map operation (2026-10-08). Its inverse is composed on the left of
-   * every placement, so the scene comes out in the frame the boot building was drawn in, with
-   * this model where its own declaration puts it on the map. `null` is the identity.
-   *
-   * The caller owns it (`renderer/model/federation-store.ts`), exactly as it owns the offset:
-   * the boot model fixes P, and each model's frame is computed against it. For a model whose map
-   * operation is the boot model's own — the identity for both, on a Revit "Shared Coordinates"
-   * federation — it is the boot model's site frame itself, exactly as before.
-   */
-  frame: ProjectFrame | null
   /** Called once per chunk with the buffers that may be transferred rather than copied. */
   onChunk: (chunk: GeometryChunk, transfer: ArrayBuffer[]) => void
 }
@@ -519,9 +486,6 @@ export function streamGeometry(
 
   // Reused across every placement; `take` is synchronous and never re-enters.
   const composed = new Float64Array(16)
-  const zUp = new Float64Array(16)
-  /** World → project, or `null` when the two frames coincide and nothing is composed. */
-  const toProjectM = worldToProjectMatrix(options.frame)
 
   const take = (mesh: MeshRecord, isSpace: boolean): void => {
     meshes++
@@ -530,19 +494,17 @@ export function streamGeometry(
       if (m.length < 16) continue
 
       /*
-       * frame⁻¹ × R × flatTransformation, in Float64: out of web-ifc's Y-up frame into IFC
-       * Z-up, and out of the file's world coordinates — through its map position — into the
-       * frame the boot building was drawn in. Then T(−offset), which for a column-major
-       * matrix is just the offset taken off the translation column — the rotation and scale
-       * stay untouched and only the large numbers shrink. Written out through a Float32Array
-       * so `matrix16` holds what the GPU will see.
+       * R × flatTransformation, in Float64: out of web-ifc's Y-up frame into IFC Z-up, in the
+       * file's own world coordinates. Then T(−offset), which for a column-major matrix is just
+       * the offset taken off the translation column — the rotation and scale stay untouched and
+       * only the large numbers shrink. Written out through a Float32Array so `matrix16` holds
+       * what the GPU will see.
        */
-      if (toProjectM) multiply4(toProjectM, toZUp(m, zUp), composed)
-      else toZUp(m, composed)
+      toZUp(m, composed)
 
       // The first placement of the first model fixes the offset, rounded to whole metres so
-      // it is exact and reproducible run to run. Chosen **after** the swap and the frame, so
-      // it is stated in the project frame the grids, storeys and every readout use.
+      // it is exact and reproducible run to run. Chosen **after** the swap, so it is stated in
+      // the Z-up world coordinates the grids, storeys and every readout use.
       offset ??= [
         Math.round(composed[12]),
         Math.round(composed[13]),
@@ -622,19 +584,7 @@ export function streamGeometry(
   const bbox6: Box6 | null = empty ? null : [minX, minY, minZ, maxX, maxY, maxZ]
   const warnings: GeometryWarning[] = []
   if (bbox6) {
-    // Recentred coordinates, so the distance from the offset is the distance from zero.
-    const cx = (bbox6[0] + bbox6[3]) / 2
-    const cy = (bbox6[1] + bbox6[4]) / 2
-    const cz = (bbox6[2] + bbox6[5]) / 2
-    const away = Math.hypot(cx, cy, cz)
-    if (away > FAR_PLACEMENT_METRES) {
-      warnings.push({
-        kind: 'farPlacement',
-        detail: `${(away / 1000).toFixed(2)} km from the federation offset`,
-        metres: away
-      })
-    }
-    // Back in the project frame's own coordinates: how far the vertices sit from its origin.
+    // Back in the file's own coordinates: how far the vertices sit from its origin.
     const [ox, oy, oz] = offset ?? [0, 0, 0]
     const local = Math.max(
       Math.abs(bbox6[0] + ox),
@@ -657,7 +607,6 @@ export function streamGeometry(
     modelKey,
     offset: offset ?? [0, 0, 0],
     offsetFromThisModel,
-    frame: options.frame,
     warnings,
     coordinationMatrix: src.coordinationMatrix(modelID),
     chunks,

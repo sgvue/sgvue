@@ -50,6 +50,10 @@ named so each trap can be traced to its original write-up.
   Coordinate-system card fills with zeros. Take the **composed matrix's X column** for the
   rotation (`atan2(m[1], m[0])`), check it really is a rotation about `+Z` before believing it,
   and undo the whole placement once in the geometry pipeline. — 2026-09-20
+  *(Amended 2026-11-07: the placement is no longer undone — models are drawn origin to origin at
+  their files' own coordinates — and the 43° is taken out of the **camera** instead: the plan
+  rotation, the grids' own dominant direction, turns the plan frame, the named views, the cube
+  and every plan rectangle (`shared/plan-rotation.ts`). Never turn a model to square it.)*
 - **`IfcMapConversion.Scale` cannot be read as an instruction: its direction depends on who wrote
   the file, and when.** For the same millimetre model in a metre CRS, Revit's exporter wrote it
   absent (up to its 25.x releases), 0.001 (26.1 to 27.0.x) and 1000 (27.3.0.12, August 2026 —
@@ -74,7 +78,9 @@ named so each trap can be traced to its original write-up.
   no EPSG code (its Survey Point, Project Base Point and Internal Origin exports) and in every
   IFC2X3 export — the turn only in `TrueNorth` for the last two. So `shared/georef.ts`'s
   `mapPlacement` applies it, once: a reader that ignores it puts those files at their local
-  origin. IfcOpenShell's `get_local_placement` ignores it too, and its `auto_xyz2enh` returns a
+  origin. *(Amended 2026-11-07: nothing applies it any more — such a file is drawn at its local
+  origin on purpose, origin to origin, and the Coordinate-system card's note names it;
+  `mapPlacement` only reads it.)* IfcOpenShell's `get_local_placement` ignores it too, and its `auto_xyz2enh` returns a
   file with no map conversion unmoved; beside a conversion it undoes the WCS first, which is the
   reading taken for that pair. If an upgrade starts applying it, the test in
   `tests/unit/georef-federation.fixture.test.ts` fails before the position is added twice.
@@ -94,6 +100,15 @@ named so each trap can be traced to its original write-up.
   offset was used) looked right. The file's own zero is scene `0 − offset z`, and the ground is
   `groundLevel(datum, box min z, box max z)` (`viewer/scene.ts`). Anything that means "grade"
   reads `rig.groundZ`; anything that means "the file's zero" subtracts the offset. — 2026-10-01
+- **A floating-point sum is not order-free, so a number that must not depend on load order is
+  summed in a canonical order.** The plan rotation is a length-weighted mean over every loaded
+  model's grids; summed in load order it differs in the last bits from one order to the next,
+  and a camera turned by it then is not the same camera. Its votes are sorted by model key, grid
+  name and endpoints before they are added (`shared/plan-rotation.ts`). — 2026-11-07
+- **The box of a turned building's world boxes is far larger than the building.** A 120 m wall
+  at 43° has an 88 × 82 m world box; turn those boxes' corners back and it spans ±60 m across
+  the wall. A plan-frame box has to come from the vertices (`viewer-core.ts`, `planBoxOf`). —
+  2026-11-07
 
 **Properties**
 

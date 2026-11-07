@@ -26,7 +26,7 @@ import { chatSchema, chatViewState, type CameraPose } from '../../shared/ai-sche
 import { visFn } from '../../shared/rules'
 import { gateOf, isViewTool } from '../../shared/tool-schemas'
 import { federation } from '../model/federation-store'
-import { getViewer, useShell } from '../state/shell'
+import { getViewer, planRotationRad, useShell } from '../state/shell'
 import { authorOf, plainOf } from '../state/selectors/chat'
 import type { TurnSnapshot } from '../state/selectors/snapshot'
 import { executeTool, newTurnState, type ToolContext, type TurnState } from './executors'
@@ -180,7 +180,11 @@ let live: LiveTurn | null = null
  * Where the camera stands, for the per-turn view state (2026-10-02): the viewer's own, since the
  * store does not hold it — or `null` before there is a viewer.
  */
-const cameraPose = (): CameraPose | null => getViewer()?.getCamera() ?? null
+const cameraPose = (): CameraPose | null => {
+  const cam = getViewer()?.getCamera()
+  // Said against project north — the plan rotation's +Y (2026-11-07).
+  return cam ? { ...cam, rho: planRotationRad(useShell.getState()) } : null
+}
 
 /** The schema is a cache breakpoint, so it is sent only when the federation has changed. */
 let sentSchemaFor = ''

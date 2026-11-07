@@ -9,36 +9,27 @@
  *
  * So this module is the design's `toMap` plus the readings the prototype had no data for.
  *
- * **The design assumes the scene *is* the project frame** — `toMap` rotates a scene point by
- * `angle` and adds the base point, the compass tick sits at `(sin a, cos a)` (`:671`), and the
- * card's own note says "True north is measured clockwise from project north". A real Revit
- * export does not oblige: the CORENET X convention puts the position **and the rotation** on
- * `IfcSite.ObjectPlacement`, so the file's world coordinates are already map-aligned and the
- * building stands at 43° to them. Rendering those world coordinates leaves every axis-aligned
- * thing the app draws — level rings, grid-bubble clipping, laser axes, dimension lines, the
- * bounding box's Length and Width, the N/S/E/W views — rotated off the building.
+ * **The scene is every file's own world coordinates** (2026-11-07, the owner: *"only focus on
+ * the internal origin of the model like how Naviswork do"*). Each model is drawn where
+ * `flatTransformation` puts it — its `IfcSite` placement included, which web-ifc applies — and
+ * nothing a file declares about the map (`IfcMapConversion`, `ePset_MapConversion`, the context's
+ * `WorldCoordinateSystem`, `TrueNorth`) moves or turns any model. Models line up origin to origin,
+ * so nothing depends on which file was opened first. Before that date the scene was the boot
+ * model's project frame in map coordinates (P = M_boot ∘ Site_boot) and each model was streamed
+ * through M_i⁻¹ ∘ P; that is gone, and with it `federationFrame`, `modelFrame` and
+ * `worldToProjectMatrix`.
  *
- * `projectFrame()` below is what puts that right: the site placement, read as the
- * **project → world** transform, so the geometry pipeline can undo it once
- * (`worker/geometry-streamer.ts`, the one place the frames meet) and everything downstream is
- * back in the frame the design assumes. The angle the design wants is then the *total*
- * rotation from project north to true north, which is what `coordsFromGeoref` composes.
+ * Georeferencing is still **read and reported**: `mapPlacement` says how a file would place
+ * itself on the map, `coordsFromGeoref` reads its project base point for the Coordinate-system
+ * card, and `mapShift` measures how far that placement is from where the file's own coordinates
+ * put it — the card's one-line note names a model for which it is not nothing. A readout that
+ * prints map coordinates prints world coordinates (`readoutCoords`), which are the map
+ * coordinates of every model the note does not name.
  *
- * **Since 2026-10-08 the federation is assembled in map space.** One exporter writes a model's
- * map position on its site placement, another in an `IfcMapConversion` over a site at the
- * file's zero — both compliant, and kilometres apart when drawn by world coordinates. So each
- * model gets its own world → map operation from its own declaration (`mapPlacement`), the
- * federation's frame is the boot model's project frame expressed in map coordinates
- * (`federationFrame`, P = M_boot ∘ Site_boot), and each model is streamed through
- * `modelFrame` — M_i⁻¹ ∘ P, project → that model's world — which keeps `ProjectFrame`'s shape,
- * so the streamer, `worldToProjectMatrix` and `toProject` are unchanged. `coordsFromGeoref` is
- * P read as a base point, so every map readout and the geometry come from the same numbers.
- *
- * And the same day, rule 4: a model with no map conversion whose 3D `Model` context has a
- * `WorldCoordinateSystem` that is not the identity is placed by it — that is where Revit writes
- * the map position when it writes no EPSG code, and in every IFC2X3 export — with the rotation
- * the context's `TrueNorth` implies when nothing else states one. web-ifc 0.0.77 applies the
- * `WorldCoordinateSystem` to nothing (`docs/TRAPS.md`), so `mapPlacement` is where it is applied.
+ * Rule 4 (2026-10-08) still holds for the reading: a model with no map conversion whose 3D
+ * `Model` context has a `WorldCoordinateSystem` that is not the identity states its map position
+ * there. web-ifc 0.0.77 applies the `WorldCoordinateSystem` to nothing (`docs/TRAPS.md`), so such
+ * a file is drawn at its local origin — and named by the note.
  *
  * Everything here is arithmetic on plain objects, so `tests/unit/georef.test.ts` can check it
  * against hand-computed literals with no file, no worker and no GPU.
@@ -64,9 +55,10 @@ export interface BasePoint {
 export const isLocated = (c: BasePoint): boolean => c.E != null && c.N != null && c.Z != null
 
 /**
- * `viewer-core.js` L409. A point in the **project** frame → map coordinates.
- * `null` when the file states no base point, which is what makes every readout show `DASH`
- * instead of a number nobody authored.
+ * `viewer-core.js` L409. A point → map coordinates through a base point.
+ * `null` when the base point is not located, which is what makes every readout show `DASH`
+ * instead of a number nobody authored. Since 2026-11-07 every readout passes world coordinates
+ * and `readoutCoords(…)`, so a located readout is the world point itself.
  */
 export function toMap(
   c: BasePoint,
@@ -80,6 +72,20 @@ export function toMap(
   const sin = Math.sin(a)
   return { E: c.E! + x * cos - y * sin, N: c.N! + x * sin + y * cos, Z: c.Z! + z }
 }
+
+const UNLOCATED: BasePoint = { E: null, N: null, Z: null, angle: null }
+const WORLD: BasePoint = { E: 0, N: 0, Z: 0, angle: 0 }
+
+/**
+ * What every map readout goes through (2026-11-07): the spot tags, the laser's map rows, the
+ * property card's Centroid, the assistant's `boxCentreMap` and the compass. The scene is the
+ * files' own world coordinates, so a readout prints a **world** point, unturned, and the compass
+ * puts north on world `+Y` — which is the map, for every model the Coordinate-system card's note
+ * does not name. It prints them only while the card's base point `c` is located — some loaded
+ * file states where it is — and the design's em dash otherwise, as before: a federation that
+ * states no map position has no map coordinates to print.
+ */
+export const readoutCoords = (c: BasePoint): BasePoint => (isLocated(c) ? WORLD : UNLOCATED)
 
 /* ────────────────────────────── the project frame ────────────────────────────── */
 
@@ -258,10 +264,11 @@ export function projectFrame(g: Georeference | null | undefined): ProjectFrame |
   }
 }
 
-/* ────────────────────────────── map space (2026-10-08) ────────────────────────────── */
+/* ──────────────────── a file's map position, as read (2026-10-08) ──────────────────── */
 
 /**
- * How one model was put into map coordinates — `get_model_info`'s `placedBy`:
+ * How one model's file places it in map coordinates — `get_model_info`'s `placedBy`. Since
+ * 2026-11-07 this is a reading only: no model is drawn through it.
  *
  *  · `IfcMapConversion` / `ePset_MapConversion` — its map conversion moves it (IFC4's entity,
  *    or IFC2X3's property set), composed over its site placement;
@@ -329,9 +336,10 @@ export interface MapPlacement {
 }
 
 /**
- * **The one function that says where a model is in map space** (2026-10-08) — the geometry
- * (`modelFrame`), the grids and storeys (`federation-store.ts`'s `metaOf`, through the same
- * frame), the base point (`coordsFromGeoref`) and `get_model_info` all read it.
+ * **The one function that says where a file puts itself on the map** (2026-10-08) — the base
+ * point (`coordsFromGeoref`), the Coordinate-system card's note (`mapShift`) and `get_model_info`
+ * all read it. Since 2026-11-07 nothing is drawn through it: the scene is the files' own world
+ * coordinates, origin to origin.
  *
  * Five rules, each the owner's:
  *
@@ -424,68 +432,14 @@ export function invertFrame(f: ProjectFrame | null): ProjectFrame | null {
   return { origin: toProject(f, 0, 0, 0), rotationDeg: normaliseDeg(-f.rotationDeg) }
 }
 
-const sameFrame = (a: ProjectFrame | null, b: ProjectFrame | null): boolean =>
-  a === b ||
-  (!!a &&
-    !!b &&
-    a.rotationDeg === b.rotationDeg &&
-    a.origin[0] === b.origin[0] &&
-    a.origin[1] === b.origin[1] &&
-    a.origin[2] === b.origin[2])
-
 /**
- * **P** — the federation's frame: the boot model's project frame expressed in map coordinates,
- * `M_boot ∘ Site_boot`, project → map. It is what the scene stands square with, what
- * `frameKey` marks a camera with, and what the base point describes.
- *
- * For a boot model whose map operation is the identity — every Revit "Shared Coordinates"
- * export, the reference model, the design's mock — it **is** the site frame, not recomputed,
- * so its `frameKey` is exactly what it was before 2026-10-08. A boot model placed by a map
- * conversion gets a new one, and a camera saved against it restores as any other camera from
- * another frame does: everything but the camera.
+ * The scene's frame key — what a session, a share link and a saved viewpoint record beside their
+ * camera. Since 2026-11-07 the scene is every file's own world coordinates minus the whole-metre
+ * offset, for every federation, so this is the only key this build writes. A payload recorded
+ * under another key — the boot model's P before that date, `x,y,z@angle` — or under none at all
+ * points its camera into another scene, and restores everything but the camera.
  */
-export function federationFrame(boot: Georeference | null | undefined): ProjectFrame | null {
-  return composeFrames(mapPlacement(boot).operation, projectFrame(boot))
-}
-
-/**
- * **frame_i** — project → model i's own world, `M_i⁻¹ ∘ P`: what `geometry-streamer.ts`
- * composes the inverse of on the left of every placement of model i, and what its grids and
- * storeys go through. World → project is then `P⁻¹ ∘ M_i`, so every model lands where its own
- * declaration puts it on the map, read in the boot model's project frame.
- *
- * When model i's operation is the boot model's own, number for number — the identity with the
- * identity included — `M_i⁻¹ ∘ M_boot` is the identity and is not computed: the frame is the
- * boot model's site frame itself. So the boot model, and every model placed the way it is,
- * streams exactly as it did when the federation was assembled by world coordinates.
- */
-export function modelFrame(
-  boot: Georeference | null | undefined,
-  g: Georeference | null | undefined
-): ProjectFrame | null {
-  const own = mapPlacement(g).operation
-  if (sameFrame(own, mapPlacement(boot).operation)) return projectFrame(boot)
-  return composeFrames(invertFrame(own), federationFrame(boot))
-}
-
-/** `identity` for no frame, else a stable string — the session's "same frame?" marker. */
 export const IDENTITY_FRAME_KEY = 'identity'
-
-/**
- * What a session, a share link and a saved viewpoint record beside their camera — since
- * 2026-10-08 the key of P, `federationFrame` (unchanged for a boot model whose map operation is
- * the identity).
- *
- * The camera is stored in **scene** coordinates, and the scene is the project frame minus the
- * federation offset — so a payload written before this frame existed, or against a different
- * boot model, points the camera somewhere else entirely. Three decimals is a millimetre on the
- * origin and 1e-4° on the angle, which is the precision the base point itself is kept to.
- */
-export function frameKey(f: ProjectFrame | null | undefined): string {
-  if (!f) return IDENTITY_FRAME_KEY
-  const [x, y, z] = f.origin
-  return `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}@${f.rotationDeg.toFixed(4)}`
-}
 
 /** World → project: subtract the origin, then turn back by `−rotationDeg`. */
 export function toProject(
@@ -517,23 +471,80 @@ export function toWorld(
   return [f.origin[0] + x * cos - y * sin, f.origin[1] + x * sin + y * cos, f.origin[2] + z]
 }
 
+/* ─────────────────── where the map would put a model (2026-11-07) ─────────────────── */
+
 /**
- * The same world → project transform as a column-major 4×4, for `geometry-streamer.ts` to
- * compose on the left of every placement. `null` keeps the streamer's old code path exactly.
+ * How far a model's own georeferencing would move it from where its file's coordinates put it:
+ * `metres`, the displacement of `centre` — the centre of the box of what the model draws, in its
+ * world coordinates — under `mapPlacement(g)`'s operation, and `degrees`, the operation's turn.
+ * Both 0 for a file whose map operation is the identity: a Revit "Shared Coordinates" export, a
+ * file that states nothing, one whose conversion moves nothing.
  */
-export function worldToProjectMatrix(f: ProjectFrame | null | undefined): Float64Array | null {
-  if (!f) return null
-  const a = (-f.rotationDeg * Math.PI) / 180
-  const cos = Math.cos(a)
-  const sin = Math.sin(a)
-  const [ox, oy, oz] = f.origin
-  // R(−a) × T(−origin): the rotation columns, then the rotated negative origin.
-  return new Float64Array([
-    cos, sin, 0, 0,
-    -sin, cos, 0, 0,
-    0, 0, 1, 0,
-    -ox * cos + oy * sin, -ox * sin - oy * cos, -oz, 1
-  ])
+export interface MapShift {
+  metres: number
+  degrees: number
+}
+
+export function mapShift(
+  g: Georeference | null | undefined,
+  centre: readonly [number, number, number]
+): MapShift {
+  const op = mapPlacement(g).operation
+  if (!op) return { metres: 0, degrees: 0 }
+  const [x, y, z] = toWorld(op, centre[0], centre[1], centre[2])
+  return {
+    metres: Math.hypot(x - centre[0], y - centre[1], z - centre[2]),
+    degrees: Math.abs(normaliseDeg(op.rotationDeg))
+  }
+}
+
+/**
+ * Past either of these a model's map position is not where it is drawn, and the Coordinate-system
+ * card's note names it. A metre and a tenth of a degree are far above what an exporter's rounding
+ * or Revit's `(1, 6.12e-17)` X axis leave (nanometres, 1e-15°), and far below what a map position
+ * written somewhere the file's coordinates are not actually moves a model — kilometres, and whole
+ * degrees, on every case seen. A tenth of a degree is 17 cm at 100 m: a turn the eye catches
+ * against a neighbour's grid, where a hundredth would be lost in the drawing.
+ */
+export const MAP_SHIFT_METRES = 1
+export const MAP_TURN_DEGREES = 0.1
+
+export const mapMisplaced = (shift: MapShift): boolean =>
+  shift.metres > MAP_SHIFT_METRES || shift.degrees > MAP_TURN_DEGREES
+
+/* ──────────────────── whose base point the card shows (2026-11-07) ──────────────────── */
+
+/**
+ * The loaded model whose georeferencing the Coordinate-system card shows — its four fields, its
+ * caption's method, the CRS chips — and `get_view_state`'s `basePoint` reports. It has one set of
+ * fields, so it needs one model, chosen without regard to load order: of the models whose file
+ * states a georeferencing method (`method` is not `none`), else of those that state anything at
+ * all (a base point, a height, a north, a CRS), the one with the most elements — the main
+ * building, in any federation of a building and its services — ties broken by model key. `null`
+ * when no loaded model states anything. Recomputed whenever the federation changes.
+ */
+export function georefSourceOf<
+  M extends { modelKey: string; georef: Georeference; counts: { elements: number } }
+>(models: readonly M[]): M | null {
+  const rank = (m: M): number =>
+    m.georef.method !== 'none' ? 2 : coordsFromGeoref(m.georef) || crsNames(m.georef).length ? 1 : 0
+  let best: M | null = null
+  let bestRank = 0
+  for (const m of models) {
+    const r = rank(m)
+    if (!r) continue
+    const better =
+      !best ||
+      r > bestRank ||
+      (r === bestRank &&
+        (m.counts.elements > best.counts.elements ||
+          (m.counts.elements === best.counts.elements && m.modelKey < best.modelKey)))
+    if (better) {
+      best = m
+      bestRank = r
+    }
+  }
+  return best
 }
 
 /* ────────────────────────────── the project base point ────────────────────────────── */
@@ -556,23 +567,22 @@ const deg4 = (v: number): number => Math.round(v * 1e4) / 1e4
  * present-but-zero map conversion first and handed the card 0 / 0 / 0 / 0 for a file whose
  * position and 43° rotation were sitting on its site.
  *
- * Since 2026-10-08 the numbers **are** `federationFrame(g)` — P, the frame the geometry is
- * placed with — read as a base point: the same map operation (`mapPlacement`), so E, N and Z
- * carry the same map unit u the geometry does, and `IfcMapConversion.Scale` is not applied
- * here either. The base point a federation shows is its boot model's
- * (`renderer/model/federation-store.ts`), so it describes the frame the whole scene is in.
- * What stays this function's own is the reading of what a file *states*: a field nothing
- * states stays blank, as before.
+ * Since 2026-10-08 the numbers are M ∘ Site — the file's map operation (`mapPlacement`) over its
+ * site placement — read as a base point, so E, N and Z carry the map unit u, and
+ * `IfcMapConversion.Scale` is not applied here either. It is what the file **declares**: since
+ * 2026-11-07 no geometry is placed with it, and the base point the card shows is the one of
+ * `georefSourceOf`'s model. What stays this function's own is the reading of what a file
+ * *states*: a field nothing states stays blank, as before.
  *
  * When nothing states a rotation but the Model context declares a `TrueNorth` that is not
  * `(0, 1)`, that direction is the angle — it is stated in the project frame once neither
  * transform rotates. It is only ever a readout: it never moves geometry, and a map conversion
  * and a `TrueNorth` that disagree are resolved in the map conversion's favour, because it is
- * what the E / N readouts and the geometry are computed with.
+ * what the E / N of the base point are computed with.
  *
  * Rule 4 (2026-10-08): a `WorldCoordinateSystem` that is the map position states E, N and Z, and
- * — through its own turn, or the `TrueNorth` turn `mapPlacement` put into P — the angle; both are
- * P's, so a file placed that way reads exactly as the geometry stands.
+ * — through its own turn, or the `TrueNorth` turn `mapPlacement` put into the operation — the
+ * angle.
  *
  * `null` means "leave every field blank" — the card renders empty fields, never a default.
  *
@@ -587,7 +597,7 @@ export function coordsFromGeoref(g: Georeference | null | undefined, per = 1): B
 
   const frame = projectFrame(g)
   const placed = mapPlacement(g)
-  const p = federationFrame(g)
+  const p = composeFrames(placed.operation, frame)
   const [pE, pN, pZ] = p ? p.origin : [0, 0, 0]
   const mapRot = mapRotationDeg(g)
   // `frame.rotationDeg` is always a number, because the geometry transform needs one; here the
@@ -598,7 +608,7 @@ export function coordsFromGeoref(g: Georeference | null | undefined, per = 1): B
   const byWcs = placed.placedBy === 'WorldCoordinateSystem'
   const wcsRot = placed.wcs && placed.wcs.rotationDeg !== 0 ? placed.wcs.rotationDeg : null
 
-  // The project origin on the map: P's own origin.
+  // The project origin on the map: M ∘ Site's own origin.
   const hasPlan = num(g.eastings) != null || num(g.northings) != null || frame != null || byWcs
   const E = hasPlan ? mm(pE / per) : null
   const N = hasPlan ? mm(pN / per) : null

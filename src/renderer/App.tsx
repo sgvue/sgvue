@@ -45,6 +45,7 @@ import { el } from './dom'
 import { DEVTOOLS } from './dev/flags'
 import { onKey } from './state/keys'
 import { lastDrawCalls, useShell, type ShellState, type UploadRow } from './state/shell'
+import { readoutCoords } from '../shared/georef'
 import { clampCtxX } from './state/selectors/ctx'
 import { abar, brow, cardTopFrom, rlane } from './state/selectors/lanes'
 import { hasActionBar, sceneSummary } from './state/selectors/status'
@@ -154,7 +155,7 @@ function useShellHost(): {
       viewer.setGrids(st.grids)
       viewer.setLevels(st.levels)
       viewer.setGroundGrid(st.groundGrid)
-      viewer.setCoords(st.coords)
+      viewer.setCoords(readoutCoords(st.coords))
       viewer.setUnits(st.units)
       viewer.setTool(st.tool)
       viewer.setModelColors(st.modelColors, st.nativeMats)
@@ -310,8 +311,9 @@ async function installDevTools(viewer: Viewer): Promise<void> {
     hint: () => shell().hint,
     setTool: (t: 'select' | 'measure' | 'spot') => viewer.setTool(t),
     setSnap: (b: boolean) => viewer.setSnap(b),
-    // No `setCoords` since 2026-10-08: the base point is the boot file's, read-only, and the store
-    // pushes it to the viewer (`setOffset`) — a hook that set the viewer's alone would split them.
+    // No `setCoords` since 2026-10-08: the base point is a loaded file's, read-only, and the store
+    // pushes the readouts to the viewer (`commitModels`) — a hook that set the viewer's alone
+    // would split them.
     /**
      * Phase 7. The design gives colour-by-property no manual control — only the assistant's
      * `color_by_property` tool sets it (`SGVue.dc.html:1547`), which is Phase 9 — so the

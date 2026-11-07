@@ -210,15 +210,10 @@ describe('geometry rows', () => {
     expect(geoRows(box([0, 0, 0], [1, 1, 1]), 3, GEOREF, [0, 0, 0])[5].v).toBe('3 solids')
   })
 
-  it('places the centroid with the file’s own base point and rotation', () => {
-    const [E, N, Z] = [GEOREF.E!, GEOREF.N!, GEOREF.Z!]
-    const a = (GEOREF.angle! * Math.PI) / 180
-    // Centre of the box below is (1, 2, 1.5).
-    const want =
-      `${(E + 1 * Math.cos(a) - 2 * Math.sin(a)).toFixed(3)} E · ` +
-      `${(N + 1 * Math.sin(a) + 2 * Math.cos(a)).toFixed(3)} N · ` +
-      `${(Z + 1.5).toFixed(3)} Z`
-    expect(geoRows(box([0, 0, 0], [2, 4, 3]), 1, GEOREF, [0, 0, 0])[4].v).toBe(want)
+  it('prints the centroid in the file’s own world coordinates while a file states a base point (2026-11-07)', () => {
+    // The scene is the files' own coordinates, so the centroid is not carried through the base
+    // point any more: the box below is centred on (1, 2, 1.5), and that is what it reads.
+    expect(geoRows(box([0, 0, 0], [2, 4, 3]), 1, GEOREF, [0, 0, 0])[4].v).toBe('1.000 E · 2.000 N · 1.500 Z')
   })
 
   it('shows the em dash when the file is not georeferenced — never a typed-in origin', () => {
@@ -236,13 +231,8 @@ describe('geometry rows', () => {
     expect(rows[0].v).toBe('2 000 mm × 4 000 mm × 3 000 mm')
     // … while base / top come back to the storey ladder's own frame.
     expect(rows[3].v).toBe('3 000 mm → 6 000 mm')
-    const a = (GEOREF.angle! * Math.PI) / 180
-    const [cx, cy] = [12521, 23188]
-    expect(rows[4].v).toBe(
-      `${(GEOREF.E! + cx * Math.cos(a) - cy * Math.sin(a)).toFixed(3)} E · ` +
-        `${(GEOREF.N! + cx * Math.sin(a) + cy * Math.cos(a)).toFixed(3)} N · ` +
-        `${(GEOREF.Z! + 4.5).toFixed(3)} Z`
-    )
+    // … and so does the centroid: (12 521, 23 188, 4.5) in the file's own coordinates.
+    expect(rows[4].v).toBe('12521.000 E · 23188.000 N · 4.500 Z')
   })
 
   it('is empty when the element has no geometry yet', () => {

@@ -386,7 +386,7 @@ export function boxGap(x: Box, y: Box): number {
  * Every boxed element within `distance` metres of one of `seeds`, nearest first — 2026-09-20,
  * `docs/AI_REVIEW.md` §9 gap 7.
  *
- * Box arithmetic in the project frame, exactly as `measure_between` and `clash_check` are, on
+ * Box arithmetic in the files' own world coordinates, exactly as `measure_between` and `clash_check` are, on
  * the same uniform hash `clash_check` uses. A seed is never its own neighbour, and a duplicate
  * across two seeds is kept once, at its smallest gap.
  *

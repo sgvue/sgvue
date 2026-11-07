@@ -24,7 +24,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { boxPlace, laserDirections, LASER_AXES } from '../../src/shared/annotate'
 import { federate } from '../../src/shared/federate'
-import { toMap } from '../../src/shared/georef'
+import { coordsFromGeoref, readoutCoords, toMap } from '../../src/shared/georef'
 import type { AiEvent, AiToolExec, AiToolResult } from '../../src/shared/ipc-contract'
 import { visFn } from '../../src/shared/rules'
 import { MARKUPS_PLACE_CAP, MAX_TOOL_IDS } from '../../src/shared/tool-schemas'
@@ -135,7 +135,7 @@ function markupViewer(): ReturnType<typeof stubViewer> {
       placedSpots.push(p)
       const [ox, oy, oz] = st().offset
       const f = { x: p[0] + ox, y: p[1] + oy, z: p[2] + oz }
-      const m = toMap(st().coords, f.x, f.y, f.z)
+      const m = toMap(readoutCoords(st().coords), f.x, f.y, f.z)
       const rec: SpotRecord = { id: ++nextId, p: p as [number, number, number], E: m ? m.E : null, N: m ? m.N : null, Z: m ? m.Z : null, ...f }
       st().setSpots([...st().spots, rec])
     },
@@ -898,7 +898,7 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
       name: 'C1',
       spot: { name: 'C1', level: +box[5].toFixed(3) },
       pointMetres: { x: +mid.x.toFixed(3), y: +mid.y.toFixed(3), z: +box[5].toFixed(3) },
-      pointFrame: 'project',
+      pointFrame: 'world',
       element: slab.id,
       at: 'top',
       on: 'bounding box'
@@ -926,21 +926,22 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
     expect(last.name).toBe('C4')
   })
 
-  it('the scene stands whole metres off the project frame: the point handed to the viewer is project − offset', async () => {
-    st().setOffset([28000, 30000, 100], null, null)
+  it('the scene stands whole metres off the files’ own coordinates: the point handed to the viewer is world − offset', async () => {
+    st().setOffset([28000, 30000, 100])
     const body = await run('manage_markups', { op: 'place_spot', point: { x: 28010.5, y: 30020.25, z: 103.2 } })
     expect(placedSpots).toEqual([[10.5, 20.25, 3.2000000000000028]])
     // What comes back is the point that was asked for, in the frame it was asked in.
-    expect(body).toMatchObject({ placed: true, pointMetres: { x: 28010.5, y: 30020.25, z: 103.2 }, pointFrame: 'project' })
+    expect(body).toMatchObject({ placed: true, pointMetres: { x: 28010.5, y: 30020.25, z: 103.2 }, pointFrame: 'world' })
     expect(body.message).toContain('at the point given')
     expect(body.element).toBeUndefined()
     expect(st().spots[0]).toMatchObject({ x: 28010.5, y: 30020.25 })
   })
 
-  it('with a base point the spot reads E, N and Z — the map coordinates the card’s row shows', async () => {
-    // The repository's synthetic set, never a real site's — stated by the file, which is the only
-    // place a base point comes from since the card became read-only (2026-10-08).
-    st().setOffset([0, 0, 0], null, {
+  it('with a base point the spot reads E, N and Z — the world coordinates the card’s row shows', async () => {
+    // The repository's synthetic set, never a real site's — stated by a file, which is the only
+    // place a base point comes from since the card became read-only (2026-10-08), and written by
+    // `commitModels` from the file the card shows.
+    const coords = coordsFromGeoref({
       source: 'IfcMapConversion',
       sources: ['IfcMapConversion'],
       method: 'IfcMapConversion',
@@ -949,11 +950,13 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
       orthogonalHeight: 5.05,
       xAxisAbscissa: 1,
       xAxisOrdinate: 0
-    })
+    })!
+    useShell.setState({ coords })
     expect(st().coords).toEqual({ E: 12345.457, N: 23456.766, Z: 5.05, angle: 0 })
     const body = await run('manage_markups', { op: 'place_spot', point: { x: 1, y: 2, z: 3 }, show: 'full' })
-    const m = toMap(st().coords, 1, 2, 3)!
-    expect(body.spot).toEqual({ name: 'C1', E: +m.E.toFixed(3), N: +m.N.toFixed(3), Z: +m.Z.toFixed(3) })
+    // 2026-11-07: the scene is the files' own coordinates, so a spot prints the point itself —
+    // not the point carried through the declared base point.
+    expect(body.spot).toEqual({ name: 'C1', E: 1, N: 2, Z: 3 })
     expect(body.message).toContain('Its tag shows the full E, N and Z.')
     // `show:"full"` on the new tag is the tag's own click, by the record's id.
     expect(shown).toEqual([[st().spots[0].id, true]])
@@ -1016,7 +1019,7 @@ describe('manage_markups — placing a spot coordinate and a laser measurement',
     }
     expect(await no({ id: 987654321 })).toBe('No element has id 987654321 — ids are per session, so query again. Nothing was placed.')
     expect(await no({})).toBe(
-      'Say where: pass the element’s id (and at: top, centre or base), or a point in project-frame metres. Nothing was placed.'
+      'Say where: pass the element’s id (and at: top, centre or base), or a point in world metres. Nothing was placed.'
     )
     expect(await no({ id: slab.id, point: { x: 1, y: 2, z: 3 } })).toBe('Pass either id (with at) or point — not both. Nothing was placed.')
     const bare = full.elements.find((e) => !e.bbox)

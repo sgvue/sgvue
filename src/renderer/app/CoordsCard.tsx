@@ -9,9 +9,9 @@
  *   coordinates of the **project frame's** origin and the total rotation from project north to
  *   true north — `IfcMapConversion` composed over the spatial-root `IfcSite.ObjectPlacement`,
  *   either of which may be identity — and **left blank** when the file states none
- *   (`shared/georef.ts`). Since 2026-10-08 they are the **boot model's**: the federation is
- *   placed in that model's frame expressed in map coordinates, so its base point is the one that
- *   holds for every model (`federation-store.ts`).
+ *   (`shared/georef.ts`). Since 2026-11-07 they are one loaded model's, picked without regard to
+ *   load order (`georefSourceOf`: of the models that state a georeferencing, the one with the
+ *   most elements, ties by key). They are what that file declares; no model is placed by them.
  * · **The CRS chip.** The design writes `SVY21 · EPSG:3414`, which is true of its own Singapore
  *   subject and a placeholder for any other file, so it names the file's declared
  *   `IfcProjectedCRS` and shows the em dash when there is none. `SVY21 · EPSG:3414` is exactly
@@ -29,14 +29,15 @@
  *   dont let user change anything."* Each field keeps its element, class and style string and is
  *   `readOnly`: it still takes focus and a selection, so a value can be copied, and nothing typed
  *   reaches it. The store has no action that changes the base point (`state/shell.ts`).
- * · **A one-line note under the caption row** when a loaded model could not be lined up — of the
+ * · **A one-line note under the caption row** when a loaded model's own map position is not
+ *   where it is drawn (2026-11-07's meaning: the scene is the files' own coordinates) — of the
  *   ways offered, *"One-line note on screen"*. Only while there is something to say; the caption
  *   span's own style string, held to one line with an ellipsis, and the whole text as its native
  *   `title` (the 2026-10-01 rule for clipped text). Model names are file text, so they come
  *   through `labelText` (`selectors/status.ts`, `notLinedUp`).
  *
- * The chip, the caption and the note are read off the store's `bootGeoref` — the declaration
- * that defined the federation's frame — so they describe the frame in use after any unload.
+ * The chip and the caption are read off the store's `georefSource`, the same model's as the
+ * fields, recomputed whenever the federation changes.
  *
  * **The fields' unit** (2026-10-09, owner-requested): the file's own map unit
  * (`shared/georef.ts`, `mapUnitOf`) — `Easting m` as the design has it for a metre CRS or a file
@@ -61,28 +62,28 @@ const FIELD =
 const CAPTION = 'font-size:12px;color:var(--muted)'
 
 /** The store fields this component reads — it re-renders when one of them changes. */
-const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'bootGeoref', 'library', 'uploadNames')
+const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'georefSource', 'library', 'uploadNames')
 
 export default function CoordsCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
   if (st.card !== 'coords') return null
-  // The declaration that defined the federation's frame — the boot model's, kept after it is
-  // unloaded — whose base point the four fields are (2026-10-08).
-  const chip = crsChip(st.bootGeoref).long
+  // The georeferencing the card shows — `georefSourceOf`'s model, whatever the load order.
+  const chip = crsChip(st.georefSource).long
   // The one visible addition in the port, the user's own request (2026-09-20): the detected
   // method, appended inside the design's own caption span, in the design's own style.
-  const caption = coordsCaption(st.bootGeoref)
+  const caption = coordsCaption(st.georefSource)
   const detected = caption !== ''
-  // 2026-10-08, the owner's: which loaded model could not be lined up, in one line.
+  // 2026-10-08, the owner's — since 2026-11-07, which loaded model's map position is not where
+  // it is drawn, in one line.
   const note = lineUpNote(notLinedUp(st))
   // 2026-10-09, owner-requested: the base point in the file's own map unit — not the display
   // toggle. The metre, and a file that names no map unit, read exactly as before; a foot or a US
   // survey foot reads as the file authored it, its unit in the three labels.
-  const mapUnit = mapUnitOf(st.bootGeoref)
+  const mapUnit = mapUnitOf(st.georefSource)
   const shown: CoordState =
     mapUnit.label === 'm'
       ? st.coords
-      : (coordsFromGeoref(st.bootGeoref, mapUnit.metres) ?? { E: null, N: null, Z: null, angle: null })
+      : (coordsFromGeoref(st.georefSource, mapUnit.metres) ?? { E: null, N: null, Z: null, angle: null })
 
   const field = (k: keyof CoordState, label: string): React.JSX.Element => (
     <label style={s('display:flex;flex-direction:column;gap:4px')}>
@@ -134,8 +135,9 @@ export default function CoordsCard(): React.JSX.Element | null {
         {/* The design's own span and style string, untouched. */}
         <span style={s(CAPTION)}>project base point{caption}</span>
       </div>
-      {/* 2026-10-08 — the owner's one-line note, only while a loaded model could not be lined up:
-          the caption's own style string, one line, the whole text as its title. */}
+      {/* 2026-10-08 — the owner's one-line note, only while a loaded model's own map position is
+          not where it is drawn (2026-11-07): the caption's own style string, one line, the whole
+          text as its title. */}
       {note && (
         <span
           data-role="coords-note"

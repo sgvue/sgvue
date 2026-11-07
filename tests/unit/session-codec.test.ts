@@ -32,9 +32,15 @@ import {
 } from '../../src/shared/session-codec'
 import { NO_PLANE, NO_SECTIONS, sectionsLabel, type Sections } from '../../src/shared/sections'
 import { ID_STRIDE, LEGACY_ID_STRIDE } from '../../src/shared/federate'
+import { IDENTITY_FRAME_KEY } from '../../src/shared/georef'
 
-/** The live federation's project frame marker — `shared/georef.ts`'s `frameKey`. */
-const FRAME = '12345.457,23456.766,5.050@-43.4103'
+/**
+ * The live scene's frame marker — `shared/georef.ts`'s `IDENTITY_FRAME_KEY`: since 2026-11-07 the
+ * scene is every file's own world coordinates, for every federation.
+ */
+const FRAME = IDENTITY_FRAME_KEY
+/** What a build from before 2026-11-07 recorded under a boot model placed by its site (its P). */
+const OLD_P = '12345.457,23456.766,5.050@-43.4103'
 
 const source = (over: Partial<SessionSource> = {}): SessionSource => ({
   uploadNames: { ARC: 'arc.ifc' },
@@ -232,11 +238,11 @@ describe('applyRestore', () => {
     expect(calls[calls.length - 1]).toBe('visibility')
   })
 
-  it('frames the extents instead of restoring a camera from another project frame', () => {
-    // The camera is scene coordinates and the scene is the project frame, so a payload from a
-    // different boot model — or from a build that recorded no frame at all — would point it
-    // with numbers that meant something else.
-    for (const p of [payload(), payload({ frame: 'identity' })]) {
+  it('frames the extents instead of restoring a camera from another frame — an old P, or none recorded', () => {
+    // The camera is scene coordinates. A payload a build before 2026-11-07 recorded under a boot
+    // model with a project frame (its P), or one from a build that recorded no frame at all,
+    // would point it with numbers that meant something else.
+    for (const p of [payload({ frame: OLD_P }), payload()]) {
       if (p.frame === FRAME) delete (p as Partial<SessionPayload>).frame
       const { target, calls } = recorder()
       applyRestore(sessionPatch(p, source()), p, target, FRAME)
@@ -246,6 +252,17 @@ describe('applyRestore', () => {
       expect(calls).toContain('section')
       expect(calls[calls.length - 1]).toBe('visibility')
     }
+  })
+
+  it('restores the camera, and everything else, from a payload recorded under the identity frame', () => {
+    // Before 2026-11-07 that was a boot model with no site placement and no map position — whose
+    // scene was then already its file's own coordinates; since then it is every payload.
+    const { target, calls } = recorder()
+    const p = payload({ frame: 'identity' })
+    applyRestore(sessionPatch(p, source()), p, target, FRAME)
+    expect(calls).toContain('camera')
+    expect(calls).not.toContain('frameExtents')
+    expect(sessionPayload(source(), [], [], null, FRAME).frame).toBe('identity')
   })
 
   it('skips shadows when the payload does not carry the key (`:1705`)', () => {

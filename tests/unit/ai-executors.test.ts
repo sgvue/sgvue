@@ -1596,7 +1596,7 @@ describe('find_nearby', () => {
 
   it('states its method and its frame, exactly as measure_between does', async () => {
     const body = await run('find_nearby', { id: stair(), distance: 1 })
-    expect(body.frame).toBe('project')
+    expect(body.frame).toBe('world')
     expect(body.method).toContain('not solid geometry')
     expect(body.message).toContain('not solid geometry')
     expect(body.message).toContain('IfcSpace excluded')

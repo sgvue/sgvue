@@ -283,11 +283,11 @@ describe('the status bar’s CRS chip', () => {
 
   it('is the em dash on a federation with no georeferencing', () => {
     // The design's mock has no CRS at all, which is why this is the parity difference.
-    expect(statusValues({ ...base, bootGeoref: null }).crs).toBe(DASH)
-    expect(statusValues({ ...base, bootGeoref: federation.models[0].meta.georef }).crs).toBe(DASH)
+    expect(statusValues({ ...base, georefSource: null }).crs).toBe(DASH)
+    expect(statusValues({ ...base, georefSource: federation.models[0].meta.georef }).crs).toBe(DASH)
   })
 
-  it('names the CRS the boot file declares — the declaration that defined the federation’s frame', () => {
+  it('names the CRS the file the Coordinate-system card shows declares', () => {
     const svy21 = {
       source: 'IfcMapConversion' as const,
       sources: ['IfcMapConversion' as const],
@@ -304,11 +304,11 @@ describe('the status bar’s CRS chip', () => {
         mapZone: ''
       }
     }
-    expect(statusValues({ ...base, bootGeoref: svy21 }).crs).toBe('SVY21')
-    // Read off the boot file, not off whichever loaded model states one: the frame in use is the
-    // boot model's, and stays so after it is unloaded (2026-10-08).
+    expect(statusValues({ ...base, georefSource: svy21 }).crs).toBe('SVY21')
+    // Read off the store's `georefSource` — since 2026-11-07 the loaded model `georefSourceOf`
+    // picks, whatever the order — never off the federation directly.
     const later = federate([mockModelIndex('ARC'), { ...mockModelIndex('STR'), georef: svy21 }])
-    expect(statusValues({ ...base, federation: later, bootGeoref: null }).crs).toBe(DASH)
+    expect(statusValues({ ...base, federation: later, georefSource: null }).crs).toBe(DASH)
     // Until 2026-10-08 a base point typed into the card kept the design's chip; there is none to type.
   })
 })
