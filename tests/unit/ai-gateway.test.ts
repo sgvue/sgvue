@@ -29,7 +29,10 @@ import {
   REQUEST_TIMEOUT_MS,
   TURN_TIMEOUT_MS,
   classifyError,
+  echoable,
   foldSystemMessages,
+  isThinkingBindingRefusal,
+  stripThinking,
   trimOldest
 } from '../../src/main/ai/gateway'
 import type { AiEvent } from '../../src/shared/ipc-contract'
@@ -303,6 +306,81 @@ describe('recoveries', () => {
     expect(errorOf(h.events)).toBeUndefined()
     expect(h.requests[2].messages.length).toBeLessThan(h.requests[1].messages.length)
     expect(h.requests[2].messages[0].role).toBe('user')
+  })
+
+  // 2026-11-09 — Sonnet 5.5 binds a thinking block to everything before it. The schema block is
+  // rebuilt when the federation changes, so a later turn's replayed blocks can be refused.
+  it('strips the replayed thinking once, and retries, when a block is bound to another prefix', async () => {
+    const bound = Object.assign(
+      new Error('messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation.'),
+      { name: 'BadRequestError', status: 400 }
+    )
+    expect(isThinkingBindingRefusal(bound.message)).toBe(true)
+    const thought = { type: 'thinking', thinking: '', signature: 'sig' }
+    const h = harness([msg([thought, text('one')], 'end_turn'), bound, msg([text('two')], 'end_turn')])
+    await h.gateway.run(turn())
+    await h.gateway.run(turn({ turnId: 't2', schema: { entities: ['IfcDoor (1)'] } }))
+    expect(errorOf(h.events)).toBeUndefined()
+    const replayed = (r: Harness['requests'][number]): number =>
+      r.messages.filter((m) => m.role === 'assistant' && Array.isArray(m.content) && (m.content as Block[]).some((b) => b.type === 'thinking')).length
+    expect(replayed(h.requests[1])).toBe(1)
+    expect(replayed(h.requests[2])).toBe(0)
+    // The text of the earlier answer is still there; only the bound block went.
+    expect(JSON.stringify(h.requests[2].messages)).toContain('"one"')
+  })
+
+  it('does not strip thinking on any other 400', async () => {
+    const other = Object.assign(new Error('messages: something else is wrong'), { name: 'BadRequestError', status: 400 })
+    expect(isThinkingBindingRefusal(other.message)).toBe(false)
+    const h = harness([other])
+    await h.gateway.run(turn())
+    expect(errorOf(h.events).kind).toBe('bad_request')
+  })
+})
+
+describe('a mid-answer fallback (2026-11-09)', () => {
+  it('echoes and acts on nothing but text from before the last fallback block', () => {
+    const content: { type: string; id?: string }[] = [
+      { type: 'thinking' },
+      text('partial') as { type: string },
+      toolUse('u0', 'query_elements', {}) as { type: string },
+      { type: 'fallback' },
+      { type: 'thinking' },
+      toolUse('u1', 'query_elements', {}) as { type: string; id: string }
+    ]
+    expect(echoable(content).map((b) => b.type)).toEqual(['text', 'fallback', 'thinking', 'tool_use'])
+    expect(echoable(content)[3].id).toBe('u1')
+    // No fallback: as it came.
+    const plain = [{ type: 'thinking' }, { type: 'text', text: 'x' }]
+    expect(echoable(plain)).toEqual(plain)
+  })
+
+  it('runs only the fallback model’s tool calls', async () => {
+    const h = harness([
+      msg([toolUse('u0', 'search', {}), { type: 'fallback' }, toolUse('u1', 'query_elements', { rules: [] })], 'tool_use'),
+      msg([text('done')], 'end_turn')
+    ])
+    await h.gateway.run(turn())
+    expect(h.toolCalls.map((c) => c.name)).toEqual(['query_elements'])
+    const echoed = h.requests[1].messages.find((m) => m.role === 'assistant') as { content: Block[] }
+    expect(echoed.content.map((b) => b.type)).toEqual(['fallback', 'tool_use'])
+  })
+})
+
+describe('stripThinking', () => {
+  it('takes thinking and redacted thinking out of assistant turns only', () => {
+    const request = {
+      messages: [
+        { role: 'user', content: [text('q')] },
+        { role: 'assistant', content: [{ type: 'thinking' }, { type: 'redacted_thinking' }, text('a')] },
+        { role: 'assistant', content: [{ type: 'thinking' }] }
+      ]
+    } as never as Parameters<typeof stripThinking>[0]
+    stripThinking(request)
+    const types = (k: number): unknown[] => (request.messages[k].content as unknown as Block[]).map((b) => b.type)
+    expect(types(1)).toEqual(['text'])
+    // A turn that would be left empty keeps what it had.
+    expect(types(2)).toEqual(['thinking'])
   })
 })
 

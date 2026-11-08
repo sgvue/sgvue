@@ -146,7 +146,13 @@ export const AiTurnStart = z.object({
   /** `SGVue.dc.html:1596` — a reply carries its target inline. */
   quote: z.object({ who: z.string().max(32), text: z.string().max(400) }).nullish(),
   viewState: z.record(z.string(), Json),
-  schema: z.record(z.string(), Json).nullish()
+  schema: z.record(z.string(), Json).nullish(),
+  /**
+   * 2026-11-09 — the first turn of a conversation the renderer started again (`seedChat`: a new
+   * federation, or the Ask Vee window's `New conversation`): main drops the window's API
+   * transcript before it runs, so the model starts with nothing of the old one.
+   */
+  fresh: z.boolean().optional()
 })
 export type AiTurnStart = z.infer<typeof AiTurnStart>
 

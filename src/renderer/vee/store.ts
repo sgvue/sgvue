@@ -14,6 +14,7 @@
  */
 import { create } from 'zustand'
 import type { DisplayUnit } from '../../shared/units'
+import { DEVTOOLS } from '../dev/flags'
 import type { VeeBoard, VeeMessage, VeeSnapshot } from '../../shared/vee-messages'
 
 export interface VeeView {
@@ -78,8 +79,24 @@ export function keepUnchanged(was: readonly VeeMessage[], next: readonly VeeMess
   return next.map((m) => known.get(m.id) ?? m)
 }
 
+/**
+ * 2026-11-09 — the owner has seen a reply of Vee's twice. Two messages of one snapshot that share
+ * an `id` would be drawn as two rows of one object here (`keepUnchanged` keeps the first), so it is
+ * said in the console of a dev build; a production build drops the check. Exported for the tests.
+ */
+export function sharedIds(msgs: readonly Pick<VeeMessage, 'id'>[]): number[] {
+  const seen = new Set<number>()
+  const twice = new Set<number>()
+  for (const m of msgs) (seen.has(m.id) ? twice : seen).add(m.id)
+  return [...twice]
+}
+
 /** Take one snapshot from the main window. */
 export function takeSnapshot(snap: VeeSnapshot): void {
+  if (DEVTOOLS) {
+    const twice = sharedIds(snap.msgs)
+    if (twice.length) console.warn(`[vee] ${twice.length} message id(s) shared by two rows of one snapshot: ${twice.join(', ')}`)
+  }
   if (typeof document !== 'undefined' && document.documentElement.dataset.theme !== snap.theme) {
     document.documentElement.dataset.theme = snap.theme
   }

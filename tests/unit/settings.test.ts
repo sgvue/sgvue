@@ -46,7 +46,7 @@ describe('defaults', () => {
   it('are the plan’s pinned model and effort, with WebGPU not on offer', () => {
     settings.clearApiKey()
     const view = settings.view()
-    expect(view.model).toBe('claude-opus-5')
+    expect(view.model).toBe('claude-sonnet-5-5')
     expect(view.effort).toBe('medium')
     expect(view.cacheOneHour).toBe(false)
     expect(view.backend).toBe('auto')
@@ -120,6 +120,17 @@ describe('defaults', () => {
     expect(() => settings.update({ model: 'x'.repeat(201) })).toThrow()
     expect(() => settings.update({ model: '' })).toThrow()
     expect(settings.view().model).toBe('claude-opus-5')
+  })
+
+  it('keeps the model an older install stored; only the default is Sonnet 5.5 (2026-11-09)', () => {
+    // What every build before this one wrote with the key: the whole object, its default model in it.
+    writeFileSync(join(dir, 'settings.json'), JSON.stringify({ model: 'claude-opus-5', effort: 'medium' }))
+    settings.resetCache()
+    expect(settings.view().model).toBe('claude-opus-5')
+    // A file that names no model takes the new default.
+    writeFileSync(join(dir, 'settings.json'), JSON.stringify({ effort: 'medium' }))
+    settings.resetCache()
+    expect(settings.view().model).toBe('claude-sonnet-5-5')
   })
 
   it('falls back to the defaults rather than refusing to start on a corrupt file', () => {

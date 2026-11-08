@@ -185,7 +185,8 @@ export function registerAiIpc(): void {
       userText: turn.userText,
       quote: turn.quote ?? null,
       viewState: turn.viewState,
-      schema: turn.schema ?? undefined
+      schema: turn.schema ?? undefined,
+      fresh: turn.fresh === true
     })
   })
 

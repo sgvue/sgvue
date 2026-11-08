@@ -194,6 +194,8 @@ const cameraPose = (): CameraPose | null => {
 
 /** The schema is a cache breakpoint, so it is sent only when the federation has changed. */
 let sentSchemaFor = ''
+/** 2026-11-09 — the conversation (`chatEpoch`) the last turn was sent in; -1 before any. */
+let sentEpoch = -1
 
 const federationStamp = (): string => {
   const s = useShell.getState()
@@ -286,6 +288,9 @@ export async function sendChat(text?: string, opts: { retry?: boolean } = {}): P
   // message will get — the slot after the user's, which `chatBegin` has just pushed.
   narrated(() => traceBegin(useShell.getState().federation, useShell.getState().chatMsgs.length), undefined)
   const turnId = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  // 2026-11-09 — the first turn sent in this conversation tells main to start its transcript afresh.
+  const epoch = useShell.getState().chatEpoch
+  const fresh = epoch !== sentEpoch
   const stamp = federationStamp()
   const sendSchema = stamp !== sentSchemaFor
 
@@ -310,9 +315,11 @@ export async function sendChat(text?: string, opts: { retry?: boolean } = {}): P
       ) as unknown as Record<string, unknown>,
       ...(sendSchema
         ? { schema: chatSchema(after.federation) as unknown as Record<string, unknown> }
-        : {})
+        : {}),
+      ...(fresh ? { fresh: true } : {})
     })
     sentSchemaFor = stamp
+    sentEpoch = epoch
   } catch (error) {
     live = null
     traceFail()

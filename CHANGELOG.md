@@ -52,12 +52,22 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   only your click answers the question.
 - A **New message** button appears when an answer arrives while you are scrolled up, and
   **copy csv** on a result table says `copied` or `couldn't copy`.
+- **New conversation.** A button in the Ask Vee header starts the conversation again: the old
+  messages and any request still waiting for your OK go, the IFC+SG question can be asked again,
+  and Vee starts with nothing of the old conversation. What earlier answers did to the 3D view
+  stays as it is. It is greyed out while Vee is working — Stop ends a turn.
 
 ### Changed
 
 - Questions that ask to tabulate — counts by storey, by type, by value — are answered with a table
   in the chat. Vee makes a schedule in the Schedules window only when you ask for one.
 - Vee writes every count in digits, zero included: "**0** walls are missing a FireRating".
+- **Sonnet 5.5 is the default model** for new installs (`claude-sonnet-5-5`). A model you set in
+  Preferences is kept — and so is the model an earlier version saved with your API key.
+- A follow-up keeps to what Vee just found: after "Which walls are missing a fire rating?",
+  "Tabulate them by type" tabulates those walls, not every wall. Say "all the walls" for all.
+- IFC names coloured in Vee's answers are bold as well, and only an exact match of your files'
+  spelling is coloured.
 - A stopped or failed turn is a neutral line, such as "Stopped · nothing changed". It says
   "nothing changed" only when nothing did; otherwise "what it already did stays".
 - In Ask Vee your messages are on the right, and the `Vee` / `You` labels above each message and
@@ -72,6 +82,11 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 - Paste (⌘V / Ctrl+V) and cut now work in text fields, including the API key box and the Ask Vee
   composer.
 - ⌘C / Ctrl+C no longer switches to the spot tool.
+- A reply of Vee's that asks the IFC+SG question no longer shows its opening sentence twice.
+- A conversation that went on after its model schema changed — a model loaded mid-conversation —
+  no longer fails on the newer models, which tie their reasoning to the conversation as it was.
+- When the API hands an answer over to another model midway, the first model's unfinished tool
+  calls are no longer run.
 
 ## [1.5.0] - 2026-11-08
 

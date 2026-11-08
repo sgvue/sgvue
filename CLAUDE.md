@@ -1160,7 +1160,11 @@ Anything not on this list is a defect.
   `couldn’t copy` for 1 400 ms here (2026-10-02's "no flash" stands for the main window).
   **Removed:** the per-message `Vee` / `You` labels and the header's ×; `Ask Vee` is the OS
   window's title. **New controls:** `reply` on a bubble, `Try again`, the `New message` pill and
-  the diary's fold toggle. The typed line lifts on a slant to the right. The OS window's minimum
+  the diary's fold toggle *(amended 2026-11-09: and a `New conversation` icon button in the header —
+  at its right, the reply bar's icon-button size and hover, a pencil-on-square in the window's stroke
+  style, `aria-label` and tip `New conversation`, disabled at `.45` while a turn runs; it starts the
+  conversation again through `seedChat`, and what earlier replies did to the view stays; no confirm)*.
+  The typed line lifts on a slant to the right. The OS window's minimum
   is 300 × 380. Styled by `.vm` classes in `styles/vee.css`; one inline string changed (the
   lift's type, 13px/1.42). The main window is unchanged but for Preferences telling the store
   whether a key is there. Not yet seen in a window: the e2e specs that drive it
@@ -1177,7 +1181,7 @@ Anything not on this list is a defect.
   the reply's announcement, never quoted. **IFC terms** — a code span of Vee's text that is
   exactly a name the loaded models carry (class, PredefinedType / ObjectType value, set or
   property name, `Entity.SUBTYPE*`), never SGVue's own attribute names, is drawn in one colour,
-  `--ifc-term` (`#859FF6`, light `#3B51BC`), mono 500; a user's words never. **The IFC+SG
+  `--ifc-term` (`#859FF6`, light `#3B51BC`), mono 600 — bold since 2026-11-09, the owner: *"also bold it"*; a user's words never. **The IFC+SG
   question** — while a model carries an `SGPset_` set, and only once the turn has read by rule
   elements that carry one, Vee may ask once a conversation, through `ask_choice`: its
   one-sentence lead-in is a bubble of Vee's own, and the app's question, "Is this model for an
@@ -1219,7 +1223,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - **IFC parser** — web-ifc 0.0.77 in a Web Worker behind a read-only adapter; IfcOpenShell is ground truth in tests.
 - **File access** — `sgvue-file://` read-only protocol with single-use tokens; the parser reads a Blob in chunks.
 - **Power query for AI** — sql.js 1.15 in its own worker, `PRAGMA query_only`, SELECT-only gate, 10 s cap.
-- **AI** — `@anthropic-ai/sdk` 0.137 in main only, `claude-opus-5`, effort `medium`, key in `safeStorage`.
+- **AI** — `@anthropic-ai/sdk` 0.137 in main only, `claude-sonnet-5-5` (since 2026-11-09; `claude-opus-5` before, and a stored model is kept), effort `medium`, key in `safeStorage`.
 - **Persistence** — JSON in `userData`, written by main: settings, sessions, recents.
 - **Share link** — `sgvue://s=<base64url>`, a scheme the app registers.
 - **Packaging** — electron-builder 26: `.dmg` arm64 + x64 (ad-hoc signed), NSIS `.exe` x64 (unsigned), `.wasm` unpacked.
@@ -1504,6 +1508,15 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 
 - 2026-11-09 — **the Edit menu carries the platform's standard roles** (undo, redo, cut, copy, paste, pasteAndMatchStyle on macOS, delete, selectAll; Electron's default order, `main/menu.ts`): on macOS a text field's ⌘X / ⌘V work only while the menu has the `cut` / `paste` role, so since 1.2.0 nothing could be pasted, the API key box included; no page handler swallows them, and the model stays read-only.
 - 2026-11-09 — **no single-letter shortcut fires with ⌘ or Ctrl held** (`keyAction`, `state/keys.ts`): after Escape, ⌘Z / ⇧⌘Z and Home, a modified key is no action, so ⌘C / ⌘X / ⌘V, ⌘H and ⌘M stay the Edit menu's and the OS's — ⌘C over the property card used to arm the spot tool; ⌘S's own guard of 2026-11-07 is now this one rule.
+
+- 2026-11-09 — **the default model is `claude-sonnet-5-5`** (`DEFAULT_MODEL`); only the default — a stored `model` wins, so an install whose settings file names `claude-opus-5` keeps it; every parameter the app sends is one Sonnet 5.5 takes.
+- 2026-11-09 — **a replayed thinking block refused as bound to another prefix is stripped once a turn and the turn retried** (`isThinkingBindingRefusal`, `stripThinking`): Sonnet 5.5 binds a block to `system`, the tools and every earlier message, and `system[1]` is rebuilt with the federation; **after a mid-answer fallback only text from before the last `fallback` block is echoed or acted on** (`echoable`).
+- 2026-11-09 — **a conversation the renderer starts again starts main's transcript again**: `seedChat` moves `chatEpoch` on, and the next turn carries `AiTurnStart.fresh`, on which the gateway empties the window's history.
+- 2026-11-09 — **a follow-up continues the previous answer's set** (the owner: *"why the conversation never follow through?"*): one instruction line after the reply-quote line (43), the ids line no longer says an earlier turn's ids are gone; eval cases `multi-followup-narrows` / `multi-followup-all` (87 cases), graded by `table: { sum }`.
+- 2026-11-09 — **an IFC term is bold, `.vm .ifc-term` mono 600**, coloured only on an exact, case-sensitive match of the loaded files' names — a coloured name is always one the files carry; the backtick line asks for the tool's exact spelling.
+- 2026-11-09 — **a reply's IFC+SG lead-in is not drawn or read out when its text already says it** (`saysAlready`); a dev build warns when two rows of one Vee snapshot share an id (`sharedIds`).
+- 2026-11-09 — **the Ask Vee header's `New conversation` button** sends the strict `{ type: 'newChat' }`; the main window alone, and not while a turn runs, calls `traceFail()` and `seedChat()` — which with no model open leaves the transcript empty — and what earlier replies did to the view stays.
+- 2026-11-09 — **the live eval takes `--model=<id>`**, set in the run's own throwaway settings; `metrics.json` gains `model_asked` and `latency_by_model` (`median_s`, `p90_s`, `s_per_turn`); `PRICES` gains Sonnet 5.5 and Haiku 5.5 (two cards, split at a 100 000-token prompt), and `claude-sonnet-5` is corrected to $2 / $10.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

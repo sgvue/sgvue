@@ -40,6 +40,7 @@ type BetaTextBlockParam = Anthropic.Beta.BetaTextBlockParam
  * schedule's rows as a set; placing a markup) — each marked where it sits. 37 lines — 39 since
  * 2026-10-08, when one design line became three (below), and 40 since 2026-10-09, when the app
  * began to print every length in the user's display unit and the replies were asked to as well.
+ * 2026-11-09: one more, after the reply-quote line — a follow-up continues the previous answer's set.
  *
  * Phase 3 also brought two of the *added* lines up to date, because each said something that
  * stopped being true: `delete_set` forgets nothing by itself any more, and a viewpoint or a
@@ -117,7 +118,7 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   // the per-turn view state names it when it is not millimetres, and a reply should match.
   'State every length, elevation and distance you give the user in their display unit — millimetres, unless the view state names units: m for metres, or ft for feet and inches such as 12\'-6 1/2" — and a coordinate in metres, or in decimal feet when units is ft; convert what a tool reports in metres, and keep a property or quantity value in the unit the file authored it in.',
   // 2026-09-20 — gap 1. The three ways to name a set, and why one of them is the last resort.
-  'To act on a set you found rather than one you can describe, pass ids to select_elements, apply_visibility or color_by_property — the ids query_sql, search or find_nearby returned — or selection:true for whatever the user has selected. Prefer rules whenever a rule can express the same set: a rule step shows in the Filter card, can be saved as a named filter set and survives a model being reloaded, while an id list is per session and does none of that. Ids you did not read from a tool this turn will not exist.',
+  'To act on a set you found rather than one you can describe, pass ids to select_elements, apply_visibility or color_by_property — the ids query_sql, search or find_nearby returned — or selection:true for whatever the user has selected. Prefer rules whenever a rule can express the same set: a rule step shows in the Filter card, can be saved as a named filter set and survives a model being reloaded, while an id list is per session and does none of that. Ids you did not read from a tool in this conversation will not exist, and an earlier turn’s ids are stale once a model is loaded or unloaded — the rules that found them are not.',
   // 2026-09-20 — gap 8.
   // (2026-10-02, phase 3: `delete_set` asks — it used to forget the set at once — and so does
   // a save that would forget one, which is what the card's two rules do to an older set.)
@@ -173,8 +174,12 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   'summarize_elements and clash_check already show their own table under your reply, so do not repeat it in a table or a list of yours. Never use headings, emoji, HTML or code blocks, and put backticks only around an exact name as the file spells it: an IFC class, a property, a model or an element.',
   // 2026-11-08 — "Vee Messages" stage 2: the panel colours an IFC term it finds in the loaded
   // models' own names (`renderer/ai/terms.ts`), so the term must be marked and spelled the file's way.
-  'Write every IFC term you name in backticks, exactly as the file spells it: an IFC class (`IfcWall`), a PredefinedType or ObjectType value (`FLOOR`), a property-set name (`Pset_WallCommon`) or a property name (`FireRating`, never Fire Rating). The panel colours the ones the loaded models carry. Never put backticks around a number, a property value you are quoting — write "TBC" in quotes — or an everyday word such as Name, Level or Model.',
+  'Write every IFC term you name in backticks, exactly as the file spells it: an IFC class (`IfcWall`), a PredefinedType or ObjectType value (`FLOOR`), a property-set name (`Pset_WallCommon`) or a property name (`FireRating`, never Fire Rating). The panel colours the ones the loaded models carry, and only a name spelled exactly as a tool returned it, case and spaces included — so inside backticks never a prettified or re-cased name such as `Fire Rating` or `firerating`. Never put backticks around a number, a property value you are quoting — write "TBC" in quotes — or an everyday word such as Name, Level or Model.',
   'A user message that opens with [replying to …] is a direct reply to that quoted turn: resolve "those", "that", "them" and "it" against the quoted message, not against the most recent one.',
+  // 2026-11-09 — the owner, thumbs down: "i was asking these walls without fire rating then
+  // tabulate the wall by type become a reset and tabulate all walls instead". The earlier turns'
+  // calls are in the conversation, and nothing said to carry their set forward.
+  'A follow-up continues the conversation. When it names no new set — "them", "these", "those walls", "the walls", "by type", "now colour them" — it means the set your previous answer found: pass the same rules your earlier call used, narrowed or grouped as asked, so "Which walls are missing a FireRating?" then "Tabulate them by type" tabulates those walls, not every wall. Start from the whole model only when the user says so — "all the walls", "every door", "the whole model" — or names a different set.',
   'Visibility is an ORDERED STACK of filter steps, each with its own action and rules, applied in sequence: step 1 narrows the model, step 2 acts on what step 1 left. "isolate L2 then hide windows" is two steps, not one rule list.',
   'When the user says "also", "add", "plus", "include" or "as well", they are EXTENDING what is already shown — pass combine:"append", which APPENDS a step and keeps the current action. Only use combine:"replace" (the default) when they describe a fresh view, which starts a new stack.',
   'For ANY view needing more than one condition, call set_filter_stack ONCE with the full ordered steps array. Do not chain several apply_visibility calls — apply_visibility is only for a single step.',
@@ -317,8 +322,8 @@ export function buildRequest(
   return {
     model: input.model,
     max_tokens: input.maxTokens,
-    // Adaptive is the default on `claude-opus-5`; stating it keeps the request self-describing
-    // and survives a model change to one where it is not.
+    // Adaptive is the default on `claude-sonnet-5-5` (and was on `claude-opus-5`); stating it keeps
+    // the request self-describing and survives a model change to one where it is not.
     thinking: { type: 'adaptive' },
     output_config: { effort: input.effort },
     tool_choice: { type: 'auto' },

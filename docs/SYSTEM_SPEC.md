@@ -1150,6 +1150,15 @@ its text — and cards: the storey rows, the result table, and the request that 
 user's OK as a **consent card**. Each reply can be reverted on its own: since 2026-10-02
 everything that reply changed, not only what is visible. §8.9 has the detail.
 
+**New conversation (2026-11-09).** One icon button at the header's right, `New conversation`
+(its `aria-label` and tip), starts the conversation again: the Vee window sends the strict intent
+`{ type: 'newChat' }`, and the main window — only there, only while no turn runs — calls the
+store's `seedChat`: the transcript is the boot line again (or empty, the not-ready line, with no
+model open), its pending requests and reverts go with it, the IFC+SG answer and the asked flag and
+any earned heads-up are cleared, the suggestions unfold, and the next turn starts main's API
+transcript afresh (`fresh`, §8.3). What earlier replies did to the view stays. Disabled at `.45`
+while a turn runs; no confirm, since nothing is saved that a question would protect.
+
 **Its name and its mascot (2026-10-01).** The assistant is **Vee** — the window's title and the
 pill read `Ask Vee`, the header names `Vee`, and the model is told the name is its own — while the
 app is still SGVue. Its mascot is a 16 × 16 pixel sprite (`app/vee-grid.ts`, `app/Vee.tsx`), drawn
@@ -1252,14 +1261,15 @@ model and a plane off their defaults at once (363 B before, when none of that wa
 A camera turned to a direction of its own adds 57 B.
 
 The live view state is a **mid-conversation `role:'system'` message**, which is supported on
-`claude-opus-5` with no beta header. It must follow a user message and may not be
+`claude-sonnet-5-5` (as it was on `claude-opus-5`) with no beta header. It must follow a user message and may not be
 `messages[0]`; earlier ones stay in history. If the API ever refuses the role, the gateway
 falls back **once**, for the rest of the session, to a second text block inside the user turn.
 
 The model schema caps each category at 150 values, **with a count for each**, and ends a
 truncated category with `… N more — use list_values`.
 
-Request parameters: `model` from settings (default `claude-opus-5`), `max_tokens: 64000`
+Request parameters: `model` from settings (default `claude-sonnet-5-5` since 2026-11-09, `claude-opus-5`
+before; a stored `model` wins, so a settings file an earlier build wrote keeps the model it names), `max_tokens: 64000`
 (the streaming guidance for this model, on which thinking shares the ceiling),
 `thinking: { type: 'adaptive' }`, `output_config: { effort }` (default `medium`),
 `tool_choice: { type: 'auto' }`. The SDK client is built with `timeout: 50 000 ms` and
@@ -1268,7 +1278,11 @@ Request parameters: `model` from settings (default `claude-opus-5`), `max_tokens
 client-side zod validation (`executors/inputs.ts`) is what makes it safe to take the input
 before the API has validated it. `budget_tokens`, `temperature`, `top_p` and `top_k` are
 never sent — they are 400s on this model. A policy refusal is re-routed server side through
-`betas: ['server-side-fallback-2026-07-01']` with `fallbacks: 'default'`.
+`betas: ['server-side-fallback-2026-07-01']` with `fallbacks: 'default'` — on Sonnet 5.5 the
+`'default'` form is the one it takes; on Haiku 5.5, which has no server-side fallback, a declined
+turn simply stays declined. After a mid-answer fallback the response's `thinking`,
+`redacted_thinking` and `tool_use` blocks from before its last `fallback` block are neither run
+nor echoed back (`echoable`); its text is kept.
 
 ### 8.3 The loop
 
@@ -1291,13 +1305,21 @@ turn would 400 for ever and the only way out would be losing the conversation.
 Three recoveries, each taken at most once: a 400 naming the `system` role, a 400 naming the
 tool schema (which drops `strict` from every tool), and a context overflow (which drops the
 oldest messages once and retries, trimming further if that would leave an orphan
-`tool_result` first).
+`tool_result` first). A fourth, once a turn (2026-11-09): a 400 saying a replayed thinking block
+is bound to a different conversation — Sonnet 5.5 binds a thinking block to the `system` prompt,
+the tools and every message before it, and `system[1]`, the model schema, is rebuilt when the
+federation changes — strips every `thinking` and `redacted_thinking` block from the history and
+retries (`stripThinking`).
+
+**A new conversation starts the transcript again** (2026-11-09): the renderer's `seedChat` — a
+new federation's boot, or the Ask Vee window's `New conversation` — moves `chatEpoch` on, and the
+next turn carries `fresh: true`, on which main empties the window's transcript before it runs.
 
 ### 8.4 IPC
 
 | Channel | Direction | Payload |
 |---|---|---|
-| `ai:turn:start` | renderer → main | `{ turnId, userText, quote?, viewState, schema? }` — `schema` only when the federation changed |
+| `ai:turn:start` | renderer → main | `{ turnId, userText, quote?, viewState, schema?, fresh? }` — `schema` only when the federation changed; `fresh` on a new conversation's first turn |
 | `ai:turn:abort` | renderer → main | `{ turnId }` |
 | `ai:event` | main → renderer | `text_delta \| tool_start{name} \| tool_done{name,ms,ok} \| usage \| request_snapshot \| done \| aborted \| error{kind,message}` |
 | `ai:tool:exec` | main → renderer | `{ turnId, callId, name, input }` |
@@ -1998,7 +2020,7 @@ if the file is still where it was.
 >
 > | File | Contents |
 > |---|---|
-> | `settings.json` | `{ model, effort, cacheOneHour, backend, preferNvidia, gpuSwitchFailed?, apiKeyEnc? }`. `model` defaults to `claude-opus-5`, `effort` to `medium`, `cacheOneHour` to `false`, `backend` to `auto` (`webgpu` is not offered — see §7), `preferNvidia` to `true` (Windows only, read once before `ready`: run on an NVIDIA adapter, else AMD, else let Windows decide — `src/main/gpu-choice.ts`; anything but `false` reads as `true`). `gpuSwitchFailed` is **absent** until the GPU process fails on a launch that asked for an adapter; it is `{ at, vendorId, deviceId }`, main-only (never in the renderer's view), stops that adapter being asked for, and is deleted when `preferNvidia` is set again or the adapter changes. `apiKeyEnc` is base64 `safeStorage` ciphertext and is **absent** until a key is saved. The plaintext key is never written, and never returned to the renderer: `hasKey: boolean` is all it learns. A hand-edited or corrupt file falls back to the defaults rather than refusing to start. |
+> | `settings.json` | `{ model, effort, cacheOneHour, backend, preferNvidia, gpuSwitchFailed?, apiKeyEnc? }`. `model` defaults to `claude-sonnet-5-5` (`claude-opus-5` before 2026-11-09; a stored one is kept), `effort` to `medium`, `cacheOneHour` to `false`, `backend` to `auto` (`webgpu` is not offered — see §7), `preferNvidia` to `true` (Windows only, read once before `ready`: run on an NVIDIA adapter, else AMD, else let Windows decide — `src/main/gpu-choice.ts`; anything but `false` reads as `true`). `gpuSwitchFailed` is **absent** until the GPU process fails on a launch that asked for an adapter; it is `{ at, vendorId, deviceId }`, main-only (never in the renderer's view), stops that adapter being asked for, and is deleted when `preferNvidia` is set again or the adapter changes. `apiKeyEnc` is base64 `safeStorage` ciphertext and is **absent** until a key is saved. The plaintext key is never written, and never returned to the renderer: `hasKey: boolean` is all it learns. A hand-edited or corrupt file falls back to the defaults rather than refusing to start. |
 >
 > When the OS has no usable secret store, nothing is stored at all and the dialog says so —
 > losing a key silently would be worse than refusing it.

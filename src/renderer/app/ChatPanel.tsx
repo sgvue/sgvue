@@ -120,7 +120,7 @@ import {
 } from '../ai/trace'
 import { onTrace, traceNow, traceState } from '../ai/trace-store'
 import { parseBlocks } from '../ai/blocks'
-import { partsOf as messageParts, quoteOfPart, type Part } from '../ai/parts'
+import { partsOf as messageParts, quoteOfPart, saysAlready, type Part } from '../ai/parts'
 import { headsUpOf, headsUpText, type Observation } from '../ai/heads-up'
 import { spanStarts } from '../ai/terms'
 import { countText, nounFor } from '../ai/trace-facts'
@@ -156,6 +156,7 @@ import {
   BoardEyeOff,
   Crosshair,
   DownArrow,
+  NewChat,
   NoSignal,
   ReplyHook,
   RevertHook,
@@ -639,7 +640,9 @@ export function announcement(msgs: readonly Pick<VeeMessage, 'role' | 'text' | '
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i]
     if (m.role !== 'assistant') continue
-    const asked = m.ask ? `${plainOf({ role: 'assistant', text: m.ask.lead })} ${m.ask.question}`.trim() : ''
+    // A lead-in the reply already says is drawn once (`saysAlready`), so it is read out once.
+    const lead = m.ask && !saysAlready(m.text, m.ask.lead) ? plainOf({ role: 'assistant', text: m.ask.lead }) : ''
+    const asked = m.ask ? `${lead} ${m.ask.question}`.trim() : ''
     return [plainOf(m), asked, m.headsUp ? headsUpText(m.headsUp) : '']
       .filter(Boolean)
       .join(' ')
@@ -1470,6 +1473,21 @@ export default function ChatPanel(): React.JSX.Element | null {
           <b />
           <b />
         </span>
+        {/* 2026-11-09 — start the conversation again; never while a turn runs (Stop ends one). */}
+        <button
+          type="button"
+          data-part="new-chat"
+          className="vm-new"
+          onClick={() => {
+            post({ type: 'newChat' })
+            focusComposer()
+          }}
+          disabled={st.chatBusy}
+          aria-label="New conversation"
+          data-tip="New conversation"
+        >
+          <NewChat />
+        </button>
       </header>
 
       {board && line ? (

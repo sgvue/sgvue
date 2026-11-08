@@ -291,7 +291,7 @@ const MARK_STYLE: Record<Mark, string> = {
 /**
  * 2026-11-08 (stage 2) — which code spans of a reply are IFC terms (`ai/terms.ts`): their ordinals
  * in render order, as the main window found them in the loaded models' vocabulary, and the
- * ordinal this block's first span has. A coloured span is the `.ifc-term` class — mono medium in
+ * ordinal this block's first span has. A coloured span is the `.ifc-term` class — mono bold (600, since 2026-11-09) in
  * the one IFC-term colour — and no inline style; every other code span is the design's mono.
  */
 export interface TermMarks {
@@ -467,7 +467,7 @@ export function BlockView({ block, marks = NO_TERMS }: { block: Block; marks?: T
  * 2026-11-08 — the owner's IFC-term decision, in the trace's own lines: a diary step's names
  * (`Filtering IfcWall`, `Checking FireRating`) and the storey-rows card's title (`FireRating ·
  * missing`) are the file's spelling, and a name that is an IFC term of the loaded models — `terms`,
- * decided in the main window — is drawn as Vee's text draws one: `.ifc-term`, mono 500 in the one
+ * decided in the main window — is drawn as Vee's text draws one: `.ifc-term`, mono 600 in the one
  * colour. Everything else stays as it was. Text only, never HTML.
  */
 export function TermText({ text, terms }: { text: string; terms: readonly string[] | undefined }): React.JSX.Element {

@@ -824,7 +824,7 @@ function measurePrompt(schema, viewState) {
   const contract = P.contractText()
   const mk = (history, text) =>
     P.buildRequest({
-      model: 'claude-opus-5',
+      model: 'claude-sonnet-5-5',
       effort: 'medium',
       maxTokens: 16_000,
       schema,

@@ -69,7 +69,8 @@ describe('the system contract', () => {
     // line became three (the case below), so 17 of the design's are left. 2026-10-09: one, the
     // display unit (the case below). 2026-11-08: two — a tabulation answers in the chat (the
     // live baseline's F1), and an IFC term is written in backticks (stage 2) — the cases below.
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(42)
+    // 2026-11-09: one, a follow-up continues the previous answer's set (the case below).
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(43)
     expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
     expect(DESIGN_SYSTEM_LINES[1]).toContain('strictly read-only with respect to model data')
     // Still the last line, as the design ends.
@@ -726,14 +727,28 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
       'A set a rule can say — a class, a level, a property’s value — is read with a rule tool (query_elements, list_values, summarize_elements) rather than query_sql: only a rule-bearing read shows the user a heads-up about the elements it read, and only one lets ask_choice ask.'
     )
     expect(contractText()).toContain(SQL_FIRST_PARAGRAPH)
-    // No instruction line was added for it: the counts stand.
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(42)
+    // No instruction line was added for it: the counts stand (43 since 2026-11-09's follow-up line).
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(43)
     expect(IFCSG_LINES).toHaveLength(4)
+  })
+
+  it('carries a follow-up on with the previous answer’s set, unless the user asks for all (2026-11-09)', () => {
+    const i = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('A follow-up continues the conversation.'))
+    // Right after the reply-quote line, its neighbour in meaning.
+    expect(DESIGN_SYSTEM_LINES[i - 1]).toMatch(/^A user message that opens with \[replying to …\]/)
+    const line = DESIGN_SYSTEM_LINES[i]
+    for (const said of ['the set your previous answer found', 'pass the same rules your earlier call used', 'not every wall', '"all the walls"']) {
+      expect([said, line.includes(said)]).toEqual([said, true])
+    }
+    // The ids line no longer says an earlier turn's ids are gone: the rules are the way back.
+    const ids = DESIGN_SYSTEM_LINES.find((l) => l.startsWith('To act on a set you found'))!
+    expect(ids).not.toContain('this turn will not exist')
+    expect(ids).toContain('the rules that found them are not')
   })
 
   it('asks for IFC terms in backticks, the file’s own spelling, and never a number, a value or an everyday word', () => {
     const line = DESIGN_SYSTEM_LINES.find((l) => l.startsWith('Write every IFC term you name in backticks'))!
-    for (const said of ['exactly as the file spells it', '`IfcWall`', '`FireRating`, never Fire Rating', 'Never put backticks around a number', 'write "TBC" in quotes', 'Name, Level or Model']) {
+    for (const said of ['exactly as the file spells it', '`IfcWall`', '`FireRating`, never Fire Rating', 'only a name spelled exactly as a tool returned it', 'never a prettified or re-cased name', 'Never put backticks around a number', 'write "TBC" in quotes', 'Name, Level or Model']) {
       expect([said, line.includes(said)]).toEqual([said, true])
     }
   })

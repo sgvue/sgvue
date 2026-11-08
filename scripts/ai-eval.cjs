@@ -36,7 +36,7 @@
  *   (neither)   LIVE. Needs ANTHROPIC_API_KEY already in the environment. Spends real money.
  *
  * Flags: --regrade=<variant dir> (plain Node, no request — `eval/regrade.cjs`), --pilot[=<ids>], --only=<ids|groups|tags>, --fixture=<mock|mock-hostile|mock-messy>, --variant=v1,
- *        --flow=DIR, --reps=N, --timeout-s=N, --retries=N, --approve-harness;
+ *        --flow=DIR, --reps=N, --timeout-s=N, --retries=N, --approve-harness, --model=<id>;
  *        --no-report is accepted and does nothing (there has been no report since 2026-10-05).
  * Env:   SGVUE_APP_OUT=<dir> runs the suite against a saved build directory instead of `out/`.
  *        SGVUE_IFC=<path>    the optional, opt-in real-model fixture (see docs/AI_EVAL.md).
@@ -117,7 +117,7 @@ const ROOT = join(__dirname, '..')
 const { CASES, PILOT_IDS, PILOT_MAX, runsOf, selectCases } = require('./eval/cases.cjs')
 const { capabilityTags, missingCapabilities, whyMissing } = require('./eval/capabilities.cjs')
 const { TRANSIENT_KINDS, failureClass, gradeCase } = require('./eval/graders.cjs')
-const { estimateRun, measuredTurn, money, runCost, turnCost } = require('./eval/cost.cjs')
+const { estimateRun, latencySummary, measuredTurn, money, runCost, turnCost } = require('./eval/cost.cjs')
 const { collectTruth, lateTruth, nullTurn, observation, oracleTurn, scriptedCalls, turnsOf, withEarlier } = require('./eval/observe.cjs')
 
 /* ────────────────────────────── arguments ────────────────────────────── */
@@ -134,7 +134,10 @@ function parseArgs(argv) {
     retries: 3,
     only: [],
     fixture: null,
-    approveHarness: false
+    approveHarness: false,
+    // 2026-11-09 — the model this run asks for, set in the run's own throwaway settings; null
+    // keeps whatever the app's settings say (its default, in safe-run's fresh `userData`).
+    model: null
   }
   for (const raw of argv) {
     const [k, v] = raw.includes('=') ? [raw.slice(0, raw.indexOf('=')), raw.slice(raw.indexOf('=') + 1)] : [raw, null]
@@ -164,6 +167,7 @@ function parseArgs(argv) {
     else if (k === '--timeout-s') a.timeoutS = Number(v)
     else if (k === '--retries') a.retries = Number(v)
     else if (k === '--approve-harness') a.approveHarness = true
+    else if (k === '--model') a.model = v
     // A no-op: there has been no report since 2026-10-05. Accepted so old command lines still run.
     else if (k === '--no-report') continue
     else if (k.startsWith('--user-data-dir')) continue // safe-run's own switch
@@ -174,6 +178,11 @@ function parseArgs(argv) {
   }
   if (a.reps !== null && !(Number.isInteger(a.reps) && a.reps >= 1)) {
     console.error(`ai-eval: --reps must be a whole number of at least 1, got ${a.reps}`)
+    process.exit(64)
+  }
+  // A model id is a short slug (`MODEL_ID_MAX` in the app's settings contract is 200).
+  if (a.model !== null && !/^[a-z0-9][a-z0-9.-]{0,199}$/.test(String(a.model))) {
+    console.error(`ai-eval: --model must be a model id such as claude-sonnet-5-5, got '${a.model}'`)
     process.exit(64)
   }
   if (!/^(baseline|v[1-9]\d*)$/.test(a.variant)) {
@@ -780,7 +789,9 @@ function summarise(rows, naRows, errorRows) {
     tokens: cost.tokens,
     cost_usd: cost.usd,
     unpriced: cost.unpriced,
-    by_case: byCase
+    by_case: byCase,
+    // 2026-11-09 — how fast each model answered: median and 90th-percentile case time, seconds a turn.
+    latency_by_model: latencySummary(scored)
   }
 }
 
@@ -824,7 +835,15 @@ app.whenReady().then(async () => {
   for (const w of strays) if (!w.isDestroyed()) w.destroy()
 
   const caps = await jsonOf(probe.js, 'window.__sgvueDev.capabilities()')
+  // 2026-11-09 — `--model`: the run's own settings (safe-run's throwaway `userData`) name the
+  // model, through the same call Preferences makes; the app's default is untouched. Every case's
+  // window reads it from there, as the app does on every turn.
+  if (ARGS.model) await jsonOf(probe.js, `window.sgvue.setSettings({ model: ${JSON.stringify(ARGS.model)} })`)
   const settings = await jsonOf(probe.js, 'window.sgvue.getSettings()')
+  if (ARGS.model && settings.model !== ARGS.model) {
+    console.error(`ai-eval: asked for --model=${ARGS.model} but the app's settings say ${settings.model}`)
+    return app.exit(70)
+  }
   const have = capabilityTags(caps)
   probe.win.destroy()
 
@@ -852,7 +871,16 @@ app.whenReady().then(async () => {
   console.log(`  fixture      ${MODEL_PATH ? `REAL MODEL ${basename(MODEL_PATH)}` : fixtures.join(', ')}`)
   console.log(`  build        ${APP_OUT}`)
   console.log(`  capabilities ${have.join(', ')}`)
+  console.log(`  model        ${settings.model}${ARGS.model ? ' (--model)' : ' (the app’s settings)'}`)
   console.log(`  results      ${ARGS.flow}/${ARGS.variant}/`)
+  if (ARGS.model && ARGS.variant === 'baseline') {
+    console.log('  note         --model without --variant writes into baseline/; give each model its own v<N>')
+  }
+  console.log(
+    '  compare      like for like: every model run of this suite takes the same cases, each the same\n' +
+      '               number of times (`runsOf`, or --reps), on the same fixture — compare variants that\n' +
+      '               were run with the same --only / --reps / --pilot'
+  )
   if (MODEL_PATH) {
     console.log(
       '\n  WARNING: a real model is loaded. Its vocabulary — storey, grid, entity, object-type\n' +
@@ -1038,7 +1066,7 @@ app.whenReady().then(async () => {
     }
   }
 
-  const summary = { ...summarise(rows, naRows, errorRows), estimate }
+  const summary = { ...summarise(rows, naRows, errorRows), estimate, model_asked: settings.model }
   writeFileSync(join(VDIR, 'metrics.json'), JSON.stringify(summary, null, 2) + '\n')
 
   console.log(`\n── ${ARGS.mode} run, ${ARGS.flow}/${ARGS.variant}`)
@@ -1058,6 +1086,9 @@ app.whenReady().then(async () => {
         (summary.unpriced ? `  (${summary.unpriced} row(s) had no rate card)` : '')
     )
     console.log(`   estimated  ${money(estimate.usdList)} before the run (${estimate.basis})`)
+    for (const [m, l] of Object.entries(summary.latency_by_model)) {
+      console.log(`   latency    ${m}: median ${l.median_s} s · p90 ${l.p90_s} s · ${l.s_per_turn} s a turn over ${l.turns} turn(s)`)
+    }
     for (const [id, c] of Object.entries(summary.by_case)) {
       console.log(`     ${id.padEnd(30)} ${c.runs} run(s)  ${money(c.cost_usd)}`)
     }

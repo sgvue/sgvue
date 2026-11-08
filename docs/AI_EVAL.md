@@ -16,7 +16,8 @@ worse, and at what cost?*
   has an answer a `SELECT` can settle, and a judge would have added a second language model,
   its own bill and its own drift to the thing being measured.
 - **What it costs** — nothing at all in the two offline modes. A live pass is one turn of
-  `claude-opus-5` per case and run (two or three for a conversation); the runner prints a rough
+  the app's model — `claude-sonnet-5-5` by default since 2026-11-09, `claude-opus-5` before, or
+  the one `--model` names — per case and run (two or three for a conversation); the runner prints a rough
   estimate before it starts, and the **first honest number comes from the pilot**, never from
   this page (see *Cost*).
 
@@ -58,6 +59,40 @@ asks again.
 Read the pilot's five rows and its measured cost before running the full pass. If the pilot's
 numbers surprise you, the eval is more likely wrong than the assistant is. The full pass, run
 after it in the same flow, prints its estimate from the pilot's **measured** cost per turn.
+
+### Comparing two models (2026-11-09)
+
+`--model=<id>` runs the suite on that model: before the first case the runner sets it in the
+run's own settings — safe-run's throwaway `userData`, through the same call Preferences makes —
+and refuses to start if the app does not then report it, so the app's default and your own
+settings are never touched. Give each model a variant of its own, and run both the same way —
+the same `--only`, `--reps` or `--pilot`, which is what makes the comparison like for like: the
+same cases, each run the same number of times, on the same fixtures. The runner says so when it
+starts, and names the model it asked for.
+
+```bash
+VITE_SGVUE_DEVTOOLS=1 npm run build
+
+# Sonnet 5.5, then Haiku 5.5 — the full pass each, in variants of their own.
+SGVUE_MAX_SECONDS=5400 node scripts/safe-run.cjs ai-eval.cjs --model=claude-sonnet-5-5 --variant=v4 --approve-harness
+SGVUE_MAX_SECONDS=5400 node scripts/safe-run.cjs ai-eval.cjs --model=claude-haiku-5-5 --variant=v5
+```
+
+(Pick the next free `v<N>` of the flow; a variant already holding rows resumes rather than
+re-runs, and `--model` with no `--variant` would write into `baseline/`, which the runner warns
+about.) Read the two `metrics.json` side by side: `pass_rate`, `by_group`, `cost_usd`, and
+**`latency_by_model`** — per model **served**, the median and the 90th-percentile case wall time
+(`median_s`, `p90_s`) and seconds a user turn (`s_per_turn`), the answer to *"is it fast to
+respond"*. `model_asked` is the model the run asked for; each row's `model` and `model_source:
+"served"` are the model that answered, which with `fallbacks: 'default'` on can differ for a
+refused turn (Sonnet 5.5 only — Haiku 5.5 has no server-side fallback, so a declined turn stays
+declined there).
+
+Every request parameter the app sends is one both models take: adaptive thinking, `effort`
+(`medium`), `max_tokens: 64000` (both allow 128 000), strict tool schemas with
+`eager_input_streaming`, `tool_choice: auto`, the mid-conversation `role: 'system'` view state, and
+one-hour or five-minute cache breakpoints. On Haiku 5.5 `fallbacks: 'default'` is accepted and does
+nothing.
 
 ### The other modes
 
@@ -273,7 +308,8 @@ of it (below); the fifth runs on the plain mock, with its instruction in a viewp
 
 ### The Ask Vee cases (2026-11-08)
 
-Twenty, appended after every older case — none of which changed, byte for byte — and written
+Twenty, appended after every older case — none of which changed, byte for byte — and, since
+2026-11-09, two follow-up conversations after them (below). Written
 the way the older ones are: the prompt is what a coordinator types, every number is a truth
 probe, and the oracle is the ideal call sequence and reply. Fifteen can be scored today; five
 wait for stage 2. Their parts:
@@ -347,6 +383,15 @@ turn's last rule-bearing call touched an element carrying an `SGPset_` set. The 
 design's own site model carries `SGPset_Planting`, the IFC+SG block and `ask_choice` are live on
 the demo too — by the handoff's detection rule, any `SGPset_` set on any element.
 
+**The owner's follow-up (2026-11-09).** *"why the conversation never follow through? like i was
+asking these walls without fire rating then tabulate the wall by type become a reset and
+tabulate all walls instead?"* Two conversations on the messy fixture, where 4 of the 80 walls
+carry no `FireRating`: `multi-followup-narrows` — "Which walls are missing a fire rating?", then
+"Tabulate them by type." — passes only when the panel's table counts sum to the walls with no
+rating (`table: { sum: 'missing' }`, a grader added for it), and `multi-followup-all` — the same
+first turn, then "Now tabulate all the walls by type, not just those." — only when they sum to
+every wall. Both run three times.
+
 ### Run counts, the pilot and the estimate (2026-11-08)
 
 The owner's cheaper plan. **The twenty tagged cases run three times in a live pass, every other
@@ -365,15 +410,18 @@ turns, then tokens and dollars — and writes the same figures to `metrics.json`
 beside what it measured: per row, as before, the four token counters and `cost_usd`; per case,
 `by_case` — runs, passes, turns, tokens and cost over its runs. The estimate's basis is said with
 it. With no live rows in the flow it is a-priori — `ROUGH_TURN` in `cost.cjs`, about 40 000 input
-and 1 200 output tokens a turn, priced at **$5 input / $25 output per million with no cache
+and 1 200 output tokens a turn, priced at **the model's list input and output rates with no cache
 discount**, so deliberately high — and once a live run has written priced rows (the pilot), the
-mean measured cost per turn replaces it. On this build the a-priori figures are:
+mean measured cost per turn replaces it. On this build (2026-11-09, 87 cases, 27 of them tagged)
+the a-priori figures are:
 
-| Run | cases · runs · user turns | estimate, list prices, no cache |
-|---|---|--:|
-| `--pilot` | 5 · 5 · 6 | $1.38 |
-| the twenty tagged cases | 20 · 60 · 69 | $15.87 |
-| the full pass (80 scorable) | 80 · 120 · 129 | $29.67 |
+| Run | cases · runs · user turns | Sonnet 5.5 | Haiku 5.5 | Opus 5 |
+|---|---|--:|--:|--:|
+| `--pilot` | 5 · 5 · 6 | $0.55 | $0.03 | $1.38 |
+| the tagged cases | 27 · 81 · 105 | $9.66 | $0.48 | $24.15 |
+| the full pass | 87 · 141 · 165 | $15.18 | $0.76 | $37.95 |
+
+(Before 2026-11-09 the table was Opus 5's alone, for 80 scorable cases: $1.38, $15.87 and $29.67.)
 
 These are not measurements. Every turn re-sends a prefix the server caches, and a cache read is a
 tenth of the input rate, so the real figure should be well under them — how far under is what
@@ -688,15 +736,21 @@ baseline was not re-graded — its setup is new.
 ## Cost
 
 Four counters at four rates, from the API's own `usage` — never estimated from string lengths.
-At `claude-opus-5` list prices per million tokens:
+List prices per million tokens (`PRICES` in `scripts/eval/cost.cjs`; source: the `claude-api`
+skill's model table and migration guide, read 2026-11-09):
 
-| | rate |
-|---|--:|
-| input | $5 |
-| output | $25 |
-| cache **read** | $0.50 (0.1 × input) |
-| cache **write**, 5-minute TTL | $6.25 (1.25 × input) |
-| cache **write**, 1-hour TTL | $10 (2 × input) |
+| | Sonnet 5.5 | Haiku 5.5, prompt ≤ 100 000 tokens | Haiku 5.5, above | Opus 5 |
+|---|--:|--:|--:|--:|
+| input | $2 | $0.10 | $0.50 | $5 |
+| output | $10 | $0.50 | $2.50 | $25 |
+| cache **read** (0.1 × input) | $0.20 | $0.01 | $0.05 | $0.50 |
+| cache **write**, 5-minute TTL (1.25 × input) | $2.50 | $0.125 | $0.625 | $6.25 |
+| cache **write**, 1-hour TTL (2 × input) | $4 | $0.20 | $1 | $10 |
+
+Haiku 5.5 has two rate cards, chosen by a request's prompt length. A turn's usage is summed over
+its rounds, so the runner takes a round's prompt as the turn's input, cache-read and cache-write
+tokens over its rounds — an approximation that matters only near the 100 000-token line.
+`claude-sonnet-5`'s entry read $3 / $15 until 2026-11-09; its list price is $2 / $10.
 
 The TTL is read from the app's own prompt-cache setting, and the row records which was used. A
 model with no entry in the table is priced at `null` rather than at a neighbour's rate.

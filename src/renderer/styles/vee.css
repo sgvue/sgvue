@@ -98,6 +98,16 @@
 @keyframes vm-ping { 0% { box-shadow: 0 0 0 0 var(--glow); } 100% { box-shadow: 0 0 0 6px transparent; } }
 .vm-sq { margin-left: auto; display: flex; align-items: flex-end; gap: 2px; height: 12px; opacity: 0; transition: opacity 0.25s; }
 .vm-sq.vm-on { opacity: 1; }
+/*
+ * 2026-11-09 — the header's `New conversation` button: the reply bar's icon button (`.vm-rx
+ * button`), its size and its hover; its tooltip opens leftwards, so it stays inside the window;
+ * disabled while a turn runs, at the window's .45.
+ */
+.vm-new { flex: none; margin-left: 4px; width: 22px; height: 20px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.vm-new:hover, .vm-new:focus-visible { background: var(--step-bg); color: var(--accent-ink); }
+.vm-new:disabled { opacity: 0.45; cursor: not-allowed; background: none; color: var(--muted); }
+.vm-new[data-tip]::after { left: auto; right: 0; transform: translateY(-3px); }
+.vm-new[data-tip]:hover::after, .vm-new[data-tip]:focus-visible::after { transform: none; }
 .vm-sq b { width: 3px; background: var(--accent); border-radius: 1px; transform-origin: bottom; animation: vm-sq 0.9s ease-in-out infinite; }
 .vm-sq b:nth-child(1) { height: 5px; animation-delay: -0.6s; }
 .vm-sq b:nth-child(2) { height: 9px; animation-delay: -0.3s; }
@@ -266,15 +276,17 @@
 .vm-foot .vm-rv { margin-left: 0; padding: 4px 6px; font: 500 11.5px/1 var(--sans); }
 
 /*
- * 2026-11-08, stage 2 ("Vee Messages", HANDOFF §2, §7, §8). An IFC term Vee names: mono at medium
- * weight in the one IFC-term colour — the face is the second channel, so colour is never alone.
+ * 2026-11-08, stage 2 ("Vee Messages", HANDOFF §2, §7, §8). An IFC term Vee names: mono, bold since
+ * 2026-11-09, in the one IFC-term colour — the face is the second channel, so colour is never alone.
  * The heads-up: one line of the app's own warn ink at the end of a reply, a 12 px outline sign,
  * its count in bold and a name in mono but uncoloured, so amber keeps its one meaning. Quick
  * replies under a question of Vee's: pills, no tape — a reply, not a view change.
  */
 /* An IFC term keeps the file's own spelling wherever it stands — also in the storey-rows title and a
-   table's header, which are set in capitals: `FireRating · MISSING`, as the prototype's `.ifc-term` has it. */
-.vm .ifc-term { font: 500 11px/1 var(--mono); color: var(--ifc-term); letter-spacing: 0; text-transform: none; }
+   table's header, which are set in capitals: `FireRating · MISSING`, as the prototype's `.ifc-term` has it.
+   Bold since 2026-11-09 (the owner: "also bold it"): 600, which the self-hosted mono — 400 and 500
+   only — draws as the 500 face emboldened, as it draws the stamp's 600 above. */
+.vm .ifc-term { font: 600 11px/1 var(--mono); color: var(--ifc-term); letter-spacing: 0; text-transform: none; }
 .vm-hu { display: flex; gap: 6px; align-items: flex-start; margin: 4px 2px 0; font: 400 12px/1.45 var(--sans); color: var(--warn-ink); max-width: 100%; }
 .vm-hu svg { flex: none; margin-top: 2px; }
 .vm-hu b { font-weight: 600; }

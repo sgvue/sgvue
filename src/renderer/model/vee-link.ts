@@ -57,7 +57,7 @@ import { abortChat, sendChat } from '../ai/bridge'
 import { quoteOfPart } from '../ai/parts'
 import { IFCSG_QUESTION, IFCSG_REPLIES } from '../ai/executors/ask'
 import { termsOf, traceTermsOf, vocabularyFor } from '../ai/terms'
-import { onTraceChange, traceEpoch, traceSnapshot, type TraceChange } from '../ai/trace-store'
+import { onTraceChange, traceEpoch, traceFail, traceSnapshot, type TraceChange } from '../ai/trace-store'
 import { api } from '../api'
 import { copyingIn } from '../clipboard'
 import { chatExamples, messageView } from '../state/selectors/chat'
@@ -475,6 +475,13 @@ export function receive(data: unknown): void {
       return
     case 'close':
       s.setChatOpen(false)
+      return
+    case 'newChat':
+      // A turn runs to its end, or the user stops it: a new conversation never cuts one off.
+      if (s.chatBusy) return
+      // The finished turn's trace goes with its reply, as the dev harness's reset does.
+      traceFail()
+      s.seedChat()
       return
   }
 }

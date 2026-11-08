@@ -108,3 +108,11 @@ export const WarnSign = (): React.JSX.Element => (
     <path d="M12 10v4.5M12 17.5v.01" />
   </svg>
 )
+
+/** 2026-11-09 — the header's `New conversation` button: a pencil on a square. */
+export const NewChat = (): React.JSX.Element => (
+  <svg width="13" height="13" viewBox="0 0 24 24" strokeWidth="2" aria-hidden="true" {...line}>
+    <path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" />
+    <path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 8.5-8.5z" />
+  </svg>
+)

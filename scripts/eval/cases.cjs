@@ -78,6 +78,12 @@ const is = (prop, val) => ({ prop, op: '=', val })
 const entity = (val) => is('IfcEntity', val)
 const level = (val) => is('Level', val)
 
+/** 2026-11-09 — walls with no FireRating value: what the `absent` operator matches. */
+const NO_FIRERATING_WALLS = [entity('IfcWall'), { prop: 'FireRating', op: 'absent', val: '' }]
+const WALLS_NO_FIRERATING =
+  "SELECT COUNT(*) FROM element e WHERE e.type = 'IfcWall' AND NOT EXISTS " +
+  "(SELECT 1 FROM property p WHERE p.element = e.id AND p.name = 'FireRating' AND p.value IS NOT NULL AND p.value <> '')"
+
 /** Every case, in the order a run takes them. */
 const CASES = [
   /* ══════════════════════════════ answer ══════════════════════════════ */
@@ -2797,6 +2803,63 @@ const VEE_CASES = [
     oracle: {
       calls: [{ name: 'query_elements', input: { rules: [entity('IfcWall'), level('L2')] } }],
       reply: 'There are {wallsL2} walls on L2.'
+    }
+  },
+
+  /*
+   * 2026-11-09 — the owner, thumbs down: *"why the conversation never follow through? like i was
+   * asking these walls without fire rating then tabulate the wall by type become a reset and
+   * tabulate all walls instead?"* A follow-up that names no new set continues the one just found;
+   * one that says "all" does not. Graded on the panel's table: its counts sum to the set. On the
+   * messy model, where 4 of the 80 walls carry no FireRating (on the plain mock every wall has one).
+   */
+  {
+    id: 'multi-followup-narrows',
+    group: 'tabulate',
+    tags: ['tabulate', 'conversation', 'vee'],
+    fixture: 'mock-messy',
+    truth: { missing: { sql: WALLS_NO_FIRERATING, shape: 'scalar' } },
+    turns: [
+      {
+        prompt: 'Which walls are missing a fire rating?',
+        oracle: { calls: [{ name: 'query_elements', input: { rules: NO_FIRERATING_WALLS } }], reply: '**{missing}** walls are missing a `FireRating`.' },
+        expect: { facts: [{ num: 'missing' }] }
+      }
+    ],
+    prompt: 'Tabulate them by type.',
+    expect: {
+      tools: { require: ['summarize_elements'], maxCalls: 5 },
+      table: { sum: 'missing' }
+    },
+    oracle: {
+      calls: [{ name: 'summarize_elements', input: { rules: NO_FIRERATING_WALLS, groupBy: 'ObjectType' } }],
+      reply: 'The **{missing}** walls with no `FireRating`, by type, are in the table.'
+    }
+  },
+  {
+    id: 'multi-followup-all',
+    group: 'tabulate',
+    tags: ['tabulate', 'conversation', 'vee'],
+    fixture: 'mock-messy',
+    truth: {
+      missing: { sql: WALLS_NO_FIRERATING, shape: 'scalar' },
+      walls: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcWall'", shape: 'scalar' }
+    },
+    turns: [
+      {
+        prompt: 'Which walls are missing a fire rating?',
+        oracle: { calls: [{ name: 'query_elements', input: { rules: NO_FIRERATING_WALLS } }], reply: '**{missing}** walls are missing a `FireRating`.' },
+        expect: { facts: [{ num: 'missing' }] }
+      }
+    ],
+    prompt: 'Now tabulate all the walls by type, not just those.',
+    expect: {
+      tools: { require: ['summarize_elements'], maxCalls: 5 },
+      table: { sum: 'walls' }
+    },
+    oracle: {
+      calls: [{ name: 'summarize_elements', input: { rules: [entity('IfcWall')], groupBy: 'ObjectType' } }],
+      reply: 'All **{walls}** walls, by type, are in the table.'
     }
   }
 ]

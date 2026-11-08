@@ -1334,6 +1334,39 @@ describe('cost', () => {
     expect(COST.turnCost({ cacheCreateTokens: 1_000_000 }, 'claude-opus-5', true).usd).toBeCloseTo(10, 6)
   })
 
+  it('prices Sonnet 5.5 and Haiku 5.5 at their list rates (2026-11-09)', () => {
+    const M = 1_000_000
+    expect(COST.turnCost({ inputTokens: M, outputTokens: M, cacheReadTokens: M, cacheCreateTokens: M }, 'claude-sonnet-5-5', false).breakdown).toEqual({
+      in: 2,
+      out: 10,
+      cacheRead: 0.2,
+      cacheWrite: 2.5
+    })
+    expect(COST.turnCost({ cacheCreateTokens: M }, 'claude-sonnet-5-5', true).usd).toBeCloseTo(4, 9)
+    // Haiku 5.5: the short card up to a 100 000-token prompt per request, the long one above it.
+    const short = COST.turnCost({ inputTokens: 50_000, outputTokens: 1_000, rounds: 1 }, 'claude-haiku-5-5', false)
+    expect(short.rates).toMatchObject({ in: 0.1, out: 0.5 })
+    expect(short.usd).toBeCloseTo((50_000 * 0.1 + 1_000 * 0.5) / M, 12)
+    const long = COST.turnCost({ inputTokens: 10_000, cacheReadTokens: 100_000, outputTokens: 1_000, rounds: 1 }, 'claude-haiku-5-5', false)
+    expect(long.rates).toMatchObject({ in: 0.5, out: 2.5 })
+    // Summed over rounds: 3 rounds of 60 000 is three short-card requests.
+    expect(COST.turnCost({ inputTokens: 180_000, rounds: 3 }, 'claude-haiku-5-5', false).rates).toMatchObject({ in: 0.1 })
+  })
+
+  it('summarises answer times per model: median, 90th percentile and seconds a turn (2026-11-09)', () => {
+    const rows = [
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((t) => ({ model: 'claude-sonnet-5-5', latency_s: t, turns: 1 })),
+      { model: 'claude-haiku-5-5', latency_s: 4, turns: 2 },
+      { model: 'claude-haiku-5-5', latency_s: 2, turns: 1 },
+      { model: 'claude-haiku-5-5' },
+      { latency_s: 3 }
+    ]
+    const s = COST.latencySummary(rows)
+    expect(s['claude-sonnet-5-5']).toEqual({ cases: 10, turns: 10, median_s: 5.5, p90_s: 9, s_per_turn: 5.5 })
+    expect(s['claude-haiku-5-5']).toEqual({ cases: 2, turns: 3, median_s: 3, p90_s: 4, s_per_turn: 2 })
+    expect(s.unknown).toEqual({ cases: 1, turns: 1, median_s: 3, p90_s: 3, s_per_turn: 3 })
+  })
+
   it('refuses to guess a rate for a model it has no entry for', () => {
     expect(COST.turnCost({ inputTokens: 100 }, 'some-other-model', false).usd).toBe(null)
   })
@@ -1440,8 +1473,9 @@ describe('the case set', () => {
     }
     // 63 after phase 3; phase 4 added three (its own test is below); 2026-10-08 took the base
     // point's case away with the request, when the Coordinate-system card became read-only;
-    // 2026-11-08 added the twenty Ask Vee cases (their own test is at the end).
-    expect(CASES).toHaveLength(85)
+    // 2026-11-08 added the twenty Ask Vee cases (their own test is at the end); 2026-11-09 two
+    // follow-up conversations among them.
+    expect(CASES).toHaveLength(87)
     const names = new Set(TOOLS.map((t) => t.name))
     for (const c of CASES) {
       // A case written ahead of its capability may call a tool that build will add (stage 2's
@@ -1691,9 +1725,10 @@ describe('the Ask Vee cases (2026-11-08)', () => {
   const withSch = (schedules: unknown, before: unknown = schedules) =>
     obs({ store: { stack: [], colorBy: null, table: null, pending: null, chips: [], schedules }, storeBefore: { stack: [], colorBy: null, schedules: before } })
 
-  it('are twenty, after every older case, and each one fails a null agent', () => {
-    expect(VEE_CASES).toHaveLength(20)
-    expect(CASES.slice(-20).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
+  it('are twenty-two, after every older case, and each one fails a null agent', () => {
+    // Twenty on 2026-11-08; 2026-11-09 the owner's follow-up, narrowed and not.
+    expect(VEE_CASES).toHaveLength(22)
+    expect(CASES.slice(-22).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
     for (const c of VEE_CASES) {
       expect([c.id, c.tags.includes('vee')]).toEqual([c.id, true])
       expect([c.id, G.gradeCase(c, obs(), {}, kindOf).grade.pass]).toEqual([c.id, 0])
@@ -1716,8 +1751,8 @@ describe('the Ask Vee cases (2026-11-08)', () => {
     expect(runsOf(byId.get('ans-counts'))).toBe(1)
     expect(runsOf(byId.get('op-scope-guard'))).toBe(3)
     for (const id of TRIPLE_RUN_IDS) expect([id, byId.has(id)]).toEqual([id, true])
-    // About twenty that a build without stage 2 can score.
-    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(20)
+    // About twenty that a build without stage 2 can score (twenty-two since the 2026-11-09 follow-ups).
+    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(22)
     expect(PILOT_MAX).toBe(5)
     for (const id of PILOT_IDS) expect([id, TRIPLE_RUN_IDS.includes(id), !!byId.get(id).requires]).toEqual([id, true, false])
   })

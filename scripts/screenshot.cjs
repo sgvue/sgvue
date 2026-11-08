@@ -943,7 +943,7 @@ app.whenReady().then(async () => {
     if (veeWin && !veeWin.isDestroyed()) veeWin.close()
   })
   ipcMain.handle('settings:get', () => ({
-    model: 'claude-opus-5',
+    model: 'claude-sonnet-5-5',
     effort: 'medium',
     cacheOneHour: false,
     backend: 'auto',

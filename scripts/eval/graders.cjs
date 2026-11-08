@@ -950,6 +950,14 @@ function gradeTable(spec, obs, truth) {
       out.push(check('table-rows', !wrong.length, `table rows disagree with the database — ${wrong.join('; ')}`))
     }
   }
+  // 2026-11-09 — the set the table covers, whatever it was grouped by: its counts sum to it.
+  if (spec.table.sum) {
+    const want = truth[spec.table.sum]
+    const got = table.rows.reduce((n, r) => n + (Number.isFinite(r.n) ? r.n : 0), 0)
+    out.push(
+      check('table-sum', typeof want === 'number' && got === want, `the table's counts sum to ${got}, expected ${want} (${spec.table.sum})`)
+    )
+  }
   return out
 }
 

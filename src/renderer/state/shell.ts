@@ -508,6 +508,12 @@ export interface ShellState {
    */
   chatIfcsgHeadsUp: { headsUp: Observation; federation: object; claimed?: boolean } | null
   /**
+   * 2026-11-09 — which conversation this is: moved on by `seedChat`, so the next turn tells main to
+   * start the API transcript afresh (`AiTurnStart.fresh`, `ai/bridge.ts`). Main keeps a window's
+   * transcript across turns; a conversation the user sees start again must start again there too.
+   */
+  chatEpoch: number
+  /**
    * 2026-09-24 — the suggestion row, once the conversation has a user turn, folds behind one
    * `suggestions` chip; this is whether that chip has it open. `chipsFolded` decides.
    */
@@ -710,7 +716,11 @@ export interface ShellState {
    * in `RESTORE_ORDER`. A share link and the chat's revert both come through here.
    */
   applySession: (p: Partial<SessionPayload>) => void
-  /** The local audit that greets a fresh federation, as the first turn. `:1642`. */
+  /**
+   * The local audit that greets a fresh federation, as the first turn. `:1642`. Since 2026-11-09
+   * also the Ask Vee window's `New conversation` button: with no model open the transcript is
+   * left empty, and the window shows its not-ready line.
+   */
   seedChat: () => void
   hide: (ids: readonly number[]) => void
   show: (ids: readonly number[]) => void
@@ -1172,6 +1182,7 @@ export const useShell = create<ShellState>((set, get) => ({
   chatIfcsg: 'unknown',
   chatIfcsgAsked: false,
   chatIfcsgHeadsUp: null,
+  chatEpoch: 0,
   chatSuggestOpen: false,
   sideStoreys: null,
   modelsOpen: true,
@@ -2176,17 +2187,26 @@ export const useShell = create<ShellState>((set, get) => ({
   /** `SGVue.dc.html:1642`. Local arithmetic, seeded as the first turn — never a model call. */
   seedChat: () => {
     const s = get()
-    if (!s.federation.elements.length) return
-    const seed = seedAudit(s.federation.elements, s.federation.storeys, s.loaded)
+    const seed = s.federation.elements.length ? seedAudit(s.federation.elements, s.federation.storeys, s.loaded) : null
     set({
-      chatMsgs: [{ role: 'assistant', text: seed.text, chips: seed.chips, at: Date.now(), models: slotRecords(s.federation) }],
+      // Every reply goes with the transcript — its pending request, its `revert` — and what the
+      // replies did to the view stays as it is.
+      chatMsgs: seed
+        ? [{ role: 'assistant', text: seed.text, chips: seed.chips, at: Date.now(), models: slotRecords(s.federation) }]
+        : [],
       chatErr: '',
       chatEnd: null,
       chatBusy: false,
+      chatReplyTo: null,
+      chatReplyPart: null,
+      // The suggestions start unfolded, as in a new window.
+      chatSuggestOpen: false,
       // A new conversation: the IFC+SG question is unasked again, and nothing is kept for it.
       chatIfcsg: 'unknown',
       chatIfcsgAsked: false,
-      chatIfcsgHeadsUp: null
+      chatIfcsgHeadsUp: null,
+      // …and main's transcript starts again with the next turn.
+      chatEpoch: s.chatEpoch + 1
     })
   },
 

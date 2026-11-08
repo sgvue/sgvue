@@ -41,7 +41,7 @@ export const TURN_TIMEOUT_MS = 120_000
 /**
  * Output tokens.
  *
- * **Thinking counts against this** on `claude-opus-5`, and the request always streams, where
+ * **Thinking counts against this** on `claude-sonnet-5-5` (as on `claude-opus-5`), and the request always streams, where
  * the documented default is ~64 000 — a timeout is not the concern a non-streaming request has.
  * At 16 000 a long table or a twelve-round turn could be cut off mid-answer, and this loop
  * treats `stop_reason: max_tokens` as a failed turn and rolls the transcript back, so the cost
@@ -216,6 +216,49 @@ const isSchemaRefusal = (message: string): boolean =>
 const isSystemRoleRefusal = (message: string): boolean =>
   /role.*system|system.*role|system.*not supported/i.test(message)
 
+/**
+ * A 400 that is really "a thinking block was replayed after something before it changed"
+ * (2026-11-09, with the move to `claude-sonnet-5-5`). On Sonnet 5.5 — and Opus 5.5, Haiku 5.5 —
+ * a thinking block is bound to the `system` prompt, the `tools` and every message before it, and
+ * on accounts created on or after 2026-08-31 a request that sends one back after a change is
+ * refused. This loop keeps the transcript append-only, but `system[1]` is the model schema, which
+ * is rebuilt when the federation changes, and the three recoveries above edit the request too.
+ */
+export const isThinkingBindingRefusal = (message: string): boolean =>
+  /signature[^.]*thinking|thinking[^.]*signature|bound to a different conversation/i.test(message)
+
+/**
+ * The documented recovery for that refusal, with no beta header: every `thinking` and
+ * `redacted_thinking` block taken out of the assistant turns (their `text` and `tool_use` stay),
+ * so the request carries nothing bound to the old prefix. The turns that follow keep their own,
+ * new blocks. An assistant turn left empty by it — none is, since every one ends in text or a
+ * tool call — keeps what it had.
+ */
+export function stripThinking(request: StreamingParams): void {
+  request.messages = request.messages.map((m) => {
+    if (m.role !== 'assistant' || typeof m.content === 'string') return m
+    const kept = m.content.filter((b) => b.type !== 'thinking' && b.type !== 'redacted_thinking')
+    return kept.length && kept.length !== m.content.length ? { ...m, content: kept } : m
+  })
+}
+
+/**
+ * What of a response goes back into the transcript, and is acted on (2026-11-09). With
+ * `fallbacks: 'default'` a model that declines mid-answer hands over to another on the same
+ * stream: `content` keeps the declined partial, then a `fallback` block, then what the fallback
+ * model wrote. Echoed back, the partial's `thinking`, `redacted_thinking` and `tool_use` blocks
+ * must be left out — the model that wrote them did not finish — and its text kept. A response with
+ * no `fallback` block is returned as it came.
+ */
+export function echoable<T extends { type: string }>(content: readonly T[]): T[] {
+  let last = -1
+  content.forEach((b, i) => {
+    if (b.type === 'fallback') last = i
+  })
+  if (last < 0) return [...content]
+  return content.filter((b, i) => i >= last || b.type === 'text')
+}
+
 /* ────────────────────────────── the session ────────────────────────────── */
 
 export interface TurnRequest {
@@ -225,6 +268,8 @@ export interface TurnRequest {
   viewState: unknown
   /** Sent only when the federation changed; main keeps the last one otherwise. */
   schema?: unknown
+  /** 2026-11-09 — the first turn of a new conversation: the transcript starts empty. */
+  fresh?: boolean
 }
 
 export interface GatewaySettings {
@@ -372,11 +417,14 @@ export class AiGateway {
     const maxRounds = this.deps.maxRounds ?? MAX_TOOL_ROUNDS
     const wallClock = this.deps.turnTimeoutMs ?? TURN_TIMEOUT_MS
     const deadline = now() + wallClock
+    // A new conversation keeps nothing of the old one (`AiTurnStart.fresh`).
+    if (turn.fresh) this.history = []
     const baseLength = this.history.length
     if (turn.schema !== undefined && turn.schema !== null) this.schema = turn.schema
     this.aborted = false
     this.stopKind = null
     let droppedOldestOnce = false
+    let strippedThinkingOnce = false
     let rounds = 0
     let text = ''
     // Armed inside the `try`, so the `finally` that clears it covers everything after it: a
@@ -436,6 +484,13 @@ export class AiGateway {
             this.snapshot(turn.turnId, request)
             continue
           }
+          // Once a turn, not once a session: the schema can change at any later turn.
+          if (failure.kind === 'bad_request' && !strippedThinkingOnce && isThinkingBindingRefusal(failure.message)) {
+            strippedThinkingOnce = true
+            stripThinking(request)
+            this.snapshot(turn.turnId, request)
+            continue
+          }
           if (failure.kind === 'bad_request' && !droppedOldestOnce && isContextOverflow(failure.message)) {
             droppedOldestOnce = true
             trimOldest(request)
@@ -444,6 +499,9 @@ export class AiGateway {
           }
           return this.finishError(turn.turnId, baseLength, failure)
         }
+
+        // A mid-answer fallback's declined partial is not acted on or echoed — only its text.
+        message = { ...message, content: echoable(message.content) }
 
         const usage = message.usage
         emit({

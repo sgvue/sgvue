@@ -49,6 +49,24 @@ export type Part =
   | { kind: 'headsUp' }
   | { kind: 'consent' }
 
+/** Text as compared for a repeat: its marks out, its spaces one, its case and closing stops gone. */
+const said = (text: string): string =>
+  plainText(text)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.!?…:;]+$/, '')
+    .toLowerCase()
+
+/**
+ * 2026-11-09 — whether a reply's text already says its IFC+SG lead-in: the lead-in, flattened as
+ * a quote is, stands somewhere in the flattened reply. Both windows split with this, from the same
+ * two fields, so the parts — and a part's place, which a reply names — are the same in both.
+ */
+export function saysAlready(text: string, lead: string): boolean {
+  const l = said(lead)
+  return l !== '' && said(text).includes(l)
+}
+
 /**
  * The parts of a message, in drawing order: one bubble per block of the text (the first is the
  * lead, which carries the time), the IFC+SG question (stage 2), the chips, the storey-rows card,
@@ -59,7 +77,9 @@ export function partsOf(m: Splittable): Part[] {
   if (m.role === 'user') return [{ kind: 'text', block: 0, lead: true }]
   const parts: Part[] = parseBlocks(m.text).map((_, i) => ({ kind: 'text' as const, block: i, lead: i === 0 }))
   if (m.ask) {
-    if (m.ask.lead.trim()) parts.push({ kind: 'askLead' })
+    // 2026-11-09 — a lead-in the reply's own text already says is not said twice (the owner saw
+    // a reply of Vee's twice: the model wrote its `ask_choice` lead-in as its answer as well).
+    if (m.ask.lead.trim() && !saysAlready(m.text, m.ask.lead)) parts.push({ kind: 'askLead' })
     parts.push({ kind: 'ask' })
   }
   if (m.chips?.length) parts.push({ kind: 'chips' })

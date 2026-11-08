@@ -494,7 +494,8 @@ async function installDevTools(viewer: Viewer): Promise<void> {
       recorded: () => lastTurnRecord(),
       reset: () => {
         traceFail()
-        useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatIfcsg: 'unknown', chatIfcsgAsked: false, chatIfcsgHeadsUp: null })
+        // 2026-11-09: a new epoch too, so the next turn starts main's transcript again (`AiTurnStart.fresh`).
+        useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatIfcsg: 'unknown', chatIfcsgAsked: false, chatIfcsgHeadsUp: null, chatEpoch: shell().chatEpoch + 1 })
       },
       /**
        * 2026-09-20. One turn's tool sequence without the API, for `scripts/ai-audit.cjs`:

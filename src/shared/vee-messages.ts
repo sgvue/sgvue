@@ -409,6 +409,11 @@ export const VeeIntent = z.discriminatedUnion('type', [
   /** The answer to a `copy`: whether the text reached the clipboard. */
   z.object({ type: z.literal('copied'), n: count, ok: z.boolean() }).strict(),
   /** The panel's ×, or Esc. */
-  z.object({ type: z.literal('close') }).strict()
+  z.object({ type: z.literal('close') }).strict(),
+  /**
+   * 2026-11-09 — the header's `New conversation` button: the main window starts the conversation
+   * again (`seedChat`), and only while no turn runs. It carries nothing.
+   */
+  z.object({ type: z.literal('newChat') }).strict()
 ])
 export type VeeIntent = z.infer<typeof VeeIntent>

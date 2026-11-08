@@ -73,7 +73,7 @@ export const ask_choice: Executor = (input, ctx) => {
   const lead = labelText(String(input.lead ?? '').trim(), ASK_LEAD_MAX)
   return {
     forModel: {
-      message: `Asked. Under your reply the user sees "${lead ? `${lead} ` : ''}${IFCSG_QUESTION}" with Yes and No. Nothing is answered yet: end your turn now, without repeating the question. The answer arrives as the user's next message, and the view state then carries ifcsg.`,
+      message: `Asked. Under your reply the user sees "${lead ? `${lead} ` : ''}${IFCSG_QUESTION}" with Yes and No. Nothing is answered yet: end your turn now, without repeating the lead-in or the question — at most one short sentence of your own. The answer arrives as the user's next message, and the view state then carries ifcsg.`,
       asked: true
     },
     // The touched set stays with the question, in the main window, for the heads-up after a "Yes".

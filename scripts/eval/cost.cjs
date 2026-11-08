@@ -12,10 +12,19 @@
  * Pure. `tests/unit/ai-eval-graders.test.ts` is its unit test.
  */
 
-/** $ per million tokens, base input and output. Cache rates are derived below. */
+/**
+ * $ per million tokens, base input and output. Cache rates are derived below.
+ *
+ * Source: the `claude-api` skill's model table and migration guide (cached 2026-10-06), read
+ * 2026-11-09 — Sonnet 5.5 $2 / $10 (cache reads $0.20, 5-minute writes $2.50, 1-hour $4), the same
+ * as Sonnet 5, whose entry here read $3 / $15 until then; Haiku 5.5 $0.10 / $0.50 for a prompt of
+ * 100 000 tokens or fewer and $0.50 / $2.50 above (`long`), its cache rates the same multiples.
+ */
 const PRICES = {
   'claude-opus-5': { in: 5, out: 25 },
-  'claude-sonnet-5': { in: 3, out: 15 },
+  'claude-sonnet-5-5': { in: 2, out: 10 },
+  'claude-sonnet-5': { in: 2, out: 10 },
+  'claude-haiku-5-5': { in: 0.1, out: 0.5, long: { above: 100_000, in: 0.5, out: 2.5 } },
   'claude-haiku-4-5': { in: 1, out: 5 }
 }
 
@@ -24,10 +33,15 @@ const CACHE_READ_MULTIPLIER = 0.1
 /** A cache **write** is 1.25× base input at the five-minute TTL, 2× at the one-hour TTL. */
 const CACHE_WRITE_MULTIPLIER = { fiveMinute: 1.25, oneHour: 2 }
 
-/** The rate card for one model, or null when the table has no entry for it. */
-function ratesFor(model, cacheOneHour) {
-  const base = PRICES[String(model)]
-  if (!base) return null
+/**
+ * The rate card for one model, or null when the table has no entry for it. A model with two cards
+ * (`long`) takes the long one when a request's prompt — `promptTokens`, input plus cache read
+ * plus cache write — is over its threshold.
+ */
+function ratesFor(model, cacheOneHour, promptTokens = 0) {
+  const card = PRICES[String(model)]
+  if (!card) return null
+  const base = card.long && promptTokens > card.long.above ? card.long : card
   return {
     in: base.in,
     out: base.out,
@@ -46,9 +60,14 @@ function ratesFor(model, cacheOneHour) {
  * @returns {{usd:number|null, rates:object|null, breakdown:object|null}}
  */
 function turnCost(usage, model, cacheOneHour) {
-  const rates = ratesFor(model, cacheOneHour)
-  if (!usage || !rates) return { usd: null, rates, breakdown: null }
   const n = (v) => (Number.isFinite(v) ? v : 0)
+  // A turn's usage is summed over its rounds, so the prompt of one request is taken as the mean
+  // per round — an approximation, and it matters only for a model with two cards (Haiku 5.5).
+  const prompt = usage
+    ? (n(usage.inputTokens) + n(usage.cacheReadTokens) + n(usage.cacheCreateTokens)) / Math.max(1, n(usage.rounds) || 1)
+    : 0
+  const rates = ratesFor(model, cacheOneHour, prompt)
+  if (!usage || !rates) return { usd: null, rates, breakdown: null }
   const breakdown = {
     in: (n(usage.inputTokens) * rates.in) / 1e6,
     out: (n(usage.outputTokens) * rates.out) / 1e6,
@@ -158,6 +177,43 @@ function estimateRun(plan, model, measured) {
   }
 }
 
+/**
+ * 2026-11-09 — how fast a model answered, per model served: the median and the 90th percentile
+ * (nearest rank) of a case's wall time, `latency_s`, and seconds a user turn — the sum of those
+ * times over the sum of the cases' turns. A row with no `latency_s` is left out; a row with no
+ * `model` counts under `unknown`. Times are rounded to 0.01 s.
+ *
+ * @param {{model?: string, latency_s?: number, turns?: number}[]} rows
+ * @returns {Record<string, {cases: number, turns: number, median_s: number, p90_s: number, s_per_turn: number}>}
+ */
+function latencySummary(rows) {
+  const by = new Map()
+  for (const r of rows || []) {
+    if (!r || typeof r.latency_s !== 'number' || !Number.isFinite(r.latency_s)) continue
+    const key = typeof r.model === 'string' && r.model ? r.model : 'unknown'
+    const acc = by.get(key) || { times: [], turns: 0 }
+    acc.times.push(r.latency_s)
+    acc.turns += Number.isInteger(r.turns) && r.turns > 0 ? r.turns : 1
+    by.set(key, acc)
+  }
+  const round = (v) => Math.round(v * 100) / 100
+  const rank = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))]
+  const out = {}
+  for (const [model, { times, turns }] of by) {
+    const sorted = [...times].sort((a, b) => a - b)
+    const mid = sorted.length >> 1
+    const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+    out[model] = {
+      cases: sorted.length,
+      turns,
+      median_s: round(median),
+      p90_s: round(rank(sorted, 0.9)),
+      s_per_turn: round(sorted.reduce((a, b) => a + b, 0) / turns)
+    }
+  }
+  return out
+}
+
 /** `$0.0123`, or `—` when nothing could be priced. */
 const money = (usd) => (typeof usd === 'number' ? `$${usd.toFixed(4)}` : '—')
 
@@ -171,5 +227,6 @@ module.exports = {
   money,
   ROUGH_TURN,
   measuredTurn,
-  estimateRun
+  estimateRun,
+  latencySummary
 }

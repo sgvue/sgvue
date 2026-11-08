@@ -23,8 +23,12 @@ import { join } from 'node:path'
 import { SettingsPatch, SettingsView, type AiEffort, type RendererBackend } from '../shared/ipc-contract'
 import type { GpuSwitchFailure } from './gpu-choice'
 
-/** The plan's pinned model (`CLAUDE.md` → Decisions). */
-const DEFAULT_MODEL = 'claude-opus-5'
+/**
+ * The plan's pinned model (`CLAUDE.md` → Decisions). `claude-sonnet-5-5` since 2026-11-09 — the
+ * owner: *"set the sonnet 5.5 for all future installer"*. Only the default: a stored `model`
+ * still wins, so a settings file an earlier build wrote keeps the model it names.
+ */
+const DEFAULT_MODEL = 'claude-sonnet-5-5'
 const DEFAULT_EFFORT: AiEffort = 'medium'
 const DEFAULT_BACKEND: RendererBackend = 'auto'
 
