@@ -70,7 +70,11 @@ async function openSchedules(app: ElectronApplication, page: Page): Promise<Page
   return win
 }
 
-const railItems = (win: Page) => win.locator('.rail-item')
+/**
+ * The rail's categories. Not every `.rail-item`: since v1.5.0, phase 3, the rail also draws the
+ * schedule in use under its Templates section (`.rail-item.cur-row`), which is no category.
+ */
+const railItems = (win: Page) => win.locator('.rail-item[data-act="category"]')
 
 /**
  * The main window's theme toggle. Since 2026-10-01 it sits in the toolbar's third group, clear
@@ -292,6 +296,13 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(sched.locator('.viewbar .vchip.filter')).toHaveCount(1)
 
     // 3 — group by Level with a header row, and switch itemise off: identical rows collapse.
+    // A template already groups by Level (a header row and a count footer —
+    // `scheduleFromPreset`), so that level is taken away first, from its chip's popover, and
+    // the grouping is built again through "+ Sort / group".
+    await expect(sched.locator('tr.group')).toHaveCount(2)
+    await chip(sched, 'sort', '[data-i="0"]').click()
+    await inPop(sched, 'sort-remove', '[data-i="0"]').click()
+    await expect(sched.locator('tr.group')).toHaveCount(0)
     await addOn(sched, 'sort', 'core|storey', 'level')
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await expect(sched.locator('tr.group')).toHaveCount(2)
@@ -332,7 +343,7 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     // 7 — edit, then switch category: the window's own dialog asks first.
     await chip(sched, 'style').click()
     await inPop(sched, 'app-zebra').uncheck()
-    await sched.locator('.rail-item', { hasText: 'IfcSlab' }).click()
+    await railItems(sched).filter({ hasText: 'IfcSlab' }).click()
     const dialog = sched.locator('.dlg[role="dialog"]')
     await expect(dialog).toContainText('Replace the current schedule setup?')
     await dialog.getByRole('button', { name: 'Replace' }).click()
@@ -484,9 +495,10 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
     await expect.poll(() => railItems(sched).count()).toBeGreaterThan(3)
 
     // A grouped door schedule with a filter, footers, a grand total and conditional colours.
+    // The template already groups by Level; its level's chip holds the header and footer.
     await useTemplate(sched, 'b:door-schedule')
     await addOn(sched, 'filter', 'core|storey', 'level')
-    await addOn(sched, 'sort', 'core|storey', 'level')
+    await chip(sched, 'sort', '[data-i="0"]').click()
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await inPop(sched, 'sort-footer', '[data-i="0"]').check()
     await chip(sched, 'rows').click()
@@ -555,7 +567,7 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
       await chip(sched, 'style').click()
       await inPop(sched, 'app-zebra').uncheck()
       await inPop(sched, 'app-zebra').check()
-      await sched.locator('.rail-item', { hasText: 'IfcWall' }).first().click()
+      await railItems(sched).filter({ hasText: 'IfcWall' }).first().click()
       await snap('dialog', theme)
       await sched.keyboard.press('Escape')
     }
@@ -697,6 +709,10 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
     await expect.poll(() => itemOff(sched, rows.nth(1), 'Isolate (2)')).toBe(true)
     await page.keyboard.press('Control+Z')
     await expect.poll(() => counts(page)).toEqual([total, total])
+    // The main window posts what is hidden to this window at most once a frame (a 100 ms timer
+    // behind an occluded window), and a menu is drawn from what this window knew when it
+    // opened — so Hide is live once that post has landed, not the moment the counts are back.
+    await expect.poll(() => itemOff(sched, rows.nth(3), 'Hide')).toBe(false)
 
     // 6 — Hide one row (not in the selection, so the menu acts on it alone), Show it, Hide it
     // again and Show all. Each item is live only when it would do something.
@@ -961,7 +977,11 @@ async function exportAs(win: Page, label: string): Promise<void> {
   await menuItem(win, label).click()
 }
 
-/** The table on screen as text: the headings, then every data row — badges and swatches left out. */
+/**
+ * The table on screen as text: the headings, then every data row — badges and swatches left
+ * out, and the `+ Column` heading too: it is the field picker's button, not a column (no
+ * `data-defcol`, no cells, hidden in print by `print.css`), and the exporter never sees it.
+ */
 const tableText = (win: Page): Promise<string[][]> =>
   win.evaluate(() => {
     const text = (el: Element): string => {
@@ -970,7 +990,7 @@ const tableText = (win: Page): Promise<string[][]> =>
       return (c.textContent ?? '').trim()
     }
     return [
-      [...document.querySelectorAll('table.schedule thead th')].map(text),
+      [...document.querySelectorAll('table.schedule thead th:not(.add-col)')].map(text),
       ...[...document.querySelectorAll('table.schedule tbody tr.data')].map((tr) => [...tr.querySelectorAll('td')].map(text))
     ]
   })
@@ -1140,9 +1160,15 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const after = await dialogs(app)
     expect([after.saves.length, after.opens.length]).toEqual([before.saves.length, before.opens.length])
 
-    // 7 — save the setup; the workbook of every saved schedule is one sheet per setup.
+    // 7 — save the setup; the workbook of every saved schedule is one sheet per setup. The
+    // header's Save on a schedule that is not a saved one opens the library's Save row (as in
+    // phase 2); Enter saves it.
     await act(sched, 'save-schedule').first().click()
+    await expect(library(sched).locator('[data-act="library-save-name"]')).toBeFocused()
+    await sched.keyboard.press('Enter')
     await expect(toast).toHaveText('Saved “Wall Schedule”.')
+    await sched.keyboard.press('Escape')
+    await expect(library(sched)).toHaveCount(0)
     const bookPath = join(out, 'book.xlsx')
     await answerSave(app, bookPath)
     await exportAs(sched, 'All saved schedules (.xlsx)')
@@ -1158,12 +1184,15 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     await sched.locator('.schedule-name').fill('Walls round trip')
     await sched.locator('.schedule-name').press('Tab')
     await addOn(sched, 'sort', 'core|storey', 'level')
-    // The switches are labels over a 1 px input: clicked where a hand clicks them.
-    const toggleOf = (input: ReturnType<Page['locator']>) => sched.locator('label', { has: input })
-    await toggleOf(inPop(sched, 'sort-header', '[data-i="0"]')).click()
+    // The switches are labels over a 1 px input: clicked where a hand clicks them. The label
+    // is looked for in the popover; the input inside it is a plain `[data-act]` locator, because
+    // Playwright reads a `has` locator relative to each label — a `#popover …` one would look
+    // for a popover inside the label, and find none.
+    const toggleOf = (name: string, more = '') => pop(sched).locator('label', { has: act(sched, name, more) })
+    await toggleOf('sort-header', '[data-i="0"]').click()
     await expect(inPop(sched, 'sort-header', '[data-i="0"]')).toBeChecked()
     await chip(sched, 'rows').click()
-    await toggleOf(inPop(sched, 'itemize')).click()
+    await toggleOf('itemize').click()
     await expect(inPop(sched, 'itemize')).not.toBeChecked()
     await expect(sched.locator('tr.data')).toHaveCount(2)
     await answerSave(app, join(out, 'setup.json'))

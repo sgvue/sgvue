@@ -1,7 +1,7 @@
 // The hand-authored templates: the general list, and the IFC-SG section beside it. No DOM.
 //
 // What is worth pinning is the boring stuff a template gets wrong silently: an IFC class
-// misspelt (the gallery would just never offer it), a template applied and then edited
+// misspelt (the Templates library would just never offer it), a template applied and then edited
 // writing back into the module constant, and a schedule that cannot survive being saved and
 // reopened — which is what applying a template and hitting Save actually does.
 
@@ -155,7 +155,7 @@ describe('the Planting template against a model', () => {
   // The fake-store pattern from engine.test.ts: three IfcGeographicElement, of which two
   // are trees. IFC-SG classifies by ObjectType on a generic class, so the class count and
   // the schedule's row count are two different numbers — which is the whole reason the
-  // gallery runs a filtered template through the engine for its "N in model".
+  // Templates library runs a filtered template through the engine for its "N in model".
   const meta: ModelMeta = {
     fileName: 'sg.ifc', schema: 'IFC4', projectName: '', authoringTool: '',
     lengthUnit: 'mm', unitSystem: 'metric', elementCount: 0, parseMs: 0,
@@ -193,8 +193,8 @@ describe('the Planting template against a model', () => {
     expect(rows[0].cells[2]).toBe('0.30');
   });
 
-  it('counts what the gallery card claims', () => {
-    // The gallery's own inModel() is not exported and lives in a DOM module, so the count
+  it('counts what the Templates library claims', () => {
+    // The library's own count (libraryCache.ts) lives in a DOM module, so the count
     // is pinned here at its source: matchedElements under the template's own filters.
     const res = runSchedule(store, scheduleFromPreset(presetById('sg-planting')!), { cap: 0 });
     expect(res.matchedElements).toBe(2);
