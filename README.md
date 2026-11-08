@@ -21,8 +21,8 @@ it up, ask **Vee**, the built-in assistant, about the model in plain language. S
   with bubbles and the dimensions between them.
 - **Properties** — every property set and quantity of the selected element, and the model's
   georeferencing, including the CORENET X (Singapore) convention.
-- **Schedules** — Revit-style schedules in a second window, linked to the 3D view, with export
-  to Excel and CSV.
+- **Schedules** — Revit-style schedules in a second window, linked to the 3D view, with a
+  library of templates and export to Excel and CSV.
 - **Views** — saved viewpoints, colour by any property, and `sgvue://` links that reopen the
   same view when the same files are at hand.
 - **Project files** — save a review as a `.sgvue` project (File › Save Project) and open it

@@ -1705,7 +1705,7 @@ test('the assistant works the Schedules window’s own controls: undo and redo, 
     await act(sched, 'undo').click()
     await expect(heads).toHaveText(['Name', 'Level'])
 
-    // 3 — the template gallery: listed with each card's figures, and one applied by its name.
+    // 3 — the Templates library's built-in templates: listed with each one's figures, and one applied by its name.
     const templates = (await manage('templates')).result.templates as { id: string; name: string; inUse: boolean; elements: number }[]
     const wall = templates.find((t) => t.id === 'wall-schedule')!
     expect(wall).toMatchObject({ name: 'Wall Schedule', inUse: false, elements: 4 })

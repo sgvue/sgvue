@@ -4,6 +4,56 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — 1.5.0 prepared: ifcTable's table-first Schedules window and the storey rule, recorded
+
+**Why.** The owner: *"Refer to my private github ifcTable. I have updated the majority of the UI
+layers for better user experience. Please help me wire them in the sgvue as v1.5.0"* — then
+*"Yes, add them"* (deterministic checks), *"Yes, 780 px"*, *"Yes, fix all three"* (the oracle's
+data findings), *"Yes, fix all four"* (Schedules defects) and *"go with your recommendation"*
+(the storey follows its host).
+
+**What 1.5.0 is** (`49a3e97..2412e5a`, ten commits). *Phase 1* (`3a38d2e`): ifcTable's pure
+schedule actions, a `between` end left empty is open-ended, calculated entries rebuilt from
+known keys on every route in, Excel cells only strings and numbers, and a net of golden masters,
+round trips, seeded simulations and a reachability tripwire. *Phase 2* (`7f67e67`): the
+table-first window — column menus from the headings, the view bar's chips, a search-first field
+picker, one popover, the press gate; the inspector, its grip, the field browser and
+`sgvue.schedules.inspectorW` gone; placeholders count as no value for coverage. *Phase 3*
+(`c0fb371`): one Templates library for the gallery and My templates, ifcTable's icon set, a cap
+of 100 that refuses (`full`; `evict` gone), Import adding to Mine, `minWidth` 780. *Checks*
+(`c5a5d97`, `81f465b`): every Schedules cell of `reference.ifc`, `feet.ifc` and `edge.ifc`
+against IfcOpenShell, the drawn table against the engine, totals and filters against an
+independent oracle, the window and port as seeded state machines. *Fixes*: derived units in SI in
+Schedules only, an exact measure table, Building / Site / Space from `IfcElement.container`
+(`a7eeee0`); a footer label's one rule, `restate`, a define as its own step, a timeout "not
+known" (`996dac7`); storey and container by IfcOpenShell's `get_container` (`2412e5a`).
+
+**Did — the records, no behaviour change.** Version **1.5.0** in `package.json`, both root
+entries of `package-lock.json` and the bug-report template's placeholder. `CHANGELOG.md`
+`[1.5.0] - 2026-11-08` (Added / Changed / Fixed / Security). `docs/releases/1.5.0.md` in 1.4.0's
+order — what's new, fixes, security, what works differently after updating (where each inspector
+tab went, the library, the refusing cap, Import adding to Mine, the open-ended `between`, nested
+parts and doors in openings on their host's storey, 780 px), known limits, 1.3.0's system
+requirements with the disk sizes left for publication, install notes. `README.md`'s Schedules
+line names the library. `CLAUDE.md`: the 2026-09-25 Schedules deviation gains a dated 2026-11-08
+amendment with the owner's words, and its now-false sentences (My templates' Open schedule file,
+the tabs, the gallery, the forget-at-the-hundred question) and four Decisions lines (the
+inspector width, the tabs, `forgottenByDuplicate`, nine results) carry *(Amended 2026-11-08)*
+notes; eight new Decisions lines. `docs/DECISIONS.md`: eight rows, five older rows amended.
+`docs/SYSTEM_SPEC.md`: the version line and the Schedules passages of §8 and §9 and the port's
+row in §10. One stale comment in `tests/e2e/schedules.spec.ts`. The oldest entry here, 2026-10-02's
+assistant parity phase 1, is compressed into Earlier work.
+
+**Verified.** `npm run typecheck` and `npm run lint` clean; `npm run build` exit 0, `1.5.0` in
+`out/main/index.js`; an unpacked arm64 app (`npx electron-builder --mac dir --arm64`, nothing
+launched), then `npm test` **206 files passed, 4 016 tests passed / 3 skipped** —
+`asar-contents.test.ts` on that package and `third-party-notices.test.ts` among them, the schedule
+oracle 0 mismatches on all three models; `npm run privacy` PASS, the new notes included.
+**Owed before the tag:** the windowed e2e runs — `schedules.spec.ts` above all (rewritten in
+phases 2 and 3 and not yet run), then `smoke`, `project`, `feet`, `keyboard`, `big-model` and
+`vee-trace` for the storey rule, and `test:packaged` on a 1.5.0 package; CI green; then the tag,
+the release build, the owner's tests and publishing.
+
 ## 2026-11-08 — SGVue 1.4.0 published
 
 **Did.** Pushed `main` and the tag `v1.4.0` (`5a58765`); `release.yml` built the three installers,
@@ -1979,90 +2029,17 @@ keeps references to the state as it stood (as the design's did for visibility) u
 is reverted or the transcript is cleared. `scripts/ai-audit.cjs`'s hand-written tool matrix was not
 extended. `dist/` was not rebuilt, so the packaged spec ran against the existing package.
 
-## 2026-10-02 — Assistant parity, phase 1 of 4: switches, selection, history, models — and reading back what it set
-
-**Why:** the owner, 2026-10-01: *"assistant should possess everything user can do on the app.
-that would be the best case scenario."* An audit set every user action beside the assistant's
-tools; this is the first of its four phases — the reversible view state the assistant could not
-reach, the defects it found in the existing tools, and the larger hole: the assistant could set
-several things it could not read back. No camera, viewpoints, markups, files, clipboard or
-Schedules-window work; those are phases 2–4 and were not started.
-
-**Did.** *Reachable now, each through the action its own control calls:* `toggle_display` gains
-`groundGrid` (the canvas grid — recorded on 2026-09-24 as not reachable; amended in
-`CLAUDE.md`, `docs/DECISIONS.md` and `state/shell.ts`), `snap` and `originalMaterials`;
-`select_elements` a `mode` (`replace | add | remove | clear`); `apply_visibility` the actions
-`undo` / `redo` (the store's `step`); `color_models` a `null` for one key (the palette's
-reset); two new view tools — `set_models` (the model eye, one `up({ modelVis })`) and
-`set_interface` (theme, units, tree mode, sidebar, card, armed tool, tree search, opening the
-Schedules window; `ai/executors/interface.ts`). 33 tools. *Read back:* the per-turn view state
-is sparse — `display`, `tool`, `modelsHidden`, `sectionPlanes` appear only while something is
-off its default (`sparseViewState`) — and `get_view_state` reports all of it in full
-(`display`, `sectionPlanes`, `history`, `models`, `interface`), `section` kept the one string
-the eval grades. *Defects fixed:* `activate_model` handed the already-active key left activate
-mode and answered "Activated X." — it stays active now; `toggle_display`'s `dims` said nothing
-when already so; a second held change in a turn silently replaced the first (`oneHeld`);
-`manage_filters`' `enable` and `apply_set` bypassed the scope guard. *Prompt:* two lines (31).
-*Ticker:* a phrase for both new tools, and `toolPhrase` for the two calls a tool's one phrase
-would misstate. *Eval:* ten dry-run cases (46), `VIEW_FINGERPRINT` sees the display switches
-and the models' eyes, `MUTATING_NAME` exempts `export_schedule` by name, the stale `ref-export`
-oracle reworded. Six rows in `docs/DECISIONS.md`; `docs/SYSTEM_SPEC.md` §8; `docs/AI_EVAL.md`.
-
-**Not as briefed, on purpose.** (1) **`manage_filters`' `remove` and `move` run the guard and
-are exempt.** The brief names four unguarded paths; two of them cannot hide — visibility is a
-conjunction of the enabled steps, so removing one can only reveal and reordering changes
-nothing. A literal check would refuse `remove` in a view that is already blank and hold a
-reorder behind Apply; a test proves the arithmetic over 216 stacks. (2) **An undo that would
-hide down to nothing, or under 5 %, is refused in words, not held.** The brief asks only for
-`step(back)`; the catalogue's rule is that anything that can hide runs the guard, and an undo
-can. Apply applies a patch on top of the history and an undo is a move through it, so it
-cannot honestly wait behind Apply until phase 3's pending *actions*. A step that only reveals
-is exempt. It needed one reader on the store, `peekHistory`. (3) **`set_interface` sets no
-`acted`**: ↺ could not put a theme or a tool back. (4) `get_view_state`'s `interface` also says
-whether the Schedules window is open — the one thing `set_interface` sets that nothing read.
-(5) The eval's new cases carry no `requires`, and `capabilities.cjs` is unchanged.
-
-**Measured.** *The cached prefix* (UTF-8 bytes): tools block 32 049 → **36 885** (31 → 33
-tools), contract 16 597 → **17 790** — 6 029 B more, about 1 500 tokens, written once per cache.
-*The per-turn view state on the mock:* at boot 258 → **258**; with a filter step, both cuts
-and a selection 363 → **363**; with every switch, the tool, a model and a plane off their
-defaults 363 → **595**. *`get_view_state`:* 357 → 1 034 B at boot.
-
-**Tested:** `npm run typecheck` exit 0. `npm test` **131 files passed / 2 skipped, 2 279 tests
-passed / 3 skipped** (was 129 / 2 183): `ai-parity.test.ts` (new, 53 — every extension and both
-tools through `executeTool` on the mock with a recording stub viewer; "the same call twice
-changes nothing" for every wrapped toggle; each refusal and each held patch, applied against
-the control's own action; `oneHeld`), `ai-readback.test.ts` (new, 18 — the sparse rule field by
-field, the full read-back, the bounds, the `SessionSource` structural check), `ai-tools.test.ts`
-(+10), `ai-eval-graders.test.ts` (+11), `trace-facts.test.ts` (+2), `ai-prompt.test.ts` (+1),
-`filter-stack.test.ts` (+1, `peek`). `npm run build` exit 0. e2e **55 passed, 6 skipped** (as
-before; 6.4 min) — none asserted anything this changed, and none was added: the production
-bundle has no turn harness, so the store-level behaviour is in the unit tests. Evaluation suite
-through its own runner, no API, into a scratch folder: **oracle 46 / 46, null 0 / 46**.
-`frame-triggers.cjs` 28 / 28, 0 scene renders at rest. *Once, in the built app* (a scratch
-spec through the real `ai:tool:exec` channel, not kept): `set_interface` set the theme on
-`<html>`, opened the Schedules window through the bridge and reported it open, and said
-"already open — brought to the front" the second time; the switches, the selection modes,
-`set_models`, the active key staying active and `get_view_state`'s read-back all answered as
-the unit tests say. Guarded runs only, one at a time; none tripped and nothing survived any of
-them.
-
-**Not done, and limits.** No live assistant run: the new descriptions and the two prompt lines
-are unmeasured against a real model, and the catalogue change rebuilds the cache once.
-`set_storeys` still has no scope check (the design's own tool has none; outside this phase).
-The per-turn ↺ still appears on turns that only toggled a display switch and restores nothing
-there — the audit's finding, phase 2's, because widening it changes a designed control.
-`scripts/ai-audit.cjs`'s hand-written tool matrix was not extended. `dist/` was not rebuilt, so
-the packaged spec ran against the existing package.
 ## Earlier work
 
-Compressed: the four 2026-10-01 entries (Vee steps 1 and 2, two section cuts, the update notice) on 2026-11-07 (origin to origin), the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-10-02 assistant-parity phase-1 entry on 2026-11-08 (1.5.0 prepared), the four 2026-10-01 entries (Vee steps 1 and 2, two section cuts, the update notice) on 2026-11-07 (origin to origin), the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (the four 2026-10-01 entries at `40c8a1d:PROGRESS.md`, the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (assistant parity phase 1 at `49a3e97:PROGRESS.md`, the four 2026-10-01 entries at `40c8a1d:PROGRESS.md`, the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-10-02 — Assistant parity, phase 1 of 4: switches, selection, history, models — and reading back what it set.** The owner's *"assistant should possess everything user can do on the app"*, first phase: `toggle_display` gains `groundGrid`, `snap` and `originalMaterials`, `select_elements` a `mode`, `apply_visibility` `undo` / `redo`, `color_models` a reset; two new tools, `set_models` and `set_interface` (33); a sparse per-turn view state and a full `get_view_state`; `activate_model`, `dims`, a second held change and two unguarded filter paths fixed. 2 279 tests passed / 3 skipped; eval oracle 46 / 46, null 0 / 46.
 
 **2026-10-01 — Vee, step 2 of 2: the thinking trace, the stop button, `You` on the left.** The assistant's reply is drawn while its turn runs from the turn's real events and data — `Thinking`, a ticker over the element matrix (Read, Filter, Check), the answer word by word, its status and a row per storey — on a pure core (`ai/trace-facts.ts`, `ai/trace.ts`) and one painter; the send button stops a turn; `You` stands on the left. 2 183 tests passed / 3 skipped.
 
