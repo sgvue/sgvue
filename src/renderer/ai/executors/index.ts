@@ -37,7 +37,7 @@
  * executor has looked, so that one is still caught afterwards (`oneHeld`).
  */
 import { TOOLS, gateOf } from '../../../shared/tool-schemas'
-import { headsUpOfTouched, headsUpText, touchedOf, touchesByRule, touchesSg, type Observation } from '../heads-up'
+import { headsUpOfTouched, headsUpText, SG_SET_MAX, touchedOf, touchesByRule, touchesSg, type Observation } from '../heads-up'
 import { changedParts } from '../../state/selectors/snapshot'
 import { parseToolInput } from './inputs'
 import { ASK_EXECUTORS } from './ask'
@@ -143,8 +143,10 @@ function observed(
     const t = touchedOf(name, input, s.federation)
     if (!t) return forModel
     headsUp = headsUpOfTouched(s.federation, t, s.chatIfcsg === 'yes')
-    // What lets `ask_choice` ask: the last such call touched an element carrying an SGPset_ set.
+    // What lets `ask_choice` ask: the last such call touched an element carrying an SGPset_ set —
+    // and, kept with the question, what that call touched, for the heads-up after a "Yes".
     ctx.turn.sgTouched = touchesSg(s.federation, t)
+    ctx.turn.sgSet = ctx.turn.sgTouched && t.seen.length <= SG_SET_MAX ? t.seen.map((i) => s.federation.elements[i].id) : null
   } catch (error) {
     console.error('[heads-up]', error)
     return forModel

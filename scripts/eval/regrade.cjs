@@ -164,7 +164,9 @@ async function regradeRow(kase, row, trace, kindOf) {
   const failed = failedIds(row)
   const last = saved.turns[saved.turns.length - 1]
   const store = { stack: saved.stack, table: saved.table, pending: saved.pending, chips: [] }
-  const obs = { reply: last.reply, calls: last.calls, outcome: { type: 'done' }, view: saved.view, viewBefore: saved.viewBefore, store, storeBefore: {} }
+  // A conversation's earlier turns' calls too: `tools.allTurns` counts over every turn.
+  const earlierCalls = saved.turns.slice(0, -1).map((t) => ({ reply: t.reply, calls: t.calls }))
+  const obs = { reply: last.reply, calls: last.calls, outcome: { type: 'done' }, view: saved.view, viewBefore: saved.viewBefore, store, storeBefore: {}, earlier: earlierCalls }
   // The calls the run recorded answer a probe that follows one of them.
   const recorded = saved.turns.flatMap((t) => t.calls)
   const ask = {

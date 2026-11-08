@@ -159,6 +159,12 @@ export interface ToolUi {
 /** A question with quick replies under a reply — stage 2's IFC+SG question (`executors/ask.ts`). */
 export interface ChatAsk {
   lead: string
+  /**
+   * The ids of the elements the asking turn's last rule-bearing call touched — what the heads-up
+   * after a "Yes" is computed over (`chooseReply`). **Main window only, never on the Vee port**
+   * (`vee-link.ts` sends `lead` alone); absent when the set was over `SG_SET_MAX`.
+   */
+  set?: readonly number[]
 }
 
 export interface ToolOutcome {
@@ -204,6 +210,8 @@ export interface TurnState {
    * an `SGPset_` set: `ask_choice` asks only then. `false` until such a call has run.
    */
   sgTouched: boolean
+  /** …and those elements' ids, at most `SG_SET_MAX` (else `null`): kept with the question it asks. */
+  sgSet: readonly number[] | null
 }
 
 export const newTurnState = (): TurnState => ({
@@ -217,7 +225,8 @@ export const newTurnState = (): TurnState => ({
   asked: null,
   headsUp: null,
   ask: null,
-  sgTouched: false
+  sgTouched: false,
+  sgSet: null
 })
 
 /**

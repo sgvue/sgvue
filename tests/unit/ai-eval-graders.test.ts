@@ -1917,6 +1917,29 @@ describe('re-grading a saved run (`eval/regrade.cjs`)', () => {
     ])
   })
 
+  it('counts a conversation’s earlier turns’ calls for `allTurns` (sg-ask-once)', async () => {
+    const k = CASES.find((c: { id: string }) => c.id === 'sg-ask-once')
+    const turns = [k.turns[0].prompt, k.turns[1].prompt, k.prompt]
+    const trace = [
+      { role: 'system', content: `fixture: mock-messy\ngroup: answer\nground truth (computed at grade time):\n{"doorsNoSg": 5, "l4DoorsOtOnly": 3}\nview before the first turn:\n{}` },
+      { role: 'user', content: turns[0] },
+      { role: 'tool_call', name: 'query_elements', content: '{}' },
+      { role: 'tool_result', content: '{}' },
+      { role: 'tool_call', name: 'ask_choice', content: '{"lead":"x"}' },
+      { role: 'tool_result', content: '{"asked":true}' },
+      { role: 'assistant', content: 'One thing first.' },
+      { role: 'user', content: `${turns[1]}  (quick reply: yes)` },
+      { role: 'assistant', content: 'Every door on L4 carries a FireRating of 1 HR.' },
+      { role: 'user', content: turns[2] },
+      { role: 'tool_call', name: 'query_sql', content: '{"sql":"SELECT 1"}' },
+      { role: 'tool_result', content: '{"rows":[]}' },
+      { role: 'assistant', content: '5 doors carry no SGPset_Door set.' },
+      { role: 'system', content: 'view after the turn:\n{"ifcsg":"yes"}\nstack:\n[]\ntable: none\npending: none' }
+    ]
+    const r = await R.regradeRow(k, { grade: { pass: 1 }, explanation: { pass: 'every check passed' } }, trace, kindOf)
+    expect(r.reasons.filter((x: string) => x.startsWith('all:'))).toEqual([])
+  })
+
   it('does not re-score a case whose setup changed since the run', async () => {
     const k = CASES.find((c: { id: string }) => c.id === 'op-filter-set-name')
     const r = await R.regradeRow(k, { grade: { pass: 0 }, explanation: { pass: '' } }, traceFor(k.prompt, 'x'), kindOf)

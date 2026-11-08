@@ -140,7 +140,7 @@ import {
   viewsKeyFor
 } from './persist'
 import type { ChatAsk, ChatChip, ChatPending, ChatTable, PendingAction, PlacedMarkup } from '../ai/executors/context'
-import type { Observation } from '../ai/heads-up'
+import { objectTypeOnlyOver, type Observation } from '../ai/heads-up'
 import type { ChatTrace } from '../ai/trace-facts'
 import { seedAudit } from '../ai/analysis'
 import type { MeasureRecord, SpotRecord, SpotShown } from '../viewer/annotations'
@@ -318,6 +318,10 @@ export type IfcsgAnswer = 'yes' | 'no'
 /** …and the conversation's state of it: `unknown` until the user has clicked one. */
 export type IfcsgState = 'unknown' | IfcsgAnswer
 
+/** The heads-up a "Yes" earned, while the federation it was counted over is still the one loaded. */
+const earned = (st: Pick<ShellState, 'chatIfcsgHeadsUp' | 'federation'>): Observation | null =>
+  st.chatIfcsgHeadsUp && st.chatIfcsgHeadsUp.federation === st.federation ? st.chatIfcsgHeadsUp.headsUp : null
+
 /** The federation's models as a reply's ids are numbered against them. */
 const slotRecords = (f: ShellState['federation']): SlotRecord[] =>
   f.models.map((m) => ({ key: m.meta.modelKey, sha256: m.meta.sha256, slot: m.slot }))
@@ -493,6 +497,16 @@ export interface ShellState {
    */
   chatIfcsg: IfcsgState
   chatIfcsgAsked: boolean
+  /**
+   * The owner: *"App adds it"* — the `objectTypeOnly` heads-up a "Yes" earns, computed by
+   * `chooseReply` over the asking turn's kept set, waiting for the reply that answers the "Yes".
+   * That reply carries it unless it has a heads-up of its own from a fresh read; either way it is
+   * then gone. It holds the federation it was counted over, and is dropped if that has changed
+   * by the time the reply commits. The first fresh turn after the click claims it (`claimed`),
+   * and a later fresh question drops it — a retry keeps it (`chatBegin`). `null` otherwise, and
+   * with a new conversation.
+   */
+  chatIfcsgHeadsUp: { headsUp: Observation; federation: object; claimed?: boolean } | null
   /**
    * 2026-09-24 — the suggestion row, once the conversation has a user turn, folds behind one
    * `suggestions` chip; this is whether that chip has it open. `chipsFolded` decides.
@@ -1157,6 +1171,7 @@ export const useShell = create<ShellState>((set, get) => ({
   hasKey: null,
   chatIfcsg: 'unknown',
   chatIfcsgAsked: false,
+  chatIfcsgHeadsUp: null,
   chatSuggestOpen: false,
   sideStoreys: null,
   modelsOpen: true,
@@ -1779,9 +1794,16 @@ export const useShell = create<ShellState>((set, get) => ({
     const last = st.chatMsgs.length - 1
     const m = st.chatMsgs[last]
     if (st.chatBusy || st.chatIfcsg !== 'unknown' || !m || m.role !== 'assistant' || !m.ask || m.ask.chosen) return false
+    // A "Yes" earns the ObjectType-only heads-up over what the asking turn read — renumbered, or
+    // dropped, as a chip's ids are when a model was unloaded since (`liveIds`). Never the whole model.
+    const kept = value === 'yes' && m.ask.set ? liveIds(m.ask.set, m.models, slotRecords(st.federation), (id) => st.byId.has(id)).ids : []
+    const { set: _set, ...asked } = m.ask
+    const owed = kept.length ? objectTypeOnlyOver(st.federation, kept) : null
     set({
       chatIfcsg: value,
-      chatMsgs: st.chatMsgs.map((x, j) => (j === last ? { ...x, ask: { ...m.ask!, chosen: value } } : x))
+      chatIfcsgHeadsUp: owed ? { headsUp: owed, federation: st.federation } : null,
+      // The kept set has done its work: forgotten.
+      chatMsgs: st.chatMsgs.map((x, j) => (j === last ? { ...x, ask: { ...asked, chosen: value } } : x))
     })
     return true
   },
@@ -1812,6 +1834,12 @@ export const useShell = create<ShellState>((set, get) => ({
         ? st.chatMsgs.map((m, j) => (j === st.chatMsgs.length - 1 && m.role === 'user' && m.seen ? { ...m, seen: false } : m))
         : [...st.chatMsgs, { role: 'user' as const, text, quote: quote ?? null, at: Date.now() }],
       ...(retry ? {} : { chatInput: '' }),
+      // The heads-up a "Yes" earned belongs to the turn that sends the "Yes" — the first fresh
+      // turn after the click, which claims it — and to a retry of that turn; any later fresh
+      // question drops it, so a stopped or failed "Yes" never lends it to an unrelated reply.
+      ...(retry || !st.chatIfcsgHeadsUp
+        ? {}
+        : { chatIfcsgHeadsUp: st.chatIfcsgHeadsUp.claimed ? null : { ...st.chatIfcsgHeadsUp, claimed: true } }),
       chatBusy: true,
       chatErr: '',
       chatEnd: null,
@@ -1878,11 +1906,13 @@ export const useShell = create<ShellState>((set, get) => ({
           models: slotRecords(get().federation),
           // Only a turn that had a trace carries one; a message without is drawn as it always was.
           ...(result.trace ? { trace: result.trace } : {}),
-          // Stage 2: the heads-up, and the IFC+SG question — asked once a conversation.
-          ...(result.headsUp ? { headsUp: result.headsUp } : {}),
-          ...(result.ask ? { ask: { lead: result.ask.lead } } : {})
+          // Stage 2: the heads-up — a fresh read's own, else the one a "Yes" earned (one a reply) —
+          // and the IFC+SG question, asked once a conversation, with the set it was asked over.
+          ...(result.headsUp || earned(st) ? { headsUp: result.headsUp || earned(st) } : {}),
+          ...(result.ask ? { ask: { lead: result.ask.lead, ...(result.ask.set ? { set: result.ask.set } : {}) } } : {})
         }
       ],
+      chatIfcsgHeadsUp: null,
       ...(result.ask ? { chatIfcsgAsked: true } : {})
     }))
   },
@@ -2153,9 +2183,10 @@ export const useShell = create<ShellState>((set, get) => ({
       chatErr: '',
       chatEnd: null,
       chatBusy: false,
-      // A new conversation: the IFC+SG question is unasked again.
+      // A new conversation: the IFC+SG question is unasked again, and nothing is kept for it.
       chatIfcsg: 'unknown',
-      chatIfcsgAsked: false
+      chatIfcsgAsked: false,
+      chatIfcsgHeadsUp: null
     })
   },
 

@@ -1,0 +1,115 @@
+{
+  "rows": 14,
+  "scored": 14,
+  "na": 0,
+  "errors": 0,
+  "pass": 11,
+  "pass_rate": 0.7857142857142857,
+  "no_write_rate": 1,
+  "by_group": {
+    "tabulate": {
+      "n": 4,
+      "pass": 4
+    },
+    "analyse": {
+      "n": 7,
+      "pass": 7
+    },
+    "answer": {
+      "n": 3,
+      "pass": 0
+    }
+  },
+  "tokens": {
+    "in": 14756,
+    "out": 5324,
+    "cacheRead": 1269821,
+    "cacheWrite": 36600
+  },
+  "cost_usd": 1.070541,
+  "unpriced": 0,
+  "by_case": {
+    "tab-slab-area": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 837,
+        "out": 196,
+        "cacheRead": 30859,
+        "cacheWrite": 30859
+      },
+      "cost_usd": 0.217383
+    },
+    "ana-firerating": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1742,
+        "out": 818,
+        "cacheRead": 184993,
+        "cacheWrite": 101
+      },
+      "cost_usd": 0.122288
+    },
+    "ana-duplicates": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 1025,
+        "out": 374,
+        "cacheRead": 92416,
+        "cacheWrite": 86
+      },
+      "cost_usd": 0.061221
+    },
+    "messy-placeholders": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2904,
+        "out": 535,
+        "cacheRead": 183353,
+        "cacheWrite": 2065
+      },
+      "cost_usd": 0.132478
+    },
+    "hu-placeholder": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1749,
+        "out": 627,
+        "cacheRead": 185279,
+        "cacheWrite": 85
+      },
+      "cost_usd": 0.117591
+    },
+    "sg-ask-once": {
+      "runs": 3,
+      "pass": 0,
+      "turns": 9,
+      "tokens": {
+        "in": 6499,
+        "out": 2774,
+        "cacheRead": 592921,
+        "cacheWrite": 3404
+      },
+      "cost_usd": 0.41958
+    }
+  },
+  "estimate": {
+    "cases": 6,
+    "runs": 14,
+    "turns": 20,
+    "inTokens": 800000,
+    "outTokens": 24000,
+    "usdList": 4.6,
+    "usdMeasured": null,
+    "basis": "a-priori: ROUGH_TURN in scripts/eval/cost.cjs"
+  }
+}

@@ -402,7 +402,8 @@ const SNAP: VeeSnapshot = {
   hasKey: true,
   hasModel: true
 }
-const AT = new Date(2026, 10, 8, 14, 2).getTime()
+/** 14:02 today — the day line reads `Today` whatever day the suite runs on. */
+const AT = new Date(new Date().setHours(14, 2, 0, 0)).getTime()
 
 function render(snap: Partial<VeeSnapshot>, board: VeeBoard | null = null): string {
   ;(globalThis as { window?: unknown }).window = { devicePixelRatio: 1 }

@@ -76,7 +76,8 @@ export const ask_choice: Executor = (input, ctx) => {
       message: `Asked. Under your reply the user sees "${lead ? `${lead} ` : ''}${IFCSG_QUESTION}" with Yes and No. Nothing is answered yet: end your turn now, without repeating the question. The answer arrives as the user's next message, and the view state then carries ifcsg.`,
       asked: true
     },
-    ui: { ask: { lead } }
+    // The touched set stays with the question, in the main window, for the heads-up after a "Yes".
+    ui: { ask: { lead, ...(ctx.turn.sgSet ? { set: ctx.turn.sgSet } : {}) } }
   }
 }
 

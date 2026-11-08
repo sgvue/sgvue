@@ -2708,10 +2708,6 @@ const VEE_CASES = [
         sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor' AND storey = 'L4' AND predefined_type = 'NOTDEFINED'",
         shape: 'scalar'
       },
-      doorsOtOnly: {
-        sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor' AND predefined_type = 'NOTDEFINED'",
-        shape: 'scalar'
-      },
       doorsNoSg: {
         sql:
           "SELECT COUNT(*) FROM element e WHERE e.type = 'IfcDoor' AND NOT EXISTS " +
@@ -2739,8 +2735,10 @@ const VEE_CASES = [
       {
         prompt: 'Yes',
         choice: 'yes',
+        // 2026-11-09 (the owner: "App adds it"): the answer may make no call at all — the app adds
+        // the ObjectType-only heads-up a "Yes" earns, over what turn 1 read.
         oracle: {
-          calls: [{ name: 'query_elements', input: { rules: [entity('IfcDoor'), level('L4'), is('FireRating', '1 HR')] } }],
+          calls: [],
           reply: 'Every door on L4 carries a FireRating of 1 HR.'
         },
         expect: {
@@ -2754,10 +2752,22 @@ const VEE_CASES = [
     expect: {
       facts: [{ num: 'doorsNoSg' }],
       tools: { forbid: ['ask_choice'], allTurns: { exactlyOne: ['ask_choice'] }, maxCalls: 6 },
-      view: { ifcsg: 'yes', headsUp: { kind: 'objectTypeOnly', n: 'doorsOtOnly' } }
+      // 2026-11-09, after the targeted re-run (`assistant/v2`): no heads-up is expected here. The
+      // question spans property sets, so Vee reads it with query_sql, as the prompt asks, and a
+      // query_sql read gives no heads-up; turn 2 already proves decision B.
+      view: { ifcsg: 'yes' }
     },
     oracle: {
-      calls: [{ name: 'query_elements', input: { rules: [entity('IfcDoor')] } }],
+      calls: [
+        {
+          name: 'query_sql',
+          input: {
+            sql:
+              "SELECT e.name, e.storey FROM element e WHERE e.type = 'IfcDoor' AND NOT EXISTS " +
+              "(SELECT 1 FROM pset s WHERE s.element = e.id AND s.name = 'SGPset_Door')"
+          }
+        }
+      ],
       reply: '{doorsNoSg} doors carry no SGPset_Door set — the five on L1.'
     }
   },

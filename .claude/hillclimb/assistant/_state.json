@@ -66,5 +66,5 @@
     "scripts/eval/cost.cjs",
     "scripts/eval/observe.cjs"
   ],
-  "harness_sha": "dc2774936e88753dc272aef872b55945e424e38e4f1a8e591fefa37e93b7db39"
+  "harness_sha": "6199c2e43a7d2b4b5d65bcc871f8b460d5cd5c33d843d9f7f31019d3c4d7e467"
 }

@@ -39,6 +39,7 @@ import {
   headsUpText,
   observe,
   pickObservation,
+  SG_SET_MAX,
   SUBTYPE_TOKEN,
   touchedOf,
   touchesByRule,
@@ -411,7 +412,7 @@ describe('IFC+SG: asked once, answered only by the user', () => {
     expect(askOf(t1)).toMatchObject({ asked: true })
     expect(askOf(t1).message).toContain(IFCSG_QUESTION)
     expect(st().chatIfcsgAsked).toBe(true)
-    expect(st().chatMsgs[t1.index].ask).toEqual({ lead: 'These doors carry `SGPset_Door` values.' })
+    expect(st().chatMsgs[t1.index].ask).toMatchObject({ lead: 'These doors carry `SGPset_Door` values.' })
     expect(askOf(await runTurnOnce('q', [READ_L4_DOORS, { name: 'ask_choice', input: { lead: 'Again?' } }]))).toMatchObject({ asked: false })
     // A second ask in one turn is refused too.
     open(messy)
@@ -670,5 +671,136 @@ describe('the Vee window, rendered headless', () => {
   it('never colours a user’s own words', () => {
     const html = render([vmsg({ role: 'user', text: 'what about `IfcDoor`?', terms: [0] })])
     expect(html).not.toContain('ifc-term')
+  })
+})
+
+/* ────────────────────────────── the heads-up a "Yes" earns ────────────────────────────── */
+
+/**
+ * The owner: *"App adds it"* — after a "Yes" to IFC+SG, the `objectTypeOnly` heads-up is the
+ * app's, over what the asking turn read, whether or not Vee reads the elements again.
+ */
+describe('the heads-up a "Yes" earns (the owner: "App adds it")', () => {
+  const l4OtOnly = (): number => messy.elements.filter((e) => e.type === 'IfcDoor' && e.storey === 'L4' && e.predefinedType === 'NOTDEFINED').length
+
+  async function askThenAnswer(value: 'yes' | 'no', answerCalls: { name: string; input: unknown }[] = []) {
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    const asked = await runTurnOnce('What fire ratings do the doors on L4 carry?', [READ_L4_DOORS, ASK], 'One thing first.')
+    expect(st().chatMsgs[asked.index].headsUp).toBeUndefined()
+    expect(st().chooseReply(value)).toBe(true)
+    return runTurnOnce(value === 'yes' ? 'Yes' : 'No', answerCalls, 'Every door on L4 carries a FireRating of 1 HR.')
+  }
+
+  it('keeps the asking turn’s touched set in the main window only, bounded, and never on the port', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    const t = await runTurnOnce('q', [READ_L4_DOORS, ASK], 'First:')
+    const ask = st().chatMsgs[t.index].ask!
+    const l4 = messy.elements.filter((e) => e.type === 'IfcDoor' && e.storey === 'L4').map((e) => e.id)
+    expect([...(ask.set ?? [])].sort()).toEqual([...l4].sort())
+    expect(SG_SET_MAX).toBe(50_000)
+    // The port carries the lead-in alone.
+    expect(Object.keys(snapshotOf(st()).msgs[t.index].ask!).sort()).toEqual(['chosen', 'lead', 'open', 'question', 'replies'])
+    expect(JSON.stringify(snapshotOf(st()).msgs[t.index])).not.toContain(String(l4[0]))
+  })
+
+  it('adds objectTypeOnly to the answer that makes no tool call, with the right count — and forgets the set', async () => {
+    open(messy)
+    const a = await askThenAnswer('yes')
+    expect(st().chatMsgs[a.index].headsUp).toMatchObject({ kind: 'objectTypeOnly', n: l4OtOnly(), noun: 'door' })
+    expect(st().chatMsgs[a.index - 2].ask).not.toHaveProperty('set')
+    expect(st().chatIfcsgHeadsUp).toBeNull()
+    // One reply only: the next one does not carry it again.
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    const next = await runTurnOnce('thanks', [], 'Glad to help.')
+    expect(st().chatMsgs[next.index].headsUp).toBeUndefined()
+  })
+
+  it('lets a fresh read’s own heads-up win, with nothing doubled up', async () => {
+    open(messy)
+    // The answer reads the walls' FireRating: its own placeholder heads-up is the reply's one.
+    const a = await askThenAnswer('yes', [{ name: 'query_elements', input: { rules: [entity('IfcWall'), { prop: 'FireRating', op: '=', val: '1 HR' }] } }])
+    expect(st().chatMsgs[a.index].headsUp).toMatchObject({ kind: 'placeholder', prop: 'FireRating' })
+    expect(st().chatIfcsgHeadsUp).toBeNull()
+  })
+
+  it('gives nothing for a "No"', async () => {
+    open(messy)
+    const a = await askThenAnswer('no')
+    expect(st().chatMsgs[a.index].headsUp).toBeUndefined()
+    expect(st().chatIfcsgHeadsUp).toBeNull()
+  })
+
+  it('gives nothing over a set with no ObjectType-only element (decision C: never the whole model)', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    // The L2 doors carry SGPset_Door and none is ObjectType-only; the L4 doors elsewhere are.
+    const l2 = { name: 'query_elements', input: { rules: [entity('IfcDoor'), { prop: 'Level', op: '=', val: 'L2' }] } }
+    await runTurnOnce('q', [l2, ASK], 'First:')
+    expect(st().chooseReply('yes')).toBe(true)
+    const a = await runTurnOnce('Yes', [], 'OK.')
+    expect(st().chatMsgs[a.index].headsUp).toBeUndefined()
+  })
+
+  it('drops the ids of a model unloaded between the question and the answer, and renumbers the rest', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    await runTurnOnce('q', [READ_L4_DOORS, ASK], 'First:')
+    // The doors are ARC's: with ARC gone there is nothing left to observe.
+    const withoutArc = federate(['STR', 'SIT', 'MEP'].map((k) => mockModelIndex(k, MESSY_OPTIONS)))
+    st().commitModels(withoutArc)
+    expect(st().chooseReply('yes')).toBe(true)
+    expect(st().chatIfcsgHeadsUp).toBeNull()
+    // With ARC loaded again on another slot, its doors are found where they are now.
+    open(messy)
+    await runTurnOnce('q', [READ_L4_DOORS, ASK], 'First:')
+    st().commitModels(federate(['MEP', 'ARC'].map((k) => mockModelIndex(k, MESSY_OPTIONS))))
+    expect(st().chooseReply('yes')).toBe(true)
+    const a = await runTurnOnce('Yes', [], 'OK.')
+    expect(st().chatMsgs[a.index].headsUp).toMatchObject({ kind: 'objectTypeOnly', n: l4OtOnly() })
+  })
+
+  it('drops an earned heads-up after a stopped or failed "Yes" turn when a fresh question follows (review fix)', async () => {
+    open(messy)
+    const { runTurnOnce, scriptedTurn } = await import('../../src/renderer/ai/bridge')
+    await runTurnOnce('q', [READ_L4_DOORS, ASK], 'First:')
+    expect(st().chooseReply('yes')).toBe(true)
+    // The "Yes" turn begins, then fails.
+    scriptedTurn.begin('Yes')
+    scriptedTurn.fail('Stopped.')
+    expect(st().chatIfcsgHeadsUp).not.toBeNull()
+    // A fresh question is not the "Yes": its reply carries no door heads-up.
+    const slabs = await runTurnOnce('Hide the slabs.', [{ name: 'apply_visibility', input: { action: 'hide', rules: [entity('IfcSlab')] } }], 'Hidden the slabs.')
+    expect(st().chatMsgs[slabs.index].headsUp).toBeUndefined()
+    expect(st().chatIfcsgHeadsUp).toBeNull()
+  })
+
+  it('keeps an earned heads-up for a retry of the failed "Yes" turn (review fix)', async () => {
+    open(messy)
+    const { runTurnOnce, scriptedTurn } = await import('../../src/renderer/ai/bridge')
+    await runTurnOnce('q', [READ_L4_DOORS, ASK], 'First:')
+    expect(st().chooseReply('yes')).toBe(true)
+    scriptedTurn.begin('Yes')
+    scriptedTurn.fail('Couldn’t reach Vee.')
+    // "Try again": the same question, not added again.
+    const before = st().chatBegin('Yes', null, true)
+    st().chatFinish('Every door on L4 carries a FireRating of 1 HR.', { trace: null }, before)
+    const last = st().chatMsgs[st().chatMsgs.length - 1]
+    expect(last.headsUp).toMatchObject({ kind: 'objectTypeOnly', n: l4OtOnly() })
+    expect(st().chatMsgs.filter((m) => m.role === 'user' && m.text === 'Yes')).toHaveLength(1)
+  })
+
+  it('drops an earned heads-up if the federation changes before the answer commits, and forgets it with a new conversation', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    await runTurnOnce('q', [READ_L4_DOORS, ASK], 'First:')
+    expect(st().chooseReply('yes')).toBe(true)
+    expect(st().chatIfcsgHeadsUp).not.toBeNull()
+    st().commitModels(federate(KEYS.map((k) => mockModelIndex(k, MESSY_OPTIONS))))
+    const a = await runTurnOnce('Yes', [], 'OK.')
+    expect(st().chatMsgs[a.index].headsUp).toBeUndefined()
+    useShell.setState({ chatIfcsgHeadsUp: { headsUp: { kind: 'noStorey', n: 1, noun: 'x' }, federation: st().federation } })
+    st().seedChat()
+    expect(st().chatIfcsgHeadsUp).toBeNull()
   })
 })

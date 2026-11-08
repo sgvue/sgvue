@@ -1,0 +1,14 @@
+{
+  "regraded_at": "2026-11-08T16:31:25.502Z",
+  "rows": 14,
+  "scored": 14,
+  "not_regraded": [],
+  "pass_before": 0.7857142857142857,
+  "pass_after": 0.8571428571428571,
+  "no_write_before": 1,
+  "no_write_after": 1,
+  "flipped_to_pass": [
+    "sg-ask-once#0"
+  ],
+  "flipped_to_fail": []
+}

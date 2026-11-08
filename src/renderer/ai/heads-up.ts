@@ -264,6 +264,29 @@ export function headsUpFor(name: string, input: Readonly<Record<string, unknown>
   return headsUpOfTouched(fed, t, ifcsgYes)
 }
 
+/**
+ * The most element ids an asking turn keeps for the answer's heads-up (the owner: *"App adds
+ * it"*). A touched set larger than this is not kept at all — never cut — so a deferred heads-up
+ * cannot undercount: with no set kept, the answer simply gets none.
+ */
+export const SG_SET_MAX = 50_000
+
+/**
+ * The `objectTypeOnly` heads-up the app adds to the reply that answers a "Yes" to IFC+SG — over the
+ * elements the asking turn's last rule-bearing call touched (`ids`, still loaded), by the same
+ * `observe` (decision C: never the whole model). `null` when none of them is ObjectType-only.
+ */
+export function objectTypeOnlyOver(fed: Federation, ids: readonly number[]): Observation | null {
+  if (!ids.length) return null
+  const want = new Set(ids)
+  const at: number[] = []
+  fed.elements.forEach((e, i) => {
+    if (want.has(e.id)) at.push(i)
+  })
+  const t: Touched = { at, seen: at, props: [], match: null, op: () => '=' }
+  return observe(fed, t).find((o) => o.kind === 'objectTypeOnly') ?? null
+}
+
 /** The one observation over what a call touched, decision B applied. */
 export const headsUpOfTouched = (fed: Federation, t: Touched, ifcsgYes: boolean): Observation | null =>
   pickObservation(observe(fed, t), (kind) => kind !== 'objectTypeOnly' || ifcsgYes)

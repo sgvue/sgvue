@@ -1,0 +1,14 @@
+{"prompt_id":"tab-slab-area","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-firerating","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-firerating","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-firerating","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-duplicates","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-placeholders","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-placeholders","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-placeholders","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"hu-placeholder","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-placeholder","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-placeholder","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"sg-ask-once","rep":0,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"sg-ask-once","rep":1,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"reasons":["turn2:heads-up (carried): heads-up: the reply carries no heads-up"],"carried":4}
+{"prompt_id":"sg-ask-once","rep":2,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"reasons":["turn2:heads-up (carried): heads-up: the reply carries no heads-up"],"carried":4}

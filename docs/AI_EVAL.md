@@ -268,7 +268,7 @@ of it (below); the fifth runs on the plain mock, with its instruction in a viewp
 | `hu-placeholder` | How many walls are rated 1 HR? — **stage 2**: the count, and the heads-up `placeholder` · FireRating · `TBC` · the TBC count | messy |
 | `hu-no-storey` | How many duct segments does the MEP model have? — **stage 2**: the count, and the heads-up `noStorey` with the ducts on no storey | messy |
 | `hu-dup-guid` | How many beams are on L2? — **stage 2**: the count, and the heads-up `dupGlobalId` for the L2 beams that share one — not the TBC walls a whole-model scan would pick (decision C) | messy |
-| `sg-ask-once` | *What fire ratings do the doors on L4 carry?* → *Yes* (quick reply) → And which doors carry no SGPset_Door set at all? — **stage 2**: `ask_choice` exactly once in the conversation, in turn 1, with no heads-up there; after the yes an `objectTypeOnly` heads-up (decision B); `ifcsg` reads `yes`; the last count right | messy |
+| `sg-ask-once` | *What fire ratings do the doors on L4 carry?* → *Yes* (quick reply) → And which doors carry no SGPset_Door set at all? — **stage 2**: `ask_choice` exactly once in the conversation, in turn 1, with no heads-up there; after the yes an `objectTypeOnly` heads-up (decision B); `ifcsg` reads `yes`; the last count right — no heads-up expected on the last turn, which spans property sets and so is read with `query_sql` (2026-11-09) | messy |
 | `sg-never-asks` | *Hide the slabs.* → How many walls are on L2? — **stage 2**: `ask_choice` never called, `ifcsg` still `unknown`, no mention of IFC+SG, the count right | messy |
 
 ### The Ask Vee cases (2026-11-08)
