@@ -416,6 +416,63 @@ export function revertPlan(undo: TurnUndo, live: TurnSnapshot): RevertPlan {
 const NOTE_NAME_CHARS = 40
 const NOTE_NAMES = 3
 
+/** `STR is no longer loaded`, `STR and MEP are no longer loaded` — the first half of every such note. */
+function noLonger(models: readonly string[]): string {
+  const clip = (k: string): string => (k.length > NOTE_NAME_CHARS ? k.slice(0, NOTE_NAME_CHARS) + '…' : k)
+  const shown = models.slice(0, NOTE_NAMES).map(clip)
+  const more = models.length - shown.length
+  const names = more > 0 ? `${shown.join(', ')} and ${more} more` : shown.join(' and ')
+  return `${names} ${models.length === 1 ? 'is' : 'are'} no longer loaded`
+}
+
+/**
+ * 2026-11-08 ("Vee Messages", stage 1b) — the elements behind a chip, a storey row or a table row
+ * of a reply, as the federation numbers them **now**. The reply recorded which models it was
+ * written against (`ChatMessage.models`), so an id is moved to the slot its model has now by the
+ * revert's own rule (`slotMapOf`, `renumberId`: a model is the same one only when its key and its
+ * digest are), and an id whose model has gone since — unloaded, or replaced by another file of
+ * that name — is dropped and its model named. A message that recorded no models (written before
+ * this, or by no turn) keeps the ids that still name an element.
+ */
+export function liveIds(
+  ids: readonly number[],
+  saved: readonly SlotRecord[] | null | undefined,
+  live: readonly SlotRecord[],
+  exists: (id: number) => boolean
+): { ids: number[]; gone: string[]; missing: number } {
+  const out: number[] = []
+  const gone = new Set<string>()
+  if (!saved) {
+    for (const id of ids) if (exists(id)) out.push(id)
+    return { ids: out, gone: [], missing: ids.length - out.length }
+  }
+  const { slots } = slotMapOf(saved, live)
+  const keyOfSlot = new Map(saved.map((m) => [m.slot, m.key]))
+  for (const id of ids) {
+    const now = renumberId(id, slots)
+    if (now !== null && exists(now)) out.push(now)
+    else if (now === null && Number.isSafeInteger(id) && id >= 0) {
+      const key = keyOfSlot.get(slotOfId(id))
+      if (key !== undefined) gone.add(key)
+    }
+  }
+  return { ids: out, gone: saved.map((m) => m.key).filter((k) => gone.has(k)), missing: ids.length - out.length }
+}
+
+/**
+ * What the panel says when a pick on a reply could select only part of what it named, or none of
+ * it — in `revertNote`'s words. `''` when everything was selected.
+ */
+export function pickNote(found: { ids: readonly number[]; gone: readonly string[]; missing: number }): string {
+  if (!found.missing) return ''
+  const none = found.ids.length === 0
+  const what = none ? 'nothing could be selected' : `${found.missing} of these elements could not be selected`
+  if (found.gone.length) return `${noLonger(found.gone)}, so ${what}.${none ? '' : ' The rest are selected.'}`
+  return none
+    ? 'These elements are no longer loaded, so nothing could be selected.'
+    : `${found.missing} of these elements are no longer loaded and could not be selected. The rest are selected.`
+}
+
 /**
  * What the panel says when a revert could not put everything back — one sentence a part, then
  * what did happen. `''` when nothing was lost, which is nearly always.
@@ -423,15 +480,8 @@ const NOTE_NAMES = 3
 export function revertNote(lost: RevertLost): string {
   const said: string[] = []
   if (lost.models.length) {
-    const clip = (k: string): string =>
-      k.length > NOTE_NAME_CHARS ? k.slice(0, NOTE_NAME_CHARS) + '…' : k
-    const shown = lost.models.slice(0, NOTE_NAMES).map(clip)
-    const more = lost.models.length - shown.length
-    const names = more > 0 ? `${shown.join(', ')} and ${more} more` : shown.join(' and ')
     const one = lost.models.length === 1
-    said.push(
-      `${names} ${one ? 'is' : 'are'} no longer loaded, so nothing of ${one ? 'it' : 'them'} could be put back.`
-    )
+    said.push(`${noLonger(lost.models)}, so nothing of ${one ? 'it' : 'them'} could be put back.`)
   }
   if (lost.camera) {
     said.push('The camera was left where it is: the model stands somewhere else than it did then.')

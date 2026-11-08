@@ -222,16 +222,21 @@ test('the canvas has a text alternative that says what is loaded', async () => {
   expect(box!.height).toBeLessThanOrEqual(1)
 })
 
-test('the chat transcript is a live log with a labelled composer', async () => {
+test('the chat transcript is a labelled log, its replies said once, with a labelled composer', async () => {
   // The pill, by its own copy — `Ask Vee` since 2026-10-01, when the assistant got its name.
   // Since 2026-11-07 it opens the Ask Vee window, where the panel is.
   await page.getByText('Ask Vee', { exact: true }).click()
   const vee = await veeWindow(app)
   const log = vee.locator('[data-role="chatlog"]')
   await expect(log).toHaveAttribute('role', 'log')
-  await expect(log).toHaveAttribute('aria-live', 'polite')
+  // 2026-11-08 ("Vee Messages"): the log itself is not live — every bubble and card would be read
+  // out — and one polite region says a running turn, then each new reply once.
+  await expect(log).toHaveAttribute('aria-live', 'off')
+  await expect(vee.locator('[data-role="vee-announce"]')).toHaveAttribute('aria-live', 'polite')
   await expect(log).toHaveAttribute('aria-labelledby', 'sgvue-chat-title')
-  await expect(vee.locator('#sgvue-chat-title')).toHaveText('Ask Vee')
+  // The header names Vee; `Ask Vee` is the OS window's title.
+  await expect(vee.locator('#sgvue-chat-title')).toHaveText('Vee')
+  expect(await vee.title()).toBe('Ask Vee')
   // The mascot beside the title, in each reply's label and on the pill is decoration: every
   // one is hidden from the accessibility tree, and the name next to it is the text.
   const sprites = [vee.locator('[data-role="vee"]'), page.locator('[data-role="vee"]')]
@@ -240,7 +245,7 @@ test('the chat transcript is a live log with a labelled composer', async () => {
     expect(await s.evaluateAll((all) => all.every((e) => e.getAttribute('aria-hidden') === 'true'))).toBe(true)
   }
   const input = vee.locator('[data-role="chatinput"]')
-  await expect(input).toHaveAttribute('aria-labelledby', 'sgvue-chat-title')
+  await expect(input).toHaveAttribute('aria-label', 'Message Vee')
   // The send button is named by the design's own tooltip.
   await expect(vee.locator('button[data-tip="Send (Enter)"]')).toHaveAttribute(
     'aria-label',

@@ -11,14 +11,19 @@
  *                   **timeline**: when each thing happened, and the facts each call brought
  *                   (`ai/trace-facts.ts`).
  *   `traceCues`     the timeline → cue times: Send, Think, Read, each step, Answer.
- *   `traceFrame`    timeline, `T`, layout → **everything visible at `T`**: Vee's state, the
- *                   status and its roll, the ticker's lines and counts, the bubble's height,
- *                   every cell, the beam, the answer's words and rows. `traceSend` is the same
- *                   for what stands outside the reply: the lift, the send button, the user row.
+ *   `traceFrame`    timeline, `T`, layout → **everything of the trace visible at `T`**: Vee's
+ *                   state, the typing dots, `Thinking` and the seconds, the diary's steps and
+ *                   their counts, every cell, the beam. `traceSend` is the same for what stands
+ *                   outside the reply: the lift, the send button, the user row.
+ *   `answerFrame`   2026-11-08 (stage 1b) — the answer's own motion: the diary folding into one
+ *                   line, and the reply's parts landing one after another (spike 4).
  *
  * The arithmetic is the reference's — the three curves (`enter` easeOutQuart, `glide`
  * easeInOutCubic, `pop` easeOutBack), every duration, stagger and offset — and its sizes are the
- * reference's px ÷ 1.5 (`J`).
+ * reference's px ÷ 1.5 (`J`). **Up to the answer.** Since 2026-11-08 ("Vee Messages", stage 1b)
+ * the handoff's answer — the bubble gliding to the answer's height, the words one by one, the
+ * cells flying into rows — is not drawn: from `done` on, every animation of the trace is at its
+ * end, and the answer is `answerFrame`'s.
  *
  * **What lives here, and what does not** (2026-10-02). This file is the part that is read beside
  * `ask-thinking-hex.jsx`: the curves, the durations and the sizes with the handoff's own line
@@ -58,8 +63,8 @@ import {
 import {
   clamp,
   J,
+  MATRIX_TOP,
   readPlanFor,
-  rowLayout,
   rulePlanFor,
   traceLattice,
   type PlanCell,
@@ -122,55 +127,48 @@ export const SEND_S = 1.0
 export const THINK_MIN_S = 0.4
 /** Each step's designed time (`README.md`, "Interactions & behaviour"), and a note's. */
 export const STEP_S = { read: 1.8, filter: 1.6, check: 2.4, note: 0.6 } as const
-/** The reply's reveal: 65 ms a word, 0.36 s each; a long reply takes at most this much in all. */
-export const WORD_STAGGER_S = 0.065
-export const WORD_S = 0.36
-export const WORD_REVEAL_MAX_S = 1.6
-/** The fly-in: 0.75 s each, 50 ms apart; many flyers share at most this much stagger. */
-export const FLY_S = 0.75
-export const FLY_STAGGER_S = 0.05
-export const FLY_STAGGER_MAX_S = 0.7
 /** Vee hops for this long at each finding. */
 export const FOUND_S = 0.5
 /** The shimmer's sweep. */
 export const SHIMMER_S = 1.6
 
-/** The stagger between two words of an `n`-word reply. */
-export const wordStagger = (n: number): number =>
-  n <= 1 ? 0 : Math.min(WORD_STAGGER_S, (WORD_REVEAL_MAX_S - WORD_S) / (n - 1))
+/*
+ * 2026-11-08 — the answer phase of "Vee Messages" (stage 1b), proved by spike 4
+ * (`spikes/vee-messages/answer-phase.ts`) before it was built. At the answer the diary's
+ * narration folds into one line over `FOLD_S`, and the reply's parts — a bubble a block, then
+ * its cards — land one after another: `PART_S` each, at most `PART_STAGGER_MAX_S` apart, all of
+ * them in before `ANSWER_TOTAL_S`. It replaces the handoff's answer — the bubble gliding to the
+ * answer's height, the words one by one, the cells flying into rows — which stage 1a could only
+ * hand over to the parts with one visible re-layout once it had settled.
+ */
+export const FOLD_S = 0.22
+export const PART_S = 0.24
+export const PART_STAGGER_MAX_S = 0.11
+/** The parts are all in strictly before this long after the answer. */
+export const ANSWER_TOTAL_S = 0.5
+/** How far below its place a part stands as it starts to land, in CSS px (the prototype's `pop`). */
+export const PART_RISE = 6
 
-/** The stagger between two of `n` flying cells. */
-export const flyStagger = (n: number): number =>
-  n <= 1 ? 0 : Math.min(FLY_STAGGER_S, FLY_STAGGER_MAX_S / (n - 1))
+/** The stagger for `n` parts: 110 ms while that fits, else what keeps the total under 0.5 s. */
+export const partStagger = (n: number): number =>
+  n <= 1 ? 0 : Math.min(PART_STAGGER_MAX_S, (ANSWER_TOTAL_S - PART_S - 1e-3) / (n - 1))
 
 /* ────────────────────────────── sizes (app px) ────────────────────────────── */
 
 /** The bubble's own padding — the existing reply bubble's `8px 11px`. */
 export const PAD_X = 11
-export const PAD_TOP = 8
-export const PAD_BOTTOM = 8
-/** `:156` — the bubble while the trace runs: ticker plus matrix. */
+/** `:156` — the trace's bubble while it ran: ticker plus matrix. The matrix's band ends here. */
 export const H_THINK = J(78)
-/** `:178` — the ticker: its top, its height (which is also how far a line rolls). */
-export const TICK_TOP = J(13)
-export const TICK_H = J(22)
-/** `:330` — the status beside the name: its height, and how far it rolls. */
-export const STATUS_H = J(20)
-/** `:327` — the author row rises this far as it fades in. */
-export const LABEL_RISE = J(6)
-/** `:241` — a word rises this far as it fades in. */
-export const WORD_RISE = J(7)
-/** `:250` — a row slides in from this far left. */
-export const ROW_SLIDE = J(8)
-/** `:43` — a row's height under the answer. (The matrix's top, `MATRIX_TOP`, is the planner's.) */
-export const ROW_H = J(26)
-/** `:256`, `:43` — the rows start this far under the answer's text; the rule 4 px above them. */
-export const ROWS_GAP = J(12)
-export const RULE_GAP = J(6)
-/** `:43` — and the bubble ends this far under the last row. */
-export const ROWS_BOTTOM = J(10)
 /** `:44`, `:166` — the beam starts and ends this far outside the matrix. */
 export const BEAM_PAD = J(6)
+/**
+ * 2026-11-08 — the band of the old bubble the matrix stands in, which the diary draws on its own
+ * canvas: from the beam's top (`MATRIX_TOP − BEAM_PAD`) to the bubble's foot. A cell's `y` is
+ * still measured from the old bubble's top, so the canvas is painted `MATRIX_BAND.top` up.
+ */
+export const MATRIX_BAND = { top: MATRIX_TOP - BEAM_PAD, height: H_THINK - (MATRIX_TOP - BEAM_PAD) } as const
+/** How far a diary step rises as it rolls in (the prototype's `roll`, 8 px). */
+export const STEP_RISE = 8
 
 /* ────────────────────────────── the timeline ────────────────────────────── */
 
@@ -323,14 +321,43 @@ export function answerRows(tl: Timeline): TraceRowData[] {
 export const traceStatus = (tl: Timeline): string =>
   tl.answer === null ? '' : statusText(lastRules(tl), tl.answer - tl.send)
 
-/** What the finished turn leaves on its reply. */
+/**
+ * 2026-11-08 — the diary's one folded line: what was read, what the last rule-bearing call
+ * scoped and found, and how long the turn took — `412 read · 80 walls · 12 missing · 7s`. A turn
+ * with no tool is its seconds alone. `''` while it runs.
+ */
+export function foldText(tl: Timeline): string {
+  if (tl.answer === null) return ''
+  const bits: string[] = []
+  if (hasTrace(tl)) bits.push(`${countText(tl.read.total)} read`)
+  const r = lastRules(tl)
+  if (r?.filter) bits.push(`${countText(r.filter.count)} ${nounFor(r.filter.count, r.filter.noun)}`)
+  if (r?.check) bits.push(`${countText(r.check.count)} ${r.check.unit}`)
+  bits.push(`${Math.max(1, Math.round(tl.answer - tl.send))}s`)
+  return bits.join(' · ')
+}
+
+/** The steps a finished reply keeps, at most: its diary reopens on the latest of them. */
+export const DIARY_STEPS_MAX = 20
+
+/** What a finished turn leaves on its reply. */
 export function traceSummary(tl: Timeline): ChatTrace {
   const rules = lastRules(tl)
+  const steps = tl.answer === null ? [] : diarySteps(tl, tl.answer, (step) => stepCount(tl, step, null))
   return {
     status: traceStatus(tl),
     wide: hasTrace(tl),
     rows: answerRows(tl).map(({ label, n, ids }) => ({ label, n, ids })),
-    noun: rules?.noun ?? 'element'
+    noun: rules?.noun ?? 'element',
+    fold: foldText(tl),
+    steps: steps.slice(-DIARY_STEPS_MAX).map((st) => ({
+      label: st.label,
+      mono: st.mono,
+      n: st.count ? st.count.n : null,
+      unit: st.count ? st.count.unit : ''
+    })),
+    // The storey-rows card is titled by the property the Check looked at, when there was one.
+    ...(rules?.check ? { title: `${rules.check.props} · ${rules.check.unit}` } : {})
   }
 }
 
@@ -357,52 +384,49 @@ export interface TraceCell {
   ring: number
 }
 
-/** One line of the ticker, or of the status: where it stands in its roll. */
-export interface Roll {
-  /** How far below its place it stands (negative: above), in CSS px. */
-  y: number
-  opacity: number
+/** A count as a diary step prints it: its number, its unit, and whether it is lit. */
+export interface StepCount {
+  n: number
+  text: string
+  unit: string
+  accent: boolean
 }
 
-export interface TickLine extends Roll {
+/**
+ * 2026-11-08 — one step of the diary (the handoff's ticker line, kept as a list: every step the
+ * turn has shown stays, ticked once the next has begun).
+ */
+export interface DiaryStep {
   /** `Reading 4 models`, `Filtering `, `Checking Fire Rating`, a note. */
   label: string
   /** What follows the label in the mono face: `IfcWall`. */
   mono: string
-  /** The count on the right, or `null`: its number as printed, its unit, and whether it is lit. */
-  count: { n: number; text: string; unit: string; accent: boolean } | null
+  /** The count on the right, or `null`. */
+  count: StepCount | null
+  /** A later step has begun (or the turn is answered): the step is ticked. */
+  done: boolean
+  /** Its roll in: how far below its place it stands, in CSS px, and its opacity. */
+  y: number
+  opacity: number
 }
 
 export interface TraceFrame {
-  /** The author row: it rises and fades in at Think. */
-  label: { opacity: number; y: number }
   /** Vee: its state, and the pop it enters with. */
   sprite: { state: VeeState; scale: number; opacity: number }
-  status: {
-    /** `Thinking` — and where its shimmer stands, 0…1, or `null` for none. */
-    thinking: Roll | null
-    shimmer: number | null
-    /** The status the turn rolls to, once it is answered. */
-    final: Roll | null
-    text: string
-  }
+  /** 2026-11-08 — typing dots: from Think until Read, or until the answer when no tool runs. */
+  dots: boolean
+  /** The diary's header while the turn runs: `Thinking`, its shimmer (0…1 or `null`) and the seconds since Send. */
+  thinking: { shimmer: number | null; seconds: number }
   bubble: {
-    /** The turn opened the trace bubble: it stays full width. */
+    /** The turn opened the trace's bubble — the diary. */
     wide: boolean
-    height: number
+    /** The diary's fade in at Read. */
     opacity: number
   }
-  ticker: { opacity: number; lines: TickLine[] }
+  steps: DiaryStep[]
   cells: TraceCell[]
   /** The scan beam: its x from the bubble's inner left, and its opacity. */
   beam: { x: number; opacity: number } | null
-  /** Each word of the answer: its opacity; it stands `(1 − opacity) × WORD_RISE` low. */
-  words: number[]
-  /** The rule above the rows, and each row: its opacity; it stands `(1 − opacity) × ROW_SLIDE` left. */
-  rule: number
-  rows: number[]
-  /** The answer is in and nothing is moving any more. */
-  settled: boolean
 }
 
 /**
@@ -424,37 +448,9 @@ export const TRACE_PALETTE: Readonly<Record<'dark' | 'light', Readonly<Record<Ce
   light: { cell: '--border-strong', flash: '#748382', ready: '#B3C3C0', dim: '#CFDCD9', hit: '--accent' }
 }
 
-/**
- * The cells of the rows under an answer, at rest: where the fly-in ends, and what a finished
- * reply shows for as long as it is in the transcript.
- */
-export function rowCells(
-  rows: readonly { label: string; n: number }[],
-  noun: string,
-  layout: Pick<TraceLayout, 'width' | 'dpr' | 'textH'>
-): TraceCell[] {
-  const lat = traceLattice(layout.dpr)
-  const { per, x0 } = rowLayout(rows, noun, layout)
-  const cells: TraceCell[] = []
-  rows.forEach((row, L) => {
-    const y = lat.snap(rowTop(layout.textH, L) + (ROW_H - lat.row.size) / 2)
-    for (let slot = 0; slot < Math.ceil(row.n / per); slot++) {
-      cells.push({ x: x0 + slot * lat.row.pitch, y, size: lat.row.size, a: 'hit', b: 'hit', t: 1, opacity: 1, scale: 1, ring: -1 })
-    }
-  })
-  return cells
-}
-
 /** `:44` — when the beam of a Check that started at `check` reaches the x `xc`. */
 export const beamAt = (check: number, xc: number, width: number): number =>
   check + 0.3 + ((xc + BEAM_PAD) / (width + 2 * BEAM_PAD)) * 1.7
-
-/** The bubble's height once the answer is in: its text, and its rows if it has any. */
-export const answerHeight = (textH: number, rows: number): number =>
-  PAD_TOP + textH + (rows ? ROWS_GAP + rows * ROW_H + ROWS_BOTTOM : PAD_BOTTOM)
-
-/** A row's top inside the bubble. */
-export const rowTop = (textH: number, row: number): number => PAD_TOP + textH + ROWS_GAP + row * ROW_H
 
 /** The rule group the matrix is showing, with the times its two steps started. */
 interface Scene {
@@ -464,12 +460,62 @@ interface Scene {
   check: number | null
 }
 
+/** A step's label and mono, at its end. */
+function stepWords(tl: Timeline, step: TraceStep): { label: string; mono: string } {
+  if (step.kind === 'read') {
+    const models = tl.read.models.filter((n) => n > 0).length
+    return { label: `Reading ${countText(models)} ${nounFor(models, 'model')}`, mono: '' }
+  }
+  const facts = tl.calls[step.call].facts
+  const r = facts.rules
+  if (step.kind === 'filter' && r?.filter) return { label: 'Filtering ', mono: r.filter.what }
+  if (step.kind === 'check' && r?.check) return { label: `Checking ${r.check.props}`, mono: '' }
+  return { label: facts.note, mono: '' }
+}
+
 /**
- * Everything visible at time `T`.
+ * A step's count: `live` its number as it stands now (the read counting up, the filter down, the
+ * check rising with the beam), else — `null` — its end.
+ */
+function stepCount(tl: Timeline, step: TraceStep, live: number | null): StepCount | null {
+  const r = step.call >= 0 ? tl.calls[step.call].facts.rules : null
+  if (step.kind === 'read') {
+    const n = live ?? tl.read.total
+    return { n, text: countText(n), unit: nounFor(n, 'element'), accent: false }
+  }
+  if (step.kind === 'filter' && r?.filter) {
+    const n = live ?? r.filter.count
+    return { n, text: countText(n), unit: nounFor(n, r.filter.noun), accent: false }
+  }
+  if (step.kind === 'check' && r?.check) {
+    const n = live ?? r.check.count
+    return { n, text: countText(n), unit: r.check.unit, accent: n > 0 }
+  }
+  return null
+}
+
+/** The diary's steps at `T`: each one shown by then, with its count as `count` gives it. */
+function diarySteps(tl: Timeline, T: number, count: (step: TraceStep) => StepCount | null): DiaryStep[] {
+  const { steps, answer } = traceCues(tl)
+  const answered = answer !== null && T >= answer
+  const out: DiaryStep[] = []
+  steps.forEach((step, i) => {
+    if (step.at > T) return
+    const next = steps[i + 1]
+    out.push({ ...stepWords(tl, step), count: count(step), done: answered || (!!next && next.at <= T), y: 0, opacity: 1 })
+  })
+  return out
+}
+
+/**
+ * Everything visible at time `T`, until the answer — the port of `Reply`, `Piece` and `hexState`
+ * (`ask-thinking-hex.jsx:155–259`, `:261–336`, `:81–89`) up to its Answer cue — and from the
+ * answer on, the end of every one of those animations: the matrix as the last rule-bearing call
+ * left it, every step at its final count. What the answer itself moves — the fold, the parts —
+ * is `answerFrame`'s.
  *
- * The port of `Reply`, `Piece` and `hexState` (`ask-thinking-hex.jsx:155–259`, `:261–336`,
- * `:81–89`). Under `layout.reduced` every animation is at its end from the moment its cue is
- * reached: the states still follow each other, with nothing in between.
+ * Under `layout.reduced` every animation is at its end from the moment its cue is reached: the
+ * states still follow each other, with nothing in between.
  */
 export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceFrame {
   const cues = traceCues(tl)
@@ -485,9 +531,6 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
     answered ? 1 : reduced ? (T >= cue ? 1 : 0) : p(T, cue + off, dur, ease)
   const preLin = (cue: number, off: number, dur: number): number =>
     answered ? 1 : reduced ? (T >= cue ? 1 : 0) : lin(T, cue + off, dur)
-  /** An animation of the answer, `off` seconds into it. */
-  const post = (off: number, dur: number, ease: Ease): number =>
-    !answered ? 0 : reduced ? 1 : p(T, A + off, dur, ease)
   /** Anything else that starts at a time of its own. */
   const at = (start: number, dur: number, ease: Ease): number =>
     reduced ? (T >= start ? 1 : 0) : p(T, start, dur, ease)
@@ -528,10 +571,6 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
   const cells: TraceCell[] = []
   let counted = 0
   let finding = false
-  /** The rows under the answer — nothing of them shows before it. */
-  const rows = answered && plan ? plan.rows : []
-  const flying = rows.length > 0
-  const textH = layout.textH
 
   if (readPlan && (answered || (read !== null && T >= read))) {
     const ga = lat.a
@@ -539,16 +578,14 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
     const readAt = read ?? 0
     /**
      * One cell of the grid the Check runs on — the filter grid, or the read grid when the call
-     * has no Filter: waiting, lit as the beam finds a match in it, dimmed as the beam passes it
-     * by; and at the answer folded away, unless it leaves for a row.
+     * has no Filter: waiting, lit as the beam finds a match in it, dimmed as the beam passes it by.
      */
-    const checked = (c: PlanCell, x: number, y: number, size: number, m: number, share: number): void => {
+    const checked = (c: PlanCell, x: number, y: number, size: number, m: number): void => {
       const tb = beamTime(c.x, hasFilter ? gb.size : ga.size)
       const hit = passed(tb)
       if (hit && c.matched) counted += c.matched
       if (c.matched && !answered && !reduced && checking && T >= tb && T < tb + FOUND_S) finding = true
       let scale = 1
-      let opacity = 1
       let ring = -1
       let a: CellRole = 'cell'
       let b: CellRole = hasFilter ? 'ready' : 'cell'
@@ -563,15 +600,7 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
         b = 'flash'
         t = answered || reduced ? 0 : 1 - lin(T, tb, 0.4)
       }
-      if (answered) {
-        // The matched cells leave for their rows; with no rows to go to they fold away as well.
-        if (c.matched && flying) return
-        const d = post(0.05 + share * 0.25, 0.28, MOTION.enter)
-        scale *= 1 - d
-        opacity *= 1 - d
-      }
-      if (opacity <= 0.001) return
-      cells.push({ x, y, size, a, b, t, opacity, scale, ring })
+      cells.push({ x, y, size, a, b, t, opacity: 1, scale, ring })
     }
 
     if (!plan) {
@@ -579,13 +608,7 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
       for (const c of readPlan.cells) {
         const share = c.order / readPlan.cols
         const sp = pre(readAt, 0.35 + share, 0.3, MOTION.pop)
-        let scale = sp
-        let opacity = clamp(sp, 0, 1)
-        if (answered) {
-          const d = post(0.05 + share * 0.25, 0.28, MOTION.enter)
-          scale *= 1 - d
-          opacity *= 1 - d
-        }
+        const opacity = clamp(sp, 0, 1)
         if (opacity <= 0.001) continue
         cells.push({
           x: c.x,
@@ -595,7 +618,7 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
           b: 'cell',
           t: preLin(readAt, 0.35 + share + 0.08, 0.45),
           opacity,
-          scale,
+          scale: sp,
           ring: -1
         })
       }
@@ -625,38 +648,11 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
         const share = c.order / plan.endOf
         const m = pre(tf, 0.35 + share * 0.35, 0.7, MOTION.glide)
         const from = readPlan.cells[c.src]
-        checked(c, lerp(from.x, c.x, m), lerp(from.y, c.y, m), lerp(ga.size, gb.size, m), m, share)
+        checked(c, lerp(from.x, c.x, m), lerp(from.y, c.y, m), lerp(ga.size, gb.size, m), m)
       }
     } else {
       // A Check with no Filter: the beam scans the read grid.
-      for (const c of readPlan.cells) checked(c, c.x, c.y, ga.size, 0, c.order / readPlan.cols)
-    }
-
-    if (flying && plan) {
-      // Into the rows: x on `glide`, y on `enter`, so the path curves; growing to the row's size.
-      // A cell the beam lit is already the accent; one that was only filtered turns it on the way.
-      const stagger = flyStagger(plan.flyers.length)
-      const lit = !!sceneRules!.check
-      const fromSize = plan.filter ? gb.size : ga.size
-      plan.flyers.forEach((f, i) => {
-        const c = plan.end[f.from]
-        const start = 0.5 + i * stagger
-        const fx = post(start, FLY_S, MOTION.glide)
-        const fy = post(start, FLY_S, MOTION.enter)
-        const toX = plan.rowX0 + f.slot * lat.row.pitch
-        const toY = lat.snap(rowTop(textH, f.row) + (ROW_H - lat.row.size) / 2)
-        cells.push({
-          x: lerp(c.x, toX, fx),
-          y: lerp(c.y, toY, fy),
-          size: lerp(fromSize, lat.row.size, fx),
-          a: lit ? 'hit' : 'ready',
-          b: 'hit',
-          t: lit ? 1 : fx,
-          opacity: 1,
-          scale: 1,
-          ring: -1
-        })
-      })
+      for (const c of readPlan.cells) checked(c, c.x, c.y, ga.size, 0)
     }
   }
 
@@ -667,83 +663,30 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
     if (opacity > 0) beam = { x: lerp(-BEAM_PAD, W + BEAM_PAD, lin(T, tc + 0.3, 1.7)), opacity }
   }
 
-  /* ── the ticker ── */
-  const lineOf = (step: TraceStep): Omit<TickLine, keyof Roll> => {
-    if (step.kind === 'read') {
-      const models = tl.read.models.filter((n) => n > 0).length
-      const n = Math.round(tl.read.total * preLin(step.at, 0.35, 1.1))
-      return {
-        label: `Reading ${countText(models)} ${nounFor(models, 'model')}`,
-        mono: '',
-        count: { n, text: countText(n), unit: nounFor(n, 'element'), accent: false }
-      }
-    }
-    const facts = tl.calls[step.call].facts
-    const r = facts.rules
+  /* ── the diary's steps ── */
+  // Each step rolls in from below over 0.42 s (`Roll`, `:128`) and stays; its count is the
+  // handoff's ticker's: the read counting up, the filter down, the check rising with the beam.
+  const live = (step: TraceStep): StepCount | null => {
+    if (answered) return stepCount(tl, step, null)
+    const r = step.call >= 0 ? tl.calls[step.call].facts.rules : null
+    if (step.kind === 'read') return stepCount(tl, step, Math.round(tl.read.total * preLin(step.at, 0.35, 1.1)))
     if (step.kind === 'filter' && r?.filter) {
-      const n = Math.round(lerp(r.total, r.filter.count, pre(step.at, 0.15, 0.9, MOTION.enter)))
-      return {
-        label: 'Filtering ',
-        mono: r.filter.what,
-        count: { n, text: countText(n), unit: nounFor(n, r.filter.noun), accent: false }
-      }
+      return stepCount(tl, step, Math.round(lerp(r.total, r.filter.count, pre(step.at, 0.15, 0.9, MOTION.enter))))
     }
-    if (step.kind === 'check' && r?.check) {
-      // The count rises as the beam passes each flagged cell, and ends on the matched size.
-      const n = answered || scene?.call !== step.call ? r.check.count : counted
-      return {
-        label: `Checking ${r.check.props}`,
-        mono: '',
-        count: { n, text: countText(n), unit: r.check.unit, accent: n > 0 }
-      }
-    }
-    return { label: facts.note, mono: '', count: null }
+    // The count rises as the beam passes each flagged cell, and ends on the matched size.
+    if (step.kind === 'check' && r?.check) return stepCount(tl, step, scene?.call !== step.call ? r.check.count : counted)
+    return null
   }
-  const lines: TickLine[] = []
-  let tickFade = 1
-  if (answered) {
-    // The ticker's end state is its last step — queued or not — fading out as the answer starts.
-    tickFade = 1 - post(0, 0.28, MOTION.enter)
-    if (wide && tickFade > 0) {
-      const lastCall = tl.calls.length - 1
-      const kinds = lastCall >= 0 ? kindsOf(tl.calls[lastCall]) : []
-      const step: TraceStep = kinds.length
-        ? { kind: kinds[kinds.length - 1], at: 0, call: lastCall }
-        : { kind: 'read', at: 0, call: -1 }
-      lines.push({ ...lineOf(step), y: 0, opacity: 1 })
-    }
-  } else {
-    // `Roll` (`:128`): a line enters from below over 0.42 s and leaves upward over 0.32 s.
-    steps.forEach((step, i) => {
-      if (step.at > T) return
-      const next = steps[i + 1]
-      const out = !!next && next.at <= T
-      const a = reduced ? 1 : p(T, step.at + (i === 0 ? 0.1 : 0), 0.42, MOTION.enter)
-      const b = !out ? 0 : reduced ? 1 : p(T, next.at, 0.32, MOTION.enter)
-      if (a <= 0 || b >= 1) return
-      lines.push({ ...lineOf(step), y: (1 - a) * TICK_H - b * TICK_H, opacity: a * (1 - b) })
-    })
-  }
+  const diary = diarySteps(tl, T, live).map((st, i) => {
+    const a = answered || reduced ? 1 : p(T, steps[i].at + (i === 0 ? 0.1 : 0), 0.42, MOTION.enter)
+    return { ...st, y: (1 - a) * STEP_RISE, opacity: a }
+  })
 
-  /* ── the bubble ── */
-  const words = Array.from({ length: answered ? tl.words : 0 }, (_, j) =>
-    post(0.35 + j * wordStagger(tl.words), WORD_S, MOTION.enter)
-  )
-  const hAnswer = answerHeight(textH, rows.length)
-  let height: number
-  let opacity: number
-  if (wide) {
-    const bIn = read === null ? (answered ? 1 : 0) : pre(read, 0, 0.45, MOTION.enter)
-    height = lerp(lerp(0, H_THINK, bIn), hAnswer, post(0.15, 0.7, MOTION.glide))
-    opacity = clamp(bIn * 1.6, 0, 1)
-  } else {
-    // No tool ran: there is no trace to fold, so the reply's own bubble opens at the answer.
-    const bIn = post(0, 0.45, MOTION.enter)
-    height = lerp(0, hAnswer, bIn)
-    opacity = clamp(bIn * 1.6, 0, 1)
-  }
+  /* ── the diary, and the dots before it ── */
+  const bIn = !wide ? 0 : read === null ? (answered ? 1 : 0) : pre(read, 0, 0.45, MOTION.enter)
+  const dots = !answered && T >= think && (read === null || T < read)
 
-  /* ── Vee, and the status beside the name ── */
+  /* ── Vee, and `Thinking` ── */
   let state: VeeState = 'thinking'
   if (A !== null && T >= A + (reduced ? 0 : 0.3)) state = 'done'
   else if (read !== null && T >= read) {
@@ -751,33 +694,87 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
     state = finding || hop ? 'found' : 'reading'
   }
   const hexIn = at(think, 0.5, MOTION.pop)
-  const lblIn = at(think, 0.4, MOTION.enter)
-  const roll = (a: number, b: number): Roll | null =>
-    a <= 0 || b >= 1 ? null : { y: (1 - a) * STATUS_H - b * STATUS_H, opacity: a * (1 - b) }
-  const thinking = roll(
-    at(think + (reduced ? 0 : 0.15), 0.42, MOTION.enter),
-    A === null ? 0 : at(A, 0.32, MOTION.enter)
-  )
-  const final = A === null ? null : roll(at(A + (reduced ? 0 : 0.26), 0.42, MOTION.enter), 0)
-  const shimmer = thinking && !reduced && T > think ? ((T - think) / SHIMMER_S) % 1 : null
-
-  /* ── the rows ── */
-  const rule = rows.length ? post(0.9, 0.4, MOTION.enter) : 0
-  const rowIn = rows.map((_, L) => post(0.95 + L * 0.08, 0.4, MOTION.enter))
+  const shimmer = !answered && !reduced && T > think ? ((T - think) / SHIMMER_S) % 1 : null
 
   return {
-    label: { opacity: lblIn, y: (1 - lblIn) * LABEL_RISE },
     sprite: { state, scale: hexIn, opacity: clamp(hexIn, 0, 1) },
-    status: { thinking, shimmer, final, text: traceStatus(tl) },
-    bubble: { wide, height, opacity },
-    ticker: { opacity: tickFade, lines },
+    dots,
+    thinking: { shimmer, seconds: Math.max(0, Math.floor((answered ? A! : T) - tl.send)) },
+    bubble: { wide, opacity: clamp(bIn * 1.6, 0, 1) },
+    steps: diary,
     cells,
-    beam,
-    words,
-    rule,
-    rows: rowIn,
-    settled: A !== null && (reduced || T >= traceEnd(tl, plan ? plan.flyers.length : 0))
+    beam
   }
+}
+
+/* ────────────────────────────── the answer ────────────────────────────── */
+
+export interface AnswerFrame {
+  /** The diary's fold into one line, 0…1 (0 while the turn runs). */
+  fold: number
+  /** Each part: its opacity, and how far below its place it stands — on whole device pixels. */
+  parts: { opacity: number; y: number }[]
+  /** The answer is in and nothing is moving any more. */
+  settled: boolean
+}
+
+/**
+ * 2026-11-08 — the answer's own motion, for a reply drawn as `n` parts (spike 4): the fold, and
+ * each part landing `partStagger(n)` after the one before. **Never delays the answer**: at the
+ * instant `done` arrives the first part starts landing, and everything of the trace before it is
+ * already at its end (`traceFrame`). Under reduced motion it is the end state from the answer on.
+ */
+export function answerFrame(tl: Timeline, T: number, n: number, opts: { dpr: number | null; reduced: boolean }): AnswerFrame {
+  const A = tl.answer
+  const snap = (v: number): number => (opts.dpr ? Math.round(v * opts.dpr) / opts.dpr : v)
+  if (A === null || T < A) return { fold: 0, parts: Array.from({ length: n }, () => ({ opacity: 0, y: snap(PART_RISE) })), settled: false }
+  if (opts.reduced) return { fold: 1, parts: Array.from({ length: n }, () => ({ opacity: 1, y: 0 })), settled: true }
+  const s = partStagger(n)
+  const parts = Array.from({ length: n }, (_, k) => {
+    const e = p(T, A + k * s, PART_S, MOTION.enter)
+    return { opacity: e, y: snap((1 - e) * PART_RISE) }
+  })
+  return { fold: p(T, A, FOLD_S, MOTION.enter), parts, settled: T >= answerEnd(tl, n) }
+}
+
+/**
+ * The last moving instant of an answered turn, drawn as `n` parts: the fold and the parts are in
+ * before `A + 0.5`; an entrance still running from an early answer (Think's pop, the lift) can end
+ * later — **never more than 1.95 s after the answer** (the lift's 0.95 s, for a turn answered at
+ * once). `+∞` while the turn runs.
+ */
+export function answerEnd(tl: Timeline, n: number): number {
+  if (tl.answer === null) return Number.POSITIVE_INFINITY
+  const A = tl.answer
+  const own = Math.max(A + FOLD_S, A + Math.max(0, n - 1) * partStagger(n) + PART_S)
+  return Math.max(own, traceCues(tl).think + 0.5, tl.send + SEND_SETTLE_S)
+}
+
+/* ────────────────────────────── the width a plan is made for ────────────────────────────── */
+
+/** The width the matrix was last planned for, and the step it was taken in. */
+export interface WidthHold {
+  /** The index of the step in `traceCues(tl).steps`, −1 before Read, −2 once answered. */
+  step: number
+  width: number
+}
+
+/**
+ * 2026-11-08 — the width to plan the matrix for at `T`, with the window being resized under it.
+ *
+ * A plan is laid out for one width, and where the beam stands — so how far the Check's count has
+ * risen — depends on it: re-planned mid-sweep, the count could jump by a dozen at once (measured
+ * by spike 4: up to 13 of 395 on a 100 000-element model). So **while a Check runs, the width it
+ * started with is kept**, and the plan follows the window again at the next step boundary — the
+ * next step, or the answer. Every other step plans for the width measured now.
+ */
+export function planWidth(tl: Timeline, T: number, measured: number, hold: WidthHold | null): WidthHold {
+  const { steps, answer } = traceCues(tl)
+  if (answer !== null && T >= answer) return { step: -2, width: measured }
+  let step = -1
+  for (let i = 0; i < steps.length && steps[i].at <= T; i++) step = i
+  if (step >= 0 && steps[step].kind === 'check' && hold && hold.step === step) return hold
+  return { step, width: measured }
 }
 
 /* ────────────────────────────── outside the reply ────────────────────────────── */
@@ -819,29 +816,6 @@ export function traceSend(tl: Timeline, T: number, reduced: boolean): SendFrame 
 
 /** The lift and the user's row are in place by this long after Send. */
 export const SEND_SETTLE_S = 0.95
-
-/**
- * The last moving instant of an answered turn: the latest end among the answer's animations and
- * the entrances that may still be running if the answer came early. `flyers` is how many cells
- * fly into the rows — the layout's to say; left out, the most their stagger can take is assumed.
- *
- * **Never more than 1.95 s after the answer** for a turn that took longer than a second: the
- * words take at most 0.35 + 1.6 s, the flyers 0.5 + 0.7 + 0.75 s, eight rows 0.95 + 0.56 + 0.4 s.
- */
-export function traceEnd(tl: Timeline, flyers?: number): number {
-  if (tl.answer === null) return Number.POSITIVE_INFINITY
-  const A = tl.answer
-  const rows = answerRows(tl)
-  let end = A + 0.15 + 0.7 // the bubble
-  end = Math.max(end, A + 0.26 + 0.42) // the status
-  if (tl.words) end = Math.max(end, A + 0.35 + (tl.words - 1) * wordStagger(tl.words) + WORD_S)
-  if (rows.length) {
-    end = Math.max(end, A + 0.95 + (rows.length - 1) * 0.08 + 0.4)
-    const stagger = flyers === undefined ? FLY_STAGGER_MAX_S : (flyers - 1) * flyStagger(flyers)
-    end = Math.max(end, A + 0.5 + Math.max(0, stagger) + FLY_S)
-  }
-  return Math.max(end, traceCues(tl).think + 0.5, tl.send + SEND_SETTLE_S)
-}
 
 /**
  * The next time after `T` at which the trace changes state: what a view that draws no motion —

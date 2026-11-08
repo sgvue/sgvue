@@ -117,6 +117,7 @@ export function view(): SettingsView {
     backend: s.backend,
     preferNvidia: s.preferNvidia,
     hasKey: !!s.apiKeyEnc,
+    envKey: !!process.env.ANTHROPIC_API_KEY?.trim(),
     keyStorageAvailable: keyStorageAvailable()
   }
 }

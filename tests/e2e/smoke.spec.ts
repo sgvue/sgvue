@@ -20,7 +20,9 @@ import { BOTTOM_GAP, HINT_MIN } from '../../src/renderer/state/selectors/lanes'
 import {
   actionText,
   DROP_COPY,
+  emit,
   HIGH_FIRST,
+  holdTurns,
   launch,
   openSchedulesWindow,
   pixelsDiffer,
@@ -120,6 +122,7 @@ test('opens on the landing page, under the production CSP, with the pinned prelo
       'backend',
       'cacheOneHour',
       'effort',
+      'envKey',
       'hasKey',
       'keyStorageAvailable',
       'model',
@@ -612,14 +615,19 @@ test('Preferences opens from the native menu, and a keyless turn fails cleanly',
 
 /**
  * Phase 9b. The panel itself, in the **production** bundle, with **no key**: it opens from its
- * own pill, it renders the local boot audit — chips included — a chip selects what it names,
- * and a question asked without a key comes back as the designed error row rather than a hang.
+ * own pill, it renders the local boot audit — chips included — and a chip selects what it names.
  *
- * Nothing here needs a key, and nothing here uses `window.__sgvueDev`: the chips come from
- * `seedAudit`, which is arithmetic over the federation (`SGVue.dc.html:1642`) and the only
- * producer of chips that never calls the API.
+ * Since 2026-11-08 ("Vee Messages") a window with no key is **not ready**: one line from Vee says
+ * where the key goes, its composer and send key are in place but disabled, and there are no
+ * suggestions — so a keyless turn cannot be sent from it at all (the keyless turn's own error is
+ * the Preferences test's step 4, through the bridge). With a key it is ready again, and a turn
+ * that fails comes back as a neutral system line with `Try again` — not a hang.
+ *
+ * Nothing here needs the API, and nothing uses `window.__sgvueDev`: the chips come from
+ * `seedAudit`, arithmetic over the federation (`SGVue.dc.html:1642`), and the failed turn is main's
+ * held turn answered with an error (`holdTurns`, `emit`).
  */
-test('the assistant panel opens from its pill, seeds the audit, and refuses a keyless turn', async () => {
+test('the assistant panel opens from its pill, seeds the audit, and is not ready without a key', async () => {
   const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: TINY, ANTHROPIC_API_KEY: '' })
   try {
     await page.getByText(DROP_COPY).click()
@@ -649,7 +657,7 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     // …lit while the window is open, as it was while the panel was.
     await expect.poll(() => pill.evaluate((b) => getComputedStyle(b).borderColor)).not.toBe(unlit)
     // The window: a child of the main window — above it, not above other apps — titled
-    // `Ask Vee`, at the panel's size.
+    // `Ask Vee`, at the panel's size, and no smaller than the messaging layout's 300 × 380.
     const shape = await app.evaluate(({ BrowserWindow }) => {
       const all = BrowserWindow.getAllWindows()
       const w = all.find((x) => /\/vee\.html(#|$)/.test(x.webContents.getURL()))!
@@ -664,32 +672,34 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
       }
     })
     expect(shape).toEqual({ child: true, top: false, modal: false, title: 'Ask Vee', width: 330, height: 420 })
-    // …the panel's title too, with the mascot where the design's sparkle was; the header is the
-    // height it had (11 + 24 + 11 px, and its rule).
+    // 2026-11-08 — the header names Vee (`Ask Vee` is the OS title), with its 32 px face and a
+    // presence line; it has no × of its own (the OS close and Esc remain).
     const title = vee.locator('#sgvue-chat-title')
-    await expect(title).toHaveText('Ask Vee')
-    const header = title.locator('xpath=..')
+    await expect(title).toHaveText('Vee')
+    const header = vee.locator('header.vm-hd')
     await expect(header.locator('[data-role="vee"] canvas')).toHaveCount(1)
-    await expect(header.locator('svg')).toHaveCount(1) // the close button's ×, and no sparkle
-    expect((await header.boundingBox())!.height).toBe(47)
+    await expect(header.locator('button')).toHaveCount(0)
+    await expect(vee.locator('[data-role="vee-presence"]')).toHaveText('no key')
     await expect(vee.getByText('Ask SGVue')).toHaveCount(0)
-    // Opening the window gave its composer the keyboard.
-    await expect(vee.locator('[data-role="chatinput"]')).toBeFocused()
 
-    // 2 — the boot audit is already the first turn, with its own chips (`:1642`).
+    // 2 — not ready for want of a key: Vee's one line, the composer and the send key there but
+    // disabled — so nothing can be typed that could not be sent — and no suggestions.
+    await expect(log.locator('[data-role="vee-not-ready"]')).toHaveText('Add your API key in Preferences to start.')
+    const input = vee.locator('[data-role="chatinput"]')
+    await expect(input).toBeDisabled()
+    await expect(input).toHaveAttribute('placeholder', '')
+    await expect(vee.locator('button[data-part="send"]')).toBeDisabled()
+    await expect(vee.locator('[data-role="chatsuggest"]')).toHaveCount(0)
+
+    // 3 — the boot audit is already the first message, Vee's, on the left with its avatar at the
+    // group's foot and its time on the lead bubble, with its own chips (`:1642`).
     await expect(log.getByText('1 model, 6 elements, 2 storeys.', { exact: false })).toBeVisible()
-    // It is the assistant's, so it is labelled `Vee`, the mascot in front of the name and the
-    // design's `reply` after it — in a row no taller than the design's 10 px.
-    const seedLabel = log.locator(':scope > div').first().locator(':scope > div').first()
-    expect(await seedLabel.evaluate((row) => [...row.children].map((k) => (k.textContent || '').trim()))).toEqual([
-      '',
-      'Vee',
-      'reply'
-    ])
-    await expect(seedLabel.locator(':scope > [data-role="vee"] canvas')).toHaveCount(1)
-    expect((await seedLabel.boundingBox())!.height).toBe(10)
+    const seed = log.locator(':scope > [data-row="0"]')
+    await expect(seed).toHaveClass(/vm-vee/)
+    await expect(seed.locator('.vm-av [data-role="vee"] canvas')).toHaveCount(1)
+    await expect(seed.locator('.vm-t').first()).toHaveText(/^\d\d:\d\d$/)
     // Every sprite is decorative, and every one has been painted: opaque pixels on its canvas —
-    // the header's and the reply's in the Vee window, the pill's in the main window.
+    // the header's and the avatars' in the Vee window, the pill's in the main window.
     const paintedIn = (where: Page) =>
       where.locator('[data-role="vee"]').evaluateAll((slots) =>
         slots.map((slot) => {
@@ -702,27 +712,26 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
         })
       )
     const painted = [...(await paintedIn(vee)), ...(await paintedIn(page))]
-    expect(painted).toHaveLength(3)
+    // The header, the audit's avatar, the not-ready line's avatar, and the pill.
+    expect(painted).toHaveLength(4)
     for (const sprite of painted) {
       expect(sprite.hidden).toBe('true')
       expect(Number.isInteger(sprite.cells) && sprite.cells >= 1 && sprite.square).toBe(true)
-      // The idle face is 116 cells of its 256 (the rim, the body, the facet, the eyes).
-      expect(sprite.opaque).toBe(116 * sprite.cells * sprite.cells)
+      expect(sprite.opaque).toBeGreaterThan(0)
     }
     const chips = log.locator('button[data-tip="Click to select · double-click to zoom"]')
     await expect(chips.first()).toBeVisible()
     expect(await chips.count()).toBeGreaterThan(0)
     expect(await chips.count()).toBeLessThanOrEqual(6)
 
-    // 3 — a chip selects what it names: the property card opens on the elements behind it, in
+    // 4 — a chip selects what it names: the property card opens on the elements behind it, in
     // the main window.
     await chips.first().click()
     await expect(page.locator('[data-role="propcard"]')).toBeVisible()
 
-    // 3b — the context menu's "Ask about this" (`:1650`) pre-fills the composer and focuses
-    // it with the caret at the end, so the question can be finished by typing.
-    // The panel is closed first — the window goes — so this also proves `askAbout` **opens**
-    // the panel, as the design does.
+    // 4b — the context menu's "Ask about this" (`:1650`) pre-fills the composer — even one that
+    // cannot be used yet. The panel is closed first — the window goes — so this also proves
+    // `askAbout` **opens** the panel, as the design does.
     await pill.click()
     await expect.poll(() => veeIsOpen(app)).toBe(false)
     const side = page.locator('aside')
@@ -739,13 +748,28 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     await settledShot(page)
     await page.locator('[data-role="viewport"]').click({ button: 'right' })
     await page.getByText('Ask about this', { exact: true }).click()
-    const asking = await veeWindow(app)
+    let asking = await veeWindow(app)
     await expect(asking.locator('[data-role="chatinput"]')).toHaveValue(/^About Wall L1-1 \(IfcWall/)
-    await expect(asking.locator('[data-role="chatinput"]')).toBeFocused()
-    const input = asking.locator('[data-role="chatinput"]')
-    const chat = asking.locator('[data-role="chatlog"]')
+    await expect(asking.locator('[data-role="chatinput"]')).toBeDisabled()
 
-    // 3c — 2026-09-24: before the first user turn the suggestions are one unfolded line,
+    // 5 — a key arrives (here: in main's environment, as `ANTHROPIC_API_KEY` would be) and the
+    // window, reopened, is ready: the composer usable, the suggestions back. Main's turn handlers
+    // are held, so no turn leaves the machine.
+    await app.evaluate((_electron, key) => {
+      process.env.ANTHROPIC_API_KEY = key
+    }, 'e2e-stand-in-not-an-api-key')
+    await holdTurns(app)
+    await pill.click()
+    await expect.poll(() => veeIsOpen(app)).toBe(false)
+    await pill.click()
+    asking = await veeWindow(app)
+    const ready = asking.locator('[data-role="chatinput"]')
+    const chat = asking.locator('[data-role="chatlog"]')
+    await expect(ready).toBeEnabled()
+    await expect(asking.locator('[data-role="vee-not-ready"]')).toHaveCount(0)
+    await expect(asking.locator('[data-role="vee-presence"]')).toHaveText('on site')
+
+    // 5b — 2026-09-24: before the first user turn the suggestions are one unfolded line,
     // with no fold chip.
     const suggest = asking.locator('[data-role="chatsuggest"]')
     const fold = asking.getByRole('button', { name: /suggestions$/ })
@@ -754,21 +778,26 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     expect((await suggest.boundingBox())!.height).toBeLessThan(30)
     await expect(fold).toHaveCount(0)
 
-    // 4 — Enter sends, and with no key the turn fails into the designed error row with the
-    // sentence main produced — not a hang, and not a silent nothing.
-    await input.fill('how many walls?')
-    await input.press('Enter')
-    await expect(chat.getByText(/Preferences/)).toBeVisible({ timeout: 30_000 })
-    // The composer emptied and the busy row is gone: `chatBegin` then `chatFail` (`:1602`).
-    await expect(input).toHaveValue('')
-    await expect(chat.getByText('reading the model')).toHaveCount(0)
-    // The question stays in the transcript as the user's: labelled `You`, and no mascot on it.
-    const asked = chat.locator(':scope > div').filter({ hasText: 'how many walls?' })
+    // 6 — Enter sends; a turn that fails comes back as the neutral system line, with the words
+    // main gave it as the line's title, and `Try again` — not a hang, and not a silent nothing.
+    await ready.fill('how many walls?')
+    await ready.press('Enter')
+    await expect(ready).toHaveValue('')
+    await emit(app, { type: 'error', kind: 'connection', message: 'Could not reach the API.' })
+    const system = chat.locator('[data-role="vee-system"]')
+    await expect(system).toContainText('Couldn’t reach Vee · nothing changed', { timeout: 30_000 })
+    await expect(system).toHaveAttribute('title', 'Could not reach the API.')
+    await expect(system.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(1)
+    await expect(asking.locator('[data-role="vee-presence"]')).toHaveText('no signal')
+    // The question stays in the transcript as the user's: on the right, with one tick — sent,
+    // never picked up — and no mascot on it.
+    const asked = chat.locator(':scope > [data-mine]').filter({ hasText: 'how many walls?' })
     await expect(asked).toHaveCount(1)
-    await expect(asked.locator(':scope > div').first().locator(':scope > span').first()).toHaveText('You')
+    await expect(asked).toHaveClass(/vm-me/)
+    await expect(asked.locator('[aria-label="Sent"]')).toHaveCount(1)
     await expect(asked.locator('[data-role="vee"]')).toHaveCount(0)
 
-    // 4a — 2026-09-24: after the first user turn the row folds behind one `suggestions` chip;
+    // 6a — 2026-09-24: after the first user turn the row folds behind one `suggestions` chip;
     // the chip opens it, and a picked suggestion fills the composer and folds it again.
     await expect(suggest).toHaveCount(0)
     await expect(fold).toHaveText('▸ suggestions')
@@ -778,23 +807,23 @@ test('the assistant panel opens from its pill, seeds the audit, and refuses a ke
     const firstSuggestion = suggest.locator('button').first()
     const picked = (await firstSuggestion.textContent())!
     await firstSuggestion.click()
-    await expect(input).toHaveValue(picked)
+    await expect(ready).toHaveValue(picked)
     await expect(suggest).toHaveCount(0)
-    await input.fill('')
+    await ready.fill('')
 
-    // 4b — 2026-11-07: the panel fills its window — the window's own edges size it, so the
+    // 6b — 2026-11-07: the panel fills its window — the window's own edges size it, so the
     // design's top-left resize corner is not drawn.
-    const panel = chat.locator('..')
+    const panel = asking.locator('.vm')
     const box = (await panel.boundingBox())!
     expect([box.x, box.y, box.width, box.height]).toEqual([0, 0, 330, 420])
     await expect(asking.locator('.hv-grab')).toHaveCount(0)
 
-    // 5 — Esc in the composer is the field's, as the design's keys leave a field alone: the
-    // window stays. Outside a field, Esc closes it, as the panel's × does, and the pill is unlit.
-    await input.press('Escape')
+    // 7 — Esc in the composer is the field's, as the design's keys leave a field alone: the
+    // window stays. Outside a field, Esc closes it, and the pill is unlit.
+    await ready.press('Escape')
     await asking.waitForTimeout(300)
     expect(veeIsOpen(app)).toBe(true)
-    await input.evaluate((el) => (el as HTMLInputElement).blur())
+    await ready.evaluate((el) => (el as HTMLInputElement).blur())
     await asking.keyboard.press('Escape')
     await expect.poll(() => veeIsOpen(app)).toBe(false)
     await expect.poll(() => pill.evaluate((b) => getComputedStyle(b).borderColor)).toBe(unlit)

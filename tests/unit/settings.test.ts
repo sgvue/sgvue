@@ -139,6 +139,7 @@ describe('the API key', () => {
       'backend',
       'cacheOneHour',
       'effort',
+      'envKey',
       'hasKey',
       'keyStorageAvailable',
       'model',

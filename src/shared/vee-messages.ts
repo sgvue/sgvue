@@ -57,6 +57,10 @@ export const VEE_MAX_CALLS = 500
 export const VEE_MAX_COPY = 8_000_000
 /** How long the main window waits for a `copied` before it counts the copy as refused. */
 export const VEE_COPY_MS = 3000
+/** The parts one message may be drawn as (2026-11-08): a block a bubble, plus its cards. */
+export const VEE_MAX_PARTS = 10_000
+/** The steps a reply's folded diary reopens to (2026-11-08, stage 1b) — `ai/trace.ts`'s `DIARY_STEPS_MAX`. */
+export const VEE_MAX_STEPS = 20
 
 const label = z.string().max(VEE_MAX_LABEL)
 const int = z.number().int()
@@ -94,16 +98,46 @@ export const VeeMessage = z
       })
       .strict()
       .nullable(),
-    /** The pending row, and the identity of the request it holds: Apply names it. */
-    pending: z.object({ id: count, label }).strict().nullable(),
+    /**
+     * The pending row, and the identity of the request it holds: Apply names it. Since
+     * 2026-11-08 also the verb its confirm button reads — `Delete` for a deletion, `Clear all`
+     * for clearing a list, `Apply` for everything else (absent: `Apply`).
+     */
+    pending: z
+      .object({ id: count, label, verb: z.enum(['Apply', 'Delete', 'Clear all']).optional() })
+      .strict()
+      .nullable(),
     canRevert: z.boolean(),
     reverted: z.boolean(),
+    /**
+     * 2026-11-08 — the messaging layout. When the message was written (wall-clock ms), whether a
+     * user's message was picked up — the turn's first stream event arrived — and what became of
+     * the request its reply held: applied, deleted, cleared or cancelled, and when.
+     */
+    at: count.optional(),
+    seen: z.boolean().optional(),
+    settled: z
+      .object({ how: z.enum(['applied', 'deleted', 'cleared', 'cancelled']), at: count, label })
+      .strict()
+      .optional(),
+    revertedAt: count.optional(),
     trace: z
       .object({
         status: label,
         wide: z.boolean(),
         noun: label,
-        rows: z.array(z.object({ label, n: count }).strict()).max(8)
+        rows: z.array(z.object({ label, n: count }).strict()).max(8),
+        /**
+         * 2026-11-08 (stage 1b) — the diary folded into one line, the steps it reopens to with
+         * their final counts, and the storey-rows card's title. Optional, so an older main window
+         * still works.
+         */
+        fold: label.optional(),
+        steps: z
+          .array(z.object({ label, mono: label, n: count.nullable(), unit: label }).strict())
+          .max(VEE_MAX_STEPS)
+          .optional(),
+        title: label.optional()
       })
       .strict()
       .nullable()
@@ -118,6 +152,32 @@ export const VeeSnapshot = z
     busy: z.boolean(),
     err: label,
     replyTo: count.nullable(),
+    /** 2026-11-08 — the one bubble of `replyTo` the user is replying to (absent: the whole message). */
+    replyPart: count.max(VEE_MAX_PARTS).nullable().optional(),
+    /**
+     * 2026-11-08 — whether Vee can answer at all: an API key is stored (`hasKey`, the one thing
+     * the renderer learns of the key), and a model is open.
+     */
+    hasKey: z.boolean().optional(),
+    hasModel: z.boolean().optional(),
+    /**
+     * 2026-11-08 — how the last turn ended, when it did not answer: stopped, or failed (its error
+     * class, `ipc-contract.ts`'s), and whether a tool had already changed the view — so the line
+     * never says "nothing changed" when something did. `retry`: the last message is the user's,
+     * so "Try again" can run it again.
+     */
+    end: z
+      .object({
+        kind: z.enum(['stopped', 'failed']),
+        error: label,
+        /** The status line's own words for it (`chatErr` as the turn ended): the line's `title`. */
+        message: label,
+        acted: z.boolean(),
+        retry: z.boolean()
+      })
+      .strict()
+      .nullable()
+      .optional(),
     suggestOpen: z.boolean(),
     /** `chatExamples` — worked out where the federation is. */
     suggestions: z.array(z.string().max(500)).max(4),
@@ -189,6 +249,28 @@ export const VeeTraceChange = z.discriminatedUnion('kind', [
 ])
 export type VeeTraceChange = z.infer<typeof VeeTraceChange>
 
+/* ────────────────────────────── the board ────────────────────────────── */
+
+/**
+ * 2026-11-08 — the pinned board: what the main window's 3D view shows now, **as counts and
+ * names only** — never an element id. Sent whenever any of it changes, whoever changed it, at
+ * most once a frame (`model/vee-link.ts`). `null`: no model is open, and there is no board.
+ */
+export const VeeBoard = z
+  .object({
+    total: count,
+    shown: count,
+    selected: count,
+    /** The storey every selected element is on, when they share one. */
+    storey: label.nullable(),
+    /** The property the view is coloured by. */
+    colourBy: label.nullable(),
+    /** The lit view button's label: `3D`, `Plan`, `N` … */
+    view: label.nullable()
+  })
+  .strict()
+export type VeeBoard = z.infer<typeof VeeBoard>
+
 /* ────────────────────────────── main window → Vee ────────────────────────────── */
 
 export const ToVee = z.discriminatedUnion('type', [
@@ -202,6 +284,8 @@ export const ToVee = z.discriminatedUnion('type', [
        */
       origin: finite,
       snap: VeeSnapshot.optional(),
+      /** 2026-11-08 — the pinned board, when it changed. */
+      board: VeeBoard.nullable().optional(),
       trace: z.array(VeeTraceChange).max(64)
     })
     .strict(),
@@ -228,8 +312,14 @@ export const VeeIntent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cancel'), ...at, pending: count }).strict(),
   /** A reply's `revert`. */
   z.object({ type: z.literal('revert'), ...at }).strict(),
-  /** A message's `reply`. */
-  z.object({ type: z.literal('reply'), ...at }).strict(),
+  /**
+   * A message's `reply`. Since 2026-11-08 a reply is drawn as several bubbles, and `part` names
+   * the one the user replied to (`ai/parts.ts`); absent, the whole message — so an older window
+   * still works. The quote is worked out in the main window, from its own message.
+   */
+  z.object({ type: z.literal('reply'), ...at, part: count.max(VEE_MAX_PARTS).optional() }).strict(),
+  /** 2026-11-08 — "Try again" on a failed turn: run the last message again, without adding it again. */
+  z.object({ type: z.literal('retry') }).strict(),
   /** The reply strip's ×. */
   z.object({ type: z.literal('unreply') }).strict(),
   /** A suggestion picked: it fills the composer and folds the row. */

@@ -263,6 +263,12 @@ export const SettingsView = z.object({
    */
   preferNvidia: z.boolean(),
   hasKey: z.boolean(),
+  /**
+   * 2026-11-08 — an `ANTHROPIC_API_KEY` is set in main's environment, which wins over the stored
+   * key (`main/settings.ts`, `apiKey`). Whether, not what: with either, the assistant can answer,
+   * and the Ask Vee window is ready. The key itself never crosses.
+   */
+  envKey: z.boolean(),
   /** False when the OS refuses to encrypt, so the dialog can say why the field is disabled. */
   keyStorageAvailable: z.boolean()
 })

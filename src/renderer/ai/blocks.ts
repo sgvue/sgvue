@@ -184,9 +184,10 @@ export function parseBlocks(text: string): Block[] {
 export const hasTable = (text: string): boolean => parseBlocks(text).some((b) => b.kind === 'table')
 
 /**
- * How many pieces the reveal brings in, one after another (`ai/trace.ts`, `wordStagger`): each
- * word of a paragraph or of a list item (`markWords`), each list marker, and each table — whole.
- * It is what `app/Trace.tsx` renders as `[data-part="word"]`, in the same order.
+ * How many words a reply has, as the handoff's reveal counted them: each word of a paragraph or
+ * of a list item (`markWords`), each list marker, and each table — whole. It is the timeline's
+ * `words` (`ai/trace-store.ts`), which still crosses the Vee port; since 2026-11-08 nothing is
+ * revealed word by word, so nothing animates by it.
  */
 export function wordCount(text: string): number {
   let n = 0
@@ -200,6 +201,25 @@ export function wordCount(text: string): number {
 
 /** A list item's or a cell's text with a full stop or semicolon at its end taken off, for joining. */
 const clause = (s: string): string => s.replace(/[.;]$/, '')
+
+/**
+ * One block as plain text, by `plainText`'s rule — 2026-11-08, for the quote of one bubble: since
+ * then a reply is drawn as one bubble a block (`ai/parts.ts`), and a reply quotes the bubble it
+ * was made on.
+ */
+export function plainBlock(block: Block): string {
+  return block.kind === 'p'
+    ? block.lines.map(shown).join(' ')
+    : block.kind === 'table'
+      ? [block.head, ...block.rows]
+          .map((row) => row.map(shown).filter(Boolean).map(clause).join(', '))
+          .filter(Boolean)
+          .join('; ')
+      : block.items
+          .map((item) => clause(item.map(shown).join(' ')))
+          .filter(Boolean)
+          .join('; ')
+}
 
 /**
  * The reply as plain text, for a quote — the line a reply carries back to the model
@@ -217,18 +237,7 @@ export function plainText(text: string): string {
   /** The last character of the block before, which decides what joins the next one to it. */
   let end = ''
   for (const block of parseBlocks(text)) {
-    const flat =
-      block.kind === 'p'
-        ? block.lines.map(shown).join(' ')
-        : block.kind === 'table'
-          ? [block.head, ...block.rows]
-              .map((row) => row.map(shown).filter(Boolean).map(clause).join(', '))
-              .filter(Boolean)
-              .join('; ')
-          : block.items
-              .map((item) => clause(item.map(shown).join(' ')))
-              .filter(Boolean)
-              .join('; ')
+    const flat = plainBlock(block)
     if (!flat) continue
     if (parts.length) parts.push(/[.!?:;…]/.test(end) ? ' ' : '. ')
     parts.push(flat)

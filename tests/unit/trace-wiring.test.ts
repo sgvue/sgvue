@@ -12,7 +12,7 @@ import { federate } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { useShell, type ChatMessage } from '../../src/renderer/state/shell'
 import { handleEvent, installAi, runTurnOnce, scriptedTurn, sendChat } from '../../src/renderer/ai/bridge'
-import { traceCues, traceFrame } from '../../src/renderer/ai/trace'
+import { answerFrame, traceCues, traceFrame } from '../../src/renderer/ai/trace'
 import { onTrace, pinTrace, traceFail, traceNow, traceState } from '../../src/renderer/ai/trace-store'
 import { chatRow, veeStateOf } from '../../src/renderer/state/selectors/chat'
 import type { AiEvent, AiToolExec, AiToolResult } from '../../src/shared/ipc-contract'
@@ -228,7 +228,15 @@ describe('what a finished reply keeps', () => {
         { label: 'L3', n: 5, ids: expect.any(Array) },
         { label: 'L4', n: 5, ids: expect.any(Array) },
         { label: 'Roof', n: 4, ids: expect.any(Array) }
-      ]
+      ],
+      // 2026-11-08 (stage 1b): the diary's folded line, the steps it reopens to and the rows' title.
+      fold: '412 read · 80 walls · 24 missing · 7s',
+      steps: [
+        { label: 'Reading 4 models', mono: '', n: 412, unit: 'elements' },
+        { label: 'Filtering ', mono: 'IfcWall', n: 80, unit: 'walls' },
+        { label: 'Checking Thermal Transmittance', mono: '', n: 24, unit: 'missing' }
+      ],
+      title: 'Thermal Transmittance · missing'
     })
     // The rows' ids are the federation's, and they are exactly the walls that carry no value.
     const ids = reply.trace!.rows.flatMap((r) => r.ids)
@@ -259,7 +267,7 @@ describe('what a finished reply keeps', () => {
     scriptedTurn.begin('hello')
     pinTrace(12.6)
     scriptedTurn.done('Hello.')
-    expect(last().trace).toEqual({ status: '3s', wide: false, rows: [], noun: 'element' })
+    expect(last().trace).toEqual({ status: '3s', wide: false, rows: [], noun: 'element', fold: '3s', steps: [] })
     expect(chatRow(last(), 2)).toMatchObject({ traced: true, status: '3s', wide: false })
     // The boot audit was written by no turn.
     expect(messages()[0].trace).toBeUndefined()
@@ -279,11 +287,14 @@ describe('what a finished reply keeps', () => {
     const tl = traceState().timeline!
     const layout = { width: 282, dpr: 1, textH: 19.375, reduced: false }
     const at = traceFrame(tl, 20.3, layout)
-    expect(at.bubble).toMatchObject({ wide: true, opacity: 1 })
-    expect(at.bubble.height).toBeCloseTo(52, 9)
-    expect(at.ticker.lines.map((l) => [l.label, l.count!.n])).toEqual([['Checking Thermal Transmittance', 24]])
-    // Two seconds later it is the finished reply, and nothing moves.
-    expect(traceFrame(tl, 22.3, layout).settled).toBe(true)
+    expect(at.bubble).toEqual({ wide: true, opacity: 1 })
+    // The matrix is the Check's end — its 24 findings lit — though no step was ever shown.
+    expect(at.steps).toEqual([])
+    expect(at.dots).toBe(false)
+    expect(at.cells.filter((c) => c.a === 'hit').reduce((n) => n + 1, 0)).toBeGreaterThan(0)
+    // The first part starts landing at once; two seconds later nothing moves.
+    expect(answerFrame(tl, 20.32, 3, { dpr: 1, reduced: false }).parts[0].opacity).toBeGreaterThan(0)
+    expect(answerFrame(tl, 22.3, 3, { dpr: 1, reduced: false }).settled).toBe(true)
     expect(last().trace!.status).toBe('checked 80 walls · 1s')
   })
 })

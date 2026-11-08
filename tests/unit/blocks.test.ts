@@ -1,21 +1,19 @@
 /**
  * The blocks a reply of Vee's is laid out in — `src/renderer/ai/blocks.ts`, and their markup,
- * `ReplyText` in `src/renderer/app/Trace.tsx` (2026-10-08).
+ * `BlockView` in `src/renderer/app/Trace.tsx` (2026-10-08; one bubble a block since 2026-11-08).
  *
  * The owner: "the Ask VEE ai assistant answer are in one sentence, which is extremely difficult to
  * read". The prompt asks for a sentence, then a list, a table or short paragraphs; the panel reads
  * exactly those — paragraphs and their line breaks, `- ` / `* ` and `1. ` lists, pipe tables with
  * a separator row — with the two inline marks inside each, and prints everything else as it was
  * written. Nothing is ever HTML. It runs on the answer path, so it is linear in the reply's length
- * whatever the reply holds; and the markup has exactly as many pieces for the reveal as
- * `wordCount` counts, in the same order.
+ * whatever the reply holds; and each block is drawn as one bubble's content.
  */
-import { createElement, isValidElement } from 'react'
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { cellsOf, hasTable, parseBlocks, plainText, wordCount, type Block } from '../../src/renderer/ai/blocks'
-import { markWords } from '../../src/renderer/ai/marks'
-import { ReplyText } from '../../src/renderer/app/Trace'
+import { BlockView } from '../../src/renderer/app/Trace'
 import { plainOf, replyStrip } from '../../src/renderer/state/selectors/chat'
 
 const p = (...lines: string[]): Block => ({ kind: 'p', lines })
@@ -307,102 +305,53 @@ describe('a long reply', () => {
   })
 })
 
-describe('the markup of a reply', () => {
-  const html = (text: string, reveal = true): string => renderToStaticMarkup(createElement(ReplyText, { text, reveal }))
-  const parts = (markup: string): number => markup.split('data-part="word"').length - 1
-  /**
-   * The text of each reveal piece, `[data-part="word"]`, in document order — read off the elements
-   * a reply renders, not out of its markup. No component a reply is drawn with uses a hook, so each
-   * is called here as React calls it; a `memo`'s own function is its `type`.
-   */
-  const pieceTexts = (text: string): string[] => {
-    const out: string[] = []
-    const walk = (node: unknown, into: string[] | null): void => {
-      if (typeof node === 'string' || typeof node === 'number') into?.push(String(node))
-      else if (Array.isArray(node)) for (const child of node) walk(child, into)
-      else if (isValidElement<{ children?: unknown; 'data-part'?: string }>(node)) {
-        const type: unknown = node.type
-        const { props } = node
-        if (typeof type === 'function') walk(type(props), into)
-        else if (typeof type === 'object') walk((type as { type: (p: object) => unknown }).type(props), into)
-        // A tag or a fragment: its children, gathered into a piece of their own if it is one.
-        else if (props['data-part'] !== 'word') walk(props.children, into)
-        else {
-          const piece: string[] = []
-          walk(props.children, piece)
-          out.push(piece.join(''))
-        }
-      }
-    }
-    walk(createElement(ReplyText, { text }), null)
-    return out
-  }
+describe('the markup of a reply: one bubble a block (`BlockView`, 2026-11-08)', () => {
+  /** Each block of a reply as the bubble the Ask Vee window draws for it. */
+  const bubbles = (text: string): string[] =>
+    parseBlocks(text).map((block) => renderToStaticMarkup(createElement(BlockView, { block })))
 
-  it('draws one paragraph as a reply always was: its words straight in, nothing around them', () => {
-    expect(html('**24 of 80** walls.')).toBe(
-      '<span data-part="word" style="position:relative"><span style="font-weight:600">24</span></span> ' +
-        '<span data-part="word" style="position:relative"><span style="font-weight:600">of</span></span> ' +
-        '<span data-part="word" style="position:relative"><span style="font-weight:600">80</span></span> ' +
-        '<span data-part="word" style="position:relative">walls.</span>'
-    )
-    // A line break inside it is a `<br>`, and nothing else is added.
-    expect(html('One.\nTwo.')).toBe(
-      '<span data-part="word" style="position:relative">One.</span><br/><span data-part="word" style="position:relative">Two.</span>'
-    )
-    // Not revealed — a message no turn produced — a plain sentence is its text and nothing more.
-    expect(html('4 models, 412 elements, 6 storeys.', false)).toBe('4 models, 412 elements, 6 storeys.')
+  it('draws a paragraph as its text inline — marks as elements, a line break as a `<br>`, nothing around it', () => {
+    expect(bubbles('**24 of 80** walls.')).toEqual(['<span style="font-weight:600">24 of 80</span> walls.'])
+    expect(bubbles('One.\nTwo.')).toEqual(['One.<br/>Two.'])
+    expect(bubbles('4 models, 412 elements, 6 storeys.')).toEqual(['4 models, 412 elements, 6 storeys.'])
+    // Nothing of a reply is revealed word by word any more: no piece is marked for it.
+    expect(bubbles(WALLS).join('')).not.toContain('data-part')
   })
 
-  it('draws a paragraph, a list and a table as elements, 6 px apart', () => {
-    const out = html(WALLS)
-    expect(out).toMatch(/^<p style="margin:0px 0 0">/)
-    expect(out).toContain('<ul style="margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px">')
-    expect(out.match(/<li style="display:flex;align-items:baseline;gap:6px">/g)).toHaveLength(3)
+  it('draws a paragraph, a list and a table as three bubbles, each its own elements', () => {
+    const [para, list, table] = bubbles(WALLS)
+    // The paragraph is inline: no `<p>` around it.
+    expect(para).not.toContain('<p')
+    expect(list).toMatch(/^<ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px">/)
+    expect(list.match(/<li style="display:flex;align-items:baseline;gap:6px">/g)).toHaveLength(3)
     // The bullet is decoration; the table is a real one, its header cells column headers.
-    expect(out).toContain('aria-hidden="true"')
-    expect(out).toContain('<table style="border-collapse:collapse;width:100%"><thead><tr><th scope="col"')
-    expect(out.match(/<th /g)).toHaveLength(3)
-    expect(out.match(/<td /g)).toHaveLength(9)
-    // The result table's own strings: its box, its header, its rows.
-    expect(out).toContain('border:1px solid var(--border);border-radius:8px;background:var(--card);margin-top:6px')
-    expect(out).toContain('font:500 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)')
-    expect(out).toContain('font:400 11.5px/1.4 var(--sans);color:var(--ink);text-align:left')
-    expect(out).toContain('font:400 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;text-align:right')
+    expect(list).toContain('aria-hidden="true"')
+    expect(table).toMatch(/^<div style="position:relative;overflow-x:auto;border:1px solid var\(--border\);border-radius:8px;background:var\(--card\)">/)
+    expect(table).toContain('<table style="border-collapse:collapse;width:100%"><thead><tr><th scope="col"')
+    expect(table.match(/<th /g)).toHaveLength(3)
+    expect(table.match(/<td /g)).toHaveLength(9)
+    // The result table's own strings: its header, its rows.
+    expect(table).toContain('font:500 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)')
+    expect(table).toContain('font:400 11.5px/1.4 var(--sans);color:var(--ink);text-align:left')
+    expect(table).toContain('font:400 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;text-align:right')
     // The two marks are elements in every block, never their characters.
-    expect(out).not.toMatch(/\*\*|`/)
-    expect(out).toContain('<span style="font:400 11px/1 var(--mono)">SB_ARC_R25</span>')
+    const all = [para, list, table].join('')
+    expect(all).not.toMatch(/\*\*|`/)
+    expect(list).toContain('<span style="font:400 11px/1 var(--mono)">SB_ARC_R25</span>')
   })
 
   it('numbers an ordered list from its first number, its numbers as wide as the widest', () => {
-    const out = html('9. nine\n10. ten')
+    const [out] = bubbles('9. nine\n10. ten')
     expect(out).toMatch(/^<ol style=/)
     expect(out).toContain('min-width:3ch">9.</span>')
     expect(out).toContain('min-width:3ch">10.</span>')
   })
 
-  it('has exactly as many pieces for the reveal as wordCount counts — and none when not revealed', () => {
-    for (const text of [
-      WALLS,
-      'One sentence.',
-      '1. a b\n2. c\n\n| x |\n|---|\n| 1 |\n\nDone.',
-      'Walls:\n- L1\n  19 walls\n- ',
-      '- \n- '
-    ]) {
-      expect([text.slice(0, 12), parts(html(text))]).toEqual([text.slice(0, 12), wordCount(text)])
-      expect(parts(html(text, false))).toBe(0)
-    }
-    // …in reading order: the sentence's words, then each marker before its item's words.
-    const order = pieceTexts(WALLS)
-    expect(markWords('**24 of 80 walls** have no Thermal Transmittance, and every level has some.')).toHaveLength(13)
-    expect(order.slice(0, 3)).toEqual(['24', 'of', '80'])
-    expect(order.slice(13, 16)).toEqual(['•', '12', 'are'])
-  })
-
   it('never renders a reply’s text as HTML, in any block', () => {
-    const out = html(
+    const out = bubbles(
       '<img src=x onerror=alert(1)>\n<IMG SRC=x ONERROR=alert(1)>\n- <script>x</script>\n- <SCRIPT>x</SCRIPT>\n\n' +
         '| <b>a</b> |\n|---|\n| &amp; |\n| <B>b</B> |'
-    )
+    ).join('')
     expect(out).not.toMatch(/<\s*(img|script|b)\b/i)
     expect(out).toContain('&lt;img')
     expect(out).toContain('&lt;script&gt;')

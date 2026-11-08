@@ -17,7 +17,8 @@
  * beside the name, whether its bubble is the trace's full-width one, its rows); and the mascot
  * in front of the newest such reply is `done` (`veeStateOf`).
  */
-import type { ChatTable } from '../../ai/executors/context'
+import type { ChatPending, ChatTable, PendingAction } from '../../ai/executors/context'
+import { group } from '../../../shared/fmt'
 import { volumeIn, volumeUnit, type DisplayUnit } from '../../../shared/units'
 import { csvCell, defuse } from '../../../schedule/export/csv'
 import type { ChatMessage, ShellState } from '../shell'
@@ -146,10 +147,26 @@ export interface ChatMessageView {
         rows: { k: string; n: number; area?: number; volume?: number; vol?: number; ids?: readonly number[] }[]
       })
     | null
-  pending: { id: number; label: string } | null
+  pending: { id: number; label: string; verb?: ConsentVerb } | null
   canRevert: boolean
   reverted: boolean
-  trace: { status: string; wide: boolean; noun: string; rows: { label: string; n: number }[] } | null
+  trace:
+    | {
+        status: string
+        wide: boolean
+        noun: string
+        rows: { label: string; n: number }[]
+        /** 2026-11-08 (stage 1b) — `ChatTrace.fold`, `steps` and `title`, when the turn left them. */
+        fold?: string
+        steps?: { label: string; mono: string; n: number | null; unit: string }[]
+        title?: string
+      }
+    | null
+  /** 2026-11-08 — `ChatMessage.at`, `seen`, `settled` and `revertedAt`, as they are. */
+  at?: number
+  seen?: boolean
+  settled?: ChatMessage['settled']
+  revertedAt?: number
 }
 
 /**
@@ -167,10 +184,22 @@ export function messageView(m: ChatMessage, id = 0, pending = 0): ChatMessageVie
     quote: m.quote ?? null,
     chips: m.chips ?? [],
     table: m.table ?? null,
-    pending: m.pending ? { id: pending, label: m.pending.label } : null,
+    pending: m.pending ? { id: pending, label: m.pending.label, verb: pendingVerb(m.pending) } : null,
     canRevert: (!!m.undoSnap || !!m.placed?.length) && !m.reverted,
     reverted: !!m.reverted,
-    trace: trace && { status: trace.status, wide: trace.wide, noun: trace.noun, rows: trace.rows }
+    trace: trace && {
+      status: trace.status,
+      wide: trace.wide,
+      noun: trace.noun,
+      rows: trace.rows,
+      ...(trace.fold !== undefined ? { fold: trace.fold } : {}),
+      ...(trace.steps ? { steps: trace.steps } : {}),
+      ...(trace.title !== undefined ? { title: trace.title } : {})
+    },
+    ...(m.at !== undefined ? { at: m.at } : {}),
+    ...(m.role === 'user' ? { seen: !!m.seen } : {}),
+    ...(m.settled ? { settled: m.settled } : {}),
+    ...(m.revertedAt !== undefined ? { revertedAt: m.revertedAt } : {})
   }
 }
 
@@ -233,6 +262,23 @@ export const veeStateOf = (
   i: number
 ): VeeState =>
   i === msgs.length - 1 && msgs[i]?.role === 'assistant' && !!msgs[i].trace ? 'done' : 'idle'
+
+/**
+ * 2026-11-08 (stage 1b) — a consent card's two lines, from the request's one label: the question
+ * — what Apply will do, its first letter a capital and a question mark after it — and the detail
+ * after the label's first ` — `, in the card's mono line (`delete the viewpoint "Lobby" (3D) — it
+ * cannot be brought back` → `Delete the viewpoint "Lobby" (3D)?` / `It cannot be brought back`).
+ * Nothing is added to what the label says, and a label with no ` — ` has no detail. The labels
+ * themselves are the requests' own, unchanged (`ai/executors`).
+ */
+export function consentText(label: string): { q: string; detail: string } {
+  const at = label.indexOf(' — ')
+  const head = (at < 0 ? label : label.slice(0, at)).trim()
+  const rest = at < 0 ? '' : label.slice(at + 3).trim()
+  const cap = (t: string): string => (/^[a-z]/.test(t) ? t[0].toUpperCase() + t.slice(1) : t)
+  const q = head ? cap(head) + (/[?.!:]$/.test(head) ? '' : '?') : ''
+  return { q, detail: cap(rest) }
+}
 
 /** How long the send button ignores clicks after it has stopped a turn. */
 export const STOP_GUARD_MS = 300
@@ -308,3 +354,150 @@ export const chipsStarted = (msgs: readonly Pick<ChatMessage, 'role'>[]): boolea
  */
 export const chipsFolded = (msgs: readonly Pick<ChatMessage, 'role'>[], open: boolean): boolean =>
   !open && chipsStarted(msgs)
+
+/* ────────────────────────────── 2026-11-08 — the messaging layout ────────────────────────────── */
+
+/**
+ * The word on a consent card's confirm button: it names what the click does (the owner's
+ * decision of 2026-11-08). `Delete` for a deletion, `Clear all` for clearing a list, and `Apply`
+ * for a visibility change and every other request — one entry per kind, so a new kind cannot be
+ * forgotten here.
+ */
+export type ConsentVerb = 'Apply' | 'Delete' | 'Clear all'
+const VERB_OF: Record<PendingAction['kind'], ConsentVerb> = {
+  undo: 'Apply',
+  redo: 'Apply',
+  restore_view: 'Apply',
+  delete_view: 'Delete',
+  delete_measure: 'Delete',
+  delete_spot: 'Delete',
+  clear_measures: 'Clear all',
+  clear_spots: 'Clear all',
+  delete_filter_set: 'Delete',
+  save_filter_set: 'Apply',
+  open_recent: 'Apply',
+  copy_link: 'Apply',
+  copy_guids: 'Apply'
+}
+export const pendingVerb = (p: Pick<ChatPending, 'action'>): ConsentVerb => (p.action ? VERB_OF[p.action.kind] : 'Apply')
+
+/** What the stamp on a consent card says the user's confirm click did. */
+export const SETTLED_BY_VERB: Record<ConsentVerb, 'applied' | 'deleted' | 'cleared'> = {
+  Apply: 'applied',
+  Delete: 'deleted',
+  'Clear all': 'cleared'
+}
+
+/** A time of day as the thread prints it: `14:02`, the 24-hour clock in local time. */
+export function hhmm(ms: number): string {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** The day separator over the messages of one day: `Today`, `Yesterday`, else the date. */
+export function dayLabel(ms: number, now: number): string {
+  const day = (t: number): number => {
+    const d = new Date(t)
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  }
+  const diff = Math.round((day(now) - day(ms)) / 86_400_000)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Yesterday'
+  return new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** The not-ready lines (HANDOFF §10.1, §9.8): the key line wins — without a key nothing can answer. */
+export const NO_KEY_LINE = 'Add your API key in Preferences to start.'
+export const NO_MODEL_LINE = 'Open a model and I’ll take a look.'
+
+/** Which not-ready line the window shows, or `null` when Vee can answer. `hasKey` unknown counts as a key. */
+export const notReadyLine = (hasKey: boolean | null | undefined, hasModel: boolean | undefined): string | null =>
+  hasKey === false ? NO_KEY_LINE : hasModel === false ? NO_MODEL_LINE : null
+
+/** An ended turn, as the Vee window is told it (`VeeSnapshot.end`). */
+export interface TurnEnd {
+  kind: 'stopped' | 'failed'
+  error: string
+  message?: string
+  acted: boolean
+  retry: boolean
+}
+
+/** The errors that mean the turn never reached Vee: the window says `no signal` until one does. */
+const NO_SIGNAL = new Set(['connection', 'timeout'])
+/** The errors a second try cannot fix: no key, or a key the service refused. */
+const NO_RETRY = new Set(['no_key', 'auth'])
+
+/**
+ * The header's presence line — derived, never stored (HANDOFF §3): `no key` while there is none;
+ * while a turn runs `on it` once a tool has run and `typing` before; `no signal` after a turn
+ * that never reached the service, until the next begins; `on site` otherwise.
+ */
+export function presenceOf(p: {
+  hasKey: boolean | null | undefined
+  busy: boolean
+  toolRan: boolean
+  end: TurnEnd | null | undefined
+}): { word: string; mode: 'idle' | 'busy' | 'off' } {
+  if (p.hasKey === false) return { word: 'no key', mode: 'off' }
+  if (p.busy) return { word: p.toolRan ? 'on it' : 'typing', mode: 'busy' }
+  if (p.end?.kind === 'failed' && NO_SIGNAL.has(p.end.error)) return { word: 'no signal', mode: 'off' }
+  return { word: 'on site', mode: 'idle' }
+}
+
+/**
+ * The system line under a turn that did not answer — the app talking, not Vee, in neutral ink
+ * (amber is kept for the heads-up). It says what happened and **never claims that nothing
+ * changed when a tool had already changed something**. `retry`: "Try again" is offered.
+ */
+export function endLine(end: TurnEnd): { text: string; retry: boolean } {
+  const tail = end.acted ? 'what it already did stays' : 'nothing changed'
+  if (end.kind === 'stopped') return { text: `Stopped · ${tail}`, retry: false }
+  const what = NO_SIGNAL.has(end.error)
+    ? 'Couldn’t reach Vee'
+    : end.error === 'rate_limit' || end.error === 'overloaded'
+      ? 'Vee is busy right now'
+      : NO_RETRY.has(end.error)
+        ? 'Vee couldn’t sign in'
+        : 'Vee couldn’t answer'
+  return { text: `${what} · ${tail}`, retry: end.retry && !NO_RETRY.has(end.error) }
+}
+
+/** The pinned board's numbers (`VeeBoard`). */
+export interface BoardView {
+  total: number
+  shown: number
+  selected: number
+  storey: string | null
+  colourBy: string | null
+  view: string | null
+}
+
+/**
+ * The pinned board's one line, in pieces: what the 3D view shows (`All 412 shown`, or `12 of 412
+ * shown` — **isolated**, drawn in the selection's colours with the eye struck through, exactly
+ * when not everything is shown), what is selected and on which storey, what it is coloured by.
+ */
+export function boardLine(b: BoardView): {
+  iso: boolean
+  lead: { strong: string; text: string; before: boolean }
+  sel: string | null
+  rest: string[]
+} {
+  const iso = b.shown < b.total
+  return {
+    iso,
+    lead: iso
+      ? { strong: group(b.shown), text: ` of ${group(b.total)} shown`, before: true }
+      : { strong: group(b.total), text: ' shown', before: false },
+    sel: b.selected ? `${group(b.selected)} selected` : null,
+    rest: [...(b.selected && b.storey ? [b.storey] : []), ...(b.colourBy ? [`coloured by ${b.colourBy}`] : [])]
+  }
+}
+
+/** The board's line as plain text: `All 412 shown`, `12 of 412 shown · 5 selected · L2`. */
+export function boardText(b: BoardView): string {
+  const l = boardLine(b)
+  const lead = l.lead.before ? `${l.lead.strong}${l.lead.text}` : `All ${l.lead.strong}${l.lead.text}`
+  return [lead, ...(l.sel ? [l.sel] : []), ...l.rest].join(' · ')
+}

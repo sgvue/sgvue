@@ -968,7 +968,8 @@ Anything not on this list is a defect.
   the row showed, and a copy is made in the window that was clicked. The main window's 3D view,
   property card, legend and bottom row are unchanged. **No new element and no new control.** The
   mascots' "no two blink together" now holds within each window. Not yet seen in a window: the
-  e2e specs that drive it and the parity harness's chat states are owed.
+  e2e specs that drive it and the parity harness's chat states are owed. *(Amended 2026-11-08:
+  the window's contents are a messaging conversation — the entry of that date, below.)*
 - **2026-11-07 — the sidebar's MODELS section folds behind its header, and expanded it is
   always its full height.** Asked for by the owner in these words: *"I think the left panel
   model management are quite messy, make it collapsible instead, but when expand always show
@@ -1095,6 +1096,44 @@ Anything not on this list is a defect.
   a model with no file behind it (the demo building). **No new element, no new control, no
   style string changed.** Parity states `library-open` (phase 3) and `library-popover`
   (phase 8) are retired. Not yet seen in a window.
+- **2026-11-08 — the Ask Vee window is a messaging conversation.** Asked for by the owner:
+  *"I need the conversation window like texting in messaging"*; the owner chose direction C,
+  "site group chat" (`prototypes/vee-messages/full/`, its `HANDOFF.md`, kept out of the repository
+  and of `app.asar`). In the Ask Vee window only: a header — the 32 px Vee at two whole device
+  pixels a cell, `Vee`, and a presence line (`no signal` after a failed turn, until the next one
+  begins); a pinned board under it — what the main window's 3D view shows, counts only, whoever
+  changed it; `You` on the right, with one tick (sent) or two (the turn's first stream event);
+  Vee on the left as one bubble per block, then its cards (chips, storey rows, the result table
+  with `copy csv`, the consent card); the time on the lead bubble; the 16 px avatar at the
+  group's foot, only the newest moving; `reply` on a bubble quotes that one bubble, worked out in
+  the main window; the pending row is a consent card — hazard tape (`--vis` `#F2C230`, light
+  `#B88600`, used nowhere else), its label read as a question with the detail after its first
+  ` — `, `Cancel`, and a confirm button naming the action (`Apply`, `Delete`, `Clear all`), never
+  focused by itself; then the stub tears and a stamp lands (`APPLIED · 14:02`, `DELETED`,
+  `CLEARED`, `CANCELLED` — also for a request the user's own work had overtaken — `REVERTED`)
+  carrying the reply's one `Revert`, else `Revert` at the group's foot; stopped and failed turns
+  are neutral system lines that never say "nothing changed" when a tool had acted, with
+  `Try again` on a failed one while a model is open; a `New message` pill; not-ready lines — no
+  key wins (`Add your API key in Preferences to start.`, composer disabled at `.45`, no
+  placeholder), no model (`Open a model and I'll take a look.`; no board, no suggestions; a
+  question gets the line back and runs no turn). **The trace's answer is the app's own** — the
+  handoff (`design-reference/ask-vee/`) is the specification up to its Answer cue: while a turn
+  runs Vee's bubble is typing dots, then a diary of every step shown with its live count over
+  the element matrix; at the answer it folds into one dashed line (`✓ 412 read · 80 walls ·
+  12 missing · 7s ›`) that reopens to its steps, and the reply's parts land ≤ 110 ms apart, all
+  within 0.5 s, on the row they settle in — no re-layout. The status beside the name, the ticker
+  bubble and the word-by-word reveal are gone. The selected storey row is pressed and ringed by
+  a revision cloud; the storey-rows card is titled by the checked property; a fresh bubble pops
+  once — none of the motion under reduced motion. The table card's `copy csv` flashes `copied` /
+  `couldn’t copy` for 1 400 ms here (2026-10-02's "no flash" stands for the main window).
+  **Removed:** the per-message `Vee` / `You` labels and the header's ×; `Ask Vee` is the OS
+  window's title. **New controls:** `reply` on a bubble, `Try again`, the `New message` pill and
+  the diary's fold toggle. The typed line lifts on a slant to the right. The OS window's minimum
+  is 300 × 380. Styled by `.vm` classes in `styles/vee.css`; one inline string changed (the
+  lift's type, 13px/1.42). The main window is unchanged but for Preferences telling the store
+  whether a key is there. Not yet seen in a window: the e2e specs that drive it are edited and
+  not run, and `tests/e2e/vee-trace.spec.ts` and `scripts/screenshot.cjs` still read the old
+  trace markup.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1388,6 +1427,13 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-08 — **the SQL tool's result is bounded by size as well as rows, and the chat's `copy csv` defuses file text** (a quick audit's two findings): `runQuery` counts cell values against `SQL_RESULT_MAX_CHARS` (500 000, `shared/sql-guard.ts`) while it collects rows — a text or blob cut to what is left, no row copied out past the cap, `truncated` true and `cut: 'size'` (absent for a cut by rows alone), `query_sql` adds a `message`; one row is still bounded only by sql.js's WASM heap. `tableCsv` writes the key always quoted, `"` doubled, through the Schedules exporter's `defuse`, and the grouping through `csvCell`; an ordinary table copies byte for byte what it did.
 - 2026-11-08 — **version 1.4.0 changes the version number and nothing else in the app**; its notes (`docs/releases/1.4.0.md`) give what is new since 1.3.0 — the `.sgvue` project file, origin-to-origin placement with the plan rotation, Ask Vee's own window, MODELS folding, gridlines and canvas grid off at start, the cut outline in model colours, and the security fixes — and what works differently for a 1.3.0 user; `CHANGELOG.md`'s `[Unreleased]` is 1.4.0's; the system requirements are 1.3.0's, measured then; the installers are built by `release.yml` from the tag, the Windows installer published first and the macOS disk images after the owner's Mac test.
 - 2026-11-08 — **the sidebar's `library` control and popover are gone, and the path title is on the whole MODELS row** (owner-requested): `addOpen`, `toggleAdd` and `addableRows` removed (`library`, `LibraryFile`, `setLibrary` and `openLibrary` stay for the Recent pills, "open all N", links and `open_recent`); `title={md.path || undefined}` sits on the row's grid `<div>`, whose siblings — the unload strip and the palette — do not inherit it.
+- 2026-11-08 — **the Ask Vee window is a messaging conversation**: `ai/parts.ts` splits a message into one part per block plus its cards, a part named `(message, part)`; `reply` gains an optional `part` and the main window quotes `quoteOfPart` of its own message; the board (`VeeBoard`, counts only) crosses on `update`, at most once a frame; `ChatMessage` gains `at`, `seen`, `settled`, `revertedAt`, the store `chatReplyPart`, `chatEnd`, `hasKey`; `settled` is written after `performGated`, `cancelled` when it did nothing; `retry` is gated in main (`canRetry`: a failed turn, the user's message last, a model open).
+- 2026-11-08 — **`SettingsView.envKey`**: whether `ANTHROPIC_API_KEY` is set in main; the window is ready with a stored key or an environment one (`hasKey || envKey`); the key itself never crosses.
+- 2026-11-08 — **the trace's answer phase is `answerFrame`**: from `done` every trace animation is at its end; the diary folds over 0.22 s and the parts land 0.24 s each, ≤ 110 ms apart, all before answer + 0.5 s; the loop ends ≤ 1.95 s after `done`; the parts are React's at `done` and the painter writes only their opacity and lift (`data-land`).
+- 2026-11-08 — **a Check keeps the matrix width it started with** (`planWidth`) until the next step boundary; the Ask Vee window's minimum content size is 300 × 380 (`VEE_MIN`).
+- 2026-11-08 — **a reply records the models its ids were numbered against** (`ChatMessage.models`, never on the port); a pick goes through `pickChat` → `liveIds` (the revert's renumbering rule), and `pickNote` says what is no longer loaded.
+- 2026-11-08 — **every transcript row is a memoised `MessageRow` fed by `rowProps`, and the Vee window keeps a message's object while its `id` is unchanged** (`keepUnchanged`): a keystroke or a board update renders no row; a row's pop is decided once, when it is first drawn (`freshRow`).
+- 2026-11-08 — **e2e launches carry a stand-in `ANTHROPIC_API_KEY`** (`E2E_KEY`, never real, never on disk); a keyless spec passes `''`.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

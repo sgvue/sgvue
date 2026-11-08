@@ -17,6 +17,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { SettingsView } from '../../shared/ipc-contract'
 import { lastRequestSnapshot } from '../ai/bridge'
 import { api } from '../api'
+import { useShell } from '../state/shell'
 import { trapTab, useDialogFocus } from './focus'
 import { s } from './css'
 import { Cross } from './icons'
@@ -39,7 +40,15 @@ export default function Preferences({
   open: boolean
   onClose: () => void
 }): React.JSX.Element | null {
-  const [settings, setSettings] = useState<SettingsView | null>(null)
+  const [settings, setView] = useState<SettingsView | null>(null)
+  /**
+   * 2026-11-08 — every answer from main also tells the store whether a key is there: the Ask Vee
+   * window is ready the moment one is saved, and not ready the moment it is forgotten.
+   */
+  const setSettings = (v: SettingsView): void => {
+    setView(v)
+    useShell.getState().setHasKey(v.hasKey || v.envKey)
+  }
   const [key, setKey] = useState('')
   const [note, setNote] = useState('')
   const [showData, setShowData] = useState(false)

@@ -61,8 +61,12 @@ const COPY_LINK = 'button[data-tip^="A link that reopens"]'
 const LINK = /^sgvue:\/\/s=[\w-]+$/
 const SENTINEL = 'sgvue e2e — nothing has been copied'
 const REFUSED = 'The clipboard could not be written, so nothing was copied.'
-/** The newest reply's `apply`, as a script finds it. */
-const LAST_APPLY = `[...[...document.querySelectorAll('[data-role="chatlog"] > [data-row]')].pop().querySelectorAll('button')].find((b) => b.textContent.trim() === 'apply')`
+/**
+ * The newest reply's confirm button, as a script finds it. Since 2026-11-08 ("Vee Messages") the
+ * pending row is a consent card whose confirm button names the action (`Apply`, `Delete`,
+ * `Clear all`): it is the card's `.vm-go`.
+ */
+const LAST_APPLY = `[...document.querySelectorAll('[data-role="chatlog"] > [data-row]')].pop().querySelector('[data-role="consent"] button.vm-go')`
 
 let dir = ''
 
@@ -81,7 +85,8 @@ const strings = (v: unknown): string[] =>
 /** The strings that say where a file is, or that are a link: there must be none. */
 const located = (v: unknown): string[] => strings(v).filter((s) => /[\\/]|sgvue:|file:/i.test(s))
 
-const apply = (row: Locator): Locator => row.getByRole('button', { name: 'apply', exact: true })
+/** A reply's confirm button — `Apply`, or the action it names — on its consent card (2026-11-08). */
+const apply = (row: Locator): Locator => row.locator('[data-role="consent"] button.vm-go')
 
 const sessionModels = (userData: string) => async (): Promise<unknown> => {
   try {
@@ -192,11 +197,12 @@ test('the clipboard: the designed copy really copies, a click nobody made copies
     expect(first.results[0]).toMatchObject({ ok: true, result: { applied: false, pending: true } })
     // What the model would have read: no link, and nothing that says where a file is.
     expect(located(first.results)).toEqual([])
-    await expect(
-      first.row.getByText('copy a link to this view to the clipboard — the view as it stands when you click', { exact: true })
-    ).toBeVisible()
+    // The request as the card reads it (2026-11-08): a question, and the label's detail after its ` — `.
+    await expect(first.row.getByText('Copy a link to this view to the clipboard?', { exact: true })).toBeVisible()
+    await expect(first.row.getByText('The view as it stands when you click', { exact: true })).toBeVisible()
     await expect(apply(first.row)).toHaveCount(1)
-    await expect(first.row.getByRole('button', { name: 'cancel', exact: true })).toHaveCount(1)
+    await expect(apply(first.row)).toHaveText('Apply')
+    await expect(first.row.getByRole('button', { name: 'Cancel', exact: true })).toHaveCount(1)
     expect(await clipboard()).toBe(SENTINEL)
 
     // A click on Apply that nobody made copies nothing — the browser's own rule, under the
@@ -278,8 +284,10 @@ test('the chat table’s copy csv: the user’s click puts the table on the clip
     const copy = asked.row.getByRole('button', { name: 'copy csv', exact: true })
     await expect(copy).toHaveCount(1)
     // The panel's status line: the one line the log shows under its rows, drawn only when there
-    // is something to say.
-    const status = vee.locator('[data-role="chatlog"] > span:not(.sr-only)')
+    // is something to say — a neutral system line since 2026-11-08.
+    const status = vee.locator('[data-role="chatlog"] > [data-role="vee-system"]')
+    // The table card's flash beside its `copy csv` (2026-11-08, the prototype's 1 400 ms).
+    const flash = asked.row.locator('[data-role="chat-table"] .vm-fl')
     await expect(status).toHaveCount(0)
     // The turn itself copied nothing.
     expect(await clipboard()).toBe(SENTINEL)
@@ -292,8 +300,9 @@ test('the chat table’s copy csv: the user’s click puts the table on the clip
     // The measured result, for the run's log: what the real click left on the real clipboard.
     const got = (await clipboard()).split(/\r?\n/)
     console.log(`\n[copy csv] the real click copied ${got.length} lines: ${got.slice(0, 3).join(' | ')} …`)
-    // No flash — the design gives this control none — and the status line stays empty.
+    // The card's own flash says it — since 2026-11-08 — and the status line stays empty.
     await expect(copy).toHaveText('copy csv')
+    await expect(flash).toHaveText('copied')
     await expect(status).toHaveCount(0)
     await expect(vee.getByText(REFUSED, { exact: true })).toHaveCount(0)
 
@@ -304,6 +313,7 @@ test('the chat table’s copy csv: the user’s click puts the table on the clip
     await page.waitForTimeout(600)
     expect(await clipboard()).toBe(SENTINEL)
     await expect(status).toHaveText(REFUSED)
+    await expect(flash).toHaveText('couldn’t copy')
 
     // ── 3. the user's click again: copied, and the sentence that no longer holds is gone ──
     await copy.click()
@@ -358,7 +368,7 @@ test('a recent file is asked for by name and loaded by the user’s Apply; an un
     expect(held).toMatchObject({ ok: true, result: { applied: false, pending: true, recent: 'high-first.ifc' } })
     // Names only: neither answer says where a file is, and neither does the row.
     expect(located(asked.results)).toEqual([])
-    await expect(asked.row.getByText('open the recent file "high-first.ifc"', { exact: true })).toBeVisible()
+    await expect(asked.row.getByText('Open the recent file "high-first.ifc"?', { exact: true })).toBeVisible()
     expect(located(await asked.row.innerText())).toEqual([])
     // Nothing has loaded.
     expect(await statusText(page)).toContain('6 / 6')

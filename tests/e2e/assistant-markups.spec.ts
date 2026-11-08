@@ -131,9 +131,9 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     expect(placed.message).toContain('this reply’s revert takes it away again')
     // The reply added a markup to the view, which a revert can take away again: it offers one.
     // (And no Apply: placing is the user's click, not a request.)
-    const revertSpot = spot.row.getByRole('button', { name: 'revert', exact: true })
+    const revertSpot = spot.row.getByRole('button', { name: 'Revert', exact: true })
     await expect(revertSpot).toHaveCount(1)
-    await expect(spot.row.getByRole('button', { name: 'apply', exact: true })).toHaveCount(0)
+    await expect(spot.row.locator('[data-role="consent"]')).toHaveCount(0)
 
     // The same tag a click with the spot tool makes: folded to its level, with the click's own title.
     await expect.poll(() => actionText(page)).toBe('1 spotsclear')
@@ -194,7 +194,10 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     const del = await turn(app, vee, 'Delete the spot.', [['manage_markups', { op: 'delete', name: 'C1' }]], 'I have asked to delete C1. Click Apply to confirm.')
     expect(del.results[0].result).toMatchObject({ applied: false, pending: true })
     expect(await actionText(page)).toBe('1 measuresclear·1 spotsclear')
-    await del.row.getByRole('button', { name: 'apply', exact: true }).click()
+    // The consent card's confirm button names the action (2026-11-08): `Delete`.
+    const confirm = del.row.locator('[data-role="consent"] button.vm-go')
+    await expect(confirm).toHaveText('Delete')
+    await confirm.click()
     await expect.poll(() => actionText(page)).toBe('1 measuresclear')
     await expect(folded).toHaveCount(0)
 
@@ -241,7 +244,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     await expect.poll(() => actionText(page)).toBe('1 measuresclear·2 spotsclear')
     await expect(folded).toHaveCount(2)
     await expect(spotRows).toHaveText(['C1', 'C2'])
-    const revert = second.row.getByRole('button', { name: 'revert', exact: true })
+    const revert = second.row.getByRole('button', { name: 'Revert', exact: true })
     await expect(revert).toHaveCount(1)
     const before = { bar: await actionText(page), tags: await folded.count(), rows: await spotRows.allTextContents() }
 
@@ -265,7 +268,7 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     )
 
     // The earlier reply's measurement is that reply's to take away, and only that one's.
-    await laser.row.getByRole('button', { name: 'revert', exact: true }).click()
+    await laser.row.getByRole('button', { name: 'Revert', exact: true }).click()
     await expect.poll(() => actionText(page)).toBe('1 spotsclear')
     await expect(spotRows).toHaveText(['C1'])
     await expect(folded).toHaveCount(1)

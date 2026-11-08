@@ -424,10 +424,21 @@ describe('the composer guards', () => {
     expect(useShell.getState().chatMsgs).toHaveLength(0)
   })
 
-  it('ignores any question with no federation loaded', async () => {
+  /**
+   * 2026-11-08 — "Vee Messages": with no model open the composer stays usable (the handoff's
+   * scenario 1b), and a question gets Vee's one fixed line — no turn is run, nothing is sent.
+   */
+  it('answers a question with no federation loaded with the one fixed line, and runs no turn', async () => {
+    fakeBridge()
     useShell.setState({ federation: EMPTY_FEDERATION, byId: new Map(), chatInput: 'hello' })
     await sendChat()
-    expect(useShell.getState().chatMsgs).toHaveLength(0)
+    expect(sent).toEqual([])
+    expect(useShell.getState().chatMsgs.map((m) => [m.role, m.text])).toEqual([
+      ['user', 'hello'],
+      ['assistant', 'Open a model and I’ll take a look.']
+    ])
+    expect(useShell.getState().chatBusy).toBe(false)
+    expect(useShell.getState().chatInput).toBe('')
   })
 
   it('sends the trimmed question, and empties the composer', () => {
@@ -436,7 +447,7 @@ describe('the composer guards', () => {
     void sendChat()
     expect(sent.map((c) => c.userText)).toEqual(['how many walls?'])
     expect(useShell.getState().chatMsgs).toEqual([
-      { role: 'user', text: 'how many walls?', quote: null }
+      { role: 'user', text: 'how many walls?', quote: null, at: expect.any(Number) }
     ])
     expect(useShell.getState().chatInput).toBe('')
     expect(useShell.getState().chatBusy).toBe(true)

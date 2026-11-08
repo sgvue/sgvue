@@ -18,7 +18,7 @@ import { ToVee, type VeeIntent } from '../../shared/vee-messages'
 import { shiftChange, traceEpoch, traceMirror, type TraceChange } from '../ai/trace-store'
 import { copyText } from '../clipboard'
 import { el, isFieldTarget } from '../dom'
-import { takeSnapshot } from './store'
+import { takeBoard, takeSnapshot, useVee } from './store'
 
 /**
  * The theme the window opens in: `#theme=light` or `#theme=dark`, put there by main
@@ -58,7 +58,12 @@ export function receive(data: unknown): void {
   if (!parsed.success) return
   const m = parsed.data
   if (m.type === 'copy') {
-    void copyText(m.text).then((ok) => post({ type: 'copied', n: m.n, ok }))
+    void copyText(m.text).then((ok) => {
+      post({ type: 'copied', n: m.n, ok })
+      // The table card's `copied` flash, for the copy its own click asked for.
+      const flash = useVee.getState().copyFlash
+      if (flash && flash.ok === null) useVee.setState({ copyFlash: { ...flash, ok } })
+    })
     return
   }
   if (m.type === 'focus') {
@@ -70,6 +75,7 @@ export function receive(data: unknown): void {
   const dt = m.origin - traceEpoch()
   for (const change of m.trace) traceMirror(shiftChange(change as TraceChange, dt))
   if (m.snap) takeSnapshot(m.snap)
+  if (m.board !== undefined) takeBoard(m.board)
 }
 
 /** Take a port. Exported for the unit tests. */

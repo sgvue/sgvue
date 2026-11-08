@@ -14,7 +14,7 @@
  */
 import { create } from 'zustand'
 import type { DisplayUnit } from '../../shared/units'
-import type { VeeMessage, VeeSnapshot } from '../../shared/vee-messages'
+import type { VeeBoard, VeeMessage, VeeSnapshot } from '../../shared/vee-messages'
 
 export interface VeeView {
   /** A snapshot has arrived: until then the panel draws nothing. */
@@ -23,6 +23,20 @@ export interface VeeView {
   chatBusy: boolean
   chatErr: string
   chatReplyTo: number | null
+  /** 2026-11-08 — the bubble of `chatReplyTo` replied to, or `null` for the whole message. */
+  chatReplyPart: number | null
+  /** 2026-11-08 — whether Vee can answer: a key, a model. `undefined`: not said, so taken as yes. */
+  hasKey: boolean | undefined
+  hasModel: boolean | undefined
+  /** 2026-11-08 — how the last turn ended when it did not answer. */
+  chatEnd: VeeSnapshot['end'] | null
+  /** 2026-11-08 — the pinned board, or `null` with no model open. */
+  board: VeeBoard | null
+  /**
+   * 2026-11-08 — the table card whose `copy csv` was clicked last (its message's identity), and
+   * how the copy went, for its `copied` flash: `null` until the copy has answered.
+   */
+  copyFlash: { msg: number; ok: boolean | null; at: number } | null
   chatSuggestOpen: boolean
   suggestions: string[]
   units: DisplayUnit
@@ -38,12 +52,31 @@ export const useVee = create<VeeView>(() => ({
   chatBusy: false,
   chatErr: '',
   chatReplyTo: null,
+  chatReplyPart: null,
+  hasKey: undefined,
+  hasModel: undefined,
+  chatEnd: null,
+  board: null,
+  copyFlash: null,
   chatSuggestOpen: false,
   suggestions: [],
   units: 'mm',
   chatInput: '',
   rev: -1
 }))
+
+/**
+ * 2026-11-08 (stage 1b) — the messages of a new snapshot, each **the object this window already
+ * holds** when it is the same message: a message's `id` is the identity of the main window's
+ * message object, which is replaced whenever the message changes (`model/vee-link.ts`), so an
+ * unchanged id is an unchanged message. A row of the transcript is memoised on its message
+ * (`app/ChatPanel.tsx`, `MessageRow`), so a snapshot that changed one message — or none: the
+ * composer, the board — renders only that one again.
+ */
+export function keepUnchanged(was: readonly VeeMessage[], next: readonly VeeMessage[]): VeeMessage[] {
+  const known = new Map(was.map((m) => [m.id, m]))
+  return next.map((m) => known.get(m.id) ?? m)
+}
 
 /** Take one snapshot from the main window. */
 export function takeSnapshot(snap: VeeSnapshot): void {
@@ -53,13 +86,22 @@ export function takeSnapshot(snap: VeeSnapshot): void {
   const was = useVee.getState()
   useVee.setState({
     ready: true,
-    chatMsgs: snap.msgs,
+    chatMsgs: keepUnchanged(was.chatMsgs, snap.msgs),
     chatBusy: snap.busy,
     chatErr: snap.err,
     chatReplyTo: snap.replyTo,
+    chatReplyPart: snap.replyPart ?? null,
+    hasKey: snap.hasKey,
+    hasModel: snap.hasModel,
+    chatEnd: snap.end ?? null,
     chatSuggestOpen: snap.suggestOpen,
     suggestions: snap.suggestions,
     units: snap.units,
     ...(snap.composer.rev !== was.rev ? { chatInput: snap.composer.text, rev: snap.composer.rev } : {})
   })
+}
+
+/** 2026-11-08 — take the pinned board from the main window. */
+export function takeBoard(board: VeeBoard | null): void {
+  useVee.setState({ board })
 }

@@ -199,6 +199,14 @@ export const VEE_PALETTE: Readonly<Record<'dark' | 'light', Readonly<Record<VeeR
 export const VEE_SLOT = { header: 21, label: 19, pill: 16 } as const
 
 /**
+ * 2026-11-08 — the Ask Vee window drawn as a messaging conversation: its header's sprite is
+ * 32 CSS px, **two** whole device pixels to a cell (`veeBox`'s `mult`), and each reply group's
+ * avatar 16 px, one. The owner kept the header at 32 px (the handoff's §9.6).
+ */
+export const VEE_FACE = { slot: 32, mult: 2 } as const
+export const VEE_AVATAR = { slot: 16, mult: 1 } as const
+
+/**
  * The margins that fit each of the sprite's slots (`VEE_SLOT`) into the row the design already
  * has. The 16 × 16 grid is larger than the 12 × 12 body in it — three empty rows above for the
  * hop and the `!`, one below, two columns either side — so a slot overhangs its row and is
@@ -258,15 +266,16 @@ export interface VeeBox {
 }
 
 /**
- * The canvas for a `slot` (CSS px) at a device pixel ratio: 16 whole-pixel cells, centred in the
+ * The canvas for a `slot` (CSS px) at a device pixel ratio: 16 whole-pixel cells — `mult` times
+ * `veeCell`'s, 2 for the Ask Vee window's 32 px header (2026-11-08) — centred in the
  * slot on a whole device pixel of it. The sprite is one size for every slot (`veeCell`), so it
  * may be smaller than its slot or stand a little outside it; the slot is what the layout sees.
  *
  * `size` is rounded **up** in its third decimal: Chromium truncates a length to 1/64 px, and
  * `21.333px` at 1.5× is 31.98 device pixels — one short, on an unlucky sub-pixel position.
  */
-export function veeBox(slot: number, dpr: number): VeeBox {
-  const cell = veeCell(dpr)
+export function veeBox(slot: number, dpr: number, mult = 1): VeeBox {
+  const cell = veeCell(dpr) * mult
   const px = cell * VEE_SIZE
   return {
     cell,

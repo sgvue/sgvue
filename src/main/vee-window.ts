@@ -29,8 +29,13 @@ import { lockNavigation, mainContents, mainWindow } from './window'
 
 /** The panel's design size (`SGVue.dc.html:850`, 330 × 420 px), as the window's content. */
 export const VEE_SIZE = { width: 330, height: 420 } as const
-/** The panel's own floor in either direction: the design's 240 px (`SGVue.dc.html:1133–1134`). */
-export const VEE_MIN = { width: 240, height: 240 } as const
+/**
+ * The window's floor, its content box: 300 × 380 px since 2026-11-08 ("Vee Messages", stage 1b —
+ * the approved prototype's smallest size, checked there with the folded diary, the board and a
+ * consent card). It was the design's 240 px each way (`SGVue.dc.html:1133–1134`), where the
+ * messaging layout's header, board and composer leave a thread a line or two tall.
+ */
+export const VEE_MIN = { width: 300, height: 380 } as const
 /** Where the panel stood: 12 px in from the stage's right edge, 52 px up from its foot. */
 export const VEE_INSET = { right: 12, bottom: 52 } as const
 

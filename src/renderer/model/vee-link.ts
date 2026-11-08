@@ -42,12 +42,16 @@ import {
   VEE_COPY_MS,
   VEE_MAX_INPUT,
   VEE_MAX_LABEL,
+  VEE_MAX_STEPS,
   VEE_MAX_TABLE_ROWS,
   VEE_MAX_TEXT,
   type ToVee,
+  type VeeBoard,
   type VeeSnapshot
 } from '../../shared/vee-messages'
+import { labelText } from '../../shared/fmt'
 import { abortChat, sendChat } from '../ai/bridge'
+import { quoteOfPart } from '../ai/parts'
 import { onTraceChange, traceEpoch, traceSnapshot, type TraceChange } from '../ai/trace-store'
 import { api } from '../api'
 import { copyingIn } from '../clipboard'
@@ -103,17 +107,40 @@ function sent(m: ChatMessage): VeeSnapshot['msgs'][number] {
         ...(r.vol !== undefined ? { vol: r.vol } : {})
       }))
     },
-    pending: v.pending && { id: v.pending.id, label: cut(v.pending.label) },
+    pending: v.pending && { id: v.pending.id, label: cut(v.pending.label), verb: v.pending.verb },
     canRevert: v.canRevert,
     reverted: v.reverted,
+    ...(v.at !== undefined ? { at: Math.max(0, Math.round(v.at)) } : {}),
+    ...(v.seen !== undefined ? { seen: v.seen } : {}),
+    ...(v.settled
+      ? { settled: { how: v.settled.how, at: Math.max(0, Math.round(v.settled.at)), label: cut(v.settled.label) } }
+      : {}),
+    ...(v.revertedAt !== undefined ? { revertedAt: Math.max(0, Math.round(v.revertedAt)) } : {}),
     trace: v.trace && {
       status: cut(v.trace.status),
       wide: v.trace.wide,
       noun: cut(v.trace.noun),
-      rows: v.trace.rows.slice(0, 8).map((r) => ({ label: cut(r.label), n: r.n }))
+      rows: v.trace.rows.slice(0, 8).map((r) => ({ label: cut(r.label), n: r.n })),
+      ...(v.trace.fold !== undefined ? { fold: cut(v.trace.fold) } : {}),
+      ...(v.trace.steps
+        ? {
+            steps: v.trace.steps
+              .slice(-VEE_MAX_STEPS)
+              .map((st) => ({ label: cut(st.label), mono: cut(st.mono), n: st.n, unit: cut(st.unit) }))
+          }
+        : {}),
+      ...(v.trace.title !== undefined ? { title: cut(v.trace.title) } : {})
     }
   }
 }
+
+/**
+ * Whether "Try again" may run: the last turn failed (not stopped), its question is the
+ * transcript's last message, and a model is open. The snapshot's `end.retry` and the `retry`
+ * intent read this one rule, so a window can offer the button only where main will act on it.
+ */
+export const canRetry = (s: ShellState): boolean =>
+  s.chatEnd?.kind === 'failed' && s.chatMsgs[s.chatMsgs.length - 1]?.role === 'user' && s.federation.elements.length > 0
 
 /** What the panel draws, as it stands. Exported for the unit tests. */
 export function snapshotOf(s: ShellState): VeeSnapshot {
@@ -123,6 +150,18 @@ export function snapshotOf(s: ShellState): VeeSnapshot {
     busy: s.chatBusy,
     err: cut(s.chatErr),
     replyTo: s.chatReplyTo,
+    replyPart: s.chatReplyTo == null ? null : s.chatReplyPart,
+    ...(s.hasKey !== null ? { hasKey: s.hasKey } : {}),
+    hasModel: s.federation.elements.length > 0,
+    end: s.chatEnd && {
+      kind: s.chatEnd.kind,
+      error: cut(s.chatEnd.error),
+      message: cut(s.chatEnd.message),
+      acted: s.chatEnd.acted,
+      // `Try again` only where a retry can run: a failed turn whose question is the last
+      // message, with a model open (`receive`'s `retry` holds the same rule).
+      retry: canRetry(s)
+    },
     suggestOpen: s.chatSuggestOpen,
     suggestions: chatExamples(s).slice(0, 4).map((t) => t.slice(0, 500)),
     composer: { text: s.chatInput.slice(0, VEE_MAX_INPUT), rev: composerRev },
@@ -133,6 +172,8 @@ export function snapshotOf(s: ShellState): VeeSnapshot {
 /** The store fields the snapshot is built from: a change to any of them sends a new one. */
 const SNAP_KEYS: readonly (keyof ShellState)[] = [
   'theme', 'units', 'chatBusy', 'chatErr', 'chatReplyTo', 'chatSuggestOpen', 'chatInput', 'chatMsgs',
+  // 2026-11-08 — the messaging layout: the bubble replied to, whether Vee can answer, how a turn ended.
+  'chatReplyPart', 'hasKey', 'chatEnd', 'federation',
   // …and what the suggestions read (`chatExamples`).
   'sel', 'byId', 'stack', 'hidden', 'loaded', 'library'
 ]
@@ -175,6 +216,70 @@ function queue(): void {
   if (queued) return
   queued = true
   queueMicrotask(flush)
+}
+
+/* ────────────────────────────── the board ────────────────────────────── */
+
+/** The lit view button's label, as the toolbar prints it (`app/Toolbar.tsx`). */
+const VIEW_LABEL: Readonly<Record<string, string>> = { iso: '3D', top: 'Plan', north: 'N', south: 'S', east: 'E', west: 'W' }
+
+/**
+ * 2026-11-08 — the pinned board: what the 3D view shows, as counts and names — never an id.
+ * `null` with no model open. The storey is named only when every selected element is on it.
+ * Names are file text, so they go through `labelText`. Exported for the unit tests.
+ */
+export function boardOf(s: ShellState): VeeBoard | null {
+  const total = s.federation.elements.length
+  if (!total) return null
+  let storey: string | null = null
+  for (let k = 0; k < s.selIds.length; k++) {
+    const at = s.byId.get(s.selIds[k])?.storey ?? ''
+    if (!at || (k > 0 && at !== storey)) {
+      storey = null
+      break
+    }
+    storey = at
+  }
+  return {
+    total,
+    shown: Math.min(total, s.visibleCount),
+    selected: s.selIds.length,
+    storey: storey && labelText(storey, 80),
+    colourBy: s.colorBy ? labelText(s.colorBy.prop, 80) : null,
+    view: (s.view && VIEW_LABEL[s.view]) ?? null
+  }
+}
+
+/** What the board reads: a change to any of them — the user's or Vee's — sends it again. */
+const BOARD_KEYS: readonly (keyof ShellState)[] = ['federation', 'visibleCount', 'selIds', 'byId', 'colorBy', 'view']
+
+let boardFrame = 0
+let boardTimer: ReturnType<typeof setTimeout> | null = null
+/** The board as last sent, so an unchanged one is not sent again. */
+let boardSent = ''
+
+/**
+ * Send the board, at most once a frame: on the next animation frame, or after 100 ms for a
+ * window the OS has hidden, whichever comes first — the Schedules window's rule
+ * (`schedule-link.ts`).
+ */
+function flushBoard(): void {
+  if (boardFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(boardFrame)
+  if (boardTimer) clearTimeout(boardTimer)
+  boardFrame = 0
+  boardTimer = null
+  if (!port) return
+  const board = boardOf(useShell.getState())
+  const key = JSON.stringify(board)
+  if (key === boardSent) return
+  boardSent = key
+  port.postMessage({ type: 'update', origin: traceEpoch(), board, trace: [] } satisfies ToVee)
+}
+
+function queueBoard(): void {
+  if (boardFrame || boardTimer) return
+  if (typeof requestAnimationFrame === 'function') boardFrame = requestAnimationFrame(flushBoard)
+  boardTimer = setTimeout(flushBoard, 100)
 }
 
 /* ────────────────────────────── copying in the Vee window ────────────────────────────── */
@@ -245,8 +350,17 @@ export function receive(data: unknown): void {
     case 'revert':
       if (named(s, i.index, i.msg)) s.revertTurn(i.index)
       return
-    case 'reply':
-      if (named(s, i.index, i.msg)) s.setChatReplyTo(i.index)
+    case 'reply': {
+      // A reply on one bubble names it; one that cannot be quoted — a chip row, a request — is
+      // ignored. The quote itself is worked out when the turn is sent (`ai/bridge.ts`).
+      const m = named(s, i.index, i.msg)
+      if (!m || (i.part !== undefined && quoteOfPart(m, i.part) === null)) return
+      s.setChatReplyTo(i.index, i.part ?? null)
+      return
+    }
+    case 'retry':
+      // Only for a turn that failed — the rule that shows the button (review of stage 1).
+      if (canRetry(s)) void sendChat(undefined, { retry: true })
       return
     case 'unreply':
       s.setChatReplyTo(null)
@@ -264,7 +378,8 @@ export function receive(data: unknown): void {
       if (!m) return
       const ids =
         i.what === 'chip' ? m.chips?.[i.j]?.ids : i.what === 'table' ? m.table?.rows[i.j]?.ids : m.trace?.rows[i.j]?.ids
-      if (ids) s.select([...ids], i.zoom)
+      // What is still loaded, on the slot its model has now; what is not is said (stage 1b).
+      if (ids) s.pickChat(i.index, ids, i.zoom)
       return
     }
     case 'copyCsv': {
@@ -292,6 +407,8 @@ export function connect(next: MessagePort | null): void {
   port = next
   snapDirty = false
   traceOut = []
+  // A window opens with no board: an empty one is not sent.
+  boardSent = 'null'
   if (!port) {
     // The window has gone — by its own close button, or with a reload — so the panel is closed.
     if (useShell.getState().chatOpen) useShell.getState().setChatOpen(false)
@@ -316,6 +433,7 @@ export function connect(next: MessagePort | null): void {
         port?.postMessage({ type: 'focus' } satisfies ToVee)
       }
     }
+    if (BOARD_KEYS.some((k) => s[k] !== prev[k])) queueBoard()
     const changed = SNAP_KEYS.filter((k) => s[k] !== prev[k])
     // Nothing to send when the one change is that echo: no snapshot per keystroke.
     if (changed.length && !(echoed && changed.length === 1)) {
@@ -332,6 +450,16 @@ export function connect(next: MessagePort | null): void {
   snapDirty = true
   traceOut = [crossing(traceSnapshot())]
   flush()
+  flushBoard()
+  // Whether a key is stored: the not-ready line and the composer read it (Preferences tells the
+  // store again whenever it changes).
+  const bridge = api()
+  if (bridge?.getSettings) {
+    void bridge
+      .getSettings()
+      .then((v) => useShell.getState().setHasKey(v.hasKey || v.envKey))
+      .catch(() => undefined)
+  }
 }
 
 /** Tests only: whether a port is held. */

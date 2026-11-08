@@ -100,7 +100,8 @@ import {
   applyRestore,
   sectionsOf,
   sessionPatch,
-  type SessionPayload
+  type SessionPayload,
+  type SlotRecord
 } from '../../shared/session-codec'
 import { NO_SECTIONS, type SecKind, type SecPlane, type Sections } from '../../shared/sections'
 import type { DisplayUnit } from '../../shared/units'
@@ -108,7 +109,9 @@ import { sphericalOf } from '../../shared/view-angles'
 import { planRotationDeg } from '../../shared/plan-rotation'
 import { DISPLAY_DEFAULTS } from '../../shared/ai-schema'
 import {
+  liveIds,
   mergeUndo,
+  pickNote,
   revertNote,
   revertPlan,
   turnSnapshot,
@@ -125,7 +128,7 @@ import {
   type Viewpoint
 } from './selectors/views'
 import { askAboutText } from './selectors/props'
-import { tableCsv } from './selectors/chat'
+import { pendingVerb, SETTLED_BY_VERB, tableCsv } from './selectors/chat'
 import { modelSwatches, pickableFor, type ModelFiles } from './selectors/models'
 import { el } from '../dom'
 import { copyText } from '../clipboard'
@@ -272,13 +275,35 @@ export interface ChatMessage {
   placed?: readonly PlacedMarkup[] | null
   reverted?: boolean
   /**
+   * 2026-11-08 — the messaging layout. `at`: when the message was written (wall-clock ms).
+   * `seen`: a user's message was picked up — its turn's first stream event arrived; a turn that
+   * never reached the API leaves it unseen. `settled`: what became of the request the reply
+   * held — the user's Apply (`applied`, `deleted`, `cleared`, by the request's verb) or Cancel —
+   * and when, so the consent card keeps its outcome. `revertedAt`: when `revert` was pressed.
+   */
+  at?: number
+  seen?: boolean
+  settled?: { how: 'applied' | 'deleted' | 'cleared' | 'cancelled'; at: number; label: string }
+  revertedAt?: number
+  /**
    * 2026-10-01 — what the turn's thinking trace leaves on its reply (`ai/trace-facts.ts`): the
    * status beside the name (`checked 86 walls · 7s`), the rows under the answer, and whether
    * the reply keeps the trace bubble's full width. Absent on a message no turn produced — the
    * boot audit — which is how the panel tells the two apart.
    */
   trace?: ChatTrace | null
+  /**
+   * 2026-11-08 ("Vee Messages", stage 1b) — the models the reply's element ids were numbered
+   * against (key, digest, slot), as they stood when it was written: a chip, a storey row or a
+   * table row picked later selects what is still loaded, on the slot its model has now, and says
+   * what is not (`pickChat`). Never crosses to the Vee window.
+   */
+  models?: readonly SlotRecord[]
 }
+
+/** The federation's models as a reply's ids are numbered against them. */
+const slotRecords = (f: ShellState['federation']): SlotRecord[] =>
+  f.models.map((m) => ({ key: m.meta.modelKey, sha256: m.meta.sha256, slot: m.slot }))
 
 /** What one finished turn adds to its assistant message. */
 export interface ChatResult {
@@ -422,6 +447,23 @@ export interface ShellState {
   chatErr: string
   /** Index of the message a reply is aimed at, or null. `:1595`. */
   chatReplyTo: number | null
+  /**
+   * 2026-11-08 — the one bubble of that message the reply is aimed at (`ai/parts.ts`), or null
+   * for the whole message. The quote is worked out from it in `ai/bridge.ts`.
+   */
+  chatReplyPart: number | null
+  /**
+   * 2026-11-08 — how the last turn ended when it did not answer, until the next begins: stopped
+   * or failed, the error class (`AiErrorKind`, `connection` for a turn main never started), and
+   * whether its tools had already changed something — so nothing claims "nothing changed" when
+   * something did.
+   */
+  chatEnd: { kind: 'stopped' | 'failed'; error: string; acted: boolean; message: string } | null
+  /**
+   * 2026-11-08 — whether an API key is stored, as main reports it (`SettingsView.hasKey`, the one
+   * thing the renderer ever learns of the key); `null` until it has been asked.
+   */
+  hasKey: boolean | null
   /**
    * 2026-09-24 — the suggestion row, once the conversation has a user turn, folds behind one
    * `suggestions` chip; this is whether that chip has it open. `chipsFolded` decides.
@@ -579,7 +621,7 @@ export interface ShellState {
   askAbout: (ids: readonly number[]) => void
   setChatOpen: (open: boolean) => void
   setChatInput: (text: string) => void
-  setChatReplyTo: (index: number | null) => void
+  setChatReplyTo: (index: number | null, part?: number | null) => void
   setChatSuggestOpen: (open: boolean) => void
   setSideStoreys: (size: SideSize | null) => void
   /**
@@ -589,12 +631,29 @@ export interface ShellState {
    */
   toggleModels: () => void
   /** Push the user turn and take the pre-turn snapshot. Returns it. `:1599`. */
-  chatBegin: (text: string, quote?: { who: string; text: string } | null) => TurnSnapshot
+  /**
+   * 2026-11-08 — `retry`: "Try again" on a failed turn. The question is already the last
+   * message, so it is run again and not added again.
+   */
+  chatBegin: (text: string, quote?: { who: string; text: string } | null, retry?: boolean) => TurnSnapshot
   chatFinish: (reply: string, result: ChatResult, before: TurnSnapshot) => void
-  chatFail: (message: string) => void
+  chatFail: (message: string, end?: Omit<NonNullable<ShellState['chatEnd']>, 'message'> | null) => void
+  /** 2026-11-08 — the turn's first stream event arrived: the question it answers was picked up. */
+  chatSeen: () => void
+  /**
+   * 2026-11-08 — a question asked with no model open: it and Vee's fixed one-line answer join the
+   * transcript, and no turn runs.
+   */
+  chatLocal: (text: string, reply: string, retry?: boolean) => void
+  setHasKey: (hasKey: boolean) => void
   applyPending: (index: number) => void
   dismissPending: (index: number) => void
   revertTurn: (index: number) => void
+  /**
+   * 2026-11-08 (stage 1b) — select what a chip, a storey row or a table row of reply `index`
+   * names, as far as it is still loaded; what is not is said in the status line.
+   */
+  pickChat: (index: number, ids: readonly number[], zoom: boolean) => void
   /**
    * `SGVue.dc.html:1690`. Put a session payload back: the state patch, then the renderer calls
    * in `RESTORE_ORDER`. A share link and the chat's revert both come through here.
@@ -1056,6 +1115,9 @@ export const useShell = create<ShellState>((set, get) => ({
   chatBusy: false,
   chatErr: '',
   chatReplyTo: null,
+  chatReplyPart: null,
+  chatEnd: null,
+  hasKey: null,
   chatSuggestOpen: false,
   sideStoreys: null,
   modelsOpen: true,
@@ -1668,7 +1730,11 @@ export const useShell = create<ShellState>((set, get) => ({
 
   setChatOpen: (chatOpen) => set({ chatOpen }),
   setChatInput: (chatInput) => set({ chatInput }),
-  setChatReplyTo: (chatReplyTo) => set({ chatReplyTo }),
+  setChatReplyTo: (chatReplyTo, part = null) =>
+    set({ chatReplyTo, chatReplyPart: chatReplyTo == null ? null : part }),
+  setHasKey: (hasKey) => {
+    if (get().hasKey !== hasKey) set({ hasKey })
+  },
   setChatSuggestOpen: (chatSuggestOpen) => set({ chatSuggestOpen }),
   setSideStoreys: (sideStoreys) => set({ sideStoreys }),
   toggleModels: () =>
@@ -1687,17 +1753,47 @@ export const useShell = create<ShellState>((set, get) => ({
    * 2026-10-01 a running turn is shown by the assistant's live reply and its thinking trace
    * (`ai/trace-store.ts`, fed by `ai/bridge.ts`), so the store keeps no stage.
    */
-  chatBegin: (text, quote) => {
+  chatBegin: (text, quote, retry = false) => {
     const before = snapshot(get())
     set((st) => ({
-      chatMsgs: [...st.chatMsgs, { role: 'user' as const, text, quote: quote ?? null }],
-      chatInput: '',
+      // A retry asks the last question again: not added again, and not picked up yet — its
+      // earlier attempt's second tick is taken back until this one's first stream event.
+      chatMsgs: retry
+        ? st.chatMsgs.map((m, j) => (j === st.chatMsgs.length - 1 && m.role === 'user' && m.seen ? { ...m, seen: false } : m))
+        : [...st.chatMsgs, { role: 'user' as const, text, quote: quote ?? null, at: Date.now() }],
+      ...(retry ? {} : { chatInput: '' }),
       chatBusy: true,
       chatErr: '',
+      chatEnd: null,
       chatReplyTo: null,
+      chatReplyPart: null,
       chatSuggestOpen: false
     }))
     return before
+  },
+
+  chatSeen: () => {
+    const msgs = get().chatMsgs
+    const last = msgs.length - 1
+    if (last < 0 || msgs[last].role !== 'user' || msgs[last].seen) return
+    set({ chatMsgs: msgs.map((m, j) => (j === last ? { ...m, seen: true } : m)) })
+  },
+
+  chatLocal: (text, reply, retry = false) => {
+    const at = Date.now()
+    set((st) => ({
+      // A retry's question is already the transcript's last message: only the answer joins it.
+      chatMsgs: [
+        ...st.chatMsgs,
+        ...(retry ? [] : [{ role: 'user' as const, text, quote: null, at }]),
+        { role: 'assistant' as const, text: reply, at }
+      ],
+      chatInput: '',
+      chatErr: '',
+      chatEnd: null,
+      chatReplyTo: null,
+      chatReplyPart: null
+    }))
   },
 
   /**
@@ -1723,11 +1819,13 @@ export const useShell = create<ShellState>((set, get) => ({
         {
           role: 'assistant' as const,
           text: reply,
+          at: Date.now(),
           chips: (result.chips ?? []).slice(0, 6),
           table: result.table ?? null,
           pending: result.pending ?? null,
           undoSnap,
           ...(result.placed?.length ? { placed: [...result.placed] } : {}),
+          models: slotRecords(get().federation),
           // Only a turn that had a trace carries one; a message without is drawn as it always was.
           ...(result.trace ? { trace: result.trace } : {})
         }
@@ -1736,8 +1834,10 @@ export const useShell = create<ShellState>((set, get) => ({
   },
 
   /** `SGVue.dc.html:1617`. A failed turn leaves the transcript alone and says why. */
-  chatFail: (message) =>
-    set({ chatBusy: false, chatErr: message || 'The assistant is unavailable.' }),
+  chatFail: (message, end = null) => {
+    const said = message || 'The assistant is unavailable.'
+    set({ chatBusy: false, chatErr: said, chatEnd: end && { ...end, message: said } })
+  },
 
   /**
    * `SGVue.dc.html:1632`. The pending entry carries the **patch**, which goes straight to
@@ -1767,19 +1867,41 @@ export const useShell = create<ShellState>((set, get) => ({
     const pending = msg?.pending
     if (!pending) return
     const before = snapshot(get())
+    // The row is taken first, so the request runs once whatever it sets off.
     set((st) => ({
       chatMsgs: st.chatMsgs.map((m, j) => (j === index ? { ...m, pending: null } : m))
     }))
+    /**
+     * 2026-11-08 — the consent card keeps its outcome, stamped **once the action has run** (review
+     * of stage 1): its verb when it was done, `cancelled` when it did nothing — the viewpoint had
+     * gone, the history had moved on, the clipboard refused — so the card never reads APPLIED or
+     * DELETED beside a status line that says nothing happened. An action that fails later (a copy,
+     * a file) re-stamps its card the same way.
+     */
+    let stamped: NonNullable<ChatMessage['settled']> | null = null
+    const restamp = (): void => {
+      const was = stamped
+      if (!was) return
+      const now = { ...was, how: 'cancelled' as const }
+      stamped = now
+      set((st) => ({ chatMsgs: st.chatMsgs.map((m) => (m.settled === was ? { ...m, settled: now } : m)) }))
+    }
     let note = ''
-    if (pending.action) note = performGated(pending.action, get, (said) => set({ chatErr: said }))
-    else if (pending.patch) get().up(pendingPatch(pending.patch))
+    if (pending.action) {
+      note = performGated(pending.action, get, (said) => {
+        set({ chatErr: said })
+        restamp()
+      })
+    } else if (pending.patch) get().up(pendingPatch(pending.patch))
+    stamped = { how: note ? 'cancelled' : SETTLED_BY_VERB[pendingVerb(pending)], at: Date.now(), label: pending.label }
+    const settled = stamped
     // A reply already reverted is never offered `revert` again (the design's rule: it stays
     // dimmed), so it is given no snapshot to hold. Since the gate's review `revertTurn` drops a
     // reverted reply's request with it, so no row is left on one to click: this is the guard
     // for an entry that reached the transcript some other way.
     const undoSnap = msg.reverted ? null : mergeUndo(msg.undoSnap, before, snapshot(get()))
     set((st) => ({
-      chatMsgs: st.chatMsgs.map((m, j) => (j === index ? { ...m, undoSnap } : m)),
+      chatMsgs: st.chatMsgs.map((m, j) => (j === index ? { ...m, undoSnap, settled } : m)),
       ...(note ? { chatErr: note } : {})
     }))
   },
@@ -1787,7 +1909,11 @@ export const useShell = create<ShellState>((set, get) => ({
   /** `SGVue.dc.html:1637`. */
   dismissPending: (index) =>
     set((st) => ({
-      chatMsgs: st.chatMsgs.map((m, j) => (j === index ? { ...m, pending: null } : m))
+      chatMsgs: st.chatMsgs.map((m, j) =>
+        j === index && m.pending
+          ? { ...m, pending: null, settled: { how: 'cancelled' as const, at: Date.now(), label: m.pending.label } }
+          : m
+      )
     })),
 
   /**
@@ -1815,6 +1941,14 @@ export const useShell = create<ShellState>((set, get) => ({
    * same. (What is *saved* is not session state and is never taken back: a viewpoint, a filter
    * set, a schedule setup. Nor is a spot tag's state put back.)
    */
+  pickChat: (index, ids, zoom) => {
+    const s = get()
+    const found = liveIds(ids, s.chatMsgs[index]?.models, slotRecords(s.federation), (id) => s.byId.has(id))
+    if (found.ids.length) s.select(found.ids, zoom)
+    const note = pickNote(found)
+    if (note) set({ chatErr: note })
+  },
+
   revertTurn: (index) => {
     const s = get()
     const msg = s.chatMsgs[index]
@@ -1881,7 +2015,9 @@ export const useShell = create<ShellState>((set, get) => ({
       // stack — a reverted reply is given no snapshot, so a base point set from it could never
       // have been reverted.
       chatMsgs: st.chatMsgs.map((m, j) =>
-        j === index ? { ...m, reverted: true, undoSnap: null, placed: null, pending: null } : m
+        j === index
+          ? { ...m, reverted: true, revertedAt: Date.now(), undoSnap: null, placed: null, pending: null }
+          : m
       ),
       ...(note ? { chatErr: note } : {})
     }))
@@ -1959,8 +2095,9 @@ export const useShell = create<ShellState>((set, get) => ({
     if (!s.federation.elements.length) return
     const seed = seedAudit(s.federation.elements, s.federation.storeys, s.loaded)
     set({
-      chatMsgs: [{ role: 'assistant', text: seed.text, chips: seed.chips }],
+      chatMsgs: [{ role: 'assistant', text: seed.text, chips: seed.chips, at: Date.now(), models: slotRecords(s.federation) }],
       chatErr: '',
+      chatEnd: null,
       chatBusy: false
     })
   },

@@ -63,51 +63,106 @@
  * shadow, fade-in and `right` transition are the OS window's now, and so is the top-left resize
  * corner and its clamp — the window is resized by its own edges. (The `--brow` lane the panel
  * cleared, which the property card still clears, is the bottom row's own.)
+ *
+ * **2026-11-08 — a messaging conversation ("Vee Messages", stage 1a).** The owner: *"I need the
+ * conversation window like texting in messaging"*, and of three directions, the third — "site
+ * group chat" (`prototypes/vee-messages/full/`, its `HANDOFF.md`). What changed, and only that:
+ *
+ * · **A header** — the 32 px Vee (two whole device pixels to a cell), `Vee`, and a presence line
+ *   (`presenceOf`) — and under it **the pinned board**: what the main window's 3D view shows now,
+ *   as counts only (`VeeBoard`, sent at most once a frame, whoever changed the view). The title
+ *   `Ask Vee` is the OS window's.
+ * · **`You` on the right**, Vee on the left. A reply of Vee's is a group: **one bubble per block of
+ *   its text** (`ai/parts.ts`), then its cards — chips, the storey rows, the table, the consent
+ *   card — with the avatar at the group's foot. Only the newest reply's avatar moves; older ones
+ *   hold one open-eyed frame. The lead bubble carries the time; a user's carries one tick (sent)
+ *   or two (picked up — its turn's first stream event arrived).
+ * · **Reply quotes one bubble.** A bubble or card shows `reply` on hover or focus; the main window
+ *   works out the quote from its own message.
+ * · **The consent card** is the pending row, taped (tape means "Vee needs your OK"): the request,
+ *   `Cancel`, and a confirm button that names the action (`pendingVerb`). It takes no focus by
+ *   itself. Once answered it keeps a stamp — `APPLIED · 14:02`, `DELETED …`, `CANCELLED` — and the
+ *   reply's one `Revert` stands on it; a reply with no card has its `Revert` at its foot.
+ * · **System lines** for a turn that stopped or failed, in neutral ink, saying whether anything
+ *   had already changed (`endLine`), with `Try again` on a failed turn; a `New message` pill when
+ *   an answer lands while the thread is scrolled up; **not-ready lines** — no key (the composer
+ *   is disabled, with no placeholder) or no model (no board, no suggestions).
+ * · **The thinking trace** (`app/Trace.tsx`) draws a running turn as typing dots, then a diary —
+ *   every step with its live count, over the element matrix.
+ *
+ * **2026-11-08 — stage 1b: the answer phase.** At the answer the diary folds into one line that
+ * reopens, and the reply's parts land one after another, 110 ms apart at most and all in under
+ * half a second (`answerFrame`) — on the very row and elements they settle in, so there is no
+ * re-layout when the trace lets go. A Check's beam keeps the width it started with if the window
+ * is resized under it (`planWidth`). The selected storey row is pressed and ringed by a revision
+ * cloud; a consent card reads its request as a question and a detail; a bubble pops in, a card's
+ * stub tears and its stamp lands — and under reduced motion each is simply there. **Every message
+ * is its own memoised row** (`MessageRow`), so a keystroke or a board update renders none of them
+ * again.
+ *
+ * The window's new look is classes in `styles/vee.css` under `.vm`, from the prototype's values.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  answerHeight,
-  LABEL_RISE,
-  PAD_X,
-  ROW_SLIDE,
+  answerFrame,
+  hasTrace,
+  MATRIX_BAND,
+  planWidth,
+  traceCues,
   traceFrame,
   traceNextCue,
   traceSend,
-  WORD_RISE,
+  type AnswerFrame,
   type SendFrame,
-  type TraceFrame
+  type Timeline,
+  type TraceFrame,
+  type WidthHold
 } from '../ai/trace'
 import { onTrace, traceNow, traceState } from '../ai/trace-store'
+import { parseBlocks } from '../ai/blocks'
+import { partsOf as messageParts, quoteOfPart, type Part } from '../ai/parts'
+import { countText, nounFor } from '../ai/trace-facts'
+import type { DisplayUnit } from '../../shared/units'
 import type { VeeMessage } from '../../shared/vee-messages'
 import {
   ASSISTANT,
-  BUBBLE_RADIUS,
+  boardLine,
   chipsFolded,
   chipsStarted,
+  consentText,
+  dayLabel,
+  endLine,
+  hhmm,
+  notReadyLine,
+  plainOf,
+  presenceOf,
   replyStrip,
   sendClick,
   veeStateOf,
-  viewRow,
-  type ChatRow
+  viewRow
 } from '../state/selectors/chat'
 import { el } from '../dom'
 import { focusComposer, post } from '../vee/link'
 import { useVee } from '../vee/store'
 import { s } from './css'
-import { Cross, ReplyArrow, Revert, SendArrow } from './icons'
-import {
-  bubbleStyle,
-  kickTrace,
-  matrixHeight,
-  onTraceFrame,
-  paintMatrix,
-  reducedMotion,
-  ReplyBubble,
-  textHeight,
-  TraceStatus
-} from './Trace'
+import { Cross } from './icons'
+import { BlockView, Diary, kickTrace, onTraceFrame, paintMatrix, reducedMotion } from './Trace'
 import { Vee } from './Vee'
-import { VEE_MARGIN, VEE_OFFSET, VEE_SLOT, veeLabelOffset, type VeeState } from './vee-grid'
+import { cloudPath } from './vee-cloud'
+import {
+  BoardEye,
+  BoardEyeOff,
+  Crosshair,
+  DownArrow,
+  NoSignal,
+  ReplyHook,
+  RevertHook,
+  SendUp,
+  StopCross,
+  TickOne,
+  TickTwo
+} from './VeeIcons'
+import { VEE_AVATAR, VEE_FACE, VEE_OFFSET, veeLabelOffset, type VeeState } from './vee-grid'
 
 /** `:495` — the empty state, one string so it diffs against the design's own line. */
 const EMPTY_COPY =
@@ -197,27 +252,27 @@ interface Parts {
   log: HTMLElement | null
   /** The reply being drawn: its row, and what is in it. */
   row: HTMLElement | null
-  label: HTMLElement | null
   sprite: HTMLElement | null
+  /** Typing dots: in the reply being written, until Read. */
+  dots: HTMLElement | null
+  /** The diary, its live header, its folded line, and its body — the steps and the matrix. */
+  diary: HTMLElement | null
   thinking: HTMLElement | null
-  final: HTMLElement | null
-  bubble: HTMLElement | null
-  canvas: HTMLCanvasElement | null
-  ticker: HTMLElement | null
-  ticks: {
-    line: HTMLElement
+  elapsed: HTMLElement | null
+  sum: HTMLElement | null
+  body: HTMLElement | null
+  steps: {
+    li: HTMLElement
     label: HTMLElement
     mono: HTMLElement
     count: HTMLElement
-    n: HTMLElement
+    num: HTMLElement
     unit: HTMLElement
   }[]
-  text: HTMLElement | null
-  words: HTMLElement[]
-  rule: HTMLElement | null
-  rows: HTMLElement[]
+  canvas: HTMLCanvasElement | null
+  /** The answer's parts — its bubbles, its cards and its foot — in the order they land. */
+  lands: HTMLElement[]
   /** The user's row above it. */
-  youLabel: HTMLElement | null
   youBubble: HTMLElement | null
   youText: HTMLElement | null
   /** The composer, and the line lifting out of it. */
@@ -235,30 +290,27 @@ function partsOf(panel: HTMLElement | null, index: number): Parts {
   const log = el('chatlog', panel ?? undefined)
   const row = log?.querySelector<HTMLElement>(`:scope > [data-row="${index}"]`) ?? null
   const you = log?.querySelector<HTMLElement>(`:scope > [data-row="${index - 1}"][data-mine]`) ?? null
-  const bubble = part(row, 'bubble')
+  const diary = part(row, 'diary')
   const parts: Parts = {
     log,
     row,
-    label: part(row, 'label'),
     sprite: part(row, 'sprite'),
-    thinking: part(row, 'status-thinking'),
-    final: part(row, 'status-final'),
-    bubble,
-    canvas: bubble?.querySelector('canvas') ?? null,
-    ticker: part(bubble, 'ticker'),
-    ticks: [...(bubble?.querySelectorAll<HTMLElement>('[data-part="tick"]') ?? [])].map((line) => ({
-      line,
-      label: part(line, 'tick-label')!,
-      mono: part(line, 'tick-mono')!,
-      count: part(line, 'tick-count')!,
-      n: part(line, 'tick-n')!,
-      unit: part(line, 'tick-unit')!
+    dots: part(row, 'dots'),
+    diary,
+    thinking: part(diary, 'thinking'),
+    elapsed: part(diary, 'elapsed'),
+    sum: part(diary, 'diary-sum'),
+    body: part(diary, 'diary-body'),
+    steps: [...(diary?.querySelectorAll<HTMLElement>('[data-part="step"]') ?? [])].map((li) => ({
+      li,
+      label: part(li, 'step-label')!,
+      mono: part(li, 'step-mono')!,
+      count: part(li, 'step-count')!,
+      num: part(li, 'step-num')!,
+      unit: part(li, 'step-unit')!
     })),
-    text: part(bubble, 'text'),
-    words: [...(bubble?.querySelectorAll<HTMLElement>('[data-part="word"]') ?? [])],
-    rule: part(bubble, 'rule'),
-    rows: [...(bubble?.querySelectorAll<HTMLElement>('[data-part="row"]') ?? [])],
-    youLabel: part(you, 'label'),
+    canvas: diary?.querySelector('canvas') ?? null,
+    lands: [...(row?.querySelectorAll<HTMLElement>('[data-land]') ?? [])],
     youBubble: part(you, 'bubble'),
     youText: part(you, 'text'),
     input: el('chatinput', panel ?? undefined),
@@ -271,9 +323,8 @@ function partsOf(panel: HTMLElement | null, index: number): Parts {
   // element a 0.01 ms transition (`design.css`), and a transition — however short — holds the
   // old value for one more frame: the one thing a state shown "at its end" must not do.
   for (const node of [
-    parts.label, parts.sprite, parts.thinking, parts.final, parts.bubble, parts.ticker,
-    ...parts.ticks.map((t) => t.line), ...parts.words, parts.rule, ...parts.rows,
-    parts.youLabel, parts.youBubble, parts.arrow, parts.stop
+    parts.sprite, parts.dots, parts.diary, parts.sum, parts.body, ...parts.steps.map((t) => t.li), ...parts.lands,
+    parts.youBubble, parts.arrow, parts.stop
   ]) {
     if (node && node.style.transitionProperty !== 'none') node.style.transitionProperty = 'none'
   }
@@ -281,19 +332,23 @@ function partsOf(panel: HTMLElement | null, index: number): Parts {
 }
 
 /**
- * Take off a row everything the trace wrote on it. The trace has moved on — the next turn began
- * while the last reply was still arriving, or the turn failed — and what it leaves has to be
- * that row's end state, which is simply the row as React laid it out: no height of the trace's,
- * every word and row in, nothing held part of the way.
+ * Take off a row everything the trace wrote on it. The trace has let go of it — its answer has
+ * settled, the next turn began, or the turn failed — and what it leaves has to be that row's end
+ * state, which is simply the row as React laid it out: every part in, the diary as its own
+ * classes have it, nothing held part of the way.
  */
 function releaseParts(n: Parts): void {
-  for (const node of [n.label, n.sprite, n.bubble, n.rule, ...n.words, ...n.rows, n.youLabel, n.youBubble]) {
+  for (const node of [n.sprite, n.diary, n.sum, n.body, ...n.lands, n.youBubble]) {
     if (!node) continue
     node.style.opacity = ''
     node.style.transform = ''
   }
-  if (n.bubble) n.bubble.style.height = ''
-  for (const word of n.words) word.style.top = ''
+  for (const node of [n.diary, n.body]) {
+    if (!node) continue
+    node.style.display = ''
+    node.style.height = ''
+    node.style.overflow = ''
+  }
   if (n.youBubble) n.youBubble.style.transformOrigin = ''
   if (n.youText) n.youText.style.visibility = ''
 }
@@ -308,9 +363,13 @@ const setText = (node: HTMLElement, text: string): void => {
 /** The send button's pressed tone: the handoff's `#1B4A45`, which is `--sel-bg` 18 % toward `--accent`. */
 const PRESSED = 18
 
-/** The composer's line height and a bubble's, in px: the lift starts with the two baselines together. */
-const INPUT_LINE = 12.5 * 1.4
-const BUBBLE_LINE = 12.5 * 1.55
+/**
+ * A user's bubble's line height, in px (13 px at 1.42, `styles/vee.css`): the lift starts from the
+ * composer's middle, on the line it will have in its bubble.
+ */
+const BUBBLE_LINE = 13 * 1.42
+/** From the composer's edge to its text: its 1 px border and 11 px of padding. */
+const INPUT_INSET = 12
 
 /** What stands outside the reply: the composer, the user's row, the line lifting between them. */
 function applySend(n: Parts, f: SendFrame | null, panel: HTMLElement | null): void {
@@ -334,20 +393,19 @@ function applySend(n: Parts, f: SendFrame | null, panel: HTMLElement | null): vo
     if (placeholder >= 1) n.input.style.removeProperty('--ph')
     else n.input.style.setProperty('--ph', String(placeholder))
   }
-  const you = f ? f.you : 1
-  if (n.youLabel) {
-    n.youLabel.style.opacity = alpha(you)
-    n.youLabel.style.transform = you >= 1 ? '' : `translateY(${px((1 - you) * LABEL_RISE)})`
-  }
   const bubble = f ? f.bubble : 1
-  /** The user's bubble comes in a little small, about the middle of its left edge. */
+  /**
+   * The user's bubble comes in a little small, about the middle of its edge on the window's side —
+   * its right edge since 2026-11-08, when `You` moved to the right.
+   */
   const scale = 0.94 + 0.06 * bubble
   if (n.youBubble) {
     n.youBubble.style.opacity = alpha(bubble)
     n.youBubble.style.transform = bubble >= 1 ? '' : `scale(${scale})`
-    n.youBubble.style.transformOrigin = bubble >= 1 ? '' : '0 50%'
+    n.youBubble.style.transformOrigin = bubble >= 1 ? '' : '100% 50%'
   }
-  // The typed line: out of the composer and up to its bubble, at one x.
+  // The typed line: out of the composer and up to its bubble — since 2026-11-08 on a slant, from
+  // the composer's left to the bubble on the right.
   const lifting = !!f && f.lift < 1 && !!n.youText && !!n.youBubble && !!n.input && !!panel
   if (n.youText) n.youText.style.visibility = lifting ? 'hidden' : ''
   if (n.lift) {
@@ -365,98 +423,117 @@ function applySend(n: Parts, f: SendFrame | null, panel: HTMLElement | null): vo
         top: mid + (now.top - mid) / scale,
         width: now.width / scale
       }
-      // The input's border and padding (1 + 8 px above its text, 1 + 10 px left of it).
-      const fromTop = from.top + 9 - (BUBBLE_LINE - INPUT_LINE) / 2
+      // The composer's text is centred in it; it starts its border and padding in from its edge.
+      const fromTop = from.top + from.height / 2 - BUBBLE_LINE / 2
       setText(n.lift, n.youText!.textContent ?? '')
       n.lift.style.display = 'block'
       n.lift.style.width = px(to.width)
       // (Measured from the panel's edge: since 2026-11-07 the window is the panel, with no border.)
-      n.lift.style.left = px(to.left + (from.left + 11 - to.left) * (1 - f!.lift) - origin.left)
+      n.lift.style.left = px(to.left + (from.left + INPUT_INSET - to.left) * (1 - f!.lift) - origin.left)
       n.lift.style.top = px(fromTop + (to.top - fromTop) * f!.lift - origin.top)
     }
   }
 }
 
-/** The reply: its label, its status, its bubble, its ticker, its matrix, its words and its rows. */
-function applyFrame(n: Parts, f: TraceFrame, canvasH: number): void {
-  if (n.label) {
-    n.label.style.opacity = alpha(f.label.opacity)
-    n.label.style.transform = f.label.y ? `translateY(${px(f.label.y)})` : ''
+/** The diary's body's height before its fold, measured once per element. */
+const unfolded = new WeakMap<HTMLElement, number>()
+
+/**
+ * The fold, at the answer: the diary's steps and matrix close up over `FOLD_S` while its one line
+ * comes in. The row is already laid out folded — its classes say so — so the body is held open
+ * here and let go once the fold is over; nothing else of the row moves but what is under it.
+ */
+function applyFold(n: Parts, a: AnswerFrame, answered: boolean): void {
+  if (!n.body) return
+  const folding = answered && a.fold < 1 && !!n.sum && !n.diary?.classList.contains('vm-open')
+  if (!folding) {
+    n.body.style.display = ''
+    n.body.style.height = ''
+    n.body.style.overflow = ''
+    n.body.style.opacity = ''
+    if (n.sum) n.sum.style.opacity = ''
+    return
   }
+  let h = unfolded.get(n.body)
+  if (h === undefined) {
+    n.body.style.display = 'block'
+    n.body.style.height = ''
+    h = n.body.offsetHeight
+    unfolded.set(n.body, h)
+  }
+  n.body.style.display = 'block'
+  n.body.style.overflow = 'hidden'
+  n.body.style.height = px(h * (1 - a.fold))
+  n.body.style.opacity = alpha(1 - a.fold)
+  if (n.sum) n.sum.style.opacity = alpha(a.fold)
+}
+
+/** The reply's parts, each landing: its opacity and how far below its place it stands. */
+function applyLands(n: Parts, a: AnswerFrame): void {
+  n.lands.forEach((node, k) => {
+    const q = a.parts[k] ?? { opacity: 1, y: 0 }
+    node.style.opacity = alpha(q.opacity)
+    node.style.transform = q.y ? `translateY(${px(q.y)})` : ''
+  })
+}
+
+/** The diary while the turn runs — its header, its steps and its matrix — and Vee and the dots. */
+function applyFrame(n: Parts, f: TraceFrame, dpr: number): void {
   if (n.sprite) {
     n.sprite.style.opacity = alpha(f.sprite.opacity)
     n.sprite.style.transform = f.sprite.scale === 1 ? '' : `scale(${Math.round(f.sprite.scale * 1000) / 1000})`
   }
+  if (n.dots) n.dots.style.display = f.dots ? '' : 'none'
+  if (n.diary && !n.sum) {
+    // Running: the diary opens at Read.
+    n.diary.style.display = f.bubble.opacity > 0 ? '' : 'none'
+    n.diary.style.opacity = alpha(f.bubble.opacity)
+  }
   if (n.thinking) {
-    const t = f.status.thinking
-    n.thinking.style.opacity = t ? String(Math.round(t.opacity * 1000) / 1000) : '0'
-    n.thinking.style.transform = t && t.y ? `translateY(${px(t.y)})` : ''
     // The shimmer: a highlight a third of the text wide, sweeping left to right every 1.6 s.
-    n.thinking.style.backgroundPosition = `${f.status.shimmer === null ? 100 : Math.round((100 - f.status.shimmer * 100) * 10) / 10}% 0`
+    n.thinking.style.backgroundPosition = `${f.thinking.shimmer === null ? 100 : Math.round((100 - f.thinking.shimmer * 100) * 10) / 10}% 0`
   }
-  if (n.final) {
-    const t = f.status.final
-    n.final.style.opacity = t ? String(Math.round(t.opacity * 1000) / 1000) : '0'
-    n.final.style.transform = t && t.y ? `translateY(${px(t.y)})` : ''
-  }
-  if (n.bubble) {
-    // Settled, the bubble is ordinary flow again: its height is its content's.
-    n.bubble.style.height = f.settled ? '' : px(f.bubble.height)
-    n.bubble.style.opacity = alpha(f.bubble.opacity)
-  }
-  if (n.ticker) {
-    const shown = f.ticker.opacity > 0 && f.ticker.lines.length > 0
-    n.ticker.style.display = shown ? 'block' : 'none'
-    n.ticker.style.opacity = alpha(f.ticker.opacity)
-    n.ticks.forEach((tick, i) => {
-      const line = shown ? f.ticker.lines[i] : undefined
-      if (!line) {
-        tick.line.style.display = 'none'
-        return
-      }
-      tick.line.style.display = 'flex'
-      tick.line.style.opacity = alpha(line.opacity)
-      tick.line.style.transform = line.y ? `translateY(${px(line.y)})` : ''
-      setText(tick.label, line.label)
-      setText(tick.mono, line.mono)
-      // Nothing in the mono face: no piece for the row's gap to stand beside.
-      tick.mono.style.display = line.mono ? '' : 'none'
-      tick.count.style.display = line.count ? '' : 'none'
-      if (line.count) {
-        setText(tick.n, line.count.text)
-        setText(tick.unit, line.count.unit)
-        tick.n.style.color = line.count.accent ? 'var(--accent-ink)' : 'var(--ink)'
-      }
-    })
-  }
-  if (n.canvas && n.bubble) {
-    paintMatrix(n.canvas, n.bubble.clientWidth, canvasH, f.cells, f.beam, window.devicePixelRatio || 1)
-  }
-  n.words.forEach((word, j) => {
-    const a = f.words[j] ?? 1
-    word.style.opacity = alpha(a)
-    word.style.top = a >= 1 ? '' : px((1 - a) * WORD_RISE)
+  if (n.elapsed) setText(n.elapsed, `${f.thinking.seconds}s`)
+  n.steps.forEach((slot, k) => {
+    const step = f.steps[k]
+    if (!step) {
+      slot.li.style.display = 'none'
+      return
+    }
+    slot.li.style.display = ''
+    slot.li.classList.toggle('vm-ok', step.done)
+    slot.li.style.opacity = alpha(step.opacity)
+    slot.li.style.transform = step.y ? `translateY(${px(step.y)})` : ''
+    setText(slot.label, step.label)
+    setText(slot.mono, step.mono)
+    // Nothing in the mono face: no piece for the line's gap to stand beside.
+    slot.mono.style.display = step.mono ? '' : 'none'
+    slot.count.style.display = step.count ? '' : 'none'
+    if (step.count) {
+      setText(slot.num, step.count.text)
+      setText(slot.unit, step.count.unit)
+      slot.num.classList.toggle('vm-hit', step.count.accent)
+    }
   })
-  if (n.rule) n.rule.style.opacity = n.rows.length ? alpha(f.rule) : ''
-  n.rows.forEach((row, L) => {
-    const a = f.rows[L] ?? 1
-    row.style.opacity = alpha(a)
-    row.style.transform = a >= 1 ? '' : `translateX(${px(-(1 - a) * ROW_SLIDE)})`
-  })
+  const width = n.canvas?.parentElement?.clientWidth ?? 0
+  if (n.canvas && width > 0) {
+    paintMatrix(n.canvas, width, MATRIX_BAND.height, f.cells, f.beam, dpr, { x: 0, y: MATRIX_BAND.top })
+  }
 }
 
-/* ────────────────────────────── the panel (`:430`) ────────────────────────────── */
+/* ────────────────────────────── a message ────────────────────────────── */
 
 /** A running turn with no trace to draw: everything of the send at rest, the button a stop. */
 const STOP_ONLY: SendFrame = { lift: 1, press: 1, bubble: 1, you: 1, placeholder: 1, busy: 1, settled: true }
 
-/** The reply being written has no message yet: what its row is drawn from until it does. */
-const LIVE_ROW: Pick<ChatRow, 'who' | 'fg' | 'bg' | 'radius'> = {
-  who: ASSISTANT,
-  fg: 'var(--ink)',
-  bg: 'var(--step-bg)',
-  radius: BUBBLE_RADIUS
-}
+/** The composer's placeholder: the design's, and none while the composer cannot be used. */
+const PLACEHOLDER = 'How many doors on L2?'
+
+/** How long the table card's `copied` flash stays: the design's `copy csv` has none; the prototype's 1 400 ms. */
+const COPY_FLASH_MS = 1400
+
+/** A consent card's stub tears away for this long once answered (the prototype's `tear`). */
+const TEAR_MS = 420
 
 /** The composer's text, typed here and kept in step with the main window's `chatInput`. */
 const setInput = (text: string): void => {
@@ -464,12 +541,549 @@ const setInput = (text: string): void => {
   post({ type: 'input', text })
 }
 
+/**
+ * A message's blocks and parts, worked out once per message object: a snapshot keeps the object
+ * of every message that did not change (`vee/store.ts`), and the window renders again at every
+ * keystroke in the composer.
+ */
+const blockCache = new WeakMap<VeeMessage, ReturnType<typeof parseBlocks>>()
+const partCache = new WeakMap<VeeMessage, Part[]>()
+const blocksOf = (m: VeeMessage): ReturnType<typeof parseBlocks> => {
+  let b = blockCache.get(m)
+  if (!b) blockCache.set(m, (b = parseBlocks(m.text)))
+  return b
+}
+const partsOfMessage = (m: VeeMessage): Part[] => {
+  let p = partCache.get(m)
+  if (!p) partCache.set(m, (p = messageParts(m)))
+  return p
+}
+
+/** A stamp's words: the outcome in capitals and, but for a cancel, when. */
+export function stampText(settled: NonNullable<VeeMessage['settled']>): string {
+  return settled.how === 'cancelled' ? 'CANCELLED' : `${settled.how.toUpperCase()} · ${hhmm(settled.at)}`
+}
+
+/** The newest of Vee's rows — the one whose avatar moves: `'nr'` for the not-ready line, else an index. */
+export function newestVee(msgs: readonly Pick<VeeMessage, 'role'>[], live: boolean, notReady: boolean): number | 'nr' | null {
+  if (notReady) return 'nr'
+  if (live) return msgs.length
+  for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === 'assistant') return i
+  return null
+}
+
+/**
+ * The not-ready line under the thread — unless the newest message already is it (Vee's answer
+ * to a question asked with no model open), so it is not said twice in a row.
+ */
+export function shownNotReady(msgs: readonly Pick<VeeMessage, 'role' | 'text'>[], line: string | null): string | null {
+  const last = msgs[msgs.length - 1]
+  return line !== null && last?.role === 'assistant' && last.text === line ? null : line
+}
+
+/** What the polite live region says: a turn is running, else the newest reply of Vee's, once. */
+export function announcement(msgs: readonly Pick<VeeMessage, 'role' | 'text'>[], busy: boolean): string {
+  if (busy) return `${ASSISTANT} is working on it.`
+  for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === 'assistant') return plainOf(msgs[i])
+  return ''
+}
+
+/**
+ * 2026-11-08 (stage 1b) — whether a storey row is the one the 3D view has selected, as the board
+ * says it: exactly its count of elements, all on its storey.
+ */
+export const rowPressed = (row: { label: string; n: number }, storey: string | null, selected: number): boolean =>
+  storey !== null && row.label === storey && row.n === selected
+
+/** The hover bar of a bubble or a card: `reply`, quoting just that one. */
+function ReplyBar({ onReply }: { onReply: () => void }): React.JSX.Element {
+  return (
+    <div className="vm-rx">
+      <button type="button" title="Reply" aria-label="Reply" onClick={onReply}>
+        <ReplyHook />
+      </button>
+    </div>
+  )
+}
+
+/**
+ * The revision cloud around the selected storey row (the prototype's): measured from the row it
+ * stands in, and drawn again whenever that row's box changes — a resize of the window included.
+ */
+function Cloud(): React.JSX.Element {
+  const ref = useRef<SVGSVGElement>(null)
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  useLayoutEffect(() => {
+    const host = ref.current?.parentElement
+    if (!host) return
+    const measure = (): void => {
+      const w = host.offsetWidth
+      const h = host.offsetHeight
+      setBox((b) => (b && b.w === w && b.h === h ? b : { w, h }))
+    }
+    measure()
+    const sized = new ResizeObserver(measure)
+    sized.observe(host)
+    return () => sized.disconnect()
+  }, [])
+  const d = box && box.w > 8 && box.h > 8 ? cloudPath(box.w - 8, box.h - 8, 3.4) : ''
+  return (
+    <svg ref={ref} className="vm-cloud" aria-hidden="true" width={box?.w ?? 0} height={box?.h ?? 0}>
+      {d ? <path transform="translate(4 4)" pathLength={1} d={d} /> : null}
+    </svg>
+  )
+}
+
+/** Where an act on a message is sent: its place, and the identity the snapshot gave it. */
+type At = { index: number; msg: number }
+
+/** What lands at the answer, while the trace draws the row; and what pops in, on a fresh one. */
+type Entry = { land: boolean; pop: boolean }
+
+const landAttr = (e: Entry): { 'data-land'?: '' } => (e.land ? { 'data-land': '' } : {})
+const popClass = (e: Entry, base: string): string => (e.pop ? `${base} vm-in` : base)
+
+/**
+ * The consent card (the pending row, taped): the request as a question and a detail, `Cancel`
+ * and a confirm button that names the action; once answered, its stub tears away and a stamp
+ * lands, with the reply's one `Revert` on it. It takes no focus by itself.
+ */
+function Consent({ message, canRevert, at, entry }: { message: VeeMessage; canRevert: boolean; at: At; entry: Entry }): React.JSX.Element {
+  const settled = message.settled
+  const label = message.pending ? message.pending.label : (settled?.label ?? '')
+  const { q, detail } = consentText(label)
+  /** The stub tearing away (its verb), and whether the stamp lands — only for a card answered while it is shown. */
+  const [tearing, setTearing] = useState<string | null>(null)
+  const [stamped, setStamped] = useState(false)
+  const was = useRef(message.pending)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useLayoutEffect(() => {
+    const before = was.current
+    was.current = message.pending
+    if (!before || message.pending) return
+    setStamped(true)
+    if (reducedMotion()) return
+    setTearing(before.verb ?? 'Apply')
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setTearing(null), TEAR_MS)
+  }, [message.pending])
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
+  const answered = !message.pending
+  return (
+    <div
+      data-role="consent"
+      {...landAttr(entry)}
+      className={popClass(entry, answered ? 'vm-card vm-pm vm-settled' : 'vm-card vm-pm')}
+    >
+      <div className="vm-tape" aria-hidden="true" />
+      <div className="vm-pm-body">
+        <span className="vm-hole" aria-hidden="true" />
+        <div className="vm-pm-q">{q}</div>
+        {detail ? <div className="vm-pm-sub">{detail}</div> : null}
+      </div>
+      <div className="vm-perf" aria-hidden="true" />
+      {message.pending ? (
+        <div className="vm-stub">
+          <button type="button" className="vm-no" onClick={() => post({ type: 'cancel', ...at, pending: message.pending!.id })}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="vm-go"
+            // The user's click on the confirm button, for the request this card shows — and nothing else.
+            onClick={() => post({ type: 'apply', ...at!, pending: message!.pending!.id })}
+          >
+            {message.pending.verb ?? 'Apply'}
+          </button>
+        </div>
+      ) : tearing !== null ? (
+        <div className="vm-stub vm-tear" aria-hidden="true">
+          <button type="button" className="vm-no" disabled tabIndex={-1}>
+            Cancel
+          </button>
+          <button type="button" className="vm-go" disabled tabIndex={-1}>
+            {tearing}
+          </button>
+        </div>
+      ) : (
+        <div className="vm-done">
+          {message.reverted ? (
+            <span className={stamped ? 'vm-stamp vm-muted vm-land' : 'vm-stamp vm-muted'}>
+              REVERTED{message.revertedAt !== undefined ? ` · ${hhmm(message.revertedAt)}` : ''}
+            </span>
+          ) : settled ? (
+            <span className={`vm-stamp${settled.how === 'cancelled' ? ' vm-muted' : ''}${stamped ? ' vm-land' : ''}`}>{stampText(settled)}</span>
+          ) : null}
+          {canRevert ? (
+            <button type="button" className="vm-rv" title="Undo just this reply" onClick={() => post({ type: 'revert', ...at })}>
+              <RevertHook />
+              Revert
+            </button>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export interface RowProps {
+  /** The message, or `null` for the reply being written. */
+  message: VeeMessage | null
+  index: number
+  units: DisplayUnit
+  /** Vee's state in front of this row, and whether its avatar holds a still frame. */
+  state: VeeState
+  still: boolean
+  /** The trace's painter draws this row: while its turn runs, and until its answer has settled. */
+  owned: boolean
+  /** The reply being written: whether its diary is up, and how many steps it has so far. */
+  diary: boolean
+  slots: number
+  /** The answered turn's timeline, while it is this reply's: its diary reopens to the final matrix. */
+  timeline: Timeline | null
+  /** The 3D view's selection, as the board says it — only to a reply with storey rows. */
+  selStorey: string | null
+  selCount: number
+  /** The table card's `copy csv` flash — only to the reply it was clicked on. */
+  copied: 'ok' | 'fail' | null
+  /** A message that arrived while the window was open: it pops in (unless the trace lands it). */
+  fresh: boolean
+}
+
+/**
+ * One row of the transcript — 2026-11-08 (stage 1b): its own memoised component, so that a
+ * keystroke, a board update or another message changing renders none of the rows that did not
+ * change. Every act is one intent, sent from here.
+ */
+export const MessageRow = memo(function MessageRow(props: RowProps): React.JSX.Element {
+  const { message, index: i, owned, state, still } = props
+
+  /** A reply on part `k` of this message: the main window keeps which, and quotes it when it sends. */
+  const replyOn = (at: At, k: number): void => {
+    post({ type: 'reply', ...at, part: k })
+    focusComposer()
+  }
+
+  /** The avatar at the foot of a group of Vee's: only the newest moves. */
+  const avatar = (
+    <span className="vm-av" data-part="sprite">
+      <Vee slot={VEE_AVATAR.slot} margin="0px" mult={VEE_AVATAR.mult} offset={veeLabelOffset(i)} state={state} still={still} />
+    </span>
+  )
+
+  if (message?.role === 'user') {
+    return (
+      <div data-row={i} data-mine="" className="vm-grp vm-me">
+        <div className="vm-stack">
+          <span data-part="bubble" className={props.fresh ? 'vm-b vm-b-me vm-in' : 'vm-b vm-b-me'}>
+            {message.quote ? (
+              <span className="vm-q">
+                <i>{message.quote.who}</i>
+                {message.quote.text}
+              </span>
+            ) : null}
+            <span data-part="text">{message.text}</span>
+            {message.at !== undefined ? (
+              <span className="vm-t">
+                {hhmm(message.at)}
+                <span className={message.seen ? 'vm-tk vm-read' : 'vm-tk'} aria-label={message.seen ? 'Picked up' : 'Sent'} role="img">
+                  {message.seen ? <TickTwo /> : <TickOne />}
+                </span>
+              </span>
+            ) : null}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!message) {
+    // The reply being written: the diary once a tool has started, typing dots until Read. Not read
+    // out — the live region says Vee is working.
+    return (
+      <div data-row={i} aria-hidden="true" className="vm-grp vm-vee">
+        {avatar}
+        <div className="vm-stack">
+          {props.diary ? <Diary fold={null} steps={NO_STEPS} slots={props.slots} timeline={null} owned /> : null}
+          <span data-part="dots" className="vm-b vm-dots">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  const m = viewRow(message, i, props.units)
+  const at: At = { index: i, msg: message.id }
+  /** The trace lands a turn's parts; a message no turn wrote pops in when it arrives. */
+  const entry: Entry = { land: owned, pop: props.fresh && !owned && !message.trace }
+  const trace = message.trace
+  const list = partsOfMessage(message)
+  const hasCard = list.some((p) => p.kind === 'consent')
+
+  const piece = (p: Part, k: number): React.JSX.Element | null => {
+    if (p.kind === 'text') {
+      const block = blocksOf(message)[p.block]
+      if (!block) return null
+      return (
+        <div key={k} {...landAttr(entry)} className={popClass(entry, message.reverted ? 'vm-b vm-tx vm-reverted' : 'vm-b vm-tx')} tabIndex={0}>
+          <BlockView block={block} />
+          {p.lead && message.at !== undefined ? <span className="vm-t">{hhmm(message.at)}</span> : null}
+          <ReplyBar onReply={() => replyOn(at, k)} />
+        </div>
+      )
+    }
+    if (p.kind === 'chips') {
+      return (
+        <div
+          key={k}
+          {...landAttr(entry)}
+          className={entry.pop ? 'vm-in' : undefined}
+          style={s('display:flex;flex-wrap:wrap;gap:5px;align-self:stretch;margin-top:1px')}
+        >
+          {message.chips.map((c, j) => (
+            <button
+              key={`${c.label}-${j}`}
+              onClick={() => post({ type: 'pick', ...at, what: 'chip', j, zoom: false })}
+              onDoubleClick={() => post({ type: 'pick', ...at, what: 'chip', j, zoom: true })}
+              data-tip="Click to select · double-click to zoom"
+              style={s(
+                'font:500 10.5px/1 var(--mono);color:var(--sel-ink);background:var(--sel-bg);border:1px solid var(--accent);border-radius:999px;padding:5px 9px;white-space:nowrap'
+              )}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )
+    }
+    if (p.kind === 'rows' && trace) {
+      const noun = trace.noun
+      const total = trace.rows.reduce((a, r) => a + r.n, 0)
+      return (
+        <div key={k} {...landAttr(entry)} data-role="storey-rows" className={popClass(entry, 'vm-card vm-tx')} tabIndex={0}>
+          <div className="vm-sn-hd">
+            <span className="vm-hole" aria-hidden="true" />
+            {/* The property the turn checked, when it checked one (stage 1b); else what the rows count. */}
+            <span>{trace.title ?? `${nounFor(2, noun)} · by storey`}</span>
+            <b>{countText(total)}</b>
+          </div>
+          <div className="vm-sn-rows">
+            {trace.rows.map((r, j) => {
+              const pressed = rowPressed(r, props.selStorey, props.selCount)
+              return (
+                <button
+                  key={j}
+                  type="button"
+                  className="vm-sn-row"
+                  title="Select in 3D"
+                  aria-pressed={pressed}
+                  onClick={() => post({ type: 'pick', ...at, what: 'row', j, zoom: false })}
+                >
+                  <span className="vm-lv">{r.label}</span>
+                  <span className="vm-cl" aria-hidden="true">
+                    {Array.from({ length: Math.min(r.n, 12) }, (_, c) => (
+                      <i key={c} />
+                    ))}
+                  </span>
+                  <span className="vm-ct">
+                    <b>{countText(r.n)}</b> {nounFor(r.n, noun)}
+                  </span>
+                  <span className="vm-xh">
+                    <Crosshair />
+                  </span>
+                  {pressed ? <Cloud /> : null}
+                </button>
+              )
+            })}
+          </div>
+          <ReplyBar onReply={() => replyOn(at, k)} />
+        </div>
+      )
+    }
+    if (p.kind === 'table' && message.table) {
+      const total = message.table.rows.reduce((a, r) => a + r.n, 0)
+      return (
+        <div key={k} {...landAttr(entry)} data-role="chat-table" className={popClass(entry, 'vm-card vm-tx')} tabIndex={0}>
+          <div className="vm-sn-hd">
+            <span className="vm-hole" aria-hidden="true" />
+            <span>{m.tableTitle}</span>
+            <b>{countText(total)}</b>
+          </div>
+          <div className="vm-sn-rows">
+            {m.tableRows.map((r, j) => (
+              <button
+                key={`${r.k}-${j}`}
+                type="button"
+                className="vm-sn-row vm-tb-row"
+                title="Select in 3D"
+                onClick={() => post({ type: 'pick', ...at, what: 'table', j, zoom: true })}
+              >
+                <span className="vm-lv">{r.k}</span>
+                <span className="vm-qty">{r.q}</span>
+                <span className="vm-ct">
+                  <b>{r.n}</b>
+                </span>
+                <span className="vm-xh">
+                  <Crosshair />
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="vm-tb-ft">
+            <span className={props.copied ? 'vm-fl vm-on' : 'vm-fl'} aria-live="polite">
+              {props.copied === 'ok' ? 'copied' : props.copied === 'fail' ? 'couldn’t copy' : ''}
+            </span>
+            <button
+              type="button"
+              className="vm-cp"
+              // `:2029`. The main window's store copies (`copyTable`), and the text is put on the
+              // clipboard here, under this click (`vee/link.ts`): the design's line called the
+              // clipboard API this app always refuses, and copied nothing.
+              onClick={() => {
+                useVee.setState({ copyFlash: { msg: message.id, ok: null, at: Date.now() } })
+                post({ type: 'copyCsv', ...at })
+              }}
+            >
+              copy csv
+            </button>
+          </div>
+          <ReplyBar onReply={() => replyOn(at, k)} />
+        </div>
+      )
+    }
+    if (p.kind === 'consent') return <Consent key={k} message={message} canRevert={m.canRevert} at={at} entry={entry} />
+    return null
+  }
+
+  return (
+    <div data-row={i} className="vm-grp vm-vee">
+      {avatar}
+      <div className="vm-stack">
+        {/* A turn that ran a tool: its diary, folded (the same element the trace drew it in). */}
+        {trace?.wide ? (
+          <Diary
+            fold={trace.fold ?? trace.status}
+            steps={trace.steps ?? NO_STEPS}
+            slots={0}
+            timeline={props.timeline}
+            owned={owned}
+          />
+        ) : null}
+        {list.map(piece)}
+        {/* One revert a reply: on the consent card's stamp once it has one, else here. */}
+        {!hasCard || message.pending ? (
+          m.canRevert ? (
+            <div {...landAttr(entry)} className="vm-foot">
+              <button type="button" className="vm-rv" title="Undo just this reply" onClick={() => post({ type: 'revert', ...at })}>
+                <RevertHook />
+                Revert
+              </button>
+            </div>
+          ) : message.reverted && !hasCard ? (
+            <div className="vm-foot">
+              <span>Reverted{message.revertedAt !== undefined ? ` · ${hhmm(message.revertedAt)}` : ''}</span>
+            </div>
+          ) : null
+        ) : null}
+      </div>
+    </div>
+  )
+})
+
+/** What every row's props are worked out from. */
+export interface RowContext {
+  units: DisplayUnit
+  msgs: readonly VeeMessage[]
+  board: { storey: string | null; selected: number } | null
+  timeline: Timeline | null
+  /** The transcript place the trace is about. */
+  traceIndex: number
+  /** Whether row `i` is the one the trace draws. */
+  drawn: (i: number) => boolean
+  /** The state of the mascot in front of the reply the trace draws. */
+  vee: VeeState
+  /** The newest of Vee's rows (`newestVee`). */
+  newest: number | 'nr' | null
+  /** The table card's `copy csv` flash, while it shows. */
+  flash: { msg: number; ok: boolean | null } | null
+  /** Whether the message at row `i` pops in — decided once per row (`freshRow`). */
+  fresh: (i: number, role: VeeMessage['role']) => boolean
+}
+
+/**
+ * Whether a message's row pops in (`.vm-in`) — **decided the first time the row is drawn, and
+ * never again** (review of stage 1b). A row pops when it arrived while the window was open
+ * (`i ≥ firstCount`) and is not the user's row the trace lifts its typed line into (`lifted`).
+ * Worked out afresh at every render, the second half flipped: once the next turn began — or the
+ * turn failed and left no timeline — the row that had been lifted was no longer `lifted`, gained
+ * `.vm-in` and played its entrance again from nothing on a bubble long on screen. So the answer is
+ * kept per row (`memo`, keyed by place and role: a failed turn's reply place can be the next
+ * question's), and a row's `fresh` never changes after it is first drawn.
+ */
+export function freshRow(
+  memo: Map<string, boolean>,
+  i: number,
+  role: VeeMessage['role'],
+  firstCount: number,
+  lifted: number
+): boolean {
+  const key = `${i}:${role}`
+  let fresh = memo.get(key)
+  if (fresh === undefined) memo.set(key, (fresh = i >= firstCount && i !== lifted))
+  return fresh
+}
+
+/**
+ * One row's props — 2026-11-08 (stage 1b). **Every prop is a value, or an object that changes
+ * only with what it says** (the message, the timeline), and a prop a row does not use is a fixed
+ * value: the selection reaches only a reply with storey rows, the flash only the reply it was
+ * clicked on, the trace's own state only the row it draws. So a keystroke, a board update or
+ * another message changing leaves every other row's props as they were, and `MessageRow`, being
+ * `memo`, is not rendered again. Exported for the unit test that holds it to that.
+ */
+export function rowProps(c: RowContext, message: VeeMessage | null, i: number): RowProps {
+  const owned = c.drawn(i)
+  const rows = !!message?.trace?.rows.length
+  const tl = c.timeline
+  return {
+    message,
+    index: i,
+    units: c.units,
+    state: owned ? c.vee : veeStateOf(c.msgs, i),
+    still: c.newest !== i,
+    owned,
+    diary: !message && !!tl && hasTrace(tl),
+    slots: !message && tl ? traceCues(tl).steps.length : 0,
+    timeline: message && tl && tl.answer !== null && c.traceIndex === i ? tl : null,
+    // A row is pressed only for a selection on one storey, so a count alone tells a row nothing.
+    selStorey: rows ? (c.board?.storey ?? null) : null,
+    selCount: rows && c.board?.storey ? c.board.selected : 0,
+    copied: message && c.flash && c.flash.ok !== null && c.flash.msg === message.id ? (c.flash.ok ? 'ok' : 'fail') : null,
+    // The reply being written never pops: the trace draws it.
+    fresh: message ? c.fresh(i, message.role) : false
+  }
+}
+
+/** No steps: one array, so a memoised row is not rendered again for nothing. */
+const NO_STEPS: readonly { label: string; mono: string; n: number | null; unit: string }[] = []
+
+/* ────────────────────────────── the panel (`:430`) ────────────────────────────── */
+
 export default function ChatPanel(): React.JSX.Element | null {
   const st = useVee()
-  const trace = useSyncExternalStore(onTrace, traceState)
+  const trace = useSyncExternalStore(onTrace, traceState, traceState)
   const panel = useRef<HTMLDivElement>(null)
   const log = useRef<HTMLDivElement>(null)
   const lastLen = useRef(0)
+  const lastMsgs = useRef(0)
   /** The log follows its own foot while the reply grows — unless the user has scrolled up. */
   const stuck = useRef(true)
   const parts = useRef<Parts | null>(null)
@@ -478,6 +1092,23 @@ export default function ChatPanel(): React.JSX.Element | null {
   const veeNow = useRef<VeeState>('thinking')
   /** When the send button last stopped a turn (`sendClick`). */
   const stoppedAt = useRef<number | null>(null)
+  /** Replies of Vee's that landed while the thread was scrolled up: the `New message` pill. */
+  const [unread, setUnread] = useState(0)
+  /**
+   * The turn (by its send time) whose reply the trace has let go of: its answer has settled, and
+   * the row is drawn by React alone — the same row, so nothing moves when it does.
+   */
+  const [released, setReleased] = useState<number | null>(null)
+  const releasedRef = useRef<number | null>(null)
+  /** The width the running turn's matrix is planned for (`planWidth`), by its send time. */
+  const hold = useRef<{ send: number; at: WidthHold } | null>(null)
+  /** How many messages there were when the window first drew: the ones after it pop in. */
+  const firstCount = useRef<number | null>(null)
+  /** Each row's pop, decided once (`freshRow`), and the transcript length it was decided for. */
+  const freshMemo = useRef(new Map<string, boolean>())
+  const freshLen = useRef(0)
+  /** The table card's `copied` flash is shown until this time. */
+  const [, setTick] = useState(0)
 
   /**
    * The turn being drawn — running, or answered and not yet replaced by the next. A turn the
@@ -490,8 +1121,10 @@ export default function ChatPanel(): React.JSX.Element | null {
   /** The transcript's rows: every message, and while a turn runs the reply being written. */
   const live = st.chatBusy && timeline !== null && trace.index === st.chatMsgs.length
   const count = st.chatMsgs.length + (live ? 1 : 0)
+  /** Whether the trace still draws its reply (it has not let go of it). */
+  const owning = timeline !== null && released !== timeline.send
   /** Whether row `i` is the one the trace draws. */
-  const drawn = (i: number): boolean => timeline !== null && trace.index === i && i < count
+  const drawn = (i: number): boolean => owning && trace.index === i && i < count
 
   /**
    * One frame of the trace, put on the page. Called by the loop (`app/Trace.tsx`), and directly
@@ -510,35 +1143,40 @@ export default function ChatPanel(): React.JSX.Element | null {
     const send = traceSend(timeline, T, reduced)
     let settled = send.settled
     applySend(n, send.settled ? null : send, panel.current)
-    if (n.row && n.bubble) {
+    if (owning && n.row) {
       const dpr = window.devicePixelRatio || 1
-      /** The frame for the bubble as it is laid out now; what it was measured from comes back. */
-      const draw = (): [number, number, TraceFrame] => {
-        const width = n.bubble!.clientWidth - 2 * PAD_X
-        const textH = textHeight(n.text)
-        const at = traceFrame(timeline, T, { width, dpr, textH, reduced })
-        const answer = timeline.answer === null ? 0 : answerHeight(textH, n.rows.length)
-        applyFrame(n, at, matrixHeight(answer))
-        return [width, textH, at]
-      }
-      let [width, textH, shown] = draw()
-      if (stuck.current) n.log.scrollTop = n.log.scrollHeight
-      // Drawing it can change what it was drawn for: a taller bubble brings the log's scrollbar,
-      // which narrows the bubble and re-wraps its text. Once more, then, from what is there now.
-      if (n.bubble.clientWidth - 2 * PAD_X !== width || textHeight(n.text) !== textH) {
-        ;[width, textH, shown] = draw()
-      }
+      const answered = timeline.answer !== null && T >= timeline.answer
+      const ans = answerFrame(timeline, T, n.lands.length, { dpr, reduced })
+      applyFold(n, ans, answered)
+      // The width the matrix is planned for: the canvas's, but held while a Check's beam runs.
+      const measured = n.canvas?.parentElement?.clientWidth ?? 0
+      const was = hold.current && hold.current.send === timeline.send ? hold.current.at : null
+      const at = planWidth(timeline, T, measured > 0 ? measured : (was?.width ?? 0), was)
+      hold.current = { send: timeline.send, at }
+      const shown = traceFrame(timeline, T, { width: at.width, dpr, textH: 0, reduced })
+      applyFrame(n, shown, dpr)
+      applyLands(n, ans)
       if (veeNow.current !== shown.sprite.state) {
         veeNow.current = shown.sprite.state
         setVee(shown.sprite.state)
       }
-      settled = settled && shown.settled
+      settled = settled && ans.settled
     }
     if (stuck.current) n.log.scrollTop = n.log.scrollHeight
     n.log.toggleAttribute('data-moving', !settled)
+    // The answer is in and nothing moves any more: React alone draws the row from here.
+    if (settled && timeline.answer !== null && releasedRef.current !== timeline.send) {
+      releasedRef.current = timeline.send
+      if (n.row) releaseParts(n)
+      setReleased(timeline.send)
+    }
     if (settled) return false
-    // With no motion to draw there is nothing to do until the turn's next cue.
-    return reduced ? (traceNextCue(timeline, T) ?? false) : true
+    if (!reduced) return true
+    // With no motion to draw there is nothing to do until the turn's next cue — or, while it
+    // runs, the next whole second of the diary's clock, which is a count and not motion.
+    const cue = traceNextCue(timeline, T)
+    const second = timeline.answer === null ? timeline.send + Math.floor(T - timeline.send) + 1 : null
+    return cue === null ? (second ?? false) : second === null ? cue : Math.min(cue, second)
   }
   /**
    * The trace is decoration, and it is drawn from a layout effect: an error thrown there would
@@ -561,33 +1199,74 @@ export default function ChatPanel(): React.JSX.Element | null {
   useEffect(() => onTraceFrame((T, reduced) => painter.current(T, reduced)), [])
 
   // After every render: find the parts again — settling the row the trace has left, if it has
-  // moved on — keep the log at its foot when a row was added (`:879`), and draw the trace's
-  // frame before the browser paints what React has laid out.
+  // moved on — keep the log at its foot when a row was added (`:879`) unless the user has
+  // scrolled up (then count the reply that landed for the pill), and draw the trace's frame
+  // before the browser paints what React has laid out.
   useLayoutEffect(() => {
     const next = partsOf(panel.current, trace.index)
     const was = parts.current
     if (was && (was.row !== next.row || was.youBubble !== next.youBubble)) releaseParts(was)
     parts.current = next
     const node = log.current
+    const msgs = st.chatMsgs.length
+    if (node && msgs !== lastMsgs.current) {
+      const added = msgs - lastMsgs.current
+      lastMsgs.current = msgs
+      // The user's own message, or a transcript replaced: back to the foot.
+      if (added < 0 || st.chatMsgs[msgs - 1]?.role === 'user') stuck.current = true
+      if (stuck.current) {
+        node.scrollTop = node.scrollHeight
+        if (unread) setUnread(0)
+      } else setUnread((u) => u + added)
+    }
     if (node && count !== lastLen.current) {
       lastLen.current = count
-      stuck.current = true
-      node.scrollTop = node.scrollHeight
+      if (stuck.current) node.scrollTop = node.scrollHeight
     }
     painter.current(traceNow(), reducedMotion())
     kickTrace()
   })
 
-  // The reply strip's line: a reply of Vee's flattened into plain text (`plainOf`) — once when the
-  // transcript or the target changes, never again at every keystroke in the composer.
-  const reply = useMemo(() => replyStrip(st.chatMsgs, st.chatReplyTo), [st.chatMsgs, st.chatReplyTo])
+  // The reply strip's line: the bubble replied to, or a whole message, flattened into plain text —
+  // once when the transcript or the target changes, never again at every keystroke.
+  const reply = useMemo(() => {
+    const strip = replyStrip(st.chatMsgs, st.chatReplyTo)
+    const target = st.chatReplyTo == null ? undefined : st.chatMsgs[st.chatReplyTo]
+    const one = target && st.chatReplyPart != null ? quoteOfPart(target, st.chatReplyPart) : null
+    return one === null ? strip : { ...strip, text: one }
+  }, [st.chatMsgs, st.chatReplyTo, st.chatReplyPart])
 
   // Opening the window gives its composer the keyboard.
   useEffect(() => {
     if (st.ready) focusComposer(true)
   }, [st.ready])
 
+  // The table card's flash goes out after its time.
+  const flash = st.copyFlash
+  useEffect(() => {
+    if (!flash || flash.ok === null) return
+    const t = setTimeout(() => setTick((k) => k + 1), Math.max(0, flash.at + COPY_FLASH_MS - Date.now()))
+    return () => clearTimeout(t)
+  }, [flash])
+
   if (!st.ready) return null
+  firstCount.current ??= st.chatMsgs.length
+  // A transcript replaced by a shorter one — a new conversation: its rows are new rows.
+  if (st.chatMsgs.length < freshLen.current) {
+    freshMemo.current.clear()
+    firstCount.current = st.chatMsgs.length
+  }
+  freshLen.current = st.chatMsgs.length
+
+  const notReady = shownNotReady(st.chatMsgs, notReadyLine(st.hasKey, st.hasModel))
+  const noKey = st.hasKey === false
+  const presence = presenceOf({ hasKey: st.hasKey, busy: st.chatBusy, toolRan: !!timeline && timeline.tool !== null, end: st.chatEnd })
+  const newest = newestVee(st.chatMsgs, live, notReady !== null)
+  const hideSuggest = notReadyLine(st.hasKey, st.hasModel) !== null
+  const now = Date.now()
+  const flashOn = flash && flash.ok !== null && now < flash.at + COPY_FLASH_MS ? flash : null
+  /** The user's row the trace lifts the typed line into: it does not also pop. */
+  const lifted = timeline ? trace.index - 1 : -1
 
   /** `:2013` — Enter sends, Shift+Enter does not. During a turn the main window's `sendChat` does nothing. */
   const onChatKey = (e: React.KeyboardEvent): void => {
@@ -610,314 +1289,175 @@ export default function ChatPanel(): React.JSX.Element | null {
     } else if (act === 'send') post({ type: 'send', text: st.chatInput })
   }
 
-  /** One row of the transcript: a message, or — `message` null — the reply being written. */
-  const row = (message: VeeMessage | null, i: number): React.JSX.Element => {
-    const m = message ? viewRow(message, i, st.units) : null
-    /** Where an act on this message is sent: its place, and the identity the snapshot gave it. */
-    const at = message ? { index: i, msg: message.id } : null
-    const look = m ?? LIVE_ROW
-    const mine = message?.role === 'user'
-    /** A turn's reply — written, or being written: the trace's bubble, and a status by the name. */
-    const traced = !message || !!m?.traced
-    const owned = traced && drawn(i)
-    return (
-      <div
-        key={i}
-        data-row={i}
-        data-mine={mine ? '' : undefined}
-        // The reply being written is not read out: one hidden line below says Vee is working.
-        aria-hidden={message ? undefined : true}
-        style={s(
-          `display:flex;flex-direction:column;align-items:${m ? m.align : 'flex-start'};gap:4px;opacity:${m ? m.opacity : '1'}`
-        )}
-      >
-        <div
-          data-part="label"
-          style={s(
-            `display:flex;align-items:center;justify-content:${m ? m.just : 'flex-start'};gap:7px;padding:0 3px`
-          )}
-        >
-          {traced ? (
-            // The reply's mascot pops in with its row, about a point just under its middle.
-            <span data-part="sprite" style={s('display:flex;transform-origin:50% 60%')}>
-              <Vee
-                slot={VEE_SLOT.label}
-                margin={VEE_MARGIN.label}
-                offset={veeLabelOffset(i)}
-                state={owned ? vee : veeStateOf(st.chatMsgs, i)}
-              />
-            </span>
-          ) : m?.hasSprite ? (
-            <Vee slot={VEE_SLOT.label} margin={VEE_MARGIN.label} offset={veeLabelOffset(i)} />
-          ) : null}
-          <span style={s('font:500 10px/1 var(--sans);letter-spacing:.02em;color:var(--faint)')}>
-            {look.who}
-          </span>
-          {traced ? <TraceStatus text={m ? m.status : ''} rolling={owned} /> : null}
-          {message ? (
-            <button
-              onClick={() => {
-                post({ type: 'reply', ...at! })
-                focusComposer()
-              }}
-              data-tip="Reply to this message"
-              className="hv-accent-ink"
-              style={s(
-                'display:flex;align-items:center;gap:4px;font:500 10px/1 var(--sans);color:var(--faint)'
-              )}
-            >
-              <ReplyArrow />
-              reply
-            </button>
-          ) : null}
-          {m?.canRevert ? (
-            <button
-              onClick={() => post({ type: 'revert', ...at! })}
-              data-tip="Undo just this step"
-              className="hv-accent-ink"
-              style={s(
-                'display:flex;align-items:center;gap:4px;font:400 9.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--faint)'
-              )}
-            >
-              <Revert />
-              revert
-            </button>
-          ) : null}
-        </div>
-
-        {m?.hasQuote ? (
-          <span
-            style={s(
-              `display:flex;flex-direction:column;gap:2px;max-width:${m.maxW};padding:5px 9px;border-left:2px solid var(--accent);background:var(--step-bg);border-radius:0 6px 6px 0`
-            )}
-          >
-            <span style={s('font:500 9.5px/1 var(--sans);color:var(--accent-ink)')}>
-              {m.quoteWho}
-            </span>
-            <span
-              style={s(
-                'font:400 11px/1.4 var(--sans);color:var(--muted);display:block;max-height:30px;overflow:hidden'
-              )}
-            >
-              {m.quoteText}
-            </span>
-          </span>
-        ) : null}
-
-        {/* Every message of Vee's is laid out in its blocks — paragraphs, lists, tables
-            (2026-10-08) — and a turn's reply also carries its trace. A user's is plain text. */}
-        {!mine ? (
-          <ReplyBubble
-            text={message ? message.text : null}
-            trace={message?.trace ?? null}
-            owned={owned}
-            // The bubble a trace opens is full width; while the turn runs that is still to be seen.
-            wide={!m || m.wide}
-            base={bubbleStyle(look.fg, look.bg, look.radius, '100%')}
-            onPick={(j) => at && post({ type: 'pick', ...at, what: 'row', j, zoom: false })}
-          />
-        ) : (
-          <span data-part="bubble" style={s(bubbleStyle(m!.fg, m!.bg, m!.radius, m!.maxW))}>
-            {/* A block of its own, so the lifting line can be laid exactly over it. */}
-            <span data-part="text" style={s('display:block')}>
-              {message.text}
-            </span>
-          </span>
-        )}
-
-        {m?.hasChips ? (
-          <div style={s('display:flex;flex-wrap:wrap;gap:5px;align-self:stretch;margin-top:1px')}>
-            {(message!.chips ?? []).map((c, j) => (
-              <button
-                key={`${c.label}-${j}`}
-                onClick={() => post({ type: 'pick', ...at!, what: 'chip', j, zoom: false })}
-                onDoubleClick={() => post({ type: 'pick', ...at!, what: 'chip', j, zoom: true })}
-                data-tip="Click to select · double-click to zoom"
-                style={s(
-                  'font:500 10.5px/1 var(--mono);color:var(--sel-ink);background:var(--sel-bg);border:1px solid var(--accent);border-radius:999px;padding:5px 9px;white-space:nowrap'
-                )}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {m?.hasTable ? (
-          <div
-            style={s(
-              'display:flex;flex-direction:column;align-self:stretch;border:1px solid var(--border);border-radius:8px;overflow:hidden'
-            )}
-          >
-            <div
-              style={s(
-                'display:flex;align-items:center;gap:8px;padding:6px 9px;background:var(--step-bg)'
-              )}
-            >
-              <span
-                style={s(
-                  'flex:1;font:500 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)'
-                )}
-              >
-                {m.tableTitle}
-              </span>
-              <button
-                // `:2029`. The main window's store copies (`copyTable`), and the text is put on the
-                // clipboard here, under this click (`vee/link.ts`): the design's line called the
-                // clipboard API this app always refuses, and copied nothing.
-                onClick={() => post({ type: 'copyCsv', ...at! })}
-                style={s('font:500 10px/1 var(--mono);color:var(--accent-ink)')}
-              >
-                copy csv
-              </button>
-            </div>
-            {m.tableRows.map((r, j) => (
-              <button
-                key={`${r.k}-${j}`}
-                onClick={() => post({ type: 'pick', ...at!, what: 'table', j, zoom: true })}
-                className="hv-step"
-                style={s(
-                  'display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:baseline;padding:5px 9px;border-top:1px solid var(--border)'
-                )}
-              >
-                <span
-                  style={s(
-                    'font:400 11.5px/1.4 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left'
-                  )}
-                >
-                  {r.k}
-                </span>
-                <span
-                  style={s(
-                    'font:400 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)'
-                  )}
-                >
-                  {r.q}
-                </span>
-                <span
-                  style={s(
-                    'font:500 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);min-width:26px;text-align:right'
-                  )}
-                >
-                  {r.n}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {m?.hasPending ? (
-          <div
-            style={s(
-              'display:flex;flex-direction:column;align-self:stretch;gap:8px;padding:9px 10px;background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:8px'
-            )}
-          >
-            <span
-              style={s('font:400 11.5px/1.45 var(--sans);color:var(--warn-ink);text-wrap:pretty')}
-            >
-              {m.pendingLabel}
-            </span>
-            <div style={s('display:flex;align-items:center;gap:8px')}>
-              <button
-                // The user's click on Apply, for the request this row shows — and nothing else.
-                onClick={() => post({ type: 'apply', ...at!, pending: message!.pending!.id })}
-                className="hv-card"
-                style={s(
-                  'font:500 11px/1 var(--sans);color:var(--warn-ink);padding:5px 11px;border:1px solid var(--warn-line);border-radius:999px'
-                )}
-              >
-                apply
-              </button>
-              <button
-                onClick={() => post({ type: 'cancel', ...at!, pending: message!.pending!.id })}
-                style={s('font:500 11px/1 var(--sans);color:var(--muted);padding:5px 6px')}
-              >
-                cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    )
+  const ctx: RowContext = {
+    units: st.units,
+    msgs: st.chatMsgs,
+    board: st.board,
+    timeline,
+    traceIndex: trace.index,
+    drawn,
+    vee,
+    newest,
+    flash: flashOn,
+    fresh: (i, role) => freshRow(freshMemo.current, i, role, firstCount.current ?? 0, lifted)
   }
+  const row = (message: VeeMessage | null, i: number): React.JSX.Element => (
+    <MessageRow key={i} {...rowProps(ctx, message, i)} />
+  )
+
+  /** The thread: a day separator over each day's first message, and every row. */
+  const thread: React.JSX.Element[] = []
+  let day = ''
+  st.chatMsgs.forEach((message, i) => {
+    if (message.at !== undefined) {
+      const label = dayLabel(message.at, now)
+      if (label !== day) {
+        day = label
+        thread.push(
+          <div key={`day-${i}`} className="vm-day">
+            {label}
+          </div>
+        )
+      }
+    }
+    thread.push(row(message, i))
+  })
+  // One keyed list: the reply being written has the key its message will have, so the row that
+  // commits is the row that was live — the same element, and nothing in it starts again.
+  if (live) thread.push(row(null, st.chatMsgs.length))
+
+  const end = st.chatEnd ? endLine(st.chatEnd) : null
+  const board = st.hasModel === false ? null : st.board
+  const line = board ? boardLine(board) : null
 
   return (
-    <div
-      ref={panel}
-      // The window is the panel: it fills it (2026-11-07). The design's string from `display` on.
-      style={s('position:fixed;inset:0;display:flex;flex-direction:column;background:var(--card)')}
-    >
-
-      <div
-        style={s(
-          'display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--border)'
-        )}
-      >
-        <Vee slot={VEE_SLOT.header} margin={VEE_MARGIN.header} offset={VEE_OFFSET.header} />
-        <span
-          id="sgvue-chat-title"
-          style={s(
-            'flex:1;font:600 11px/1 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)'
-          )}
-        >
-          Ask Vee
+    <div ref={panel} className="vm">
+      <header className="vm-hd">
+        <span className="vm-face">
+          <Vee
+            slot={VEE_FACE.slot}
+            margin="0px"
+            mult={VEE_FACE.mult}
+            offset={VEE_OFFSET.header}
+            state={st.chatBusy ? (live ? vee : 'thinking') : 'idle'}
+          />
         </span>
-        <button
-          onClick={() => post({ type: 'close' })}
-          aria-label="Close"
-          className="hv-step-ink"
-          style={s(
-            'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--faint)'
-          )}
+        <div className="vm-who">
+          <span className="vm-nm" id="sgvue-chat-title">
+            {ASSISTANT}
+          </span>
+          <span data-role="vee-presence" className={`vm-pr vm-${presence.mode}`}>
+            <i aria-hidden="true" />
+            <span>{presence.word}</span>
+          </span>
+        </div>
+        <span className={st.chatBusy ? 'vm-sq vm-on' : 'vm-sq'} aria-hidden="true">
+          <b />
+          <b />
+          <b />
+        </span>
+      </header>
+
+      {board && line ? (
+        <div data-role="vee-board" className={line.iso ? 'vm-board vm-iso' : 'vm-board'} title="What the 3D view shows now">
+          {line.iso ? <BoardEyeOff /> : <BoardEye />}
+          <span className="vm-board-txt">
+            {line.lead.before ? null : 'All '}
+            <b>{line.lead.strong}</b>
+            {line.lead.text}
+            {line.sel ? (
+              <>
+                {' · '}
+                <em>{line.sel}</em>
+              </>
+            ) : null}
+            {line.rest.map((r, k) => (
+              <Fragment key={k}>
+                {' · '}
+                {r}
+              </Fragment>
+            ))}
+          </span>
+          {board.view ? <span className="vm-vw">{board.view}</span> : null}
+        </div>
+      ) : null}
+
+      <div className="vm-tw">
+        <div
+          data-role="chatlog"
+          ref={log}
+          role="log"
+          // Each new reply is said once, by the live region below — not every bubble and card.
+          aria-live="off"
+          aria-labelledby="sgvue-chat-title"
+          onScroll={(e) => {
+            const node = e.currentTarget
+            stuck.current = node.scrollHeight - node.scrollTop - node.clientHeight < 2
+            if (stuck.current && unread) setUnread(0)
+          }}
+          className="vm-thread"
         >
-          <Cross size={13} weight={1.8} />
-        </button>
-      </div>
+          {thread}
 
-      <div
-        data-role="chatlog"
-        ref={log}
-        role="log"
-        aria-live="polite"
-        aria-labelledby="sgvue-chat-title"
-        onScroll={(e) => {
-          const node = e.currentTarget
-          stuck.current = node.scrollHeight - node.scrollTop - node.clientHeight < 2
-        }}
-        style={s(
-          'flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;display:flex;flex-direction:column;gap:9px;padding:12px'
-        )}
-      >
-        {/* One keyed list: the reply being written has the key its message will have, so the
-            row that commits is the row that was live — the same element, and nothing in it
-            starts again. */}
-        {[...st.chatMsgs.map(row), ...(live ? [row(null, st.chatMsgs.length)] : [])]}
+          {notReady !== null ? (
+            <div key="nr" data-role="vee-not-ready" className="vm-grp vm-vee">
+              <span className="vm-av" data-part="sprite">
+                <Vee
+                  slot={VEE_AVATAR.slot}
+                  margin="0px"
+                  mult={VEE_AVATAR.mult}
+                  offset={veeLabelOffset(st.chatMsgs.length)}
+                  state="idle"
+                  still={newest !== 'nr'}
+                />
+              </span>
+              <div className="vm-stack">
+                <div className="vm-b">{notReady}</div>
+              </div>
+            </div>
+          ) : st.chatMsgs.length === 0 && !hideSuggest ? (
+            <span style={s('font:400 12px/1.55 var(--sans);color:var(--faint);text-wrap:pretty')}>{EMPTY_COPY}</span>
+          ) : null}
 
-        {st.chatMsgs.length === 0 ? (
-          <span style={s('font:400 12px/1.55 var(--sans);color:var(--faint);text-wrap:pretty')}>
-            {EMPTY_COPY}
-          </span>
-        ) : null}
-
-        {st.chatErr ? (
-          <span
-            style={s(
-              'font:400 11.5px/1.5 var(--sans);color:var(--warn-ink);background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:7px;padding:7px 9px'
-            )}
+          {end && st.chatEnd ? (
+            <div data-role="vee-system" className="vm-sys" title={st.chatEnd.message || undefined}>
+              {st.chatEnd.kind === 'stopped' ? <StopCross /> : <NoSignal />}
+              <span>{end.text}</span>
+              {end.retry && !st.chatBusy ? (
+                <button type="button" className="vm-again" onClick={() => post({ type: 'retry' })}>
+                  Try again
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {st.chatErr && st.chatErr !== st.chatEnd?.message ? (
+            <div data-role="vee-system" className="vm-sys">
+              <span>{st.chatErr}</span>
+            </div>
+          ) : null}
+        </div>
+        {unread > 0 ? (
+          <button
+            type="button"
+            className="vm-newpill"
+            onClick={() => {
+              stuck.current = true
+              setUnread(0)
+              if (log.current) log.current.scrollTop = log.current.scrollHeight
+            }}
           >
-            {st.chatErr}
-          </span>
+            <DownArrow />
+            <span>{unread === 1 ? 'New message' : `${unread} new messages`}</span>
+          </button>
         ) : null}
-
-        {/* What a screen reader hears of a running turn; the trace itself is not read out. */}
-        <span className="sr-only">{st.chatBusy ? `${ASSISTANT} is working on it.` : ''}</span>
       </div>
 
-      <div
-        style={s(
-          'display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--border)'
-        )}
-      >
+      {/* What a screen reader hears: that a turn is running, then each new reply of Vee's, once. */}
+      <span className="sr-only" aria-live="polite" data-role="vee-announce">
+        {announcement(st.chatMsgs, st.chatBusy)}
+      </span>
+
+      <div className="vm-dock">
         {reply.replying ? (
           <div
             style={s(
@@ -939,6 +1479,7 @@ export default function ChatPanel(): React.JSX.Element | null {
             <button
               onClick={() => post({ type: 'unreply' })}
               title="Cancel reply"
+              aria-label="Cancel reply"
               className="hv-card-ink"
               style={s(
                 'flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:5px;color:var(--faint)'
@@ -949,40 +1490,41 @@ export default function ChatPanel(): React.JSX.Element | null {
           </div>
         ) : null}
 
-        <SuggestRow
-          items={st.suggestions}
-          onPick={(t) => {
-            useVee.setState({ chatInput: t })
-            post({ type: 'suggest', text: t })
-          }}
-        />
+        {!hideSuggest ? (
+          <SuggestRow
+            items={st.suggestions}
+            onPick={(t) => {
+              useVee.setState({ chatInput: t })
+              post({ type: 'suggest', text: t })
+            }}
+          />
+        ) : null}
 
-        <div style={s('display:flex;align-items:flex-end;gap:8px')}>
+        <div className="vm-cmp">
           <input
             data-role="chatinput"
             type="text"
             value={st.chatInput}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onChatKey}
-            aria-labelledby="sgvue-chat-title"
-            placeholder="How many doors on L2?"
-            style={s(
-              'flex:1;min-width:0;font:400 12.5px/1.4 var(--sans);color:var(--ink);background:var(--step-bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px'
-            )}
+            aria-label="Message Vee"
+            // Not ready for want of a key: the composer is there but cannot be used, and says
+            // nothing itself — the line above says what to do.
+            disabled={noKey}
+            placeholder={noKey ? '' : PLACEHOLDER}
           />
           {/* While a turn runs the same button stops it: its arrow cross-fades to a stop square. */}
           <button
+            type="button"
             data-part="send"
             onClick={onSendClick}
             data-tip={st.chatBusy ? 'Stop' : 'Send (Enter)'}
             aria-label={st.chatBusy ? 'Stop' : 'Send (Enter)'}
-            className="hv-accent-ground"
-            style={s(
-              'flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--sel-bg);color:var(--sel-ink);border:1px solid var(--accent)'
-            )}
+            disabled={noKey}
+            className="vm-key hv-accent-ground"
           >
             <span data-part="send-arrow" style={s('display:flex')}>
-              <SendArrow />
+              <SendUp />
             </span>
             <span
               data-part="send-stop"
@@ -1003,7 +1545,7 @@ export default function ChatPanel(): React.JSX.Element | null {
         <span
           data-part="lift"
           style={s(
-            'position:absolute;display:none;font:400 12.5px/1.55 var(--sans);color:var(--ink);text-wrap:pretty'
+            'position:absolute;display:none;font:400 13px/1.42 var(--sans);color:var(--ink);text-wrap:pretty'
           )}
         />
       </div>

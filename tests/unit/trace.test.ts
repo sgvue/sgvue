@@ -13,29 +13,40 @@
  * Then what the handoff leaves open and the brief fixes: the cue mapping from real events, the
  * answer that is never delayed, steps that pile up, bucketing on a large model, whole device
  * pixels, reduced motion, and what a finished reply keeps.
+ *
+ * **2026-11-08 ("Vee Messages", stage 1b): the handoff is the specification up to its Answer cue
+ * only.** From the answer on, the app's own answer phase (spike 4, `answerFrame`) replaces the
+ * handoff's — the narration folds into one line and the reply's parts land, all within half a
+ * second — and the trace's own animations are simply at their end. So the comparisons against the
+ * jsx run until the answer; what follows it is checked against the new phase's rules: the answer
+ * is never delayed, everything queued is at its end at `done`, nothing animates for ever, and the
+ * parts land ≤ 110 ms apart on whole device pixels. The ticker is a list now (the diary): every
+ * step the turn has shown stays, ticked once the next has begun, with the ticker's own counts.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  answerHeight,
+  ANSWER_TOTAL_S,
+  answerEnd,
+  answerFrame,
   answerRows,
   beamAt,
   columnsIn,
-  flyStagger,
+  foldText,
   H_THINK,
   J,
+  MATRIX_BAND,
   MATRIX_TOP,
   MOTION,
+  PART_STAGGER_MAX_S,
+  partStagger,
+  planWidth,
   ROW_CELLS,
-  ROW_H,
-  rowCells,
   rowLayout,
-  rowTop,
   STEP_S,
   TRACE_PALETTE,
   traceCues,
-  traceEnd,
   traceFrame,
   traceLattice,
   traceNextCue,
@@ -43,13 +54,14 @@ import {
   traceSend,
   traceStatus,
   traceSummary,
-  wordStagger,
   type CellRole,
+  type DiaryStep,
   type Timeline,
   type TraceCell,
   type TraceEvent,
   type TraceFrame,
-  type TraceLayout
+  type TraceLayout,
+  type WidthHold
 } from '../../src/renderer/ai/trace'
 import { readFacts, toolFacts, type ToolFacts } from '../../src/renderer/ai/trace-facts'
 import type { Rule } from '../../src/shared/rules'
@@ -217,6 +229,10 @@ const SAMPLES = (() => {
   for (let T = CUES.Send - 0.31; T < CUES.Hold + 1.2; T += 0.0371) out.push(T)
   return out
 })()
+/** The samples the handoff is still the specification for: until its Answer cue (stage 1b). */
+const BEFORE = SAMPLES.filter((T) => T < CUES.Answer)
+/** A diary step as text: its label, its mono, and its count. */
+const stepText = (st: DiaryStep): string => `${st.label}${st.mono}${st.count ? ` · ${st.count.text} ${st.count.unit}` : ''}`
 
 const frameAt = (T: number, layout = REF_LAYOUT): TraceFrame => traceFrame(SCENE, T, layout)
 
@@ -271,9 +287,9 @@ describe('the handoff’s scene, driven by events', () => {
    * which is what the handoff's README describes. Those cells are compared in everything but
    * colour until the Filter cue.
    */
-  it('draws the reference’s cells: place, size, scale, opacity, colour and ring', () => {
+  it('draws the reference’s cells until its Answer: place, size, scale, opacity, colour and ring — then holds them at their end', () => {
     let compared = 0
-    for (const T of SAMPLES) {
+    for (const T of BEFORE) {
       const want = referenceCells(T).sort(byPlace)
       const got = frameAt(T).cells.map(drawn).sort(byPlace)
       expect([T, got.length]).toEqual([T, want.length])
@@ -291,6 +307,13 @@ describe('the handoff’s scene, driven by events', () => {
       })
     }
     expect(compared).toBeGreaterThan(20_000)
+    // From the answer on the matrix is the Check's end, and nothing of it moves again: the nine
+    // findings lit, the other 77 walls dimmed, each in its place in the filter grid.
+    const end = frameAt(CUES.Answer).cells
+    expect(end).toHaveLength(86)
+    expect(end.filter((c) => c.a === 'hit' && c.scale === 1 && c.ring === -1)).toHaveLength(9)
+    expect(end.filter((c) => c.a === 'dim' && c.t === 0)).toHaveLength(77)
+    for (const T of SAMPLES.filter((t) => t >= CUES.Answer)) expect([T, frameAt(T).cells]).toEqual([T, end])
   }, 20_000) // the whole matrix at every sample: ~1.3 s alone, past vitest's 5 s default at full parallelism on a busy PC or a slower CI runner
 
   it('spot-checks the two grids and the rows against the reference’s formulas ÷ 1.5', () => {
@@ -318,81 +341,74 @@ describe('the handoff’s scene, driven by events', () => {
       expect([k, !!found]).toEqual([k, true])
       expect(found!.size).toBeCloseTo(R.SIZE_B / 1.5, 9)
     }
-    // Done: nine cells of 10 ÷ 1.5 px at a 14 ÷ 1.5 pitch, 44 ÷ 1.5 from the text's edge, each
-    // row's 8 ÷ 1.5 px under its top.
+    // Done: the nine findings stay where the beam lit them, in the filter grid — no cell flies
+    // into rows since stage 1b: the rows are a card of their own.
     const done = frameAt(CUES.Hold).cells
-    expect(done).toHaveLength(9)
-    R.FLAGGED.forEach((_, f) => {
-      const x = (61 - R.MX + R.FLAG_SLOT[f] * 14) / 1.5
-      const y = (R.ROW_Y0 + R.FLAG_LEVEL[f] * R.ROW_H + 8) / 1.5
-      const found = cellAt(done, x, y)
-      expect([f, !!found]).toEqual([f, true])
-      expect(found).toMatchObject({ a: 'hit', b: 'hit', opacity: 1, scale: 1, ring: -1 })
-      expect(found!.size).toBeCloseTo(10 / 1.5, 9)
-    })
-    expect(rowTop(REF_LAYOUT.textH, 0)).toBeCloseTo(R.ROW_Y0 / 1.5, 9)
-    expect(ROW_H).toBeCloseTo(R.ROW_H / 1.5, 12)
+    expect(done).toHaveLength(86)
+    for (const k of R.FLAGGED) {
+      const c = R.CELLS[R.WALLS[k]]
+      expect(cellAt(done, c.xB! / 1.5, (c.yB! + R.MY) / 1.5)).toMatchObject({ a: 'hit', b: 'hit', opacity: 1, scale: 1, ring: -1 })
+    }
     expect(MATRIX_TOP).toBeCloseTo(R.MY / 1.5, 12)
+    // The diary's canvas is the old bubble's band the matrix stood in: the beam's top to its foot.
+    expect(MATRIX_BAND).toEqual({ top: MATRIX_TOP - J(6), height: expect.closeTo(H_THINK - MATRIX_TOP + J(6), 9) })
+    for (const c of [...frameAt(CUES.Filter - 0.01).cells, ...done]) {
+      expect(c.y).toBeGreaterThanOrEqual(MATRIX_BAND.top)
+      expect(c.y + c.size).toBeLessThanOrEqual(MATRIX_BAND.top + MATRIX_BAND.height)
+    }
   })
 
-  it('opens the bubble 0 → 52 px, then glides it to the answer’s height', () => {
-    const { p, lerp, clamp, MOTION: M } = R
-    for (const T of SAMPLES) {
+  it('shows typing dots from Think, then opens the diary at Read, fading in as the reference’s bubble did', () => {
+    const { p, clamp, MOTION: M } = R
+    for (const T of BEFORE) {
       const bIn = p(T, CUES.Read, 0.45, M.enter)
-      const bGrow = p(T, CUES.Answer + 0.15, 0.7, M.glide)
       const f = frameAt(T)
-      expect([T, f.bubble.height]).toEqual([T, expect.closeTo(lerp(lerp(0, 78, bIn), R.H_ANSWER, bGrow) / 1.5, 6)])
-      expect([T, f.bubble.opacity]).toEqual([T, expect.closeTo(clamp(bIn * 1.6, 0, 1), 6)])
-      expect(f.bubble.wide).toBe(true)
+      expect([T, f.bubble]).toEqual([T, { wide: true, opacity: expect.closeTo(clamp(bIn * 1.6, 0, 1), 6) }])
+      expect([T, f.dots]).toEqual([T, T >= CUES.Think && T < CUES.Read])
     }
-    expect(frameAt(CUES.Read - 0.2).bubble.height).toBe(0)
-    expect(frameAt(CUES.Filter).bubble.height).toBeCloseTo(52, 9)
+    expect(frameAt(CUES.Hold).bubble).toEqual({ wide: true, opacity: 1 })
+    expect(frameAt(CUES.Hold).dots).toBe(false)
     expect(H_THINK).toBeCloseTo(52, 12)
-    expect(frameAt(CUES.Hold).bubble.height).toBeCloseTo(130, 9)
-    expect(answerHeight(REF_LAYOUT.textH, 4)).toBeCloseTo(R.H_ANSWER / 1.5, 9)
   })
 
-  it('rolls the ticker through Reading, Filtering and Checking, with the reference’s counts', () => {
+  it('lists Reading, Filtering and Checking as the diary’s steps, with the reference’s counts, each ticked once the next begins', () => {
     const { p, lin, lerp, MOTION: M } = R
-    const roll = (T: number, tin: number, tout: number | null): { y: number; opacity: number } | null => {
-      const a = p(T, tin, 0.42, M.enter)
-      const b = tout == null ? 0 : p(T, tout, 0.32, M.enter)
-      return a <= 0 || b >= 1 ? null : { y: ((1 - a) * 22 - b * 22) / 1.5, opacity: a * (1 - b) }
-    }
-    for (const T of SAMPLES) {
+    for (const T of BEFORE) {
       const n1 = Math.round(412 * lin(T, CUES.Read + 0.35, 1.1))
       const n2 = Math.round(lerp(412, 86, p(T, CUES.Filter + 0.15, 0.9, M.enter)))
       const missing = R.FLAGGED.filter((k) => T >= R.beamAt(CUES, R.CELLS[R.WALLS[k]].xB! + R.SIZE_B / 2)).length
       const want = [
-        { r: roll(T, CUES.Read + 0.1, CUES.Filter), label: 'Reading 4 models', mono: '', n: n1, unit: n1 === 1 ? 'element' : 'elements', accent: false },
-        { r: roll(T, CUES.Filter, CUES.Check), label: 'Filtering ', mono: 'IfcWall', n: n2, unit: 'walls', accent: false },
-        { r: roll(T, CUES.Check, null), label: 'Checking Fire Rating', mono: '', n: missing, unit: 'missing', accent: missing > 0 }
-      ].filter((w) => w.r)
+        { at: CUES.Read, roll: CUES.Read + 0.1, label: 'Reading 4 models', mono: '', n: n1, unit: n1 === 1 ? 'element' : 'elements', accent: false, next: CUES.Filter },
+        { at: CUES.Filter, roll: CUES.Filter, label: 'Filtering ', mono: 'IfcWall', n: n2, unit: 'walls', accent: false, next: CUES.Check },
+        { at: CUES.Check, roll: CUES.Check, label: 'Checking Fire Rating', mono: '', n: missing, unit: 'missing', accent: missing > 0, next: Infinity }
+      ].filter((w) => T >= w.at)
       const f = frameAt(T)
-      expect([T, f.ticker.opacity]).toEqual([T, expect.closeTo(1 - p(T, CUES.Answer, 0.28, M.enter), 6)])
-      if (f.ticker.opacity <= 0) continue
-      expect([T, f.ticker.lines.map((l) => l.label + l.mono)]).toEqual([T, want.map((w) => w.label + w.mono)])
-      f.ticker.lines.forEach((line, i) => {
+      expect([T, f.steps.map((l) => l.label + l.mono)]).toEqual([T, want.map((w) => w.label + w.mono)])
+      f.steps.forEach((step, i) => {
         const w = want[i]
-        expect([T, line.y]).toEqual([T, expect.closeTo(w.r!.y, 6)])
-        expect([T, line.opacity]).toEqual([T, expect.closeTo(w.r!.opacity, 6)])
-        expect([T, line.count]).toEqual([T, { n: w.n, text: String(w.n), unit: w.unit, accent: w.accent }])
+        const a = p(T, w.roll, 0.42, M.enter)
+        expect([T, step.y]).toEqual([T, expect.closeTo((1 - a) * 8, 6)])
+        expect([T, step.opacity]).toEqual([T, expect.closeTo(a, 6)])
+        expect([T, step.done]).toEqual([T, T >= w.next])
+        expect([T, step.count]).toEqual([T, { n: w.n, text: String(w.n), unit: w.unit, accent: w.accent }])
       })
     }
     // Chosen instants, in words.
-    const said = (T: number): string =>
-      frameAt(T).ticker.lines.map((l) => `${l.label}${l.mono} · ${l.count!.text} ${l.count!.unit}`).join(' | ')
+    const said = (T: number): string => frameAt(T).steps.map(stepText).join(' | ')
     expect(said(CUES.Read + 0.9)).toBe('Reading 4 models · 206 elements')
     expect(said(CUES.Filter - 0.1)).toBe('Reading 4 models · 412 elements')
-    expect(said(CUES.Filter + 1.2)).toBe('Filtering IfcWall · 86 walls')
-    expect(said(CUES.Check + 0.35)).toBe('Checking Fire Rating · 0 missing')
-    expect(said(CUES.Check + 2.3)).toBe('Checking Fire Rating · 9 missing')
-    // Two lines only while one rolls out under the other.
-    expect(frameAt(CUES.Filter + 0.1).ticker.lines.map((l) => l.label)).toEqual(['Reading 4 models', 'Filtering '])
-    expect(frameAt(CUES.Check + 0.1).ticker.lines.map((l) => l.label)).toEqual(['Filtering ', 'Checking Fire Rating'])
+    expect(said(CUES.Filter + 1.2)).toBe('Reading 4 models · 412 elements | Filtering IfcWall · 86 walls')
+    expect(said(CUES.Check + 0.35)).toBe('Reading 4 models · 412 elements | Filtering IfcWall · 86 walls | Checking Fire Rating · 0 missing')
+    expect(said(CUES.Check + 2.3)).toMatch(/Checking Fire Rating · 9 missing$/)
     // The number lights only once it is above 0.
-    expect(frameAt(CUES.Check + 0.35).ticker.lines[0].count!.accent).toBe(false)
-    expect(frameAt(CUES.Check + 1.0).ticker.lines[0].count!.accent).toBe(true)
+    expect(frameAt(CUES.Check + 0.35).steps[2].count!.accent).toBe(false)
+    expect(frameAt(CUES.Check + 1.0).steps[2].count!.accent).toBe(true)
+    // At the answer every step is ticked, at its end, and in place.
+    expect(frameAt(CUES.Answer).steps.map((st) => [stepText(st), st.done, st.y, st.opacity])).toEqual([
+      ['Reading 4 models · 412 elements', true, 0, 1],
+      ['Filtering IfcWall · 86 walls', true, 0, 1],
+      ['Checking Fire Rating · 9 missing', true, 0, 1]
+    ])
   })
 
   it('sweeps the beam left to right in 1.7 s, 6 ÷ 1.5 px beyond either side', () => {
@@ -435,45 +451,42 @@ describe('the handoff’s scene, driven by events', () => {
     expect(frameAt(CUES.Hold + 5).sprite.state).toBe('done')
   })
 
-  it('brings the author row, the sprite and the status in as the reference does', () => {
+  it('brings the sprite in as the reference does, and shimmers `Thinking` beside the seconds until the answer', () => {
     const { p, clamp, MOTION: M } = R
-    const roll = (a: number, b: number): { y: number; opacity: number } | null =>
-      a <= 0 || b >= 1 ? null : { y: ((1 - a) * 20 - b * 20) / 1.5, opacity: a * (1 - b) }
     for (const T of SAMPLES) {
       const f = frameAt(T)
-      const lblIn = p(T, CUES.Think, 0.4, M.enter)
       const hexIn = p(T, CUES.Think, 0.5, M.pop)
-      expect([T, f.label.opacity]).toEqual([T, expect.closeTo(lblIn, 6)])
-      expect([T, f.label.y]).toEqual([T, expect.closeTo(((1 - lblIn) * 6) / 1.5, 6)])
       expect([T, f.sprite.scale]).toEqual([T, expect.closeTo(hexIn, 6)])
       expect([T, f.sprite.opacity]).toEqual([T, expect.closeTo(clamp(hexIn, 0, 1), 6)])
-      const thinking = roll(p(T, CUES.Think + 0.15, 0.42, M.enter), p(T, CUES.Answer, 0.32, M.enter))
-      const final = roll(p(T, CUES.Answer + 0.26, 0.42, M.enter), 0)
-      for (const [name, got, want] of [['thinking', f.status.thinking, thinking], ['final', f.status.final, final]] as const) {
-        if (!want) expect([T, name, got]).toEqual([T, name, null])
-        else expect([T, name, got]).toEqual([T, name, { y: expect.closeTo(want.y, 6), opacity: expect.closeTo(want.opacity, 6) }])
-      }
-      // The shimmer sweeps once every 1.6 s for as long as `Thinking` shows.
-      if (thinking && T > CUES.Think) expect([T, f.status.shimmer]).toEqual([T, expect.closeTo(((T - CUES.Think) / 1.6) % 1, 9)])
-      else expect([T, f.status.shimmer]).toEqual([T, null])
+      // The shimmer sweeps once every 1.6 s for as long as the turn runs.
+      if (T > CUES.Think && T < CUES.Answer) expect([T, f.thinking.shimmer]).toEqual([T, expect.closeTo(((T - CUES.Think) / 1.6) % 1, 9)])
+      else expect([T, f.thinking.shimmer]).toEqual([T, null])
+      // The seconds since Send, whole; held at the answer.
+      expect([T, f.thinking.seconds]).toEqual([T, Math.max(0, Math.floor(Math.min(T, CUES.Answer) - CUES.Send))])
     }
     // The pop overshoots: Vee is larger than life for a moment as it arrives.
     expect(Math.max(...SAMPLES.map((T) => frameAt(T).sprite.scale))).toBeGreaterThan(1.05)
   })
 
-  it('reveals the answer word by word and the rows from the left, as the reference does', () => {
+  it('lands the reply’s parts at the answer: ≤ 110 ms apart, all in under 0.5 s, the diary folding in 0.22 s', () => {
     const { p, MOTION: M } = R
-    for (const T of SAMPLES) {
-      const f = frameAt(T)
-      if (T < CUES.Answer) {
-        expect([T, f.words, f.rows, f.rule]).toEqual([T, [], [], 0])
-        continue
+    for (const n of [1, 3, 5]) {
+      for (const T of SAMPLES) {
+        const a = answerFrame(SCENE, T, n, { dpr: null, reduced: false })
+        if (T < CUES.Answer) {
+          expect([T, a.fold, a.parts.every((q) => q.opacity === 0 && q.y === 6), a.settled]).toEqual([T, 0, true, false])
+          continue
+        }
+        expect([T, a.fold]).toEqual([T, expect.closeTo(p(T, CUES.Answer, 0.22, M.enter), 9)])
+        a.parts.forEach((q, k) => {
+          const e = p(T, CUES.Answer + k * partStagger(n), 0.24, M.enter)
+          expect([T, k, q.opacity]).toEqual([T, k, expect.closeTo(e, 9)])
+          expect([T, k, q.y]).toEqual([T, k, expect.closeTo((1 - e) * 6, 9)])
+        })
       }
-      expect(f.words).toHaveLength(13)
-      f.words.forEach((a, j) => expect([T, j, a]).toEqual([T, j, expect.closeTo(p(T, CUES.Answer + 0.35 + j * 0.065, 0.36, M.enter), 6)]))
-      f.rows.forEach((a, L) => expect([T, L, a]).toEqual([T, L, expect.closeTo(p(T, CUES.Answer + 0.95 + L * 0.08, 0.4, M.enter), 6)]))
-      expect([T, f.rule]).toEqual([T, expect.closeTo(p(T, CUES.Answer + 0.9, 0.4, M.enter), 6)])
     }
+    expect(partStagger(3)).toBe(PART_STAGGER_MAX_S)
+    expect(partStagger(1)).toBe(0)
   })
 
   it('lifts the question, presses the button and turns it to stop, as the reference does', () => {
@@ -494,30 +507,43 @@ describe('the handoff’s scene, driven by events', () => {
     expect(traceSend(SCENE, CUES.Answer + 0.5, false)).toMatchObject({ busy: 0, settled: true })
   })
 
-  it('says `checked 86 walls` and the seconds the turn really took', () => {
+  it('says `checked 86 walls`, folds to `412 read · 86 walls · 9 missing`, and the seconds the turn really took', () => {
     // 2.6 → 10.8 on the reference's own clock is 8.2 s. (Its still reads `7s`: a drawn string.)
     expect(traceStatus(SCENE)).toBe('checked 86 walls · 8s')
-    expect(frameAt(CUES.Hold).status.text).toBe('checked 86 walls · 8s')
+    expect(foldText(SCENE)).toBe('412 read · 86 walls · 9 missing · 8s')
     expect(traceSummary(SCENE)).toEqual({
       status: 'checked 86 walls · 8s',
       wide: true,
       noun: 'wall',
-      rows: R.LEVELS.map(([label, n]) => ({ label, n, ids: expect.any(Array) }))
+      rows: R.LEVELS.map(([label, n]) => ({ label, n, ids: expect.any(Array) })),
+      fold: '412 read · 86 walls · 9 missing · 8s',
+      steps: [
+        { label: 'Reading 4 models', mono: '', n: 412, unit: 'elements' },
+        { label: 'Filtering ', mono: 'IfcWall', n: 86, unit: 'walls' },
+        { label: 'Checking Fire Rating', mono: '', n: 9, unit: 'missing' }
+      ],
+      title: 'Fire Rating · missing'
     })
     expect(traceSummary(SCENE).rows.flatMap((r) => r.ids)).toHaveLength(9)
   })
 
-  it('stops moving 1.65 s after the answer, and says so', () => {
-    // The last thing to land is the ninth cell: 0.5 + 8 × 0.05 + 0.75 s after the answer.
-    expect(traceEnd(SCENE, 9)).toBeCloseTo(CUES.Answer + 1.65, 9)
-    expect(frameAt(CUES.Answer + 1.64).settled).toBe(false)
-    expect(frameAt(CUES.Answer + 1.66).settled).toBe(true)
-    // Nothing differs between the settled frame and any later one.
-    expect(frameAt(CUES.Answer + 1.66)).toEqual(frameAt(CUES.Answer + 60))
-    // While the turn runs it is never settled: `Thinking` shimmers.
+  it('stops moving under half a second after the answer, and says so', () => {
+    // Five parts: the fifth starts 4 × 0.11 s in and takes 0.24 s — 0.68 s is too long, so the
+    // stagger shrinks to keep all five under 0.5 s.
+    const n = 5
+    expect(answerEnd(SCENE, n) - CUES.Answer).toBeLessThan(ANSWER_TOTAL_S)
+    expect(answerFrame(SCENE, answerEnd(SCENE, n) - 0.001, n, { dpr: 1, reduced: false }).settled).toBe(false)
+    expect(answerFrame(SCENE, answerEnd(SCENE, n), n, { dpr: 1, reduced: false })).toEqual({
+      fold: 1,
+      parts: Array(n).fill({ opacity: 1, y: 0 }),
+      settled: true
+    })
+    // Nothing of the trace differs between the answer and any later instant.
+    expect(frameAt(CUES.Answer + 0.6)).toEqual(frameAt(CUES.Answer + 60))
+    // While the turn runs it is never settled.
     const live = turn([{ type: 'begin', at: 0, read: readFacts(fed) }])
-    expect(traceFrame(live, 500, REF_LAYOUT).settled).toBe(false)
-    expect(traceEnd(live)).toBe(Number.POSITIVE_INFINITY)
+    expect(answerFrame(live, 500, 3, { dpr: 1, reduced: false }).settled).toBe(false)
+    expect(answerEnd(live, 3)).toBe(Number.POSITIVE_INFINITY)
   })
 })
 
@@ -537,8 +563,9 @@ describe('the cues, from real events', () => {
     const none = turn([{ type: 'begin', at: 10, read: READ }])
     expect(traceCues(none)).toMatchObject({ read: null, steps: [], answer: null, last: -1 })
     const f = traceFrame(none, 14, REF_LAYOUT)
-    expect(f.bubble).toEqual({ wide: false, height: 0, opacity: 0 })
-    expect([f.sprite.state, f.cells, f.ticker.lines, f.status.thinking]).toEqual(['thinking', [], [], { y: 0, opacity: 1 }])
+    expect(f.bubble).toEqual({ wide: false, opacity: 0 })
+    // Typing dots, and nothing else.
+    expect([f.sprite.state, f.cells, f.steps, f.dots]).toEqual(['thinking', [], [], true])
     // A tool that ran without announcing itself still opens the trace.
     const quiet = turn([{ type: 'begin', at: 10, read: READ }, { type: 'tool_exec', at: 12, facts: NOTE('get_view_state') }])
     expect(traceCues(quiet).read).toBe(12)
@@ -563,9 +590,18 @@ describe('the cues, from real events', () => {
     ])
     // The note is the busy row's own phrase, capitalised, with no count; the matrix is untouched.
     const f = traceFrame(tl, 5, REF_LAYOUT)
-    expect(f.ticker.lines.map((l) => [l.label, l.mono, l.count])).toEqual([['Reading the file header', '', null]])
+    expect(f.steps.map((l) => [l.label, l.mono, l.count?.n ?? null, l.done])).toEqual([
+      ['Reading 4 models', '', 412, true],
+      ['Reading the file header', '', null, false]
+    ])
     expect(f.cells).toHaveLength(412)
-    expect(traceFrame(tl, 21, REF_LAYOUT).ticker.lines.map((l) => l.label)).toEqual(['Moving the camera'])
+    expect(traceFrame(tl, 21, REF_LAYOUT).steps.map((l) => l.label + l.mono)).toEqual([
+      'Reading 4 models',
+      'Reading the file header',
+      'Filtering IfcWall',
+      'Checking Fire Rating',
+      'Moving the camera'
+    ])
     // …and under a note that follows a Check the matrix stays as the Check left it.
     expect(traceFrame(tl, 21, REF_LAYOUT).cells.filter((c) => c.a === 'hit')).toHaveLength(9)
   })
@@ -604,11 +640,13 @@ describe('the cues, from real events', () => {
     const restart = traceFrame(again, 12.05, REF_LAYOUT)
     expect(restart.cells).toHaveLength(412)
     expect(restart.cells.every((c) => c.scale === 1 && c.opacity === 1 && c.size === J(3.2))).toBe(true)
-    expect(restart.ticker.lines.map((l) => l.label + l.mono)).toEqual(['Checking Fire Rating', 'Filtering STR'])
+    expect(restart.steps.slice(-2).map((l) => l.label + l.mono)).toEqual(['Checking Fire Rating', 'Filtering STR'])
+    // The Check before it keeps its final count in the diary.
+    expect(restart.steps[2].count!.n).toBe(9)
     // 244 elements of STR: more than the 86 the filter grid holds one each, so 3 to a cell.
     const settled = traceFrame(again, 14, REF_LAYOUT)
     expect(settled.cells).toHaveLength(82)
-    expect(settled.ticker.lines[0].count).toEqual({ n: 244, text: '244', unit: 'elements', accent: false })
+    expect(settled.steps.at(-1)!.count).toEqual({ n: 244, text: '244', unit: 'elements', accent: false })
   })
 })
 
@@ -627,34 +665,36 @@ describe('the answer is never delayed by animation', () => {
     const before = traceFrame(SNAP, 4.299, REF_LAYOUT)
     expect(before.cells.some((c) => c.a === 'hit')).toBe(false)
     expect(before.cells.length).toBeGreaterThan(86)
-    expect(before.ticker.lines.map((l) => l.label + l.mono)).toEqual(['Filtering IfcWall'])
-    expect(before.words).toEqual([])
+    expect(before.steps.map((l) => l.label + l.mono)).toEqual(['Reading 4 models', 'Filtering IfcWall'])
+    expect(answerFrame(SNAP, 4.299, 4, { dpr: 1, reduced: false }).parts.every((q) => q.opacity === 0)).toBe(true)
     // At the answer: the Check that never ran is at its end. The nine findings are lit, the
-    // other 77 walls dimmed, each in its place in the filter grid; the ticker has gone on to the
-    // Check with its final count; no beam.
+    // other 77 walls dimmed, each in its place in the filter grid; every step shown is ticked at
+    // its end; no beam.
     const at = traceFrame(SNAP, 4.3, REF_LAYOUT)
     expect(at.cells).toHaveLength(86)
     expect(at.cells.filter((c) => c.a === 'hit' && c.scale === 1 && c.ring === -1)).toHaveLength(9)
     expect(at.cells.filter((c) => c.a === 'dim' && c.t === 0)).toHaveLength(77)
     for (const c of at.cells) expect(c.size).toBeCloseTo(J(7), 9)
     expect(at.beam).toBeNull()
-    expect(at.ticker.lines.map((l) => [l.label, l.count!.n, l.y, l.opacity])).toEqual([['Checking Fire Rating', 9, 0, 1]])
-    expect(at.bubble.height).toBeCloseTo(52, 9)
-    expect(at.bubble.opacity).toBe(1)
-    // …and the answer's own choreography starts there, on the reference's offsets.
+    expect(at.steps.map((l) => [l.label + l.mono, l.count!.n, l.done, l.y, l.opacity])).toEqual([
+      ['Reading 4 models', 412, true, 0, 1],
+      ['Filtering IfcWall', 86, true, 0, 1]
+    ])
+    expect(at.bubble).toEqual({ wide: true, opacity: 1 })
+    // …and the answer's own motion starts there: the first part lands from the answer itself.
     const { p, MOTION: M } = R
-    for (const dt of [0.1, 0.4, 0.8, 1.2]) {
-      const f = traceFrame(SNAP, 4.3 + dt, REF_LAYOUT)
-      expect(f.words[0]).toBeCloseTo(p(dt, 0.35, 0.36, M.enter), 9)
-      expect(f.ticker.opacity).toBeCloseTo(1 - p(dt, 0, 0.28, M.enter), 9)
-      expect(f.rows[0]).toBeCloseTo(p(dt, 0.95, 0.4, M.enter), 9)
+    for (const dt of [0.02, 0.1, 0.2, 0.4]) {
+      const a = answerFrame(SNAP, 4.3 + dt, 4, { dpr: null, reduced: false })
+      expect(a.parts[0].opacity).toBeCloseTo(p(dt, 0, 0.24, M.enter), 9)
+      expect(a.fold).toBeCloseTo(p(dt, 0, 0.22, M.enter), 9)
     }
     expect(traceFrame(SNAP, 4.3 + 0.31, REF_LAYOUT).sprite.state).toBe('done')
     expect(traceStatus(SNAP)).toBe('checked 86 walls · 4s')
-    // The rows are the real ones, whether or not the Check was ever shown.
-    const end = traceFrame(SNAP, 30, REF_LAYOUT)
-    expect(end.cells).toHaveLength(9)
-    expect(end.settled).toBe(true)
+    // The fold says what the last call found, whether or not its Check was ever shown.
+    expect(foldText(SNAP)).toBe('412 read · 86 walls · 9 missing · 4s')
+    // Nothing of the trace moves after the answer: only Vee turns `done`, 0.3 s on.
+    expect({ ...traceFrame(SNAP, 30, REF_LAYOUT), sprite: at.sprite }).toEqual(at)
+    expect(answerFrame(SNAP, 30, 4, { dpr: 1, reduced: false }).settled).toBe(true)
   })
 
   it('answers a turn whose tools all ran in an instant: no Think wait, no Read wait', () => {
@@ -669,11 +709,12 @@ describe('the answer is never delayed by animation', () => {
     expect(cues.read).toBeNull()
     expect(cues.steps).toEqual([])
     const at = traceFrame(tl, 100.004, REF_LAYOUT)
-    expect(at.bubble).toEqual({ wide: true, height: expect.closeTo(52, 9), opacity: 1 })
+    expect(at.bubble).toEqual({ wide: true, opacity: 1 })
     expect(at.cells.filter((c) => c.a === 'hit')).toHaveLength(9)
-    expect(at.ticker.lines.map((l) => l.label)).toEqual(['Checking Fire Rating'])
-    // Settled 1.65 s later, as any answer is.
-    expect(traceFrame(tl, 100.004 + 1.66, REF_LAYOUT).settled).toBe(true)
+    expect(at.steps).toEqual([])
+    // The lift from the composer is what runs longest: settled once it is over, 0.95 s after Send.
+    expect(answerEnd(tl, 3)).toBeCloseTo(100 + 0.95, 9)
+    expect(answerFrame(tl, 100.96, 3, { dpr: 1, reduced: false }).settled).toBe(true)
     expect(traceStatus(tl)).toBe('checked 86 walls · 1s')
   })
 
@@ -693,35 +734,58 @@ describe('a turn with no tool', () => {
   ])
   const layout: TraceLayout = { ...REF_LAYOUT, textH: 58 }
 
-  it('opens no trace bubble: the reply’s own bubble opens at the answer, word by word', () => {
-    const { p, clamp, MOTION: M } = R
-    expect(traceFrame(tl, 3.39, layout).bubble).toEqual({ wide: false, height: 0, opacity: 0 })
-    for (const dt of [0.05, 0.2, 0.44, 1]) {
+  it('opens no diary: typing dots until the answer, then the parts land', () => {
+    expect(traceFrame(tl, 3.39, layout)).toMatchObject({ bubble: { wide: false, opacity: 0 }, dots: true, steps: [], cells: [] })
+    for (const dt of [0, 0.05, 0.2, 1]) {
       const f = traceFrame(tl, 3.4 + dt, layout)
-      const bIn = p(dt, 0, 0.45, M.enter)
-      expect(f.bubble.wide).toBe(false)
-      expect(f.bubble.height).toBeCloseTo(bIn * (8 + 58 + 8), 9)
-      expect(f.bubble.opacity).toBeCloseTo(clamp(bIn * 1.6, 0, 1), 9)
-      expect([f.cells, f.ticker.lines, f.beam, f.rows, f.rule]).toEqual([[], [], null, [], 0])
+      expect([f.bubble, f.dots, f.cells, f.steps, f.beam]).toEqual([{ wide: false, opacity: 0 }, false, [], [], null])
     }
+    expect(answerFrame(tl, 3.4, 2, { dpr: 1, reduced: false }).parts.map((q) => q.opacity)).toEqual([0, 0])
+    expect(answerFrame(tl, 3.45, 2, { dpr: 1, reduced: false }).parts[0].opacity).toBeGreaterThan(0)
     expect(traceStatus(tl)).toBe('3s')
-    expect(traceSummary(tl)).toEqual({ status: '3s', wide: false, rows: [], noun: 'element' })
+    expect(traceSummary(tl)).toEqual({ status: '3s', wide: false, rows: [], noun: 'element', fold: '3s', steps: [] })
     expect(traceFrame(tl, 3.4 + 0.31, layout).sprite.state).toBe('done')
   })
 
-  it('shortens the stagger of a long reply so the whole reveal takes at most 1.6 s', () => {
-    expect(wordStagger(13)).toBe(0.065)
-    expect(wordStagger(20)).toBe(0.065)
-    expect(wordStagger(30)).toBeCloseTo(1.24 / 29, 12)
-    expect(wordStagger(1)).toBe(0)
-    for (const n of [2, 13, 20, 21, 30, 400]) expect((n - 1) * wordStagger(n) + 0.36).toBeLessThanOrEqual(1.6 + 1e-9)
-    const f = traceFrame(tl, 3.4 + 0.35 + 1.6 - 0.001, layout)
-    expect(f.words).toHaveLength(30)
-    expect(f.words[29]).toBeGreaterThan(0.999)
-    // 400 words: every one is in, and the frame is settled, within two seconds of the answer.
-    const long = turn([{ type: 'begin', at: 0, read: READ }, { type: 'done', at: 3.4, words: 400, table: false }])
-    expect(traceEnd(long)).toBeCloseTo(3.4 + 0.35 + 1.6, 9)
-    expect(traceFrame(long, 3.4 + 1.96, layout).settled).toBe(true)
+  it('keeps a reply of any length under half a second: the stagger shrinks to fit', () => {
+    for (const n of [1, 2, 3, 4, 5, 8, 20, 200]) {
+      expect(partStagger(n)).toBeLessThanOrEqual(PART_STAGGER_MAX_S)
+      expect(answerEnd(tl, n) - 3.4).toBeLessThan(ANSWER_TOTAL_S)
+      const end = answerFrame(tl, answerEnd(tl, n), n, { dpr: 1, reduced: false })
+      expect(end.parts.every((q) => q.opacity === 1 && q.y === 0)).toBe(true)
+    }
+    expect(partStagger(5)).toBeCloseTo((0.5 - 0.24 - 0.001) / 4, 12)
+  })
+
+  it('lands every part on whole device pixels, in order, never going back', () => {
+    for (const dpr of [1, 1.25, 1.5, 1.75, 2, 2.5, 3]) {
+      let prev: number[] = []
+      for (let T = 3.39; T < 4; T += 0.007) {
+        const f = answerFrame(tl, T, 6, { dpr, reduced: false })
+        for (const q of f.parts) expect(Math.abs(q.y * dpr - Math.round(q.y * dpr))).toBeLessThan(1e-9)
+        for (let k = 1; k < f.parts.length; k++) expect(f.parts[k].opacity).toBeLessThanOrEqual(f.parts[k - 1].opacity)
+        f.parts.forEach((q, k) => expect(q.opacity).toBeGreaterThanOrEqual(prev[k] ?? 0))
+        prev = f.parts.map((q) => q.opacity)
+      }
+    }
+  })
+
+  it('ends the loop ≤ 1.95 s after `done` for any turn, and ≤ 0.5 s for one that took a second or more', () => {
+    let seed = 12345
+    const rnd = (): number => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+    for (let i = 0; i < 2000; i++) {
+      const toolAt = rnd() * 4
+      const A = Math.max(0.001, toolAt + rnd() * 10)
+      const n = 1 + Math.floor(rnd() * 30)
+      const t = turn([
+        { type: 'begin', at: 0, read: READ },
+        { type: 'tool_start', at: toolAt },
+        { type: 'tool_exec', at: toolAt + 0.2, facts: WALL_FACTS },
+        { type: 'done', at: A, words: 30, table: false }
+      ])
+      expect(answerEnd(t, n) - t.answer!).toBeLessThanOrEqual(1.95)
+      if (t.answer! >= 1) expect(answerEnd(t, n) - t.answer!).toBeLessThan(ANSWER_TOTAL_S)
+    }
   })
 })
 
@@ -786,7 +850,7 @@ describe('a large model: each cell stands for several elements, and every number
     expect(f.cells.filter((c) => c.x === last)).toHaveLength(1)
     // The count beside the matrix is the federation's own — a cell stands for 244, the number
     // for nothing but itself.
-    const said = traceFrame(tl, 3.79, REF_LAYOUT).ticker.lines[0]
+    const said = traceFrame(tl, 3.79, REF_LAYOUT).steps[0]
     expect([said.label, said.count]).toEqual(['Reading 3 models', { n: 100_000, text: '100,000', unit: 'elements', accent: false }])
   })
 
@@ -796,9 +860,9 @@ describe('a large model: each cell stands for several elements, and every number
     const filtered = traceFrame(tl, 5.39, REF_LAYOUT)
     // ceil(2 767 / 86) = 33 to a cell → 84 cells.
     expect(filtered.cells).toHaveLength(Math.ceil(2_767 / 33))
-    expect(filtered.ticker.lines[0].count).toEqual({ n: 2_767, text: '2,767', unit: 'walls', accent: false })
+    expect(filtered.steps.at(-1)!.count).toEqual({ n: 2_767, text: '2,767', unit: 'walls', accent: false })
     // The Check: the count rises cell by cell as the beam passes and ends on the matched size.
-    const counts = [5.45, 5.9, 6.4, 6.9, 7.3, 7.79].map((T) => traceFrame(tl, T, REF_LAYOUT).ticker.lines.at(-1)!.count!.n)
+    const counts = [5.45, 5.9, 6.4, 6.9, 7.3, 7.79].map((T) => traceFrame(tl, T, REF_LAYOUT).steps.at(-1)!.count!.n)
     expect(counts[0]).toBe(0)
     for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeGreaterThanOrEqual(counts[i - 1])
     expect(counts.at(-1)).toBe(395)
@@ -821,24 +885,11 @@ describe('a large model: each cell stands for several elements, and every number
     const largest = Math.max(...rows.map((r) => r.n))
     expect(lay.per).toBe(Math.ceil(largest / lay.cap))
     expect(lay.cap).toBeLessThanOrEqual(ROW_CELLS)
-    // Settled: each row holds `ceil(n / per)` cells, no more than the cap, all the accent.
-    const end = traceFrame(tl, 30, { ...REF_LAYOUT, textH: 40 })
-    expect(end.settled).toBe(true)
-    const perRow = rows.map((_, L) => end.cells.filter((c) => Math.abs(c.y - (rowTop(40, L) + (ROW_H - J(10)) / 2)) < 1e-6))
-    perRow.forEach((cells, L) => {
-      const distinct = new Set(cells.map((c) => c.x.toFixed(4))).size
-      expect([L, distinct]).toEqual([L, Math.ceil(rows[L].n / lay.per)])
-      expect(distinct).toBeLessThanOrEqual(lay.cap)
-    })
-    expect(perRow.flat()).toHaveLength(end.cells.length)
-    expect(end.cells.every((c) => c.b === 'hit' && c.t === 1)).toBe(true)
-    // However many cells fly, their stagger is bounded: all are home 1.95 s after the answer.
-    expect(flyStagger(9)).toBe(0.05)
-    expect(flyStagger(15)).toBeCloseTo(0.05, 12)
-    expect(flyStagger(16)).toBeLessThan(0.05)
-    expect(flyStagger(200) * 199).toBeCloseTo(0.7, 12)
-    expect(traceEnd(tl, 200)).toBeCloseTo(9 + 1.95, 9)
-    expect(traceEnd(tl)).toBeCloseTo(9 + 1.95, 9)
+    // Settled, the matrix is the Check's end in the filter grid: the lit cells hold all 395.
+    const end = traceFrame(tl, 30, REF_LAYOUT)
+    expect(end.cells).toHaveLength(84)
+    expect(end.steps.at(-1)!.count!.n).toBe(395)
+    expect(answerEnd(tl, 6) - 9).toBeLessThan(ANSWER_TOTAL_S)
   })
 })
 
@@ -859,7 +910,7 @@ describe('the layout', () => {
     // 86 walls in 2 × 29: two to a cell.
     expect(traceFrame(SCENE, CUES.Check - 0.01, { ...REF_LAYOUT, width: 192 }).cells).toHaveLength(43)
     // The count does not change with the panel.
-    expect(traceFrame(SCENE, CUES.Check - 0.01, { ...REF_LAYOUT, width: 192 }).ticker.lines[0].count!.n).toBe(86)
+    expect(traceFrame(SCENE, CUES.Check - 0.01, { ...REF_LAYOUT, width: 192 }).steps.at(-1)!.count!.n).toBe(86)
   })
 
   it('rounds the lattice to whole device pixels — at 150 %, the handoff’s own numbers rounded', () => {
@@ -961,50 +1012,57 @@ describe('reduced motion: every state at its end, and nothing in between', () =>
 
   it('shows each state the moment its cue is reached, already settled', () => {
     // Send → Think: nothing yet.
-    expect(at(CUES.Think - 0.01).label.opacity).toBe(0)
     expect(at(CUES.Think - 0.01).sprite.opacity).toBe(0)
-    // Think: the row, the sprite and `Thinking` are simply there — no rise, no pop, no shimmer.
+    expect(at(CUES.Think - 0.01).dots).toBe(false)
+    // Think: the sprite and the dots are simply there — no pop, no shimmer.
     const think = at(CUES.Think)
-    expect([think.label, think.sprite, think.status.thinking, think.status.shimmer]).toEqual([
-      { opacity: 1, y: 0 },
-      { state: 'thinking', scale: 1, opacity: 1 },
-      { y: 0, opacity: 1 },
-      null
-    ])
-    // Read: the bubble open, all 412 cells at rest, the whole count.
+    expect([think.sprite, think.dots, think.thinking.shimmer]).toEqual([{ state: 'thinking', scale: 1, opacity: 1 }, true, null])
+    // Read: the diary open, all 412 cells at rest, the whole count.
     const read = at(CUES.Read)
-    expect(read.bubble).toEqual({ wide: true, height: H_THINK, opacity: 1 })
+    expect(read.bubble).toEqual({ wide: true, opacity: 1 })
+    expect(read.dots).toBe(false)
     expect(read.cells).toHaveLength(412)
     expect(read.cells.every((c) => c.scale === 1 && c.opacity === 1 && c.t === 1 && c.b === 'cell')).toBe(true)
-    expect(read.ticker.lines).toEqual([{ label: 'Reading 4 models', mono: '', count: { n: 412, text: '412', unit: 'elements', accent: false }, y: 0, opacity: 1 }])
+    expect(read.steps).toEqual([
+      { label: 'Reading 4 models', mono: '', count: { n: 412, text: '412', unit: 'elements', accent: false }, done: false, y: 0, opacity: 1 }
+    ])
     expect(read.sprite.state).toBe('reading')
     // Filter: 86 cells in the filter grid, nothing else.
     const filter = at(CUES.Filter)
     expect(filter.cells).toHaveLength(86)
     expect(filter.cells.every((c) => c.size === J(7) && c.b === 'ready' && c.t === 1)).toBe(true)
-    expect(filter.ticker.lines.map((l) => [l.label + l.mono, l.count!.n, l.y, l.opacity])).toEqual([['Filtering IfcWall', 86, 0, 1]])
+    expect(filter.steps.map((l) => [l.label + l.mono, l.count!.n, l.done, l.y, l.opacity])).toEqual([
+      ['Reading 4 models', 412, true, 0, 1],
+      ['Filtering IfcWall', 86, false, 0, 1]
+    ])
     // Check: all nine lit at once, the count whole, no beam; Vee hops once.
     const check = at(CUES.Check)
     expect(check.beam).toBeNull()
     expect(check.cells.filter((c) => c.a === 'hit' && c.scale === 1 && c.ring === -1)).toHaveLength(9)
     expect(check.cells.filter((c) => c.a === 'dim' && c.t === 0)).toHaveLength(77)
-    expect(check.ticker.lines.map((l) => [l.label, l.count])).toEqual([['Checking Fire Rating', { n: 9, text: '9', unit: 'missing', accent: true }]])
+    expect(check.steps.at(-1)).toMatchObject({ label: 'Checking Fire Rating', count: { n: 9, text: '9', unit: 'missing', accent: true } })
     expect(check.sprite.state).toBe('found')
     expect(at(CUES.Check + 0.51).sprite.state).toBe('reading')
-    // Answer: the final state, at once.
+    // Answer: the final state, at once — the diary folded and every part in.
     const answer = at(CUES.Answer)
-    expect(answer.settled).toBe(true)
+    expect(answerFrame(SCENE, CUES.Answer, 4, { dpr: 1, reduced: true })).toEqual({
+      fold: 1,
+      parts: Array(4).fill({ opacity: 1, y: 0 }),
+      settled: true
+    })
+    expect(answerFrame(SCENE, CUES.Answer - 0.001, 4, { dpr: 1, reduced: true }).parts.every((q) => q.opacity === 0)).toBe(true)
     expect(answer).toEqual(traceFrame(SCENE, CUES.Hold + 60, REF_LAYOUT))
     expect(answer.sprite.state).toBe('done')
-    expect(answer.words.every((a) => a === 1)).toBe(true)
   })
 
   it('never draws a frame that differs from the state’s end between two cues', () => {
     const cuts = [CUES.Think, CUES.Read, CUES.Filter, CUES.Check, CUES.Check + 0.5, CUES.Answer]
     for (let i = 0; i < cuts.length; i++) {
       const [from, to] = [cuts[i], cuts[i + 1] ?? cuts[i] + 5]
-      const first = at(from)
-      for (let T = from; T < to - 1e-3; T += (to - from) / 17) expect([T, at(T)]).toEqual([T, first])
+      // The seconds since Send are a clock, not motion: they are the one thing that moves.
+      const still = (f: TraceFrame): TraceFrame => ({ ...f, thinking: { ...f.thinking, seconds: 0 } })
+      const first = still(at(from))
+      for (let T = from; T < to - 1e-3; T += (to - from) / 17) expect([T, still(at(T))]).toEqual([T, first])
     }
     // The view is told when to look again: at each cue, and when Vee's hop is over.
     const wakes: number[] = []
@@ -1032,10 +1090,9 @@ describe('what the answer carries', () => {
     ])
     expect(answerRows(table)).toEqual([])
     expect(traceSummary(table)).toMatchObject({ status: 'checked 86 walls · 9s', wide: true, rows: [] })
-    // With nowhere to fly to, the lit cells fold away with the rest.
+    // The matrix keeps the Check's end — what the folded diary reopens to.
     expect(traceFrame(table, 9.01, REF_LAYOUT).cells.filter((c) => c.a === 'hit')).toHaveLength(9)
-    expect(traceFrame(table, 12, REF_LAYOUT).cells).toEqual([])
-    expect(traceFrame(table, 12, REF_LAYOUT).bubble.height).toBeCloseTo(8 + REF_LAYOUT.textH + 8, 9)
+    expect(traceFrame(table, 12, REF_LAYOUT).cells).toEqual(traceFrame(table, 9.01, REF_LAYOUT).cells)
 
     const nothing = turn([
       { type: 'begin', at: 0, read: READ },
@@ -1059,7 +1116,7 @@ describe('what the answer carries', () => {
     expect(answerRows(tl).map((r) => r.n)).toEqual([3, 2, 2, 2])
   })
 
-  it('flies a filter’s cells into rows too, turning the accent on the way', () => {
+  it('rests a filter’s cells in the filter grid, waiting, when there is no Check', () => {
     // "How many walls, by level?" — a Filter and no Check: every wall is a match.
     const filterOnly = RULED([{ prop: 'IfcEntity', op: '=', val: 'IfcWall' }])
     const tl = turn([
@@ -1069,22 +1126,17 @@ describe('what the answer carries', () => {
       { type: 'done', at: 9, words: 5, table: false }
     ])
     expect(traceStatus(tl)).toBe('found 86 walls · 9s')
+    expect(foldText(tl)).toBe('412 read · 86 walls · 9s')
     expect(traceCues(tl).steps.map((s) => s.kind)).toEqual(['read', 'filter'])
-    // No beam, no finding, no lit cell before the answer.
-    for (const T of [4, 6, 8.9]) {
+    // No beam, no finding, no lit cell — before the answer or after it.
+    for (const T of [4, 6, 8.9, 9, 30]) {
       const f = traceFrame(tl, T, REF_LAYOUT)
-      expect([f.beam, f.sprite.state, f.cells.some((c) => c.a === 'hit')]).toEqual([null, 'reading', false])
+      expect([f.beam, f.cells.some((c) => c.a === 'hit')]).toEqual([null, false])
     }
-    // 86 walls: 80 on L1 and two on each of the three levels above — seven to a cell, twelve
-    // cells in the first row.
-    const lay = rowLayout(answerRows(tl), 'wall', REF_LAYOUT)
+    expect(traceFrame(tl, 30, REF_LAYOUT).cells.every((c) => c.b === 'ready' && c.t === 1)).toBe(true)
     expect(answerRows(tl).map((r) => r.n)).toEqual([80, 2, 2, 2])
-    expect(lay.per).toBe(7)
-    const mid = traceFrame(tl, 9 + 0.9, REF_LAYOUT)
-    expect(mid.cells.some((c) => c.a === 'ready' && c.b === 'hit' && c.t > 0 && c.t < 1)).toBe(true)
-    const end = traceFrame(tl, 30, REF_LAYOUT)
-    expect(end.cells.every((c) => c.b === 'hit' && c.t === 1)).toBe(true)
-    expect(new Set(end.cells.map((c) => `${c.x.toFixed(3)},${c.y.toFixed(3)}`)).size).toBe(12 + 1 + 1 + 1)
+    // No Check, so the storey-rows card keeps its own title.
+    expect(traceSummary(tl).title).toBeUndefined()
   })
 
   it('scans the read grid when the call has no scope rule', () => {
@@ -1103,7 +1155,10 @@ describe('what the answer carries', () => {
     expect(mid.beam).not.toBeNull()
     const end = traceFrame(tl, 8.9, REF_LAYOUT)
     expect(end.cells.filter((c) => c.a === 'hit')).toHaveLength(9)
-    expect(end.ticker.lines.map((l) => [l.label, l.count!.n, l.count!.unit])).toEqual([['Checking Fire Rating', 9, 'missing']])
+    expect(end.steps.map((l) => [l.label, l.count!.n, l.count!.unit])).toEqual([
+      ['Reading 4 models', 412, 'elements'],
+      ['Checking Fire Rating', 9, 'missing']
+    ])
     expect(traceStatus(tl)).toBe('checked 412 elements · 9s')
   })
 })
@@ -1159,39 +1214,84 @@ describe('the cells’ colours', () => {
   })
 })
 
-describe('a finished reply, at rest', () => {
-  it('draws its rows’ cells exactly where the fly-in left them', () => {
-    const kept = traceSummary(SCENE)
-    expect(kept).toMatchObject({ wide: true, noun: 'wall' })
-    expect(kept.rows.map((r) => [r.label, r.n])).toEqual(R.LEVELS)
-    /**
-     * What a list of cells puts on the canvas: each distinct square — its place and side to a
-     * millionth of a pixel (float dust), its colour, its opacity and scale — in order. Several
-     * cells that flew to one place are one square.
-     */
-    const placed = (cells: readonly TraceCell[]): string[] =>
-      [
-        ...new Set(
-          cells.map((c) => `${c.y.toFixed(6)} ${c.x.toFixed(6)} ${c.size.toFixed(6)} ${mixed(c.a, c.b, c.t).join(',')} ${c.opacity} ${c.scale} ${c.ring}`)
-        )
-      ].sort()
-    for (const layout of [REF_LAYOUT, { width: 282, dpr: 1, textH: 38.75, reduced: false }, { width: 282, dpr: 1.5, textH: 38.75, reduced: false }]) {
-      const settled = traceFrame(SCENE, CUES.Hold + 30, layout)
-      expect(settled.settled).toBe(true)
-      const rest = rowCells(kept.rows, kept.noun, layout)
-      expect(rest).toHaveLength(9)
-      expect(placed(rest)).toEqual(placed(settled.cells))
+/* ────────────────────────────── the window resized under a turn ────────────────────────────── */
+
+describe('a resize mid-turn (stage 1b): the matrix keeps its width while a Check’s beam runs', () => {
+  // Windows of 300 (the new minimum), 330 (the default) and 420 px: the diary's canvas is the
+  // window less the thread's 10 px gutters, the avatar's 22 px and the card's 10 px padding a side.
+  const WIDTHS = [300, 330, 420].map((w) => w - 2 * 10 - 22 - 2 * 10)
+  // The 100 000-element model, where a cell stands for many and the count rises by cells.
+  const big = largeFederation(
+    [61_993, 38_000, 7],
+    (i) => i % 36 === 5 && i < 99_582,
+    (i) => Math.floor(i / 36) % 7 === 2
+  )
+  const facts = toolFacts('query_elements', { rules: REFERENCE_RULES }, big)
+  const tl = turn([
+    { type: 'begin', at: 0, read: readFacts(big) },
+    { type: 'tool_start', at: 2 },
+    { type: 'tool_exec', at: 2.5, facts },
+    { type: 'done', at: 9, words: 12, table: false }
+  ])
+  const check = traceCues(tl).steps.find((st) => st.kind === 'check')!.at
+  const countAt = (T: number, width: number): number | null =>
+    traceFrame(tl, T, { width, dpr: 1, textH: 0, reduced: false }).steps.at(-1)?.count?.n ?? null
+
+  it('says the same words at every width, and the same count everywhere but inside the beam', () => {
+    let inside = 0
+    for (let T = 1; T < 8.99; T += 0.05) {
+      if (T >= check && T <= check + 2.01 && new Set(WIDTHS.map((w) => countAt(T, w))).size > 1) inside++
+      const said = WIDTHS.map((width) => traceFrame(tl, T, { width, dpr: 1, textH: 0, reduced: false }).steps.map((st) => st.label + st.mono))
+      expect([T, said[1]]).toEqual([T, said[0]])
+      expect([T, said[2]]).toEqual([T, said[0]])
+      if (T < check || T > check + 2.01) {
+        const n = WIDTHS.map((w) => countAt(T, w))
+        expect([T, new Set(n).size]).toEqual([T, 1])
+      }
     }
-    // The same for cells that stand for several: 86 walls, seven to a cell.
-    const tl = turn([
-      { type: 'begin', at: 0, read: READ },
-      { type: 'tool_exec', at: 2, facts: RULED([{ prop: 'IfcEntity', op: '=', val: 'IfcWall' }]) },
-      { type: 'done', at: 9, words: 5, table: false }
-    ])
-    const many = traceSummary(tl)
-    const rest = rowCells(many.rows, many.noun, REF_LAYOUT)
-    expect(rest).toHaveLength(12 + 1 + 1 + 1)
-    expect(placed(rest)).toHaveLength(15)
-    expect(placed(rest)).toEqual(placed(traceFrame(tl, 60, REF_LAYOUT).cells))
+    // …and every width ends on the exact 395. Inside the beam they do disagree — spike 4 measured
+    // a gap of up to 13 — which is why a Check keeps the width it started with (below).
+    for (const w of WIDTHS) expect(countAt(8.98, w)).toBe(395)
+    expect(inside).toBeGreaterThan(0)
+  })
+
+  it('holds the width a Check started with, so a resize under the beam never makes its count jump back or skip', () => {
+    for (const [from, to] of [
+      [WIDTHS[1], WIDTHS[0]],
+      [WIDTHS[1], WIDTHS[2]],
+      [WIDTHS[2], WIDTHS[0]]
+    ]) {
+      let hold: WidthHold | null = null
+      let prev = -1
+      const seen: number[] = []
+      for (let T = check - 0.5; T < 8.99; T += 0.01) {
+        // The window is resized a third of the way through the sweep.
+        const measured = T < check + 0.9 ? from : to
+        hold = planWidth(tl, T, measured, hold)
+        const n = countAt(T, hold.width)
+        if (T >= check && T < check + STEP_S.check) {
+          // Inside the Check the width it started with is kept, so the count is exactly the
+          // count of an unresized window — rising, never falling.
+          expect([T, hold.width]).toEqual([T, from])
+          expect([T, n]).toEqual([T, countAt(T, from)])
+          expect(n!).toBeGreaterThanOrEqual(prev)
+          prev = n!
+          seen.push(n!)
+        }
+      }
+      expect(seen.at(-1)).toBe(395)
+      // At the next step boundary — here the answer — the plan follows the window again.
+      expect(planWidth(tl, 9, to, hold)).toEqual({ step: -2, width: to })
+    }
+  })
+
+  it('plans every other step for the width measured now', () => {
+    const read = traceCues(tl).steps[0].at
+    expect(planWidth(tl, read + 0.5, 250, { step: 0, width: 300 })).toEqual({ step: 0, width: 250 })
+    expect(planWidth(tl, 0.5, 250, null)).toEqual({ step: -1, width: 250 })
+    // A Check that started under another hold takes the width measured as it starts.
+    const ci = traceCues(tl).steps.findIndex((st) => st.kind === 'check')
+    expect(planWidth(tl, check + 0.01, 260, { step: ci - 1, width: 300 })).toEqual({ step: ci, width: 260 })
+    expect(planWidth(tl, check + 1, 200, { step: ci, width: 260 })).toEqual({ step: ci, width: 260 })
   })
 })

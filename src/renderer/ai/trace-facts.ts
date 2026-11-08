@@ -326,6 +326,14 @@ export interface ChatTrace {
   rows: { label: string; n: number; ids: number[] }[]
   /** What a row counts, singular: `wall`, `element`. */
   noun: string
+  /**
+   * 2026-11-08 — the diary folded into one line (`412 read · 80 walls · 12 missing · 7s`), the
+   * steps it reopens to, each at its final count, and the storey-rows card's title when the turn
+   * checked a property (`Fire Rating · missing`). Absent on a reply written before then.
+   */
+  fold?: string
+  steps?: { label: string; mono: string; n: number | null; unit: string }[]
+  title?: string
 }
 
 /**

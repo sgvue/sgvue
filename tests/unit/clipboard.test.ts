@@ -225,7 +225,8 @@ describe('the chat table’s copy csv', () => {
     // window's store builds the CSV (`copyTable`) with the copy routed back to where the click
     // was (`model/vee-link.ts`, `copyingIn`).
     const panel = readFileSync(join(process.cwd(), 'src/renderer/app/ChatPanel.tsx'), 'utf8')
-    expect(panel).toMatch(/onClick=\{\(\) => post\(\{ type: 'copyCsv', \.\.\.at! \}\)\}/)
+    // 2026-11-08 — the table card's click also notes which card asked, for its `copied` flash.
+    expect(panel).toMatch(/post\(\{ type: 'copyCsv', \.\.\.at \}\)/)
     expect(panel).not.toMatch(/navigator\s*\.\s*clipboard|execCommand/)
     const link = readFileSync(join(process.cwd(), 'src/renderer/model/vee-link.ts'), 'utf8')
     expect(link).toMatch(/copyingIn\(copyInVee, \(\) => void s\.copyTable\(table\)\)/)

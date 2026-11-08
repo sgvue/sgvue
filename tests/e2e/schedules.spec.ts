@@ -1302,9 +1302,14 @@ async function openChat(app: ElectronApplication, page: Page): Promise<void> {
   await holdTurns(app)
 }
 
-/** Put the panel away: the Ask Vee window's own ×. */
+/**
+ * Put the panel away. Since 2026-11-08 ("Vee Messages") the window has no × of its own — the OS
+ * close and Esc remain — so: Esc, with the focus out of the composer (Esc in a field is the field's).
+ */
 async function closeChat(app: ElectronApplication): Promise<void> {
-  await (await veeWindow(app)).locator('button[aria-label="Close"]').click()
+  const vee = await veeWindow(app)
+  await vee.locator('[data-role="chatinput"]').evaluate((el) => (el as HTMLInputElement).blur())
+  await vee.keyboard.press('Escape')
   await expect.poll(() => veeIsOpen(app)).toBe(false)
 }
 

@@ -44,3 +44,237 @@
     transform: translateX(-50%) translateY(-3px);
   }
 }
+
+/*
+ * 2026-11-08 — the Ask Vee window drawn as a messaging conversation ("Vee Messages", stage 1a).
+ * The owner: "I need the conversation window like texting in messaging", and direction C, "site
+ * group chat", of the approved prototype (`prototypes/vee-messages/full/index.html`), whose values
+ * these are. Everything is under `.vm`, the Vee window's root (`app/ChatPanel.tsx`), so the main
+ * window — which loads this sheet for the composer's placeholder rule — is untouched.
+ *
+ * The tokens the window adds, beside the design's own: the window and bubble grounds, the hair
+ * line, and hi-vis yellow — used only on a consent card (tape means "Vee needs your OK"). The
+ * light theme's yellow is darker, `#B88600`, so it and its ink pass AA (the prototype's §6).
+ */
+.vm {
+  --panel: #181f21;
+  --bubble: #1f2827;
+  --line: #282f31;
+  --vis: #f2c230;
+  --vis-ink: #15130b;
+  --grid: rgba(148, 167, 164, 0.045);
+  --glow: rgba(53, 196, 182, 0.55);
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+:root[data-theme='light'] .vm {
+  --panel: #fafcfb;
+  --bubble: #edf3f2;
+  --line: #e3eae8;
+  --vis: #b88600;
+  --vis-ink: #1b1a12;
+  --grid: rgba(27, 42, 44, 0.04);
+  --glow: rgba(14, 138, 128, 0.35);
+}
+
+/* The header: Vee, its presence, and the activity bars while a turn runs. */
+.vm-hd { height: 46px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 12px 0 9px; border-bottom: 1px solid var(--line); }
+.vm-face { width: 32px; height: 32px; flex: none; display: flex; align-items: center; justify-content: center; }
+.vm-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vm-nm { font: 600 13.5px/1 var(--sans); color: var(--ink); letter-spacing: 0.01em; }
+.vm-pr { display: flex; align-items: center; gap: 5px; font: 400 10.5px/1 var(--mono); color: var(--faint); }
+.vm-pr i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.vm-pr.vm-busy i { animation: vm-ping 1.1s ease-out infinite; }
+.vm-pr.vm-off i { background: var(--border-strong); }
+@keyframes vm-ping { 0% { box-shadow: 0 0 0 0 var(--glow); } 100% { box-shadow: 0 0 0 6px transparent; } }
+.vm-sq { margin-left: auto; display: flex; align-items: flex-end; gap: 2px; height: 12px; opacity: 0; transition: opacity 0.25s; }
+.vm-sq.vm-on { opacity: 1; }
+.vm-sq b { width: 3px; background: var(--accent); border-radius: 1px; transform-origin: bottom; animation: vm-sq 0.9s ease-in-out infinite; }
+.vm-sq b:nth-child(1) { height: 5px; animation-delay: -0.6s; }
+.vm-sq b:nth-child(2) { height: 9px; animation-delay: -0.3s; }
+.vm-sq b:nth-child(3) { height: 12px; }
+@keyframes vm-sq { 0%, 100% { transform: scaleY(0.45); } 50% { transform: scaleY(1); } }
+
+/* The pinned board: what the 3D view shows now. Isolated — not everything shown — in the selection's colours. */
+.vm-board { height: 26px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 12px; background: var(--card); border-bottom: 1px solid var(--line); font: 500 10.5px/1 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.vm-board svg { flex: none; color: var(--faint); }
+.vm-board.vm-iso { background: var(--sel-bg); color: var(--sel-ink); box-shadow: inset 3px 0 0 var(--accent); }
+.vm-board.vm-iso svg { color: var(--accent-ink); }
+.vm-board-txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vm-board-txt b { font-weight: 500; color: var(--ink); }
+.vm-board.vm-iso .vm-board-txt b { color: var(--sel-ink); }
+.vm-board-txt em { font-style: normal; color: var(--sel-ink); }
+.vm-vw { margin-left: auto; color: var(--faint); flex: none; }
+
+/* The thread, on a faint grid; its rows stand at its foot. */
+.vm-tw { flex: 1; min-height: 0; position: relative; display: flex; }
+.vm-thread {
+  flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 10px 12px; display: flex; flex-direction: column;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 16px 16px; background-position: -1px -1px;
+}
+.vm-thread::-webkit-scrollbar { width: 6px; }
+.vm-thread > :first-child { margin-top: auto; }
+.vm-day { align-self: center; margin: 10px 0 2px; font: 500 10px/1 var(--mono); color: var(--faint); letter-spacing: 0.06em; flex: none; }
+.vm-grp { display: flex; gap: 6px; margin-top: 12px; align-items: flex-end; flex: none; }
+.vm-grp.vm-me { justify-content: flex-end; margin-top: 10px; }
+.vm-av { width: 16px; flex: none; margin-bottom: 2px; display: flex; justify-content: center; transform-origin: 50% 60%; }
+.vm-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; width: calc(100% - 22px); }
+.vm-me .vm-stack { align-items: flex-end; width: auto; max-width: 84%; }
+
+/* A bubble: Vee's on the left with its tail at the foot, the user's on the right in the selection's ground. */
+.vm-b { position: relative; font: 400 13px/1.42 var(--sans); padding: 6px 9px 6px 10px; border-radius: 12px 12px 12px 5px; background: var(--bubble); color: var(--ink); max-width: 100%; overflow-wrap: anywhere; }
+.vm-vee .vm-stack > .vm-b + .vm-b { border-top-left-radius: 5px; }
+.vm-b.vm-b-me { background: var(--sel-bg); border-radius: 12px 12px 5px 12px; }
+.vm-b p { margin: 0; }
+.vm-t { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 5px 0 -3px 9px; font: 400 9.5px/1 var(--mono); color: var(--faint); }
+.vm-t svg { display: block; }
+.vm-tk { color: var(--faint); }
+.vm-tk.vm-read { color: var(--accent-ink); }
+.vm-b.vm-reverted { opacity: 0.55; }
+.vm-q { display: block; margin: 1px 0 5px; padding: 3px 0 3px 7px; border-left: 2px solid var(--accent); font: 400 11.5px/1.35 var(--sans); color: var(--muted); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vm-q i { font-style: normal; font-weight: 500; color: var(--accent-ink); margin-right: 5px; }
+
+/* The hover bar of one bubble or card: reply, quoting just it — shown on hover and on keyboard focus. */
+.vm-tx { outline-offset: 1px; }
+.vm-rx { position: absolute; top: -15px; right: -2px; display: flex; gap: 1px; padding: 2px; background: var(--card); border: 1px solid var(--border-strong); border-radius: 999px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); opacity: 0; transform: translateY(4px) scale(0.9); pointer-events: none; transition: opacity 0.12s, transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 3; }
+.vm-tx:hover > .vm-rx, .vm-tx:focus-within > .vm-rx { opacity: 1; transform: none; pointer-events: auto; }
+.vm-rx button { width: 22px; height: 20px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.vm-rx button:hover { background: var(--step-bg); color: var(--accent-ink); }
+
+/*
+ * 2026-11-08, stage 1b — the diary: a running turn's narration in Vee's bubble — `Thinking` and
+ * the seconds since Send, a line a step, the element matrix — folded at the answer into one
+ * dashed line that reopens (`app/Trace.tsx`, `Diary`). Its padding is the same folded or not, so
+ * the fold moves nothing but what closes up under its header.
+ */
+.vm-lc { align-self: stretch; padding: 7px 10px 8px; border: 1px solid var(--line); }
+.vm-lc.vm-fold { border-style: dashed; }
+.vm-lc-hd { display: flex; align-items: center; gap: 6px; font: 400 12px/16px var(--sans); color: var(--faint); min-height: 16px; }
+.vm-el { margin-left: auto; font: 400 10.5px/1 var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+/* `Thinking`'s shimmer: the painter slides the gradient (`backgroundPosition`); at rest it is plain `--faint`. */
+.vm-shim { background-image: linear-gradient(90deg, var(--faint) 36%, var(--ink) 50%, var(--faint) 64%); background-size: 300% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; color: transparent; }
+.vm-lc-steps { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.vm-step { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 6px; align-items: center; font: 400 12px/17px var(--sans); color: var(--muted); }
+.vm-step.vm-ok { color: var(--faint); }
+.vm-g { width: 12px; height: 12px; display: flex; align-items: center; justify-content: center; color: var(--accent-ink); }
+.vm-g i { width: 6px; height: 6px; border: 1.5px solid var(--accent); border-radius: 1px; animation: vm-spin 1s linear infinite; }
+.vm-g svg, .vm-step.vm-ok .vm-g i { display: none; }
+.vm-step.vm-ok .vm-g svg { display: block; }
+@keyframes vm-spin { to { transform: rotate(360deg); } }
+.vm-sl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-sl code { font: 400 11.5px/1 var(--mono); color: var(--ink); }
+.vm-n { font: 400 11.5px/1 var(--mono); color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vm-n b { font-weight: 400; color: var(--ink); }
+.vm-n b.vm-hit { color: var(--accent-ink); }
+/* The matrix's band: `MATRIX_BAND.height` (`ai/trace.ts`), 26 px; the painter sets its exact device-pixel length. */
+.vm-lc-mx { display: block; width: 100%; height: 26px; margin-top: 7px; }
+.vm-fold .vm-lc-body { display: none; }
+.vm-fold.vm-open .vm-lc-body { display: block; }
+.vm-lc-sum { display: flex; align-items: center; gap: 6px; width: 100%; font: 400 10.5px/16px var(--mono); color: var(--faint); text-align: left; min-width: 0; }
+.vm-lc-sum > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vm-lc-sum .vm-cv { margin-left: auto; flex: none; transition: transform 0.2s; }
+.vm-lc-sum[aria-expanded='true'] .vm-cv { transform: rotate(90deg); }
+.vm-lc-sum:hover { color: var(--ink); }
+.vm-ck { color: var(--accent-ink); flex: none; display: flex; }
+
+/* Typing dots: from Think until the first step, or until the answer when no tool runs. */
+.vm-b.vm-dots { display: flex; gap: 3px; padding: 10px 11px; }
+.vm-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); animation: vm-dot 1s ease-in-out infinite; }
+.vm-dots i:nth-child(2) { animation-delay: 0.15s; }
+.vm-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes vm-dot { 0%, 60%, 100% { transform: none; opacity: 0.5; } 30% { transform: translateY(-3px); opacity: 1; } }
+
+/*
+ * Entry motion (stage 1b): a bubble or card that arrives while the window is open pops in — one
+ * a turn wrote lands instead, by the trace's painter. The design's reduced-motion rule
+ * (`design.css`) ends every animation here at once, so each simply appears.
+ */
+.vm-in { animation: vm-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both; transform-origin: 0 100%; }
+.vm-me .vm-in { transform-origin: 100% 100%; }
+@keyframes vm-pop { 0% { opacity: 0; transform: translateY(6px) scale(0.9); } 100% { opacity: 1; transform: none; } }
+
+/* A card: a punched tag. */
+.vm-card { position: relative; width: 100%; padding: 0; background: var(--card); border: 1px solid var(--border-strong); border-radius: 12px 12px 12px 5px; }
+.vm-hole { width: 7px; height: 7px; border-radius: 50%; background: var(--panel); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45); border: 1px solid var(--border-strong); flex: none; }
+
+/* The storey rows and the table: rows that select in 3D. */
+.vm-sn-hd { display: flex; align-items: center; gap: 7px; padding: 7px 10px 6px; font: 500 10px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+.vm-sn-hd span:not(.vm-hole) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vm-sn-hd b { margin-left: auto; font: 500 11px/1 var(--mono); letter-spacing: 0; color: var(--accent-ink); }
+.vm-sn-rows { display: flex; flex-direction: column; padding: 3px 4px 5px; }
+.vm-sn-row { position: relative; display: grid; grid-template-columns: minmax(26px, max-content) minmax(0, 1fr) auto 14px; align-items: center; gap: 6px; padding: 8px 9px; border-radius: 6px; font: 400 12px/1 var(--mono); color: var(--muted); text-align: left; }
+.vm-sn-row:hover { background: var(--step-bg); color: var(--ink); }
+.vm-lv { color: var(--ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vm-cl { display: flex; gap: 3px; min-width: 0; overflow: hidden; }
+.vm-cl i { width: 6px; height: 6px; flex: none; border-radius: 1.5px; background: var(--accent); box-shadow: 0 0 6px var(--glow); }
+.vm-qty { font: 400 11px/1 var(--mono); color: var(--faint); text-align: right; white-space: nowrap; }
+.vm-ct { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vm-ct b { font-weight: 400; color: var(--ink); }
+.vm-xh { display: flex; color: var(--faint); opacity: 0; transition: opacity 0.15s; }
+.vm-sn-row:hover .vm-xh, .vm-sn-row:focus-visible .vm-xh, .vm-sn-row[aria-pressed='true'] .vm-xh { opacity: 1; color: var(--accent-ink); }
+/* The storey row the 3D view has selected (stage 1b): pressed, and ringed by a revision cloud that draws itself in. */
+.vm-sn-row[aria-pressed='true'] { background: var(--sel-bg); color: var(--ink); }
+.vm-cloud { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.vm-cloud path { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linejoin: round; stroke-dasharray: 1; animation: vm-draw 0.5s cubic-bezier(0.65, 0, 0.35, 1) both; }
+@keyframes vm-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.vm-tb-ft { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 7px 10px 8px; border-top: 1px solid var(--line); }
+.vm-cp { font: 500 11.5px/1 var(--sans); color: var(--accent-ink); padding: 4px 2px; }
+.vm-cp:hover { text-decoration: underline; }
+.vm-fl { font: 400 10.5px/1 var(--mono); color: var(--faint); opacity: 0; transition: opacity 0.2s; }
+.vm-fl.vm-on { opacity: 1; }
+
+/* The consent card: the one place hi-vis tape appears. Answered, the tape greys and a stamp says what happened. */
+.vm-pm { overflow: hidden; }
+.vm-tape { height: 6px; background: repeating-linear-gradient(-45deg, var(--vis) 0 6px, var(--vis-ink) 6px 12px); }
+.vm-settled .vm-tape { background: repeating-linear-gradient(-45deg, var(--border-strong) 0 6px, transparent 6px 12px); }
+.vm-pm-body { display: grid; grid-template-columns: 7px 1fr; gap: 4px 9px; padding: 9px 11px 9px 10px; align-items: center; }
+.vm-pm-q { font: 600 13px/1.3 var(--sans); color: var(--ink); overflow-wrap: anywhere; }
+/* The request's detail — its label after the first ` — ` (stage 1b, `consentText`). */
+.vm-pm-sub { grid-column: 2; font: 400 11px/1.35 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.vm-perf { position: relative; height: 0; border-top: 1.5px dashed var(--border-strong); margin: 0 6px; }
+.vm-perf::before, .vm-perf::after { content: ''; position: absolute; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--panel); border: 1px solid var(--border-strong); }
+.vm-perf::before { left: -12px; }
+.vm-perf::after { right: -12px; }
+.vm-stub { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 9px 9px; }
+.vm-no { font: 500 12px/1 var(--sans); color: var(--muted); padding: 8px 10px; border-radius: 7px; }
+.vm-no:hover { color: var(--ink); background: var(--step-bg); }
+.vm-go { font: 600 12px/1 var(--sans); color: var(--vis-ink); background: var(--vis); padding: 8px 16px; border-radius: 7px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25), inset 0 -2px 0 rgba(0, 0, 0, 0.14); }
+.vm-go:hover { filter: brightness(1.07); }
+.vm-done { display: flex; align-items: center; gap: 8px; padding: 9px 10px 10px; min-height: 44px; }
+.vm-stamp { display: inline-block; font: 600 10.5px/1 var(--mono); letter-spacing: 0.14em; color: var(--accent-ink); border: 2px double var(--accent); border-radius: 4px; padding: 5px 7px 4px; transform: rotate(-5deg); white-space: nowrap; }
+.vm-stamp.vm-muted { color: var(--muted); border-color: var(--border-strong); }
+/* A card answered while it is shown: its stub tears away, then the stamp lands. */
+.vm-tear { animation: vm-tear 0.42s cubic-bezier(0.5, 0, 0.75, 0) forwards; transform-origin: 100% 0; }
+@keyframes vm-tear { 0% { transform: none; opacity: 1; } 30% { transform: rotate(2deg) translateY(2px); } 100% { transform: rotate(-7deg) translate(18px, 26px); opacity: 0; } }
+.vm-stamp.vm-land { animation: vm-stamp 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes vm-stamp { 0% { transform: rotate(-14deg) scale(1.9); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(-5deg) scale(1); opacity: 1; } }
+.vm-rv { margin-left: auto; display: flex; align-items: center; gap: 5px; font: 500 12px/1 var(--sans); color: var(--accent-ink); padding: 7px 8px; border-radius: 7px; }
+.vm-rv:hover { background: var(--sel-bg); }
+
+/* A reply's foot: its revert, when it has no consent card to stand on. */
+.vm-foot { display: flex; align-items: center; gap: 6px; margin: 2px 0 0 2px; font: 400 10.5px/1 var(--mono); color: var(--faint); }
+.vm-foot .vm-rv { margin-left: 0; padding: 4px 6px; font: 500 11.5px/1 var(--sans); }
+
+/* System lines — the app talking, not Vee — in neutral ink: amber is kept for the heads-up. */
+.vm-sys { align-self: center; display: flex; align-items: center; gap: 6px; margin: 12px 0 0; padding: 5px 10px; border-radius: 999px; border: 1px dashed var(--border-strong); font: 400 11px/1.3 var(--mono); color: var(--muted); max-width: 100%; flex: none; text-align: center; flex-wrap: wrap; justify-content: center; }
+.vm-sys svg { flex: none; color: var(--faint); }
+.vm-again { font: 500 11.5px/1 var(--sans); color: var(--accent-ink); padding: 2px 4px; border-radius: 5px; }
+.vm-again:hover { background: var(--sel-bg); }
+
+/* A reply landed while the thread is scrolled up. */
+.vm-newpill { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px 11px 6px 9px; border-radius: 999px; background: var(--card); border: 1px solid var(--accent); color: var(--sel-ink); font: 500 11.5px/1 var(--sans); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); white-space: nowrap; z-index: 4; }
+
+/* The dock: the reply strip, the suggestions, the composer and its send key. */
+.vm-dock { flex: none; display: flex; flex-direction: column; gap: 7px; padding: 8px 10px 10px; border-top: 1px solid var(--line); background: var(--panel); }
+.vm-cmp { display: flex; gap: 8px; }
+.vm-cmp input { flex: 1; min-width: 0; height: 36px; font: 400 13px/1 var(--sans); color: var(--ink); background: var(--bubble); border: 1px solid var(--border); border-radius: 8px; padding: 0 11px; }
+.vm-cmp input:focus { border-color: var(--accent); }
+.vm-cmp input:disabled, .vm-key:disabled { opacity: 0.45; cursor: not-allowed; }
+.vm-key { position: relative; width: 36px; height: 36px; flex: none; border-radius: 8px; background: var(--sel-bg); border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; color: var(--accent-ink); }
+.vm-key:disabled:hover { background: var(--sel-bg) !important; color: var(--accent-ink) !important; }

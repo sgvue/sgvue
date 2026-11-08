@@ -211,6 +211,12 @@ const CASES: Record<string, Case> = {
     draws: ['setTheme', 'setElementColors', 'setVisibility']
   },
   select: { run: () => st().select(ids(2), true), draws: ['setSelected', 'setDims', 'zoomTo'] },
+  // 2026-11-08 (stage 1b): a pick on a reply is `select` of what is still loaded.
+  pickChat: {
+    setup: () => useShell.setState({ chatMsgs: [{ role: 'assistant', text: 'x', chips: [{ label: 'two', ids: ids(2) }] }] }),
+    run: () => st().pickChat(0, ids(2), true),
+    draws: ['setSelected', 'setDims', 'zoomTo']
+  },
   setColorBy: { run: () => st().setColorBy('IfcEntity'), draws: ['setElementColors'] },
   setColorByGroups: {
     run: () => st().setColorByGroups('Mark', [{ value: 'A', ids: ids(2) }]),

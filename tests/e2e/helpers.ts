@@ -16,6 +16,16 @@ export const HIGH_FIRST = join(ROOT, 'tests/fixtures/high-first.ifc')
 /** `SGVue.dc.html:769` — the drop zone's own copy. */
 export const DROP_COPY = 'Drop IFC files here, or click to choose'
 
+/**
+ * 2026-11-08 ("Vee Messages") — a stand-in API key for every launch, so the Ask Vee window is
+ * ready: without a key its composer is disabled (the not-ready state), and the specs that hold
+ * main's turn handlers (`holdTurns`) type into it. **It is not a key**: no turn here reaches the
+ * API with it — a spec that sends holds main's handlers first, and a spec about the keyless state
+ * passes `ANTHROPIC_API_KEY: ''`. It also keeps a key from the developer's own environment out of
+ * every run. Never written to disk: it lives in the launched app's environment only.
+ */
+export const E2E_KEY = 'e2e-stand-in-not-an-api-key'
+
 /** The built app (`out/`) on a profile of its own, once its first window has its DOM. */
 export async function launch(
   userData: string,
@@ -23,7 +33,7 @@ export async function launch(
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     args: [MAIN, `--user-data-dir=${userData}`],
-    env: { ...process.env, ...env } as Record<string, string>
+    env: { ...process.env, ANTHROPIC_API_KEY: E2E_KEY, ...env } as Record<string, string>
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')

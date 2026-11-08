@@ -1,8 +1,9 @@
 /**
  * The thinking trace — its view (2026-10-01, the owner's "Ask Vee" handoff,
- * `design-reference/ask-vee/`). What is shown at any instant is `traceFrame` (`ai/trace.ts`),
- * which is pure; this is the thin part that needs a document: the frame loop, the canvas the
- * matrix is drawn on, and the markup of a turn's reply.
+ * `design-reference/ask-vee/`). What is shown at any instant is `traceFrame` and `answerFrame`
+ * (`ai/trace.ts`), which are pure; this is the thin part that needs a document: the frame loop,
+ * the canvas the matrix is drawn on, the diary a turn's narration is drawn in, and the markup of
+ * a reply's blocks.
  *
  * **The loop** is one `requestAnimationFrame` chain for everything the trace moves. A painter
  * (`app/ChatPanel.tsx` registers the only one) is called with the trace's time and says whether
@@ -12,46 +13,39 @@
  * `prefers-reduced-motion: reduce` nothing is animated: a frame is drawn when the turn's state
  * changes — an event, or the next cue, which a timer waits for — and each is that state's end.
  *
- * **The canvas** covers the reply's bubble and draws the cells, the beam and the rings in device
- * pixels. The lattice is already on whole device pixels (`traceLattice`), so a cell at rest is a
- * crisp square with no blending; a cell in flight is drawn where it is.
+ * **The canvas** draws the cells, the beam and the rings in device pixels. The lattice is already
+ * on whole device pixels (`traceLattice`), so a cell at rest is a crisp square with no blending;
+ * a cell in flight is drawn where it is.
  *
- * **A turn's reply** is the existing bubble with three things in it: the answer's words, each a
- * span the reveal can fade in — the two inline marks rendered as elements, never as HTML
- * (`ai/marks.ts`) — the rows under it, each a button that selects its elements, and the canvas.
- * Once nothing moves the bubble is ordinary flow again: it re-wraps and grows with the panel,
- * and its rows' cells are redrawn where the rows are.
+ * **2026-11-08 — the diary** ("Vee Messages", stage 1b, the approved prototype's "site diary").
+ * While a turn runs, Vee's bubble is a card: `Thinking` and the seconds since Send, every step the
+ * trace has shown — ticked once the next has begun, with its live count — and the element matrix
+ * under them. At the answer it folds into one line (`✓ 412 read · 80 walls · 12 missing · 7s ›`),
+ * which reopens to the steps — and, while it is the newest turn's, the final matrix.
  *
- * **Since 2026-10-08 the answer is laid out in blocks** (`ai/blocks.ts`, `ReplyText`): paragraphs,
- * their line breaks, bulleted and numbered lists, and tables. A reply of one paragraph is drawn
- * exactly as before; a list marker and a whole table each come in as one of the reveal's pieces.
+ * **Since 2026-10-08 a reply is laid out in blocks** (`ai/blocks.ts`): paragraphs, their line
+ * breaks, bulleted and numbered lists, and tables. Since 2026-11-08 each block is a bubble of its
+ * own (`BlockView`), and nothing of it is revealed word by word.
  */
-import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useLayoutEffect, useRef, useState } from 'react'
 import { s } from './css'
-import { markWords, splitMarks, type Mark } from '../ai/marks'
-import { hasTable, parseBlocks, type Block } from '../ai/blocks'
+import { splitMarks, type Mark } from '../ai/marks'
+import type { Block } from '../ai/blocks'
 import {
-  H_THINK,
   J,
+  MATRIX_BAND,
   MATRIX_TOP,
-  MONO_CH,
   PAD_X,
-  ROW_H,
-  ROWS_GAP,
-  RULE_GAP,
-  ROWS_BOTTOM,
-  STATUS_H,
-  TICK_H,
-  TICK_TOP,
   TRACE_PALETTE,
-  rowCells,
-  rowLayout,
+  traceFrame,
   type CellRole,
+  type Timeline,
   type TraceCell,
   type TraceFrame
 } from '../ai/trace'
-import { countText, nounFor, type ChatTrace } from '../ai/trace-facts'
+import { countText } from '../ai/trace-facts'
 import { traceNow, traceState } from '../ai/trace-store'
+import { Chevron, TickOne } from './VeeIcons'
 
 /* ────────────────────────────── the loop ────────────────────────────── */
 
@@ -178,7 +172,8 @@ export function paintMatrix(
   height: number,
   cells: readonly TraceCell[],
   beam: TraceFrame['beam'],
-  dpr: number
+  dpr: number,
+  origin: { x: number; y: number } = { x: PAD_X, y: 0 }
 ): void {
   const w = Math.max(1, Math.round(width * dpr))
   const h = Math.max(1, Math.round(height * dpr))
@@ -193,9 +188,14 @@ export function paintMatrix(
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, w, h)
   const c = traceColours()
-  /** The bubble's inner left, on a whole device pixel. */
-  const ox = Math.round(PAD_X * dpr)
+  /**
+   * Where a cell's coordinates start: the bubble's inner left, on a whole device pixel — and, for
+   * the diary's own canvas (2026-11-08), the matrix's band, `origin.y` under the old bubble's top.
+   */
+  const ox = Math.round(origin.x * dpr)
+  const oy = Math.round(origin.y * dpr)
   const px = (v: number): number => v * dpr
+  const py = (v: number): number => v * dpr - oy
 
   if (beam && beam.opacity > 0) {
     // `ask-thinking-hex.jsx:184–185` — a 46 px trail fading up to 16 %, then the 2 px beam and
@@ -206,13 +206,13 @@ export function paintMatrix(
     trail.addColorStop(1, css(c.hit, 0.16))
     ctx.globalAlpha = beam.opacity * 0.9
     ctx.fillStyle = trail
-    ctx.fillRect(x - px(J(46)), px(MATRIX_TOP - J(4)), px(J(46)), px(J(28)))
+    ctx.fillRect(x - px(J(46)), py(MATRIX_TOP - J(4)), px(J(46)), px(J(28)))
     ctx.globalAlpha = beam.opacity
     ctx.shadowColor = css(c.hit, 0.55)
     ctx.shadowBlur = px(J(10))
     ctx.fillStyle = css(c.hit)
     ctx.beginPath()
-    ctx.roundRect(x - px(J(1)), px(MATRIX_TOP - J(6)), px(J(2)), px(J(32)), px(J(1)))
+    ctx.roundRect(x - px(J(1)), py(MATRIX_TOP - J(6)), px(J(2)), px(J(32)), px(J(1)))
     ctx.fill()
     ctx.shadowBlur = 0
     ctx.shadowColor = 'transparent'
@@ -222,7 +222,7 @@ export function paintMatrix(
     const side = px(cell.size) * cell.scale
     if (side <= 0 || cell.opacity <= 0) continue
     const cx = ox + px(cell.x + cell.size / 2)
-    const cy = px(cell.y + cell.size / 2)
+    const cy = py(cell.y + cell.size / 2)
     if (cell.ring >= 0) {
       // `:213` — a ring that grows to 2.6× and fades over 0.6 s, and the cell glows while it does.
       const grow = 1 + cell.ring * 1.6
@@ -275,49 +275,7 @@ function onEnvironment(fn: () => void): () => void {
   }
 }
 
-/* ────────────────────────────── the status beside the name ────────────────────────────── */
-
-/** The status's own type: the label row's 10 px, a weight lighter than the name beside it. */
-const STATUS_TEXT = 'font:400 10px/1 var(--sans);letter-spacing:.02em;color:var(--faint);white-space:nowrap'
-
-/**
- * `Thinking`'s shimmer (`ask-thinking-hex.jsx:332`): the text is filled with a gradient three
- * times its width — `--faint`, a band of `--ink` in the middle third, `--faint` — and the panel
- * slides that gradient across it. At `100% 0`, where it rests, the text is plain `--faint`.
- */
-const SHIMMER =
-  'background-image:linear-gradient(90deg, var(--faint) 0%, var(--faint) 36%, var(--ink) 50%, var(--faint) 64%, var(--faint) 100%);background-size:300% 100%;background-position:100% 0;-webkit-background-clip:text;background-clip:text;color:transparent'
-
-/**
- * The status beside `Vee`. For a finished reply it is one line of text. For the reply the trace
- * is drawing it is the same line's box with a window `STATUS_H` tall laid over it — reaching
- * 1.67 px above and below the 10 px row, which it does not make any taller — in which `Thinking`
- * and the final status roll past each other; `app/ChatPanel.tsx` moves the two lines.
- */
-export function TraceStatus({ text, rolling }: { text: string; rolling: boolean }): React.JSX.Element | null {
-  if (!rolling) return text ? <span data-part="status" style={s(STATUS_TEXT)}>{text}</span> : null
-  const line = 'position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;opacity:0'
-  return (
-    <span data-part="status" style={s(`${STATUS_TEXT};position:relative;flex:none`)}>
-      {/* What gives the box its width: the status once there is one, `Thinking` until then. */}
-      <span style={s('visibility:hidden')}>{text || 'Thinking'}</span>
-      <span
-        style={s(
-          `position:absolute;left:0;top:${(10 - STATUS_H) / 2}px;width:100%;height:${STATUS_H}px;overflow-x:visible;overflow-y:clip`
-        )}
-      >
-        <span data-part="status-thinking" aria-hidden="true" style={s(`${line};${SHIMMER}`)}>
-          Thinking
-        </span>
-        <span data-part="status-final" style={s(line)}>
-          {text}
-        </span>
-      </span>
-    </span>
-  )
-}
-
-/* ────────────────────────────── the reply's bubble ────────────────────────────── */
+/* ────────────────────────────── a reply's blocks ────────────────────────────── */
 
 const MARK_STYLE: Record<Mark, string> = {
   '': '',
@@ -338,43 +296,21 @@ const marked = (pieces: readonly { text: string; mark: Mark }[]): React.ReactNod
     )
   )
 
-/**
- * One line of a reply as words. Each word is a span the reveal can fade and lift — `position:
- * relative`, so it is still inline and the line breaks exactly where plain text would break —
- * and each piece of a word carries its mark as an element.
- */
-function Words({ text }: { text: string }): React.JSX.Element {
-  const words = markWords(text)
-  return (
-    <>
-      {words.map((word, j) => (
-        <Fragment key={j}>
-          <span data-part="word" style={s('position:relative')}>
-            {marked(word)}
-          </span>
-          {j < words.length - 1 ? ' ' : ''}
-        </Fragment>
-      ))}
-    </>
-  )
-}
-
-/** A block's lines, a line break between each two: as the reveal's words, or as plain pieces. */
-function Lines({ lines, reveal }: { lines: readonly string[]; reveal: boolean }): React.JSX.Element {
+/** A block's lines, a line break between each two, each line's marks as elements. */
+function Lines({ lines }: { lines: readonly string[] }): React.JSX.Element {
   return (
     <>
       {lines.map((line, i) => (
         <Fragment key={i}>
           {i ? <br /> : null}
-          {reveal ? <Words text={line} /> : marked(splitMarks(line))}
+          {marked(splitMarks(line))}
         </Fragment>
       ))}
     </>
   )
 }
 
-/** Between two blocks of a reply, between two items of a list, and from a marker to its text: px. */
-const BLOCK_GAP = 6
+/** Between two items of a list, and from a marker to its text: px. */
 const ITEM_GAP = 3
 const MARKER_GAP = 6
 
@@ -399,22 +335,19 @@ const TABLE_TEXT = 'border-top:1px solid var(--border);vertical-align:baseline;f
 const TABLE_NUMBER =
   'border-top:1px solid var(--border);vertical-align:baseline;font:400 11px/1.4 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap'
 
-/** One block of a reply, `top` px under the one before it. Nothing in it is ever HTML. */
-function ReplyBlock({ block, top, reveal }: { block: Block; top: number; reveal: boolean }): React.JSX.Element {
-  /** A list marker and a whole table are each one of the reveal's pieces, like a word. */
-  const piece = reveal ? 'word' : undefined
-  if (block.kind === 'p') {
-    return (
-      <p style={s(`margin:${top}px 0 0`)}>
-        <Lines lines={block.lines} reveal={reveal} />
-      </p>
-    )
-  }
+/**
+ * One block of a reply as one bubble's content (2026-11-08: the Ask Vee window draws a reply as
+ * one bubble per block, `ai/parts.ts`). A paragraph is its lines inline — so the bubble's time
+ * can stand at the end of its last line — a list its items, a table the result table's look.
+ * Nothing in it is ever HTML.
+ */
+export function BlockView({ block }: { block: Block }): React.JSX.Element {
+  if (block.kind === 'p') return <Lines lines={block.lines} />
   if (block.kind === 'table') {
     const last = block.head.length - 1
     const pad = (c: number, y: number): string => `padding:${y}px ${c === last ? 9 : 5}px ${y}px ${c === 0 ? 9 : 5}px`
     return (
-      <div data-part={piece} style={s(`${TABLE_BOX};margin-top:${top}px`)}>
+      <div style={s(TABLE_BOX)}>
         <table style={s('border-collapse:collapse;width:100%')}>
           <thead>
             <tr>
@@ -448,22 +381,18 @@ function ReplyBlock({ block, top, reveal }: { block: Block; top: number; reveal:
   /** Every number of a list as wide as its widest, so their full stops stand in a column. */
   const digits = ordered ? String(block.start + block.items.length - 1).length + 1 : 0
   return (
-    <List
-      style={s(`margin:${top}px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:${ITEM_GAP}px`)}
-    >
+    <List style={s(`margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:${ITEM_GAP}px`)}>
       {block.items.map((item, k) => (
         <li key={k} style={s(`display:flex;align-items:baseline;gap:${MARKER_GAP}px`)}>
           {ordered ? (
-            <span data-part={piece} style={s(`${NUMBER_MARK};min-width:${digits}ch`)}>
-              {block.start + k}.
-            </span>
+            <span style={s(`${NUMBER_MARK};min-width:${digits}ch`)}>{block.start + k}.</span>
           ) : (
-            <span data-part={piece} aria-hidden="true" style={s(BULLET)}>
+            <span aria-hidden="true" style={s(BULLET)}>
               •
             </span>
           )}
           <span style={s('flex:1;min-width:0')}>
-            <Lines lines={item} reveal={reveal} />
+            <Lines lines={item} />
           </span>
         </li>
       ))}
@@ -471,234 +400,140 @@ function ReplyBlock({ block, top, reveal }: { block: Block; top: number; reveal:
   )
 }
 
-/**
- * A reply's text, laid out in its blocks (`ai/blocks.ts`). **A reply of one paragraph is drawn as
- * every reply was** — its words straight into the text's box, with nothing around them — and
- * anything more is a paragraph, a list or a table each, `BLOCK_GAP` apart. With `reveal` every
- * word, list marker and table is a `[data-part="word"]` the reveal fades in, in reading order and
- * as many as `wordCount` counts; without it the reply is the same layout with nothing to reveal.
- *
- * Memoised on the text: the panel renders again at every keystroke in the composer, and a reply
- * that has not changed is neither split nor laid out again. (What the reveal writes on the
- * spans is the painter's own, and no render of this touches it.)
- */
-export const ReplyText = memo(function ReplyText({
-  text,
-  reveal = true
-}: {
-  text: string
-  reveal?: boolean
-}): React.JSX.Element {
-  const blocks = parseBlocks(text)
-  if (blocks.length === 1 && blocks[0].kind === 'p') return <Lines lines={blocks[0].lines} reveal={reveal} />
-  return (
-    <>
-      {blocks.map((block, i) => (
-        <ReplyBlock key={i} block={block} top={i ? BLOCK_GAP : 0} reveal={reveal} />
-      ))}
-    </>
-  )
-})
+/* ────────────────────────────── the diary ────────────────────────────── */
 
-/**
- * The ticker's one line (`ask-thinking-hex.jsx:128`, `:171–180`): a label, what follows it in
- * the mono face, and the count on the right — a flex row centred on the line, 6 ÷ 1.5 px between
- * its pieces. The count is never squeezed; a label or a name too long for the panel is cut with
- * an ellipsis instead.
- */
-function TickerLine(): React.JSX.Element {
-  const cut = 'min-width:0;overflow:hidden;text-overflow:ellipsis'
-  return (
-    <div
-      data-part="tick"
-      style={s(`position:absolute;inset:0;display:none;align-items:center;gap:${J(6)}px;white-space:nowrap`)}
-    >
-      <span data-part="tick-label" style={s(cut)} />
-      {/* The reference's line height is 1; as tall as the ticker's own line it is centred the
-          same and its descenders are not cut by the ellipsis's clip. */}
-      <span
-        data-part="tick-mono"
-        style={s(`font:400 10px/${TICK_H}px var(--mono);color:var(--ink);${cut}`)}
-      />
-      <span
-        data-part="tick-count"
-        style={s('flex:none;margin-left:auto;font:400 10px/1 var(--mono);color:var(--faint)')}
-      >
-        <span data-part="tick-n" /> <span data-part="tick-unit" />
-      </span>
-    </div>
-  )
+/** One step a finished reply keeps (`ChatTrace.steps`). */
+export interface DiaryLine {
+  label: string
+  mono: string
+  n: number | null
+  unit: string
 }
 
 /**
- * The height of a reply's text as it is laid out — to the fraction of a pixel, which
- * `offsetHeight` rounds away: two lines of 12.5 px text at 1.55 are 38.75 px, and a quarter of a
- * pixel is what decides which device pixel a row's cell is centred on.
+ * Paint a turn's final matrix on `canvas`: the frame at its answer, which is every animation's
+ * end. What a reopened diary shows.
  */
-export const textHeight = (text: HTMLElement | null): number => (text ? text.getBoundingClientRect().height : 0)
-
-/** A reply with no rows: one array, so that an effect keyed on the rows does not run again for nothing. */
-const NO_ROWS: readonly { label: string; n: number }[] = []
-
-/** The existing reply bubble's own style string (`ChatPanel`), which the trace's bubble starts from. */
-export const bubbleStyle = (fg: string, bg: string, radius: string, maxW: string): string =>
-  `font:400 12.5px/1.55 var(--sans);color:${fg};background:${bg};border-radius:${radius};padding:8px 11px;max-width:${maxW};text-wrap:pretty`
+export function paintFinal(canvas: HTMLCanvasElement, tl: Timeline): void {
+  if (tl.answer === null) return
+  const width = canvas.parentElement ? canvas.parentElement.clientWidth : 0
+  if (width <= 0) return
+  const dpr = window.devicePixelRatio || 1
+  const f = traceFrame(tl, tl.answer, { width, dpr, textH: 0, reduced: true })
+  paintMatrix(canvas, width, MATRIX_BAND.height, f.cells, null, dpr, { x: 0, y: MATRIX_BAND.top })
+}
 
 /**
- * The bubble of a turn's reply — live, being answered, or long finished.
+ * The diary — 2026-11-08 ("Vee Messages", stage 1b). A turn's narration in Vee's bubble: while
+ * the turn runs, `Thinking`, the seconds since Send, a line a step and the element matrix — all
+ * written by the trace's painter (`app/ChatPanel.tsx`), so nothing here renders again at every
+ * frame; once answered, one line that folds the narration away and reopens it.
  *
- * It is the existing bubble with its padding moved onto an inner block, so that its height can
- * be drawn from nothing while the trace opens it; settled, its box is the existing bubble's. A
- * reply whose turn opened the trace bubble is full width (`wide`); one with no trace hugs its
- * text as every reply did.
- *
- * `owned` is the reply the trace is drawing: it carries the ticker, and its canvas is painted by
- * the panel's frame loop. Any other reply paints its own canvas — the rows' cells at rest — and
- * again whenever its box, the theme or the display's ratio changes.
- *
- * 2026-10-08: every message of Vee's is drawn in this bubble — the boot audit too, which no turn
- * produced (it has no trace, so no canvas and nothing to reveal) — so that every reply is laid out
- * in its blocks. A reply that holds a table is full width as well: a table never decides how wide
- * its bubble is, so a wide one scrolls inside its own box.
+ * `owned`: the trace's painter draws this diary — while the turn runs and until its answer has
+ * settled. A diary it has let go of paints its own final matrix when it is reopened, while its
+ * turn's timeline is still the trace's (`timeline`); an older one reopens to its steps alone.
  */
-export function ReplyBubble({
-  text,
-  trace,
-  owned,
-  wide,
-  base,
-  onPick
+export const Diary = memo(function Diary({
+  fold,
+  steps,
+  slots,
+  timeline,
+  owned
 }: {
-  /** The reply, or `null` while it is being written. */
-  text: string | null
-  /** What its trace left: the rows under it and what they count (since 2026-11-07 without their ids). */
-  trace: (Pick<ChatTrace, 'noun'> & { rows: readonly { label: string; n: number }[] }) | null
+  /** The folded line, or `null` while the turn runs. */
+  fold: string | null
+  /** The steps a finished reply keeps. */
+  steps: readonly DiaryLine[]
+  /** While the turn runs: how many steps the trace has so far (the painter writes them). */
+  slots: number
+  /** The answered turn's timeline, while it is this reply's. */
+  timeline: Timeline | null
   owned: boolean
-  wide: boolean
-  /** The existing bubble's style string. */
-  base: string
-  /** A row under the answer was clicked: its place (2026-11-07 — the main window has its ids). */
-  onPick: (row: number) => void
 }): React.JSX.Element {
-  const bubble = useRef<HTMLSpanElement>(null)
+  const [open, setOpen] = useState(false)
   const canvas = useRef<HTMLCanvasElement>(null)
-  const words = useRef<HTMLDivElement>(null)
-  const rows = trace?.rows ?? NO_ROWS
-  const noun = trace?.noun ?? 'element'
-  /** The bubble's inner width, which decides how wide a row's label may be. */
-  const [inner, setInner] = useState(0)
+  const live = fold === null
+  const matrix = owned || (open && timeline !== null)
 
   useLayoutEffect(() => {
-    const node = bubble.current
-    if (!node) return
-    const paint = (): void => {
-      const width = node.clientWidth - 2 * PAD_X
-      setInner((was) => (was === width ? was : width))
-      // The reply the trace is drawing is painted by the loop; it only has to be told.
-      if (owned) return kickTrace()
-      if (!canvas.current || !rows.length) return
-      const dpr = window.devicePixelRatio || 1
-      const cells = rowCells(rows, noun, { width, dpr, textH: textHeight(words.current) })
-      paintMatrix(canvas.current, node.clientWidth, node.clientHeight, cells, null, dpr)
-    }
+    const node = canvas.current
+    if (owned || !open || !timeline || !node) return
+    const paint = (): void => paintFinal(node, timeline)
     paint()
     const sized = new ResizeObserver(paint)
-    sized.observe(node)
+    if (node.parentElement) sized.observe(node.parentElement)
     const stop = onEnvironment(paint)
     return () => {
       sized.disconnect()
       stop()
     }
-    // `rows` is the message's own array, stable for as long as the message is.
-  }, [owned, rows, noun, text])
-
-  const lay = rowLayout(rows, noun, { width: inner, dpr: window.devicePixelRatio || 1 })
-  const hasCanvas = owned || rows.length > 0
-  const table = useMemo(() => text !== null && hasTable(text), [text])
+  }, [owned, open, timeline])
 
   return (
-    <span
-      ref={bubble}
-      data-part="bubble"
-      style={s(
-        `${base};padding:0;position:relative;overflow:hidden` +
-          (wide || table ? ';align-self:stretch' : '') +
-          // Nothing of the bubble shows until the trace opens it.
-          (text === null ? ';height:0;opacity:0' : '')
+    <div data-part="diary" className={`vm-b vm-lc${live ? '' : ' vm-fold'}${open ? ' vm-open' : ''}`}>
+      {live ? (
+        <div className="vm-lc-hd">
+          <span data-part="thinking" className="vm-shim">
+            Thinking
+          </span>
+          <span data-part="elapsed" className="vm-el" />
+        </div>
+      ) : (
+        <button
+          type="button"
+          data-part="diary-sum"
+          className="vm-lc-sum"
+          aria-expanded={open}
+          title="What Vee looked at"
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className="vm-ck">
+            <TickOne />
+          </span>
+          <span>{fold}</span>
+          <Chevron />
+        </button>
       )}
-    >
-      {hasCanvas ? (
-        <canvas
-          ref={canvas}
-          data-part="matrix"
-          aria-hidden="true"
-          width={1}
-          height={1}
-          style={s('position:absolute;left:0;top:0;width:1px;height:1px;display:block;z-index:1;pointer-events:none')}
-        />
-      ) : null}
-      {owned ? (
-        <div
-          data-part="ticker"
-          aria-hidden="true"
-          style={s(
-            `position:absolute;left:${PAD_X}px;right:${PAD_X}px;top:${TICK_TOP}px;height:${TICK_H}px;overflow:hidden;font:400 ${J(15.6)}px/${TICK_H}px var(--sans);color:var(--muted);display:none`
-          )}
-        >
-          <TickerLine />
-          <TickerLine />
-        </div>
-      ) : null}
-      {text !== null ? (
-        <div
-          data-part="body"
-          style={s(`padding:8px ${PAD_X}px ${rows.length ? ROWS_BOTTOM : 8}px`)}
-        >
-          <div ref={words} data-part="text">
-            {/* Only a turn's reply has words to reveal; a message no turn produced is plain. */}
-            <ReplyText text={text} reveal={trace !== null} />
-          </div>
-          {rows.length ? (
-            <div data-part="rows" style={s(`position:relative;margin-top:${ROWS_GAP}px`)}>
-              <div
-                data-part="rule"
-                aria-hidden="true"
-                style={s(`position:absolute;left:0;right:0;top:${RULE_GAP - ROWS_GAP}px;height:1px;background:var(--border)`)}
-              />
-              {rows.map((row, L) => {
-                // A name cut by the ellipsis carries its whole text on hover, as the property card's do.
-                const label = [...row.label].length * MONO_CH > lay.labelMax ? row.label : undefined
-                return (
-                  <button
-                    key={L}
-                    data-part="row"
-                    onClick={() => onPick(L)}
-                    className="hv-card"
-                    style={s(
-                      `display:flex;align-items:center;width:100%;height:${ROW_H}px;font:400 10px/1 var(--mono);border-radius:3px`
-                    )}
-                  >
-                    <span
-                      title={label}
-                      style={s(
-                        `color:var(--muted);max-width:${lay.labelMax}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`
-                      )}
-                    >
-                      {row.label}
-                    </span>
-                    <span style={s('margin-left:auto;color:var(--faint);white-space:nowrap')}>
-                      <span style={s('color:var(--ink)')}>{countText(row.n)}</span> {nounFor(row.n, noun)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </span>
+      <div data-part="diary-body" className="vm-lc-body">
+        <ol className="vm-lc-steps">
+          {live
+            ? Array.from({ length: slots }, (_, k) => (
+                <li key={`l${k}`} data-part="step" className="vm-step">
+                  <span className="vm-g" aria-hidden="true">
+                    <i />
+                    <TickOne />
+                  </span>
+                  <span className="vm-sl">
+                    <span data-part="step-label" />
+                    <code data-part="step-mono" />
+                  </span>
+                  <span data-part="step-count" className="vm-n">
+                    <b data-part="step-num" /> <span data-part="step-unit" />
+                  </span>
+                </li>
+              ))
+            : steps.map((st, k) => (
+                <li key={`s${k}`} className="vm-step vm-ok">
+                  <span className="vm-g" aria-hidden="true">
+                    <i />
+                    <TickOne />
+                  </span>
+                  <span className="vm-sl">
+                    {st.label}
+                    {st.mono ? <code>{st.mono}</code> : null}
+                  </span>
+                  <span className="vm-n">
+                    {st.n !== null ? (
+                      <>
+                        <b>{countText(st.n)}</b> {st.unit}
+                      </>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+        </ol>
+        {matrix ? <canvas ref={canvas} data-part="matrix" className="vm-lc-mx" aria-hidden="true" width={1} height={1} /> : null}
+      </div>
+    </div>
   )
-}
-
-/** The canvas of the reply the trace is drawing: as tall as the trace, or as the answer once it is in. */
-export const matrixHeight = (answer: number): number => Math.max(H_THINK, answer)
+})

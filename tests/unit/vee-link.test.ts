@@ -142,7 +142,7 @@ describe('the snapshot', () => {
     expect(json).not.toMatch(/"ids"/)
     expect(json).not.toContain('G1')
     expect(json).not.toMatch(/"action"|"patch"|"undoSnap"/)
-    expect(snap.msgs[1].pending).toEqual({ id: pendingId(GUIDS.pending!), label: GUIDS.pending!.label })
+    expect(snap.msgs[1].pending).toEqual({ verb: 'Apply', id: pendingId(GUIDS.pending!), label: GUIDS.pending!.label })
     expect(snap.msgs[1].id).toBe(messageId(GUIDS))
   })
 
@@ -242,7 +242,9 @@ describe('the other intents do what the panel’s controls did', () => {
   })
 
   it('a chip, a table row and an answer row select their own elements — by place, from the main window’s message', () => {
-    useShell.setState({ chatMsgs: [GUIDS] })
+    // Elements 11 and 12 are loaded (since stage 1b a pick selects only what still is).
+    const byId = new Map([11, 12].map((id) => [id, { id }])) as unknown as ReturnType<typeof useShell.getState>['byId']
+    useShell.setState({ chatMsgs: [GUIDS], byId })
     connect(fakePort().port)
     const at = { index: 0, msg: messageId(GUIDS) }
     receive({ type: 'pick', ...at, what: 'chip', j: 0, zoom: false })

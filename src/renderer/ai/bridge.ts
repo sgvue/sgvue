@@ -27,7 +27,8 @@ import { visFn } from '../../shared/rules'
 import { gateOf, isViewTool } from '../../shared/tool-schemas'
 import { federation } from '../model/federation-store'
 import { getViewer, planRotationRad, useShell } from '../state/shell'
-import { authorOf, plainOf } from '../state/selectors/chat'
+import { authorOf, NO_MODEL_LINE, plainOf } from '../state/selectors/chat'
+import { QUOTE_MAX, quoteOfPart } from './parts'
 import type { TurnSnapshot } from '../state/selectors/snapshot'
 import { executeTool, newTurnState, type ToolContext, type TurnState } from './executors'
 import { scheduleBriefOf } from './executors/schedule'
@@ -173,8 +174,13 @@ interface LiveTurn {
   text: string
   turn: TurnState
   resolve: () => void
+  /** 2026-11-08 — the turn's first stream event has arrived: its question is marked seen. */
+  seen: boolean
 }
 let live: LiveTurn | null = null
+
+/** 2026-11-08 — whether a turn's tools changed anything, which a stopped or failed turn must not deny. */
+const actedIn = (t: TurnState): boolean => t.acted || t.placed.length > 0
 
 /**
  * Where the camera stands, for the per-turn view state (2026-10-02): the viewer's own, since the
@@ -235,30 +241,47 @@ function context(turn: TurnState, traced = false): ToolContext {
  * resolve "those" against the right message, and the pre-turn snapshot is taken **before**
  * anything runs so ↺ can put the view back.
  */
-export async function sendChat(text?: string): Promise<void> {
+export async function sendChat(text?: string, opts: { retry?: boolean } = {}): Promise<void> {
   const bridge = api()
   const s = useShell.getState()
-  const q = (text ?? s.chatInput ?? '').trim()
-  if (!q || s.chatBusy || !s.federation.elements.length) return
+  // 2026-11-08 — "Try again": the question is the transcript's last message, asked again as it
+  // was, with its quote, and not added again.
+  const last = s.chatMsgs[s.chatMsgs.length - 1]
+  const retry = !!opts.retry && last?.role === 'user'
+  if (opts.retry && !retry) return
+  const q = (retry ? last.text : (text ?? s.chatInput ?? '')).trim()
+  if (!q || s.chatBusy) return
+  // 2026-11-08 — with no model open there is nothing to ask about: the question and Vee's one
+  // fixed line join the transcript, and no turn runs.
+  if (!s.federation.elements.length) {
+    // A retry with no model open is answered too, with the same line — never with nothing.
+    s.chatLocal(q, NO_MODEL_LINE, retry)
+    return
+  }
   if (!bridge) {
-    useShell.getState().chatFail('The assistant is unavailable.')
+    useShell.getState().chatFail('The assistant is unavailable.', { kind: 'failed', error: 'unknown', acted: false })
     return
   }
 
   // A reply carries its target inline, truncated exactly as the design truncates it (`:1597`).
   // Its author is the name the panel shows — `Vee` for the assistant since 2026-10-01 — and,
   // since 2026-10-08, a reply of Vee's is quoted as plain text: its list, its table and its
-  // marks flattened into one line (`plainOf`) before it is cut.
+  // marks flattened into one line (`plainOf`) before it is cut. Since 2026-11-08 a reply made on
+  // one bubble of a message quotes that bubble (`quoteOfPart`) — worked out here, from this
+  // window's own message, never from text the Vee window sent.
   const target = s.chatReplyTo == null ? null : s.chatMsgs[s.chatReplyTo]
-  const said = target ? plainOf(target) : ''
-  const quote = target
-    ? {
-        who: authorOf(target),
-        text: said.length > 220 ? said.slice(0, 220) + '…' : said
-      }
-    : null
+  const part = target && s.chatReplyPart != null ? quoteOfPart(target, s.chatReplyPart) : null
+  const said = part ?? (target ? plainOf(target) : '')
+  const quote = retry
+    ? (last.quote ?? null)
+    : target
+      ? {
+          who: authorOf(target),
+          text: said.length > QUOTE_MAX ? said.slice(0, QUOTE_MAX) + '…' : said
+        }
+      : null
 
-  const before = useShell.getState().chatBegin(q, quote)
+  const before = useShell.getState().chatBegin(q, quote, retry)
   // Send: the trace begins with the turn. The live reply takes the place the assistant's
   // message will get — the slot after the user's, which `chatBegin` has just pushed.
   narrated(() => traceBegin(useShell.getState().federation, useShell.getState().chatMsgs.length), undefined)
@@ -270,7 +293,7 @@ export async function sendChat(text?: string): Promise<void> {
   turnLog = { tools: [], usage: null }
   if (DEVTOOLS && recording) turnRecord = { calls: [], outcome: null }
   const done = new Promise<void>((resolve) => {
-    live = { id: turnId, before, text: '', turn: newTurnState(), resolve }
+    live = { id: turnId, before, text: '', turn: newTurnState(), resolve, seen: false }
   })
 
   try {
@@ -293,7 +316,9 @@ export async function sendChat(text?: string): Promise<void> {
   } catch (error) {
     live = null
     traceFail()
-    useShell.getState().chatFail(error instanceof Error ? error.message : String(error))
+    useShell
+      .getState()
+      .chatFail(error instanceof Error ? error.message : String(error), { kind: 'failed', error: 'unknown', acted: false })
     return
   }
   await done
@@ -541,6 +566,11 @@ export function handleEvent(event: AiEvent): void {
     return
   }
   if (!live || live.id !== event.turnId) return
+  // 2026-11-08 — the read tick: the turn's first stream event says the question was picked up.
+  if (!live.seen && event.type !== 'aborted' && event.type !== 'error') {
+    live.seen = true
+    shell.chatSeen()
+  }
 
   switch (event.type) {
     case 'text_delta':
@@ -573,7 +603,7 @@ export function handleEvent(event: AiEvent): void {
       live = null
       if (DEVTOOLS && recording) turnRecord.outcome = { type: 'aborted' }
       traceFail()
-      shell.chatFail('Stopped.')
+      shell.chatFail('Stopped.', { kind: 'stopped', error: '', acted: actedIn(t.turn) })
       t.resolve()
       return
     }
@@ -584,7 +614,8 @@ export function handleEvent(event: AiEvent): void {
         turnRecord.outcome = { type: 'error', kind: event.kind, message: event.message }
       }
       traceFail()
-      shell.chatFail(event.message)
+      if (event.kind === 'no_key') shell.setHasKey(false)
+      shell.chatFail(event.message, { kind: 'failed', error: event.kind, acted: actedIn(t.turn) })
       t.resolve()
       return
     }

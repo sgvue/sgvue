@@ -128,6 +128,8 @@ describe('main/vee-window.ts — the window', () => {
     expect(o.useContentSize).toBe(true)
     expect([o.width, o.height]).toEqual([330, 420])
     expect([o.minWidth, o.minHeight]).toEqual([VEE_MIN.width, VEE_MIN.height])
+    // 2026-11-08 (stage 1b): the prototype's smallest window, as the content box.
+    expect(VEE_MIN).toEqual({ width: 300, height: 380 })
     // Not above other apps: a child window, never `alwaysOnTop`.
     expect(o.alwaysOnTop).toBeUndefined()
     expect(o.webPreferences).toMatchObject({

@@ -90,6 +90,11 @@ export function paintVee(
 /** One mounted sprite: what it shows, and how to draw a frame of it. */
 interface Sprite {
   state: VeeState
+  /**
+   * 2026-11-08 — held still: an older reply's avatar, which shows one open-eyed frame and is not
+   * on the clock — only the newest reply's avatar (and the header's) blinks or moves.
+   */
+  still: boolean
   /** The frames an `idle` sprite stands ahead of the clock. */
   offset: number
   /** The clock's frame when the sprite entered its state. */
@@ -121,7 +126,7 @@ const redrawAll = (force: boolean): void => {
   const clock = clockFrame()
   const still = !!reduced?.matches
   for (const sp of sprites) {
-    sp.draw(veeSpriteFrame(sp.state, sp.offset, sp.since, clock, still, pinned), force)
+    sp.draw(sp.still ? VEE_STILL_FRAME : veeSpriteFrame(sp.state, sp.offset, sp.since, clock, still, pinned), force)
   }
 }
 
@@ -134,7 +139,7 @@ function arm(): void {
   if (!counting) return
   const clock = clockFrame()
   const next = veeNextWake(
-    [...sprites].map((sp) => ({
+    [...sprites].filter((sp) => !sp.still).map((sp) => ({
       state: sp.state,
       offset: sp.state === 'idle' ? sp.offset : -sp.since
     })),
@@ -154,7 +159,8 @@ function arm(): void {
 
 /** Start or stop counting, whichever `veeClockRuns` says, and set the timer again. */
 function sync(): void {
-  const run = veeClockRuns(sprites.size, !document.hidden, !!reduced?.matches, pinned !== null)
+  const moving = [...sprites].filter((sp) => !sp.still).length
+  const run = veeClockRuns(moving, !document.hidden, !!reduced?.matches, pinned !== null)
   if (run && !counting) {
     startedAt = performance.now()
     counting = true
@@ -204,12 +210,12 @@ function detach(): void {
 }
 
 /** Mount a sprite: it is drawn at once, then whenever the clock or the page asks. */
-function subscribe(state: VeeState, offset: number, draw: Sprite['draw']): () => void {
+function subscribe(state: VeeState, offset: number, still: boolean, draw: Sprite['draw']): () => void {
   if (!sprites.size) attach()
-  const sprite: Sprite = { state, offset, since: clockFrame(), draw }
+  const sprite: Sprite = { state, offset, still, since: clockFrame(), draw }
   sprites.add(sprite)
   sync()
-  draw(veeSpriteFrame(state, offset, sprite.since, clockFrame(), !!reduced?.matches, pinned), true)
+  draw(still ? VEE_STILL_FRAME : veeSpriteFrame(state, offset, sprite.since, clockFrame(), !!reduced?.matches, pinned), true)
   return () => {
     sprites.delete(sprite)
     if (!sprites.size) detach()
@@ -230,6 +236,9 @@ export function pinVeeFrame(n: number | null): void {
 /** Dev harness only: how many times the clock's timer has fired since the page loaded. */
 export const veeWakes = (): number => wakes
 
+/** The frame a still avatar holds: `idle` with its eyes open (a blink is frames 0 and 1 of 28). */
+export const VEE_STILL_FRAME = 2
+
 /* ────────────────────────────── the component ────────────────────────────── */
 
 /**
@@ -242,13 +251,20 @@ export function Vee({
   slot,
   margin,
   offset = 0,
-  state = 'idle'
+  state = 'idle',
+  mult = 1,
+  still = false
 }: {
   slot: number
   margin: string
   offset?: number
   state?: VeeState
+  /** 2026-11-08 — cells of `veeCell` device pixels each: 2 for the 32 px header. */
+  mult?: number
+  /** 2026-11-08 — hold one open-eyed `idle` frame, off the clock. */
+  still?: boolean
 }): React.JSX.Element {
+  const shown = still ? 'idle' : state
   const canvas = useRef<HTMLCanvasElement>(null)
 
   // A layout effect, so the canvas has its size before the first paint: unsized it is the
@@ -257,22 +273,23 @@ export function Vee({
     const node = canvas.current
     if (!node) return
     let drawn = ''
-    return subscribe(state, offset, (frame, force) => {
-      const grid = veeGrid(state, frame)
+    return subscribe(shown, offset, still, (frame, force) => {
+      const grid = veeGrid(shown, frame)
       const key = veeKey(grid)
       if (!force && key === drawn) return
       drawn = key
-      const box = veeBox(slot, window.devicePixelRatio || 1)
+      const box = veeBox(slot, window.devicePixelRatio || 1, mult)
       node.style.width = node.style.height = `${box.size}px`
       node.style.left = node.style.top = `${box.inset}px`
       paintVee(node, grid, box.cell)
     })
-  }, [slot, offset, state])
+  }, [slot, offset, shown, still, mult])
 
   return (
     <span
       data-role="vee"
-      data-state={state}
+      data-state={shown}
+      data-still={still ? '' : undefined}
       aria-hidden="true"
       style={s(`position:relative;flex:none;width:${slot}px;height:${slot}px;margin:${margin}`)}
     >
