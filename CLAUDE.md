@@ -1526,6 +1526,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-09 — **a turn's heads-up is the first observation of the highest kind any of its rule-bearing calls made** (`betterObservation`: placeholder > noStorey > dupGlobalId > objectTypeOnly, earlier on a tie; a clean call takes nothing away), decision C unchanged.
 - 2026-11-09 — **a fixed-choice tool input in a stray pair of wrapping quotes is read without them** (`unquote` in `en`, `executors/inputs.ts`); free strings never are. The prompt uses `query_sql` when the user names the database, SQL or a query, and holds digits in every sentence (43 lines, unchanged).
 
+- 2026-11-09 — **version 1.5.0 ships the Ask Vee messaging work beside the Schedules work, in one installer** (the owner: *"Fold into 1.5.0"*): 1.5.0 was prepared on main and never published; `CHANGELOG.md`'s `[Unreleased]` is folded into its section and `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently and Known limits; the installers are built by `release.yml` from the tag, Windows first and the macOS disk images after the owner's Mac test.
+
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
 ---

@@ -4,6 +4,18 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-09 — 1.5.0 now includes Ask Vee: notes folded, installers built locally
+
+The owner: *"Fold into 1.5.0"*. `CHANGELOG.md`'s `[Unreleased]` folded into 1.5.0; `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently (including that a deliberate Opus 5 choice is moved once too) and Known limits. Checks green: typecheck, lint, vitest 4 218 passed, privacy. Local builds, unrun, ad-hoc signed (Mac) and unsigned (Windows):
+
+| File | Bytes | SHA-256 |
+|---|--:|---|
+| `SGVue-1.5.0-arm64.dmg` | 135 690 628 | `ffaba92c67cb59da27d4508771900064bce2ad7dd1c103fce2441232e9792d2a` |
+| `SGVue-1.5.0-x64.dmg` | 142 293 020 | `c9e5a8e72dabcec7937266a44350fee7a3244a3d34bcc6f2ff5d346841b4a005` |
+| `SGVue-1.5.0-setup.exe` | 124 904 211 | `949f68f67684dd8eb81951d605fe9bd216d4e18fc084c0844c38b438916856c5` |
+
+Every `app.asar` holds only `node_modules`, `out` and `package.json`; notices present; versions 1.5.0. **Owed:** the owner's Mac and Windows test of these builds; merging this branch to main; the tag; `release.yml`'s builds; publishing.
+
 ## 2026-11-09 — Ask Vee after the owner's try-out: Sonnet 5.5 by default, and its confirm run
 
 The owner tried the window in a packaged copy (`714014f` and the commits before it). **Fixed from that:**

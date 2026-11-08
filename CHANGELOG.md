@@ -8,8 +8,24 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-08
+
 ### Added
 
+- **The Schedules window is table-first**, after ifcTable's redesign: the table takes the whole
+  window. Click a column heading for everything about that column — its heading text, total,
+  decimals, unit, alignment, sorting, grouping, colour rules, filter, width, position, hide and
+  remove; Left and Right move between headings. What the schedule does reads as chips above the
+  table — each filter as a sentence with how many rows it removes, each sort and group level,
+  Rows (itemise, grand total) and Style — and each chip opens its own small popover. Columns are
+  added from a search-first field picker, from **+ Column** at the end of the headings or the
+  fields chip, which shows how many elements carry each field.
+- **One Templates library** (the header's templates button, the rail's **Templates library**, or
+  `T`) holds the built-in templates and your own, under Mine · Built-in · IFC-SG, with a search,
+  sortable columns and a preview of what the selected template gives on the models open — how
+  many elements, which columns it finds and its first rows. Use, save, rename, duplicate,
+  delete, export and import from one place.
+- A new icon set in the Schedules window, from ifcTable, drawn in SGVue's stroke style.
 - **Ask Vee reads like a conversation in a messaging app.** Your questions stand on the right
   with the time and a tick — two once Vee has picked the question up. Vee's answer stands on the
   left as one bubble per paragraph, list or table, then its cards: the storey rows, the result
@@ -37,82 +53,27 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   row that matches what is selected in 3D is marked with a revision cloud.
 - **A heads-up line.** Under some answers, in amber, SGVue points out something odd it saw in the
   elements Vee just looked at: a placeholder value such as `TBC` or `-` in the property it
-  checked, elements on no storey, or a GlobalId shared by two elements. It is written by SGVue from
-  what it read, never by Vee, and most answers have none.
+  checked, elements on no storey, or a GlobalId shared by two elements — when one answer looks at
+  the model several ways, the most telling of them, a placeholder in the property you asked about
+  first. It is written by SGVue from what it read, never by Vee, and most answers have none.
 - **IFC names in one colour.** When Vee names a class, a PredefinedType or ObjectType value, a
   property set or a property exactly as your models spell it — `IfcWall`, `FireRating` — it is
-  shown in one colour, and so are the names in the diary's steps and in the storey rows' title,
-  which use the file's own spelling — `Checking FireRating`, not "Fire Rating". A name your
-  models do not carry stays plain.
+  shown in one colour and in bold, and so are the names in the diary's steps and in the storey
+  rows' title, which use the file's own spelling — `Checking FireRating`, not "Fire Rating". Only
+  an exact match of your files' spelling is coloured; a name your models do not carry stays
+  plain.
 - **The IFC+SG question.** When a model carries `SGPset_` property sets and you ask about the types
-  or properties of elements that carry them, Vee asks once per conversation whether the model is
-  for an IFC+SG submission, with **Yes** and **No** buttons. Yes: answers name each element's
-  IFC+SG identity, such as `IfcDoor.DOOR*`. No: plain IFC terms. Vee never says whether a sub-type
-  is valid or which parameters are required — the official IFC+SG mapping is not in SGVue — and
-  only your click answers the question.
+  or properties of elements that carry them, Vee answers and, in the same reply, asks once per
+  conversation whether the model is for an IFC+SG submission, with **Yes** and **No** buttons.
+  Yes: answers name each element's IFC+SG identity, such as `IfcDoor.DOOR*`. No: plain IFC terms.
+  Vee never says whether a sub-type is valid or which parameters are required — the official
+  IFC+SG mapping is not in SGVue — and only your click answers the question.
 - A **New message** button appears when an answer arrives while you are scrolled up, and
   **copy csv** on a result table says `copied` or `couldn't copy`.
 - **New conversation.** A button in the Ask Vee header starts the conversation again: the old
   messages and any request still waiting for your OK go, the IFC+SG question can be asked again,
   and Vee starts with nothing of the old conversation. What earlier answers did to the 3D view
   stays as it is. It is greyed out while Vee is working — Stop ends a turn.
-
-### Changed
-
-- Questions that ask to tabulate — counts by storey, by type, by value — are answered with a table
-  in the chat. Vee makes a schedule in the Schedules window only when you ask for one.
-- Vee writes every count in digits, zero included: "**0** walls are missing a FireRating".
-- **Sonnet 5.5 is the default model** (`claude-sonnet-5-5`). Existing installs move once from
-  Opus 5 to the new default model; a model you choose later is kept.
-- A follow-up keeps to what Vee just found: after "Which walls are missing a fire rating?",
-  "Tabulate them by type" tabulates those walls, not every wall. Say "all the walls" for all.
-- IFC names coloured in Vee's answers are bold as well, and only an exact match of your files'
-  spelling is coloured.
-- When you ask about the types or properties of elements that carry `SGPset_` sets, Vee answers
-  and asks the IFC+SG question in the same reply, once per conversation — it no longer holds the
-  answer back, or forgets to ask.
-- When one answer looks at the model several ways, its heads-up line is the most telling thing
-  SGVue saw — a placeholder in the property you asked about, first — not whatever the last look
-  found.
-- Vee uses a database query whenever you ask for "the database", "SQL" or "a query".
-- A stopped or failed turn is a neutral line, such as "Stopped · nothing changed". It says
-  "nothing changed" only when nothing did; otherwise "what it already did stays".
-- In Ask Vee your messages are on the right, and the `Vee` / `You` labels above each message and
-  the panel's own × are gone — the window's own close button and Esc close it. The status beside
-  Vee's name and the answer appearing word by word are replaced by the diary and its folded line.
-- The Ask Vee window is at least 300 × 380.
-- When Vee makes a schedule for several classes and one of them is in no loaded model, it leaves
-  that class out and says so. An interference check states the tolerance it used.
-
-### Fixed
-
-- Paste (⌘V / Ctrl+V) and cut now work in text fields, including the API key box and the Ask Vee
-  composer.
-- ⌘C / Ctrl+C no longer switches to the spot tool.
-- A reply of Vee's that asks the IFC+SG question no longer shows its opening sentence twice.
-- A conversation that went on after its model schema changed — a model loaded mid-conversation —
-  no longer fails on the newer models, which tie their reasoning to the conversation as it was.
-- When the API hands an answer over to another model midway, the first model's unfinished tool
-  calls are no longer run.
-
-## [1.5.0] - 2026-11-08
-
-### Added
-
-- **The Schedules window is table-first**, after ifcTable's redesign: the table takes the whole
-  window. Click a column heading for everything about that column — its heading text, total,
-  decimals, unit, alignment, sorting, grouping, colour rules, filter, width, position, hide and
-  remove; Left and Right move between headings. What the schedule does reads as chips above the
-  table — each filter as a sentence with how many rows it removes, each sort and group level,
-  Rows (itemise, grand total) and Style — and each chip opens its own small popover. Columns are
-  added from a search-first field picker, from **+ Column** at the end of the headings or the
-  fields chip, which shows how many elements carry each field.
-- **One Templates library** (the header's templates button, the rail's **Templates library**, or
-  `T`) holds the built-in templates and your own, under Mine · Built-in · IFC-SG, with a search,
-  sortable columns and a preview of what the selected template gives on the models open — how
-  many elements, which columns it finds and its first rows. Use, save, rename, duplicate,
-  delete, export and import from one place.
-- A new icon set in the Schedules window, from ifcTable, drawn in SGVue's stroke style.
 - From the repository only: every Schedules cell of three synthetic models is checked against
   IfcOpenShell (`tests/unit/schedule/oracle.test.ts`, `scripts/make-edge-ifc.py`); the drawn
   table against the engine's rows, totals and filters against an independent oracle, and seeded
@@ -143,6 +104,22 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 - In the Schedules window, Building, Site and Room / Space come from the element's own place
   in the spatial structure, so a wall placed in the building names it, and furniture placed in
   a room names the room.
+- Questions that ask to tabulate — counts by storey, by type, by value — are answered with a table
+  in the chat. Vee makes a schedule in the Schedules window only when you ask for one.
+- Vee writes every count in digits, zero included: "**0** walls are missing a FireRating".
+- **Sonnet 5.5 is the default model** (`claude-sonnet-5-5`). Existing installs move once from
+  Opus 5 to the new default model; a model you choose later is kept.
+- A follow-up keeps to what Vee just found: after "Which walls are missing a fire rating?",
+  "Tabulate them by type" tabulates those walls, not every wall. Say "all the walls" for all.
+- Vee uses a database query whenever you ask for "the database", "SQL" or "a query".
+- A stopped or failed turn is a neutral line, such as "Stopped · nothing changed". It says
+  "nothing changed" only when nothing did; otherwise "what it already did stays".
+- In Ask Vee your messages are on the right, and the `Vee` / `You` labels above each message and
+  the panel's own × are gone — the window's own close button and Esc close it. The status beside
+  Vee's name and the answer appearing word by word are replaced by the diary and its folded line.
+- The Ask Vee window is at least 300 × 380.
+- When Vee makes a schedule for several classes and one of them is in no loaded model, it leaves
+  that class out and says so. An interference check states the tolerance it used.
 
 ### Fixed
 
@@ -154,6 +131,15 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   brings the old name back on Undo; a schedule changed by Ask Vee is always its own Undo step.
 - When the Schedules window does not answer Ask Vee in time, Vee says it is not known whether
   the action happened, instead of saying it most likely did not.
+- Paste (⌘V / Ctrl+V) and cut now work in text fields, including the API key box and the Ask Vee
+  composer.
+- ⌘C / Ctrl+C no longer switches to the spot tool.
+- A reply of Vee's that asks the IFC+SG question no longer shows its opening sentence twice.
+- A conversation that went on after its model schema changed — a model loaded mid-conversation —
+  no longer fails on the newer models, which tie their reasoning to the conversation as it was.
+- When the API hands an answer over to another model midway, the first model's unfinished tool
+  calls are no longer run.
+- A change that waits for your OK counts a single element as `1 element`, not `1 elements`.
 
 ### Security
 
