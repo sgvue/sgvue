@@ -1,4 +1,4 @@
-// Appearance: how the whole table looks on screen and on paper.
+// Appearance: how the whole table looks on screen and on paper — the view bar's Style chip.
 
 import { BODY_FONTS, normaliseFont } from '../../../schedule/schedule/fonts';
 import type { AppState } from '../state';
@@ -23,12 +23,8 @@ function fontNote(current: string | undefined): string {
   return f?.note ?? '';
 }
 
-export function appearanceSummary(state: AppState): string {
-  const a = state.def.appearance ?? {};
-  return `${a.gridLines !== false ? 'Grid' : 'No grid'} · ${a.zebra !== false ? 'zebra' : 'plain'} · ${a.fontSize ?? 13} px`;
-}
-
-export function appearanceBody(state: AppState): string {
+/** The Style chip's body. `idp` prefixes its label/input ids. */
+export function appearanceBody(state: AppState, idp = ''): string {
   const a = state.def.appearance ?? {};
 
   return `<div class="eyebrow block-label">Graphics</div>
@@ -48,23 +44,23 @@ export function appearanceBody(state: AppState): string {
     </div>
 
     <div class="block tight">
-      <label class="lbl" for="app-title">Title</label>
-      <input id="app-title" class="full" type="text" data-act="app-title"
+      <label class="lbl" for="${idp}app-title">Title</label>
+      <input id="${idp}app-title" class="full" type="text" data-act="app-title"
         value="${esc(a.title ?? '')}" placeholder="${esc(state.def.name)}" />
     </div>
 
     <div class="block">
       <div class="row ends">
-        <label class="lbl" for="app-size">Text size</label>
+        <label class="lbl" for="${idp}app-size">Text size</label>
         <span class="mono size-read">${esc(a.fontSize ?? 13)} px</span>
       </div>
-      <input id="app-size" class="full" type="range" min="10" max="18" step="1"
+      <input id="${idp}app-size" class="full" type="range" min="10" max="18" step="1"
         data-act="app-fontsize" value="${esc(a.fontSize ?? 13)}" />
     </div>
 
     <div class="block">
-      <label class="lbl" for="app-font">Body font</label>
-      <select id="app-font" class="full" data-act="app-font" aria-label="Body font">
+      <label class="lbl" for="${idp}app-font">Body font</label>
+      <select id="${idp}app-font" class="full" data-act="app-font" aria-label="Body font">
         ${fontOptions(a.bodyFont)}
       </select>
       <div class="sub hint-under">${esc(fontNote(a.bodyFont))}</div>

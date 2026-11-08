@@ -1,4 +1,5 @@
-// Drag-to-reorder for the column list and the sort levels.
+// Drag-to-reorder for the field picker's "In this table" list (since v1.5.0's table-first
+// port; it served the inspector's column list and sort levels before).
 //
 // The hover cue is written straight onto DOM classes and NEVER into AppState. That is the
 // whole trick: state changes repaint the pane with innerHTML, and a repaint in the middle
@@ -77,10 +78,6 @@ export function wireReorder(root: HTMLElement, move: (kind: string, from: number
   });
 }
 
-/** Move one item, leaving the array unchanged when the target is out of range. */
-export function moveItem<T>(list: T[], from: number, to: number): boolean {
-  if (from < 0 || from >= list.length || to < 0 || to >= list.length || from === to) return false;
-  const [item] = list.splice(from, 1);
-  list.splice(to, 0, item);
-  return true;
-}
+/** Move one item, leaving the array unchanged when the target is out of range. Pure list
+ *  logic, so it lives with the schedule actions; re-exported for existing callers. */
+export { moveItem } from '../../schedule/schedule/actions';

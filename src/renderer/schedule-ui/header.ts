@@ -52,7 +52,7 @@ export function renderHeader(state: AppState): string {
       title="Fit every column to its contents, and give columns of nearly equal width one shared width">Auto-fit columns</button>
     <button class="btn" data-act="fit-equal"${equal ? '' : ' disabled'}
       title="${equal
-        ? 'Give the selected columns the width of the column being edited in Format'
+        ? 'Give the selected columns the width of the column you last clicked'
         : 'Shift+click two or more column headings first'}">Equal width</button>
     <span class="hdr-group" role="group" aria-label="Schedule actions">
       ${tool('open-templates', 'Start from a template', icon.templates)}

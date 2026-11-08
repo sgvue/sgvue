@@ -120,7 +120,7 @@ const MOCK_MM = 'a length in millimetres of the design\'s mock federation, in th
 const ALLOWED_NUMBERS = {
   '2249.99': DOOR_COST,
   '2583.32': DOOR_COST,
-  '2666.65': DOOR_COST,
+  '2666.65': "a total / average over the doors' synthetic costs, in the kitchen-sink golden master's grand-total row (tests/unit/schedule/golden/hand-kitchen-sink.json)",
   '2916.65': DOOR_COST,
   '3249.98': DOOR_COST,
   '3583.31': DOOR_COST,

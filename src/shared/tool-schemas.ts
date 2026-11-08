@@ -90,7 +90,8 @@
  *
  * **2026-10-02 — phase 4 of 4: the Schedules window, and placing markups.**
  *
- *   · `make_schedule` gains what that window's Filter, Sorting and Format tabs and its
+ *   · `make_schedule` gains what that window's Filter, Sorting and Format tabs (since v1.5.0 its
+ *     column menus and view-bar chips) and its
  *     calculated-value editor set: `filterLogic`, `itemize`, per column `hidden`, `decimals`,
  *     `unit`, `align` and a position (`after`), and `calculated` columns in the engine's own
  *     formula grammar — refused, with the engine's reason, when one does not parse;
@@ -1199,6 +1200,8 @@ export const SCHEDULE_RESULT_ENUM = [
   'angle'
 ] as const
 export const SCHEDULE_CALCULATED_MAX = 20
+/** A calculated value's formula, at most — what `parseScheduleDef` keeps on read and `make_schedule`'s zod check allows; its description says so (v1.5.0). */
+export const SCHEDULE_FORMULA_CHARS = 1000
 
 /** A column's field, wherever `make_schedule` takes one. The tool description lists them. */
 const SCHEDULE_FIELD: JsonSchema = {
@@ -1284,7 +1287,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
             name: { type: 'string', description: 'Its name, which is also its heading' },
             formula: {
               type: 'string',
-              description: 'An expression over the other columns’ headings; [Heading] for one with a space'
+              description: `An expression over the other columns’ headings; [Heading] for one with a space. At most ${SCHEDULE_FORMULA_CHARS} characters.`
             },
             percentageOf: {
               type: 'string',
@@ -1311,7 +1314,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
               type: 'string',
               enum: SCHEDULE_OP_ENUM,
               description:
-                'The Filter tab’s operators. hasValue and noValue take no value; in takes values (any of); between takes values with two numbers.'
+                'The Schedules window’s filter operators. hasValue and noValue take no value; in takes values (any of); between takes values with two numbers.'
             },
             value: { type: 'string' },
             values: { type: 'array', items: { type: 'string' } }

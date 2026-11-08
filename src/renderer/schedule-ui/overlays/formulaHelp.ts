@@ -2,8 +2,9 @@
 //
 // ifcTable served this as a page of its own, `public/formula.html`, opened in a new tab from
 // the calculated-value editor's "Syntax guide" link. A desktop window has no tab to open and
-// must not navigate, so the same text is an overlay here, drawn in the field browser's card,
-// reached from the same link, and left with Escape or "Back to fields". The content is
+// must not navigate, so the same text is an overlay here, drawn in the modal card, reached
+// from the same link, and left with Escape or "Back to calculated values" (the
+// calculated-value editor's own modal since v1.5.0). The content is
 // ifcTable's own, section for section; only the pointers to where things live are SGVue's.
 // Static text — no model data reaches this string.
 
@@ -24,7 +25,7 @@ export function formulaHelp(): string {
         <div class="row top head-row">
           <div class="grow-1">
             <h3>Formula syntax</h3>
-            <p>For calculated columns — Fields › Add fields… › Calculated › Add formula</p>
+            <p>For calculated columns — the field picker’s + Calculated value, or a calculated column’s Edit formula</p>
           </div>
           <button class="overlay-close hv-step-ink" data-act="close-overlay" aria-label="Close">${cross(14, 1.8)}</button>
         </div>
@@ -179,7 +180,7 @@ if(contains(Type, "FD"), "Fire door", "Standard")</code></pre>
       </div>
       <div class="overlay-foot">
         <span class="spacer"></span>
-        <button class="btn primary" data-act="open-fields">Back to fields</button>
+        <button class="btn primary" data-act="open-calc">Back to calculated values</button>
       </div>
     </div>
   </div>`;

@@ -9,8 +9,10 @@
 const SCROLLERS = [
   // The rail has two: the categories list, and the capped saved-schedules list pinned
   // below it. Both are rebuilt by the same innerHTML write, so both have to be listed.
-  '.rail-body', '.rail-sched .rail-group', '.inspector-body', '.table-wrap',
-  '.browse-list', '.browse-groups', '.tpl-grid-wrap', '.saved-list',
+  '.rail-body', '.rail-sched .rail-group', '.table-wrap',
+  '.tpl-grid-wrap', '.saved-list', '.calc-scroll', '.pick-list',
+  // The popover node is never rebuilt, but its body is — and a long menu scrolls.
+  '#popover',
 ];
 
 /** Input types that support a text selection; the rest throw on setSelectionRange. */
@@ -23,15 +25,19 @@ const CARET_TYPES = new Set(['text', 'search', 'url', 'tel', 'password']);
 const KEYS = [
   'i', 'id', 'pset', 'v',
   'section', 'entity', 'name', 'type',
+  // A column-menu control names its column; without this the menu's heading box and another
+  // column's could not be told apart (ifcTable, 2026-11-05).
+  'defcol',
 ] as const;
 
 /**
- * The panes a control can live in. The field browser deliberately mirrors the column list
- * that is also in the inspector, with the same data-act and data-i, so a document-wide
- * lookup would find the inspector's hidden copy behind the modal and put focus there.
- * Restoring inside the ORIGINATING pane keeps the two apart.
+ * The panes a control can live in. The same control can be drawn in two of them at once —
+ * the field picker's Hide in the popover, say, beside another pane's control of the same act —
+ * so a document-wide lookup could put focus in the wrong copy. Restoring inside the
+ * ORIGINATING pane keeps them apart. (v1.5.0: the popover and the view bar's `#centre-head`
+ * took the retired inspector's place.)
  */
-const PANES = ['#overlay-root', '#inspector-pane', '#rail-pane', '#header', '#output-pane'];
+const PANES = ['#popover', '#overlay-root', '#rail-pane', '#header', '#centre-head', '#output-pane'];
 
 export interface Ui {
   pane: string | null;

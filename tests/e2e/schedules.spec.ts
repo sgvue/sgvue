@@ -230,8 +230,31 @@ async function beside(page: Page, sched: Page): Promise<Buffer> {
 /** A control in the Schedules window by its `data-act` (and, optionally, more attributes). */
 const act = (win: Page, name: string, more = '') => win.locator(`[data-act="${name}"]${more}`)
 
-/** The inspector tab by id. */
-const tab = (win: Page, id: string) => act(win, 'section', `[data-section="${id}"]`).first()
+/** A view-bar chip by kind (v1.5.0, the table-first window): its popover opens under it. */
+const chip = (win: Page, kind: string, more = '') => act(win, 'vb-open', `[data-v="${kind}"]${more}`).first()
+/** The one popover, and a control inside it. */
+const pop = (win: Page) => win.locator('#popover')
+const inPop = (win: Page, name: string, more = '') => pop(win).locator(`[data-act="${name}"]${more}`)
+
+/**
+ * "+ Filter" or "+ Sort / group", then a field from its picker (searched for by `find`): the new
+ * rule's or level's own popover opens, as the inspector's "+ Add" and field select used to.
+ */
+async function addOn(win: Page, kind: 'filter' | 'sort', fieldId: string, find: string): Promise<void> {
+  await chip(win, kind === 'filter' ? 'add-filter' : 'add-sort').click()
+  await inPop(win, 'pick-search').fill(find)
+  await inPop(win, 'vb-add', `[data-v="${kind}"][data-id="${fieldId}"]`).click()
+  await expect(pop(win)).toBeVisible()
+}
+
+/** Add one field as a column through the field picker (its chip), as Add fields… used to. */
+async function addColumn(win: Page, fieldId: string, find: string): Promise<void> {
+  await chip(win, 'picker', '[data-id="chip"]').click()
+  await inPop(win, 'pick-search').fill(find)
+  await inPop(win, 'pick-toggle', `[data-id="${fieldId}"]`).click()
+  await inPop(win, 'pick-commit').click()
+  await expect(pop(win)).toBeHidden()
+}
 
 test('phase 2: template → filter → group (itemise off) → a grouped row selects its elements; undo; saved round trip', async () => {
   const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: TINY })
@@ -253,20 +276,18 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(sched.locator('.tpl-chip')).toContainText('Wall Schedule')
     await expect(sched.locator('table.schedule thead th', { hasText: 'IsExternal' })).toHaveCount(1)
 
-    // 2 — a filter rule on Level: it says what it does before anything else.
-    await tab(sched, 'filter').click()
-    await act(sched, 'filter-add').click()
-    await act(sched, 'filter-field', '[data-i="0"]').selectOption('core|storey')
-    await expect(sched.locator('.rule-effect .keeps')).toHaveText('Keeps 4')
-    await expect(sched.locator('.tab[data-section="filter"] .tab-badge')).toHaveText('1')
+    // 2 — a filter rule on Level: it says what it does before anything else, and the view bar
+    // reads it as a chip.
+    await addOn(sched, 'filter', 'core|storey', 'level')
+    await expect(pop(sched).locator('.rule-effect .keeps')).toHaveText('Keeps 4')
+    await expect(sched.locator('.viewbar .vchip.filter')).toHaveCount(1)
 
     // 3 — group by Level with a header row, and switch itemise off: identical rows collapse.
-    await tab(sched, 'sort').click()
-    await act(sched, 'sort-add').click()
-    await act(sched, 'sort-field', '[data-i="0"]').selectOption('core|storey')
-    await act(sched, 'sort-header', '[data-i="0"]').check()
+    await addOn(sched, 'sort', 'core|storey', 'level')
+    await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await expect(sched.locator('tr.group')).toHaveCount(2)
-    await act(sched, 'itemize').uncheck()
+    await chip(sched, 'rows').click()
+    await inPop(sched, 'itemize').uncheck()
     await expect(sched.locator('table.schedule thead th', { hasText: 'Count' })).toHaveCount(1)
     await expect(sched.locator('tr.data')).toHaveCount(2)
     // Header rows select nothing: they carry no data-row.
@@ -294,8 +315,8 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(sched.locator('.rail-saved.on')).toContainText('Wall Schedule')
 
     // 7 — edit, then switch category: the window's own dialog asks first.
-    await tab(sched, 'appearance').click()
-    await act(sched, 'app-zebra').uncheck()
+    await chip(sched, 'style').click()
+    await inPop(sched, 'app-zebra').uncheck()
     await sched.locator('.rail-item', { hasText: 'IfcSlab' }).click()
     const dialog = sched.locator('.dlg[role="dialog"]')
     await expect(dialog).toContainText('Replace the current schedule setup?')
@@ -327,7 +348,7 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(again.locator('.schedule-title')).toHaveText('Walls by level')
     await expect(again.locator('tr.group')).toHaveCount(2)
     await expect(again.locator('tr.data')).toHaveCount(2)
-    await expect(again.locator('.tab[data-section="filter"] .tab-badge')).toHaveText('1')
+    await expect(again.locator('.viewbar .vchip.filter')).toHaveCount(1)
     // And the loaded setup still drives the 3D selection.
     await again.locator('tr.data', { hasText: 'Level 1' }).click()
     await expect(page.locator('[data-role="propcard"]')).toContainText('2 selected')
@@ -341,7 +362,7 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
   }
 })
 
-test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard reorder, coverage, the inspector', async () => {
+test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard reorder, coverage, the column menu', async () => {
   const { app, page } = await launch(dir, { SGVUE_OPEN_PATHS: TINY })
   try {
     await page.getByText(DROP_COPY).click()
@@ -354,10 +375,9 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
       sched.locator('table.schedule').evaluate((t, n) => (t as HTMLElement).style.getPropertyValue(`--colw-${n}`), i)
 
     // Coverage: the tiny model carries no wall quantities, so those columns say so on the
-    // heading, and the Fields tab offers a remap under them.
+    // heading, and the view bar's fields chip counts them (v1.5.0: the Fields tab is gone).
     await expect(sched.locator('table.schedule thead th .badge', { hasText: '0 values' }).first()).toBeVisible()
-    await expect(sched.locator('.drag-row.empty').first()).toBeVisible()
-    await expect(sched.locator('.tab[data-section="fields"] .tab-alert')).toHaveCount(1)
+    await expect(sched.locator('.viewbar .warnc')).toContainText('empty')
 
     // Shift-click marks a run of headings; Equal width wakes up; Escape clears the marks.
     await heads.nth(0).click()
@@ -372,7 +392,8 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
     await act(sched, 'fit-all').click()
     await expect.poll(() => widthVar(0)).toMatch(/^\d+px$/)
 
-    // Ctrl-click two, Equal width: both take the width of the column Format is editing.
+    // Ctrl-click two, Equal width: both take the width of the column last clicked. (The plain
+    // click opens its column menu; the Ctrl-click after it, outside the menu, closes it.)
     await heads.nth(1).click()
     await heads.nth(0).click({ modifiers: ['ControlOrMeta'] })
     await heads.nth(3).click({ modifiers: ['ControlOrMeta'] })
@@ -394,30 +415,31 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
     await sched.keyboard.press('Control+Z')
     await expect.poll(async () => parseInt(await widthVar(2), 10)).toBe(before)
 
-    // Keyboard reorder: focus a column's grip, arrow down; the column moves and focus follows.
-    await tab(sched, 'fields').click()
+    // Keyboard reorder: in the field picker's "In this table", focus a column's grip, arrow
+    // down; the column moves and focus follows.
+    await chip(sched, 'picker', '[data-id="chip"]').click()
     const firstHeading = (await heads.nth(0).textContent())?.trim()
-    await sched.locator('.drag-row[data-i="0"] .handle').focus()
+    await pop(sched).locator('.crow[data-i="0"] .handle').focus()
     await sched.keyboard.press('ArrowDown')
     await expect(heads.nth(1)).toHaveText(firstHeading!)
-    await expect(sched.locator('.drag-row[data-i="1"] .handle')).toBeFocused()
+    await expect(pop(sched).locator('.crow[data-i="1"] .handle')).toBeFocused()
+    await sched.keyboard.press('Escape')
+    await expect(pop(sched)).toBeHidden()
 
-    // The inspector: resizable by its edge (kept in this window's own storage), collapsible
-    // to its icon strip, and each icon both reopens it and picks its tab.
-    const pane = sched.locator('#inspector-pane')
-    const w0 = (await pane.boundingBox())!.width
-    const edge = (await sched.locator('.panel-resize').boundingBox())!
-    await sched.mouse.move(edge.x + edge.width / 2, edge.y + 200)
-    await sched.mouse.down()
-    await sched.mouse.move(edge.x + edge.width / 2 - 100, edge.y + 200, { steps: 4 })
-    await sched.mouse.up()
-    await expect.poll(async () => Math.round((await pane.boundingBox())!.width)).toBe(Math.round(w0 + 100))
-    expect(await sched.evaluate(() => localStorage.getItem('sgvue.schedules.inspectorW'))).toBe(String(Math.round(w0 + 100)))
-    await sched.locator('.inspector-head [data-act="panel-toggle"]').click()
-    await expect(pane).toHaveClass(/closed/)
-    await sched.locator('.strip-tab[data-section="sort"]').click()
-    await expect(pane).not.toHaveClass(/closed/)
-    await expect(sched.locator('.tab.on')).toHaveAttribute('data-section', 'sort')
+    // v1.5.0: no inspector. A heading opens its column's menu with its heading box focused;
+    // Escape closes it and gives the heading the focus back; a second click closes it too.
+    await expect(sched.locator('#inspector-pane')).toHaveCount(0)
+    await heads.nth(1).click()
+    await expect(pop(sched)).toBeVisible()
+    await expect(heads.nth(1)).toHaveAttribute('aria-expanded', 'true')
+    await expect(inPop(sched, 'fmt-heading')).toBeFocused()
+    await sched.keyboard.press('Escape')
+    await expect(pop(sched)).toBeHidden()
+    await expect(heads.nth(1)).toBeFocused()
+    await heads.nth(1).click()
+    await expect(pop(sched)).toBeVisible()
+    await heads.nth(1).click()
+    await expect(pop(sched)).toBeHidden()
   } finally {
     await app.close()
   }
@@ -443,24 +465,23 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
     // A grouped door schedule with a filter, footers, a grand total and conditional colours.
     await act(sched, 'open-templates').click()
     await sched.locator('[data-act="apply-template"][data-id="door-schedule"]').click()
-    await tab(sched, 'filter').click()
-    await act(sched, 'filter-add').click()
-    await act(sched, 'filter-field', '[data-i="0"]').selectOption('core|storey')
-    await tab(sched, 'sort').click()
-    await act(sched, 'sort-add').click()
-    await act(sched, 'sort-field', '[data-i="0"]').selectOption('core|storey')
-    await act(sched, 'sort-header', '[data-i="0"]').check()
-    await act(sched, 'sort-footer', '[data-i="0"]').check()
-    await act(sched, 'itemize').uncheck()
-    await act(sched, 'grand-total').check()
+    await addOn(sched, 'filter', 'core|storey', 'level')
+    await addOn(sched, 'sort', 'core|storey', 'level')
+    await inPop(sched, 'sort-header', '[data-i="0"]').check()
+    await inPop(sched, 'sort-footer', '[data-i="0"]').check()
+    await chip(sched, 'rows').click()
+    await inPop(sched, 'itemize').uncheck()
+    await inPop(sched, 'grand-total').check()
     await sched.locator('table.schedule thead th[data-defcol="0"]').click()
-    await act(sched, 'cond-add').click()
+    await inPop(sched, 'cm-view', '[data-v="colour"]').click()
+    await inPop(sched, 'cond-add').click()
     const first = ((await sched.locator('tr.data td').first().textContent()) ?? '').trim()
-    await act(sched, 'cond-value', '[data-i="0"]').fill(first)
-    await act(sched, 'cond-add').click()
-    await act(sched, 'cond-preset', '[data-i="1"]').nth(2).click()
-    await act(sched, 'cond-op', '[data-i="1"]').selectOption('!=')
-    await act(sched, 'cond-value', '[data-i="1"]').fill(first)
+    await inPop(sched, 'cond-value', '[data-i="0"]').fill(first)
+    await inPop(sched, 'cond-add').click()
+    await inPop(sched, 'cond-preset', '[data-i="1"]').nth(2).click()
+    await inPop(sched, 'cond-op', '[data-i="1"]').selectOption('!=')
+    await inPop(sched, 'cond-value', '[data-i="1"]').fill(first)
+    await sched.keyboard.press('Escape')
     await sched.locator('tr.data').first().click()
 
     const snap = async (name: string, theme: string): Promise<void> => {
@@ -474,23 +495,27 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
       await expect.poll(() => sched.evaluate(() => document.documentElement.dataset.theme)).toBe(theme)
 
       await snap('grouped-conditional', theme)
-      for (const id of ['fields', 'filter', 'sort', 'appearance']) {
-        await tab(sched, id).click()
-        await snap(`tab-${id}`, theme)
+      // v1.5.0: each view-bar chip's popover where the inspector's tabs were.
+      for (const [name, kind, more] of [
+        ['filter', 'filter', '[data-i="0"]'], ['sort', 'sort', '[data-i="0"]'], ['rows', 'rows', ''], ['style', 'style', ''],
+      ]) {
+        await chip(sched, kind, more).click()
+        await expect(pop(sched)).toBeVisible()
+        await snap(`chip-${name}`, theme)
+        await sched.keyboard.press('Escape')
       }
-      await tab(sched, 'fields').click()
-      await act(sched, 'open-fields').first().click()
-      await act(sched, 'field-search').fill('fire')
+      await chip(sched, 'picker', '[data-id="chip"]').click()
+      await inPop(sched, 'pick-search').fill('fire')
       await sched.waitForTimeout(300)
-      await snap('field-browser', theme)
-      await act(sched, 'field-search').fill('')
-      if (!(await sched.locator('[data-act="calc-formula"]').count())) {
-        await act(sched, 'calc-add-formula').click()
-        await act(sched, 'calc-formula').fill('Width * Height')
+      await snap('field-picker', theme)
+      await inPop(sched, 'pick-search').fill('')
+      await inPop(sched, 'pick-calc').click()
+      if ((await sched.locator('[data-act="calc-formula"]').count()) < 2) {
+        await act(sched, 'calc-formula').last().fill('Width * Height')
         await act(sched, 'calc-add-percent').click()
       }
       await sched.waitForTimeout(300)
-      await sched.locator('.browse-chosen').evaluate((e) => e.scrollTo(0, e.scrollHeight))
+      await sched.locator('.calc-scroll').evaluate((e) => e.scrollTo(0, e.scrollHeight))
       await snap('calc-editor', theme)
       await act(sched, 'open-formula').click()
       await snap('formula-help', theme)
@@ -504,11 +529,12 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
       await snap('my-templates', theme)
       await sched.keyboard.press('Escape')
       await sched.locator('table.schedule thead th[data-defcol="0"]').click()
-      await snap('tab-format', theme)
+      await snap('column-menu', theme)
+      await sched.keyboard.press('Escape')
       // An edit that changes nothing on screen, so a category click has something to ask about.
-      await tab(sched, 'appearance').click()
-      await act(sched, 'app-zebra').uncheck()
-      await act(sched, 'app-zebra').check()
+      await chip(sched, 'style').click()
+      await inPop(sched, 'app-zebra').uncheck()
+      await inPop(sched, 'app-zebra').check()
       await sched.locator('.rail-item', { hasText: 'IfcWall' }).first().click()
       await snap('dialog', theme)
       await sched.keyboard.press('Escape')
@@ -671,9 +697,7 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
     await expect.poll(() => counts(page)).toEqual([total, total])
 
     // 7 — Copy GUIDs: the clipboard holds exactly the GUIDs a GUID column shows for the two rows.
-    await act(sched, 'open-fields').first().click()
-    await sched.locator('[data-act="browse-add"][data-id="core|guid"]').click()
-    await sched.keyboard.press('Escape')
+    await addColumn(sched, 'core|guid', 'guid')
     await expect(sched.locator('.overlay')).toHaveCount(0)
     await expect(heads.last()).toHaveText('GUID')
     await rows.nth(0).click()
@@ -706,13 +730,11 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
       [...new Set(trs.map((t) => t.querySelector('td')!.textContent))].sort()
     )
     expect(models).toEqual(['SB_ARC_R25', 'SB_STR_R25'])
-    await tab(sched, 'filter').click()
-    await act(sched, 'filter-add').click()
-    await act(sched, 'filter-field', '[data-i="0"]').selectOption('core|model')
-    await act(sched, 'filter-op', '[data-i="0"]').selectOption('=')
-    await act(sched, 'filter-value', '[data-i="0"]').fill('SB_STR_R25')
+    await addOn(sched, 'filter', 'core|model', 'model')
+    await inPop(sched, 'filter-op', '[data-i="0"]').selectOption('=')
+    await inPop(sched, 'filter-value', '[data-i="0"]').fill('SB_STR_R25')
     await expect(rows).toHaveCount(12)
-    await act(sched, 'filter-remove', '[data-i="0"]').click()
+    await inPop(sched, 'filter-remove', '[data-i="0"]').click()
     await expect(rows).toHaveCount(80)
 
     // 9 — Colour 3D by the Model column: the main window's legend is titled with the column and
@@ -774,11 +796,9 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
 
     // 10 — a model unloaded in the main window: the new snapshot keeps this window's schedule,
     // its filter and where the table was scrolled, since the category is still there.
-    await tab(sched, 'filter').click()
-    await act(sched, 'filter-add').click()
-    await act(sched, 'filter-field', '[data-i="0"]').selectOption('core|model')
-    await act(sched, 'filter-op', '[data-i="0"]').selectOption('=')
-    await act(sched, 'filter-value', '[data-i="0"]').fill('SB_ARC_R25')
+    await addOn(sched, 'filter', 'core|model', 'model')
+    await inPop(sched, 'filter-op', '[data-i="0"]').selectOption('=')
+    await inPop(sched, 'filter-value', '[data-i="0"]').fill('SB_ARC_R25')
     await expect(rows).toHaveCount(68)
     await wrap.evaluate((w) => { w.scrollTop = 300 })
     const before = await wrap.evaluate((w) => w.scrollTop)
@@ -791,7 +811,8 @@ test('phase 3: two-way selection, multi-row, the row menu, the Model column, col
     await expect(unload).toHaveCount(3)
     await expect(railItems(sched).filter({ hasText: 'IfcDuctSegment' })).toHaveCount(0)
     await expect(rows).toHaveCount(68)
-    await expect(act(sched, 'filter-value', '[data-i="0"]')).toHaveValue('SB_ARC_R25')
+    // The rule's popover stayed open over the new snapshot, as the inspector's tab did.
+    await expect(inPop(sched, 'filter-value', '[data-i="0"]')).toHaveValue('SB_ARC_R25')
     await expect(heads.first()).toHaveText('Model')
     expect(await wrap.evaluate((w) => w.scrollTop)).toBe(before)
   } finally {
@@ -990,9 +1011,7 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
       Object.keys((window as unknown as { sgvue: object }).sgvue).filter((k) => /export|schedulefile/i.test(k)))).toEqual([])
 
     // 1 — a numeric column, so the workbook has numbers to prove: the core Level Elevation.
-    await act(sched, 'open-fields').first().click()
-    await sched.locator('[data-act="browse-add"][data-id="core|storeyElevation"]').click()
-    await sched.keyboard.press('Escape')
+    await addColumn(sched, 'core|storeyElevation', 'level elevation')
     await expect(sched.locator('table.schedule thead th', { hasText: 'Level Elevation' })).toHaveCount(1)
 
     // 2 — the menu from the keyboard: Enter opens it on its first item, the arrows move,
@@ -1118,15 +1137,14 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     // exported from the menu; the Save dialog's name is forced to .schedule.json.
     await sched.locator('.schedule-name').fill('Walls round trip')
     await sched.locator('.schedule-name').press('Tab')
-    await tab(sched, 'sort').click()
-    await act(sched, 'sort-add').click()
-    await act(sched, 'sort-field', '[data-i="0"]').selectOption('core|storey')
+    await addOn(sched, 'sort', 'core|storey', 'level')
     // The switches are labels over a 1 px input: clicked where a hand clicks them.
     const toggleOf = (input: ReturnType<Page['locator']>) => sched.locator('label', { has: input })
-    await toggleOf(act(sched, 'sort-header', '[data-i="0"]')).click()
-    await expect(act(sched, 'sort-header', '[data-i="0"]')).toBeChecked()
-    await toggleOf(act(sched, 'itemize')).click()
-    await expect(act(sched, 'itemize')).not.toBeChecked()
+    await toggleOf(inPop(sched, 'sort-header', '[data-i="0"]')).click()
+    await expect(inPop(sched, 'sort-header', '[data-i="0"]')).toBeChecked()
+    await chip(sched, 'rows').click()
+    await toggleOf(inPop(sched, 'itemize')).click()
+    await expect(inPop(sched, 'itemize')).not.toBeChecked()
     await expect(sched.locator('tr.data')).toHaveCount(2)
     await answerSave(app, join(out, 'setup.json'))
     await exportAs(sched, 'Schedule file (.schedule.json)')
@@ -1201,11 +1219,19 @@ test('phase 4: a focused column heading takes Enter and Space as its click', asy
     const heads = sched.locator('table.schedule thead th[data-defcol]')
     await expect(heads.first()).toHaveAttribute('title', /Keys: Enter or Space for a click/)
 
-    // Enter formats the column, as a click does.
-    await tab(sched, 'fields').click()
+    // Enter opens the column's menu, as a click does (v1.5.0: the menu is where Format was);
+    // Escape closes it and the heading has the focus again.
     await heads.nth(1).focus()
     await sched.keyboard.press('Enter')
-    await expect(sched.locator('.tab.on')).toHaveAttribute('data-section', 'format')
+    await expect(pop(sched)).toBeVisible()
+    await expect(inPop(sched, 'fmt-heading')).toHaveAttribute('data-defcol', '1')
+    await sched.keyboard.press('Escape')
+    await expect(pop(sched)).toBeHidden()
+    await expect(heads.nth(1)).toBeFocused()
+    // Left and Right move between the headings.
+    await sched.keyboard.press('ArrowRight')
+    await expect(heads.nth(2)).toBeFocused()
+    await sched.keyboard.press('ArrowLeft')
     await expect(heads.nth(1)).toBeFocused()
     // Shift+Enter takes the run from there, as Shift+click does; Escape clears it.
     await heads.nth(0).focus()
@@ -1218,10 +1244,10 @@ test('phase 4: a focused column heading takes Enter and Space as its click', asy
     await sched.keyboard.press('Escape')
     await expect(sched.locator('table.schedule thead th.sel')).toHaveCount(0)
     // Space alone is a plain click too.
-    await tab(sched, 'fields').click()
     await heads.nth(0).focus()
     await sched.keyboard.press('Space')
-    await expect(sched.locator('.tab.on')).toHaveAttribute('data-section', 'format')
+    await expect(pop(sched)).toBeVisible()
+    await expect(inPop(sched, 'fmt-heading')).toHaveAttribute('data-defcol', '0')
   } finally {
     await app.close()
   }
@@ -1875,29 +1901,33 @@ test('a real model: what the snapshot costs (SGVUE_IFC)', async () => {
       return { main: ws(pid('index.html')) / 1024, sched: ws(pid('schedule.html')) / 1024 }
     })
     // Phase 2: the largest category, drawn. The status line's own number is the engine run; a
-    // synchronous click that repaints every pane (an inspector tab) is the whole paint, and the
-    // rail's A→Z switch is a 'panes' repaint, which leaves the table alone.
+    // synchronous Ctrl-click on a heading (it marks the column: an 'all' repaint) is the whole
+    // paint, the rail's A→Z switch is a 'panes' repaint, which leaves the table alone, and a
+    // chip opening or closing its popover (v1.5.0) repaints the popover alone.
     const largest = railItems(sched).first()
     const largestName = ((await largest.locator('.grow').textContent()) ?? '').trim()
     if (!/\bon\b/.test((await largest.getAttribute('class')) ?? '')) await largest.click()
     await expect(largest).toHaveClass(/\bon\b/)
     const engineMs = ((await sched.locator('.status').textContent()) ?? '').match(/Rendered in (\d+) ms/)?.[1]
-    const timed = (selector: string) => sched.evaluate((sel) => {
+    const timed = (selector: string, ctrlKey = false) => sched.evaluate(([sel, ctrl]) => {
       const t = performance.now()
-      document.querySelector<HTMLElement>(sel)!.click()
+      document.querySelector<HTMLElement>(sel)!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: ctrl }))
       return performance.now() - t
-    }, selector)
+    }, [selector, ctrlKey] as const)
     const paints: number[] = []
     const panes: number[] = []
-    for (const id of ['filter', 'sort', 'fields', 'filter']) {
-      paints.push(await timed(`.tab[data-section="${id}"]`))
+    const popovers: number[] = []
+    for (let k = 0; k < 4; k++) {
+      paints.push(await timed('table.schedule thead th[data-defcol="0"]', true))
       panes.push(await timed('[data-act="rail-sort"]'))
+      popovers.push(await timed('[data-act="vb-open"][data-v="rows"]'))
     }
     const dataRows = await sched.locator('tr.data').count()
     console.log(
       `\n[schedules] largest category ${largestName}: ${dataRows} rows drawn · engine ${engineMs} ms · ` +
         `full repaint ${paints.map((m) => m.toFixed(0)).join(' / ')} ms · ` +
-        `panes-only repaint ${panes.map((m) => m.toFixed(0)).join(' / ')} ms`
+        `panes-only repaint ${panes.map((m) => m.toFixed(0)).join(' / ')} ms · ` +
+        `popover open / close ${popovers.map((m) => m.toFixed(0)).join(' / ')} ms`
     )
     // Phase 3: a click in the main window's tree → the row marked in this window, clock to
     // clock (both pages stamp `timeOrigin + now` on the one system clock); then a colour-by on

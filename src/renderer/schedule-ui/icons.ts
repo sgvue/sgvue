@@ -13,23 +13,9 @@ const svg = (body: string, size = 16, weight = 1.7) =>
 
 /** `icons.tsx` Cross: the × on every remove / close button. */
 export const cross = (size = 12, weight = 2) => svg('<path d="M6 6l12 12M18 6L6 18"/>', size, weight);
-/** `icons.tsx` ChevronLeft / ChevronRight. */
-export const chevronLeft = (size = 14) => svg('<path d="M15 6l-6 6 6 6"/>', size, 1.8);
+/** `icons.tsx` ChevronRight — the closed rail's way back. (ChevronLeft and the inspector's five
+ *  tab glyphs went with the inspector, v1.5.0.) */
 export const chevronRight = (size = 14) => svg('<path d="M9 6l6 6-6 6"/>', size, 1.8);
-
-/** The five inspector tabs. */
-export const TAB_ICONS = {
-  // Three columns.
-  fields: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M9.2 4.5v15M14.8 4.5v15"/>'),
-  // `icons.tsx` IconFilter.
-  filter: svg('<path d="M3 5h18l-7 8v6l-4 2v-8z"/>'),
-  // Three bars shortening: sort and nest.
-  sort: svg('<path d="M4 6h16M4 12h11M4 18h6"/>'),
-  // Two sliders.
-  format: svg('<path d="M3 7h18M3 17h18"/><circle cx="15" cy="7" r="2.4" fill="var(--card)"/><circle cx="8.5" cy="17" r="2.4" fill="var(--card)"/>'),
-  // Half-filled disc: how it looks.
-  appearance: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>'),
-} as const;
 
 /** The header's actions. */
 // Four cards: start from a template.

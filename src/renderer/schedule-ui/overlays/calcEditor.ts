@@ -1,10 +1,9 @@
 // Authoring calculated values — formulas and percentages.
 //
-// This used to hang off the bottom of the Fields section in the 368px inspector, which is
-// where it became "too much text and messy": a name box, a formula box, two warning lines,
-// a unit row with a suggestion chip and three lines of syntax help, all folded into a rail.
-// It lives in the field browser instead, for one reason beyond the extra width — this is the
-// only screen where the list of fields a formula may refer to is visible WHILE you type.
+// This used to hang off the bottom of the Fields section in the 368px inspector, where it
+// became "too much text and messy". It moved to the Add-fields modal, and since that modal's
+// browsing went to the field picker (ifcTable 2026-11-05, SGVue v1.5.0 phase 2) it is a modal
+// of its own (calcOverlay.ts), listing the column names a formula may refer to while you type.
 //
 // Three lines of syntax help went with the move, deleted rather than relocated: the syntax
 // guide says the same thing properly, and duplicated help is the thing that rots. SGVue opens
@@ -16,9 +15,6 @@ import { headingOf, resultOf, type Calculated, type ScheduleDef } from '../../..
 import { dimensionOf } from '../../../schedule/schedule/formula';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
-// The leaf, not the barrel: ./panels re-exports fieldsSection, which imports calcProblems
-// from here, so going through it would be a cycle. All three of these live in shared.ts —
-// the barrel was only ever passing them along.
 import { fieldKey, kindsByHeading, selectableFields } from '../panels/shared';
 import { cross } from '../icons';
 
@@ -52,7 +48,7 @@ function formulaVariables(def: ScheduleDef): string[] {
 
 /**
  * Everything wrong with one calculated value, in the order a person would want to hear it.
- * Shared with the inspector, which shows the count so a broken formula cannot hide behind a
+ * Shared with the view bar, which shows the count so a broken formula cannot hide behind a
  * closed modal — the one thing that genuinely got worse by moving the editor in here.
  *
  * SGVue (2026-10-02): the rule itself is the engine's `calcProblems` now (`schedule/computed.ts`),
@@ -118,8 +114,8 @@ export function calcEditor(state: AppState, store: ModelStore): string {
     </div>
     <div class="stack tight">${items.map((c) => calcRow(state, c, problems, store)).join('')}</div>
     ${items.length ? '' : `<div class="sub">Work out a value from the columns you have — an
-       allowance on an area, a flag for the fire doors. Add it here, then it appears in the
-       list on the left to add as a column.</div>`}
+       allowance on an area, a flag for the fire doors. Add it here, then add it as a column
+       from the fields chip, where it is listed with the other fields.</div>`}
     ${items.length && vars.length ? `<div class="sub">Refer to: ${esc(vars.join(', '))}</div>` : ''}
     <div class="row snug">
       <button class="btn" data-act="calc-add-formula">Add formula</button>

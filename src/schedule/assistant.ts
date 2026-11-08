@@ -31,6 +31,7 @@
  */
 import type { ScheduleBrief } from '../shared/ai-schema'
 import { ATTR_KEYS } from '../shared/attr'
+import { SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
 import { ambiguousText, nearestKeys, normKey, resolveKey } from '../shared/prop-names'
 import { keysForEntity, type ModelStore } from './ifc/store'
 import type { PropStat, UnitKind } from './ifc/types'
@@ -106,8 +107,9 @@ export const SCHEDULE_RESULTS = ['number', 'yes_no', 'text', 'length', 'area', '
 export type ScheduleResultKind = (typeof SCHEDULE_RESULTS)[number]
 /** Calculated values one call may define — and the most `get_schedule` lists. */
 export const SCHEDULE_CALC_CAP = 20
-/** A formula as one call may send it. The port takes 4 000 (`messages.ts`, `DefShape`). */
-export const SCHEDULE_FORMULA_CHARS = 1000
+/** A formula as one call may send it. The port takes 4 000 (`messages.ts`, `DefShape`). Since
+ *  v1.5.0 the tool's own description states it, so it lives beside that description. */
+export { SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
 
 /* ────────────────────────────── the input ────────────────────────────── */
 

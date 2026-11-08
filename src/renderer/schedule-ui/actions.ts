@@ -19,6 +19,7 @@ import { withModelColumn } from '../../schedule/schedule/columns';
 import { scheduleFromPreset, type Preset } from '../../schedule/schedule/presets';
 import { confirmDialog, type ConfirmHow } from './dialog';
 import { flash } from './dom';
+import { closePopover, popoverId } from './popover';
 import {
   deleteSchedule, duplicateSchedule, renameSchedule, saveSchedule, type SavedEntry,
 } from './schedules';
@@ -29,6 +30,8 @@ export function stepHistory(wantRedo: boolean): boolean {
   if (!state.store) return false;
   const def = wantRedo ? redo() : undo();
   if (!def) { flash(wantRedo ? 'Nothing to redo.' : 'Nothing to undo.'); return false; }
+  // The column menu names a position in a definition that has just been replaced (v1.5.0).
+  if (popoverId()) closePopover();
   // The history stack holds definitions, not where they came from, so stepping through it
   // can land anywhere. Dropping both markers under-claims (you can undo back to exactly
   // the saved setup and it no longer says so) — which beats claiming a setup you left.
@@ -56,7 +59,6 @@ export function applyTemplate(preset: Preset): void {
     removedBy: null,
     litBy: null,
     overlay: null,
-    open: 'fields',
     dirty: false,
   });
   flash(`Applied “${preset.name}”.`);

@@ -7,32 +7,32 @@
 // ifcTable's two render scopes — 'all' rebuilds every pane, 'table' only the schedule and the
 // status line — plus SGVue's third, 'panes' (2026-09-25): everything BUT the schedule, for a
 // change that cannot alter it (a search box, a list filter). On a 4 082-row category the table
-// is the whole cost of a paint (~0.4–0.5 s, DECISIONS.md), so a keystroke in the field browser
-// must not rebuild it. main.ts restores focus, caret and scroll around every repaint.
+// is the whole cost of a paint (~0.4–0.5 s, DECISIONS.md), so a keystroke in a search box must
+// not rebuild it. main.ts restores focus, caret and scroll around every repaint.
+//
+// v1.5.0, phase 2 (ifcTable's table-first redesign, 2026-11-05): the right-hand inspector is
+// gone, and with it its tab, its open state and the field browser's boxes. Which popover is
+// open is not AppState either (`popover.ts`). Every edit is a pure action from
+// `schedule/schedule/actions`, so `updateDef` takes the next definition rather than a mutation.
 
 import { record } from '../../schedule/history';
 import type { ModelStore } from '../../schedule/ifc/store';
 import { emptySchedule, type ScheduleDef } from '../../schedule/schedule/def';
 
-/** The five inspector tabs. Exactly one is active; the whole panel can collapse instead. */
-export type Section = 'fields' | 'filter' | 'sort' | 'format' | 'appearance';
-/** `formula` is the in-window syntax guide ifcTable served as `/formula.html`. */
-type Overlay = 'fields' | 'templates' | 'saved' | 'formula';
+/** The modals: the calculated-value editor, the template gallery, the saved setups — and
+ *  `formula`, the in-window syntax guide ifcTable served as `/formula.html`. */
+type Overlay = 'calc' | 'templates' | 'saved' | 'formula';
 export type RenderScope = 'all' | 'table' | 'panes';
-type FieldType = 'all' | 'number' | 'text' | 'bool';
 
 export interface AppState {
   store: ModelStore | null;
   def: ScheduleDef;
 
-  /** The active inspector tab. Stays put while the panel is collapsed, so reopening
-   *  lands where the user left off. */
-  open: Section;
-  /** Whether the inspector is expanded, or collapsed to its icon strip. Ordinary app
-   *  state, like railOpen — render() reads it back on every paint. */
-  inspectorOpen: boolean;
   overlay: Overlay | null;
-  /** Index into def.columns, for the Column formatting section. */
+  /**
+   * Index into def.columns of the column whose heading was last clicked: the anchor a
+   * Shift+click runs from, and the width "Equal width" copies.
+   */
   selectedColumn: number | null;
   /**
    * Columns marked at their headings, as def.columns indices. A grip is solo by default, so
@@ -75,11 +75,6 @@ export interface AppState {
 
   // transient search / filter boxes
   railQuery: string;
-  fieldSearch: string;
-  fieldType: FieldType;
-  /** 'all', or a property-set name to narrow the field browser to. */
-  fieldPset: string;
-  hideEmpty: boolean;
   templateQuery: string;
   /** Search text in the My templates panel — transient, like templateQuery. */
   savedQuery: string;
@@ -128,8 +123,6 @@ export const state: AppState = {
   store: null,
   def: emptySchedule(),
 
-  open: 'fields',
-  inspectorOpen: true,
   overlay: null,
   selectedColumn: null,
   selectedCols: [],
@@ -140,10 +133,6 @@ export const state: AppState = {
   railSort: 'count',
 
   railQuery: '',
-  fieldSearch: '',
-  fieldType: 'all',
-  fieldPset: 'all',
-  hideEmpty: true,
   templateQuery: '',
   savedQuery: '',
 
@@ -190,15 +179,19 @@ export function update(patch: Partial<AppState>, scope: RenderScope = 'all') {
   paint(scope);
 }
 
-/** Mutate the schedule definition in place and repaint. Marks the definition dirty. */
-export function updateDef(fn: (def: ScheduleDef) => void, scope: RenderScope = 'all') {
+/**
+ * Change the schedule definition and repaint. Marks the definition dirty. `fn` returns the
+ * new definition — built by a pure action from `schedule/schedule/actions`, so every edit a
+ * user can make has one named, testable home — or the same def when there is nothing to do.
+ */
+export function updateDef(fn: (def: ScheduleDef) => ScheduleDef, scope: RenderScope = 'all') {
   editDef(fn);
   paint(scope);
 }
 
 /** `updateDef` without the repaint — for a typed edit committed from inside a gesture. */
-export function editDef(fn: (def: ScheduleDef) => void) {
-  fn(state.def);
+export function editDef(fn: (def: ScheduleDef) => ScheduleDef) {
+  state.def = fn(state.def);
   state.dirty = true;
   record(state.def);
 }

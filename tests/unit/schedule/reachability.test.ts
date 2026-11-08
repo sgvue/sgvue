@@ -11,9 +11,9 @@
 // is seen writing it) fails with "columns[].conditional[].bold" uncovered.
 //
 // Ported from ifcTable's `tests/reachability.test.ts` (Yong Yen) for SGVue v1.5.0, phase 1.
-// The second tripwire is SKIPPED until phase 2: the Schedules window's handlers
-// (`renderer/schedule-ui/events.ts`) still edit the definition in place, and phase 2 rebuilds
-// them on these actions. Unskip it then — it is already pointed at SGVue's UI.
+// The second tripwire went live with phase 2, when the Schedules window's handlers
+// (`renderer/schedule-ui/events.ts`) were rebuilt on these actions. Proven to fail: with
+// events.ts's `act.setGrandTotalTitle(` call renamed, it fails with ["setGrandTotalTitle"].
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -178,9 +178,9 @@ describe('every ScheduleDef setting is written by at least one action', () => {
     expect(Object.keys(NOT_EDITS).filter((k) => written.has(k))).toEqual([]);
   });
 
-  // Phase 2: unskip. Every action must be CALLED from the Schedules window's UI
-  // (`src/renderer/schedule-ui/`, its `main.ts` the composition root). Today none is.
-  it.skip('every action is called from src/renderer/schedule-ui', () => {
+  // Every action must be CALLED from the Schedules window's UI (`src/renderer/schedule-ui/`, its
+  // `main.ts` the composition root) — live since phase 2.
+  it('every action is called from src/renderer/schedule-ui', () => {
     const files = (dir: URL): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
       (e.isDirectory() ? files(new URL(`${e.name}/`, dir)) : e.name.endsWith('.ts') ? [readFileSync(new URL(e.name, dir), 'utf8')] : []));
     const ui = files(new URL('../../../src/renderer/schedule-ui/', import.meta.url))
