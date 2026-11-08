@@ -4,6 +4,28 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-09 — Ask Vee after the owner's try-out: Sonnet 5.5 by default, and its confirm run
+
+The owner tried the window in a packaged copy (`714014f` and the commits before it). **Fixed from that:**
+- paste and cut in every text field (missing from the Edit menu since 1.2.0, which is why the API key could not be pasted);
+- ⌘C no longer arms the spot tool;
+- a follow-up keeps the previous answer's set ("tabulate them by type");
+- IFC terms bold and only ever in the file's exact spelling;
+- the IFC+SG lead-in no longer doubled;
+- a `New conversation` button that also clears main's transcript.
+
+**Model choice (the owner):** the same 87 cases on Sonnet 5.5 and Haiku 5.5. Both safe once grader artefacts were taken out; Haiku only 0.3 s faster per answer. **Sonnet 5.5 is the default**, and existing installs move once from Opus 5.
+
+**Then fixed:** the IFC+SG question is asked with the answer (`IFCSG_NUDGE`); the heads-up keeps the strongest finding across a turn's calls; graders that misread honest replies.
+
+**Sonnet 5.5 confirm run (v6):** 137/141 live, **141/141** after two more grader false positives were fixed; no_write 100 %; median 4.8 s an answer; $3.06. Haiku 5.5 (v5): 127/141 regraded, $0.18.
+
+**Owed:**
+- a window run for the New conversation button and bold terms (e2e and `vm-*` captures);
+- VoiceOver;
+- the owner's Windows check;
+- push and release.
+
 ## 2026-11-09 — Ask Vee as a messaging conversation: stages 1 and 2, the live eval, and the first window run made ready
 
 **Why.** The owner: *"I need the conversation window like texting in messaging"* — of three

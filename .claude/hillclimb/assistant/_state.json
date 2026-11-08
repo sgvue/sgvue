@@ -64,7 +64,8 @@
     "scripts/eval/graders.cjs",
     "scripts/eval/capabilities.cjs",
     "scripts/eval/cost.cjs",
-    "scripts/eval/observe.cjs"
+    "scripts/eval/observe.cjs",
+    "scripts/eval/summary.cjs"
   ],
-  "harness_sha": "f9abb769ccbb1a7fbd9accec52f94377d556fb3fe884ed3289fa6eaf54ca58b6"
+  "harness_sha": "99a035c14d8e785f88de1ffa4f94ff6f08a5eb1dfc8db51203f78753403e6808"
 }
