@@ -164,6 +164,43 @@ describe('the heads-up: observed over the elements the call touched, never the w
     expect(st().chatMsgs[t.index].headsUp).toBeUndefined()
   })
 
+  it('takes list_values’ attr and summarize_elements’ groupBy as the property checked — hu-placeholder’s own call (live eval)', () => {
+    const tbc = messy.elements.filter((e) => e.type === 'IfcWall' && attr(e, 'FireRating') === 'TBC').length
+    expect(tbc).toBe(6)
+    const input = { attr: 'FireRating', rules: [entity('IfcWall')] }
+    const h = headsUpFor('list_values', input, messy, false)!
+    expect(h).toMatchObject({ kind: 'placeholder', prop: 'FireRating', value: 'TBC', n: 6, noun: 'wall', op: 'list' })
+    expect(text(h)).toBe('Heads-up: 6 walls say “TBC” as their FireRating. They are listed as a value of their own.')
+    // The scope set is the walls, as before (decision C).
+    expect(touchedOf('list_values', input, messy)!.at.length).toBe(messy.elements.filter((e) => e.type === 'IfcWall').length)
+    expect(headsUpFor('summarize_elements', { groupBy: 'FireRating', rules: [entity('IfcWall')] }, messy, false)).toMatchObject({ kind: 'placeholder', value: 'TBC', n: 6 })
+    // One of SGVue's attribute names is not a property to doubt: grouping by Level checks nothing.
+    expect(touchedOf('summarize_elements', { groupBy: 'Level', rules: [entity('IfcWall')] }, messy)!.props).toEqual([])
+  })
+
+  it('marks summarize_elements’ no-value group for the model, while the table keeps the design’s em dash (live eval)', async () => {
+    open(messy)
+    const r = await runToolWithUi('summarize_elements', { groupBy: 'FireRating', rules: [entity('IfcWall')] })
+    const body = r.forModel as { message: string; groups: { value: string; count: number; noValue?: boolean }[] }
+    const none = messy.elements.filter((e) => e.type === 'IfcWall' && attr(e, 'FireRating') === undefined).length
+    expect(none).toBe(4)
+    expect(body.groups.find((g) => g.noValue)).toEqual(expect.objectContaining({ value: '—', count: 4, noValue: true }))
+    expect(body.groups.filter((g) => g.noValue)).toHaveLength(1)
+    expect(body.message).toContain('— 4 (carry no FireRating)')
+    // The authored "-" of the parapets is a value of its own, never the no-value group.
+    expect(body.groups.find((g) => g.value === '-')).not.toHaveProperty('noValue')
+    expect(r.ui.table!.rows.find((x) => x.k === '—')!.n).toBe(4)
+    // A value a file authored as "—" stays a group of its own, apart from no value.
+    const { summarize } = await import('../../src/renderer/ai/analysis')
+    const walls = messy.elements.filter((e) => e.type === 'IfcWall').slice(0, 3)
+    const authored = [{ ...walls[0], psets: { P: { FireRating: '—' } } }, { ...walls[1], psets: {} }, walls[2]] as unknown as FederatedElement[]
+    const rows = summarize(authored, 'FireRating').rows.filter((x) => x.k === '—')
+    expect(rows.map((x) => [x.n, !!x.noValue]).sort()).toEqual([
+      [1, false],
+      [1, true]
+    ])
+  })
+
   it('says nothing for a call whose touched elements are clean — most replies have none', () => {
     expect(headsUpFor('query_elements', { rules: [entity('IfcSlab'), { prop: 'FireRating', op: '=', val: '2 HR' }] }, mock, true)).toBeNull()
     // A call that reads no element by rule touches nothing.

@@ -17,12 +17,12 @@
 {"prompt_id":"tab-materials","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"tab-sql-join","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"ana-audit","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
-{"prompt_id":"ana-firerating","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
-{"prompt_id":"ana-firerating","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
-{"prompt_id":"ana-firerating","rep":2,"before":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-firerating","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"reasons":["fact1: the reply does not state missing = 0"],"carried":1}
+{"prompt_id":"ana-firerating","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"reasons":["fact1: the reply does not state missing = 0"],"carried":1}
+{"prompt_id":"ana-firerating","rep":2,"before":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"reasons":["fact1: the reply does not state missing = 0"],"carried":1}
 {"prompt_id":"ana-tallest","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"ana-clash","rep":0,"before":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
-{"prompt_id":"ana-duplicates","rep":0,"before":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-duplicates","rep":0,"before":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"reasons":["fact0: the reply does not state duplicateNames = 0"],"carried":1}
 {"prompt_id":"ana-absent-operator","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"ana-proximity","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"op-isolate","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}

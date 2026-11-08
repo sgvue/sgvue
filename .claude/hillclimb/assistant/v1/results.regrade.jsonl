@@ -1,0 +1,135 @@
+{"prompt_id":"ans-counts","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-property","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-units","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-selection","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-storeys","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-display-readback","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-camera-readback","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-markups-none","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"tab-doors-storey","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"tab-walls-type","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"tab-slab-area","rep":0,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":0},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":0},"reasons":["tool:summarize_elements: summarize_elements was never called (called: query_sql, query_sql, get_model_info, query_sql, get_model_info)","table: no table was produced for the panel"],"carried":1}
+{"prompt_id":"tab-materials","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"tab-sql-join","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-audit","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-firerating","rep":0,"before":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"reasons":["fact1: the reply does not state missing = 0"],"carried":1}
+{"prompt_id":"ana-firerating","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"reasons":["fact1: the reply does not state missing = 0"],"carried":1}
+{"prompt_id":"ana-firerating","rep":2,"before":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.5,"tools_ok":1},"reasons":["fact1: the reply does not state missing = 0"],"carried":1}
+{"prompt_id":"ana-tallest","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-clash","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-duplicates","rep":0,"before":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"reasons":["fact0: the reply does not state duplicateNames = 0"],"carried":1}
+{"prompt_id":"ana-absent-operator","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ana-proximity","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-isolate","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-two-step","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-highlight-colours","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-colour-by","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-section","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-solo-storey","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-activate","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-reset","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-scope-guard","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-scope-guard","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-scope-guard","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-act-on-found-ids","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-act-on-found-ids","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-act-on-found-ids","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-selection-target","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-filter-set-name","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-canvas-grid","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-clear-selection","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-add-to-selection","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-undo","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-hide-model","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-model-colour-reset","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-light-theme","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-arm-laser","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-active-stays","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-camera-direction","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-fit-selection","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-save-viewpoint","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-restore-viewpoint","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-rename-viewpoint","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-filter-step-colour","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-filter-step-action","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-place-spot","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-place-measure","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-schedule-rows-none","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-delete-viewpoint","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-forget-filter-set","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":5}
+{"prompt_id":"op-undo-held","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-undo-held","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-undo-held","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"op-copy-link","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-unload-model","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":5}
+{"prompt_id":"ref-rename","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ref-delete","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ref-property","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ref-export","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"res-name","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"res-property","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"res-vocabulary","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"res-viewpoint-name","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"res-gated-delete","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":8}
+{"prompt_id":"res-gated-delete","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":8}
+{"prompt_id":"res-gated-delete","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":8}
+{"prompt_id":"op-make-schedule-doors","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-make-schedule-doors","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-make-schedule-doors","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"ans-get-schedule","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-get-schedule","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"ans-get-schedule","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"op-schedule-undo","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-schedule-undo","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-schedule-undo","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-schedule-delete-asks","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-schedule-delete-asks","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-schedule-delete-asks","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"op-export-schedule","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-export-schedule","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-export-schedule","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-colour-by-schedule-column","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-colour-by-schedule-column","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"op-colour-by-schedule-column","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"multi-schedule-add-column","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"multi-schedule-add-column","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"multi-schedule-add-column","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"multi-hide-undo","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"multi-hide-undo","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"multi-hide-undo","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":4}
+{"prompt_id":"multi-storey-followup","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"multi-storey-followup","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"multi-storey-followup","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":3}
+{"prompt_id":"messy-placeholders","rep":0,"before":{"pass":0,"no_write":1,"facts":0.3333333333333333,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.6666666666666666,"tools_ok":1},"reasons":["fact2: the reply mentions none of: carry no, have no, has no, no FireRating, without a FireRating, without FireRating, missing, no value, not carry, do not carry, does not carry, don’t carry, don't carry, lack, no rating"],"carried":1}
+{"prompt_id":"messy-placeholders","rep":1,"before":{"pass":0,"no_write":1,"facts":0.3333333333333333,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.6666666666666666,"tools_ok":1},"reasons":["fact2: the reply mentions none of: carry no, have no, has no, no FireRating, without a FireRating, without FireRating, missing, no value, not carry, do not carry, does not carry, don’t carry, don't carry, lack, no rating"],"carried":1}
+{"prompt_id":"messy-placeholders","rep":2,"before":{"pass":0,"no_write":1,"facts":0.3333333333333333,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.6666666666666666,"tools_ok":1},"reasons":["fact2: the reply mentions none of: carry no, have no, has no, no FireRating, without a FireRating, without FireRating, missing, no value, not carry, do not carry, does not carry, don’t carry, don't carry, lack, no rating"],"carried":1}
+{"prompt_id":"messy-two-spellings","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-two-spellings","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-two-spellings","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-no-storey","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-no-storey","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-no-storey","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-duplicate-guids","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-duplicate-guids","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-duplicate-guids","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-tbc-not-invented","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-tbc-not-invented","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-tbc-not-invented","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-trench","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-trench","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"messy-trench","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"hu-placeholder","rep":0,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"reasons":["heads-up (carried): heads-up: the reply carries no heads-up"],"carried":2}
+{"prompt_id":"hu-placeholder","rep":1,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"reasons":["heads-up (carried): heads-up: the reply carries no heads-up"],"carried":2}
+{"prompt_id":"hu-placeholder","rep":2,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"reasons":["heads-up (carried): heads-up: the reply carries no heads-up"],"carried":2}
+{"prompt_id":"hu-no-storey","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-no-storey","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-no-storey","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-dup-guid","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-dup-guid","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"hu-dup-guid","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
+{"prompt_id":"sg-ask-once","rep":0,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":0},"reasons":["turn2:heads-up (carried): heads-up: the reply carries no heads-up","all:one:ask_choice: ask_choice was called 0 times in the conversation, expected exactly 1","heads-up (carried): heads-up: the reply carries no heads-up"],"carried":5}
+{"prompt_id":"sg-ask-once","rep":1,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":0},"reasons":["turn2:fact0: the reply does not mention \"1 HR\"","turn2:heads-up (carried): heads-up: the reply carries no heads-up","all:one:ask_choice: ask_choice was called 0 times in the conversation, expected exactly 1","heads-up (carried): heads-up: the reply carries no heads-up","ifcsg (carried): the conversation's IFC+SG answer is \"unknown\", expected \"yes\""],"carried":5}
+{"prompt_id":"sg-ask-once","rep":2,"before":{"pass":0,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":1,"tools_ok":0},"reasons":["turn2:fact0: the reply does not mention \"1 HR\"","turn2:heads-up (carried): heads-up: the reply carries no heads-up","all:one:ask_choice: ask_choice was called 0 times in the conversation, expected exactly 1","heads-up (carried): heads-up: the reply carries no heads-up","ifcsg (carried): the conversation's IFC+SG answer is \"unknown\", expected \"yes\""],"carried":5}
+{"prompt_id":"sg-never-asks","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"sg-never-asks","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
+{"prompt_id":"sg-never-asks","rep":2,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}

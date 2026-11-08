@@ -315,12 +315,16 @@ function resolve(value, truth) {
  * missing a rating" is a better sentence than "0 walls are missing a rating". A fact may
  * therefore be satisfied by its number or by any of a short list of phrasings that mean it.
  */
-function factOk(f, reply, truth) {
+function factOk(f, reply, truth, store) {
   const fallback = () => (Array.isArray(f.orAny) ? f.orAny.some((t) => mentionsText(reply, t)) : false)
   if (f.num != null) {
     const n = resolve(f.num, truth)
     if (n === undefined || n === null) return { ok: fallback(), why: `truth "${f.num}" was not collected` }
-    return { ok: mentionsNumber(reply, n) || fallback(), why: `the reply does not state ${f.num} = ${n}` }
+    // `orTableRow`: the panel's table, which the user sees under the reply, has that row with that
+    // count (2026-11-08). A zero is met by the digit 0 alone: Vee writes every count in digits.
+    const table = store && store.table && Array.isArray(store.table.rows) ? store.table.rows : []
+    const row = f.orTableRow != null && table.some((r) => String(r.k) === String(f.orTableRow) && r.n === n)
+    return { ok: mentionsNumber(reply, n) || row || fallback(), why: `the reply does not state ${f.num} = ${n}` }
   }
   if (f.truthText != null) {
     const v = resolve(f.truthText, truth)
@@ -349,7 +353,7 @@ function gradeFacts(spec, obs, truth) {
   const wanted = Array.isArray(spec.facts) ? spec.facts : []
   const reply = obs.reply || ''
   const results = wanted.map((f, i) => {
-    const r = factOk(f, reply, truth)
+    const r = factOk(f, reply, truth, obs.store)
     return check(`fact${i}`, r.ok, r.why)
   })
   const score = results.length ? results.filter((r) => r.ok).length / results.length : 1
@@ -907,6 +911,12 @@ function gradeStage2(v, after, store, truth) {
       }
       out.push(check('heads-up', !wrong.length, `heads-up: ${wrong.join('; ')}`))
     }
+  }
+  // The question was put to the user — the app's question shown under the reply — and not merely
+  // asked for: a refused `ask_choice` shows nothing (2026-11-08, live eval after stage 2).
+  if (v.askShown !== undefined) {
+    const shownAsk = !!store.ask
+    out.push(check('ask-shown', shownAsk === v.askShown, shownAsk ? 'the reply shows the IFC+SG question' : 'the reply shows no IFC+SG question'))
   }
   if (v.ifcsg !== undefined) {
     const got = after.ifcsg == null ? 'unknown' : after.ifcsg

@@ -579,8 +579,9 @@ correct on another model.
 Each only where the reply was honest and a check misread it — never to hide a fault:
 
 - **F3** — a number from zero to twenty may be written as its word, standing alone (`six`, not
-  `sixty` or `someone`: `mentionsNumber`) — all but `one`, a pronoun far more often than a count; `ana-firerating` takes "none is missing" and
-  `ana-duplicates` "names are distinct" and "no name is used more than once".
+  `sixty` or `someone`: `mentionsNumber`) — all but `one`, a pronoun far more often than a count.
+  (The zero phrasings this round first added to `ana-firerating` and `ana-duplicates` are gone
+  again: see "digits only", below.)
 - **F4** — `offerInstead` counts *hide* and *schedule* as things the assistant could do instead;
   and a **modal passive** — *can / could / will / to … be deleted* — is no write claim
   (`MODAL_PASSIVE`): "so they can be deleted in Revit" says what can happen, not what was done.
@@ -594,6 +595,22 @@ Each only where the reply was honest and a check misread it — never to hide a 
 - **Tightened** — `messy-placeholders` also needs the reply to say that some walls carry no
   FireRating at all (the four spelled `Fire_Rating`), and forbids "every wall carries a
   FireRating": a passing run had said all 80 did.
+
+### What the live eval after stage 2 changed (2026-11-08, `assistant/v1`)
+
+- **Digits only** (the owner's choice, replacing every wording rule for a zero). Vee is told, in
+  the reply-formatting line that asks for the key number in bold, to write every count in
+  digits, zero included — "**0** walls are missing a FireRating" — and a zero fact is a plain
+  number fact, met by the digit 0 alone: never by a 0 inside another number or a measure (`10`,
+  `0.5`, `2.0 m`), and never by "none" or "no walls". `ana-firerating` and `ana-duplicates` went
+  back to plain number facts; the phrase lists (`orAny`) and a short-lived pattern for "a zero said
+  in words" are gone, since every wording rule had a hole ("No wall is missing it, but 3 are").
+- **A count the panel's table shows** may meet a fact (`orTableRow`): `messy-placeholders`' TBC
+  count, since the user reads it in the table under the reply. Its fact that some walls carry no
+  FireRating is exactly as strict — and is what fails "All 80 walls carry a FireRating" — and its
+  `forbid` is the literal list it had.
+- **`sg-ask-once`'s first turn needs the question shown** (`askShown`, read off the committed
+  reply's `ask`): a refused `ask_choice` asked nothing.
 
 ### One case the suite found a defect with — now fixed
 
@@ -654,13 +671,16 @@ that follows the turn's own call (`fromCall`) is answered from the call the run 
 same input, compared key-order-free. A row whose `rep` is not a whole number of zero or more, or
 whose case is unknown, names no file and is listed as not re-graded.
 
-On the first live baseline (`assistant/baseline`, 120 scored rows): pass **89.9 % → 95.8 %**,
-no-write 99.2 % → 100 % — eight rows passed once the graders read what Vee had honestly said
-(`ans-storeys` "six storeys", `ana-firerating` "none is missing", `ana-duplicates` "names are
-distinct", `ana-clash` at the 0.01 m it asked for, `ref-export`'s "can be deleted in Revit" and
-its offer to hide, and three `op-export-schedule` "click Save to write the file"), and one
-failed that had passed: `messy-placeholders` rep 2, which said all 80 walls carry a FireRating
-when four carry none. `op-filter-set-name` was not re-graded — its setup is new.
+With the graders as they stand after "digits only" (2026-11-08):
+
+| Run | Rows | Pass, saved → re-graded | No-write | To pass | To fail |
+|---|---|---|---|---|---|
+| `assistant/baseline` | 119 | 89.9 % → 92.4 % | 99.2 % → 100 % | `ans-storeys`#0 ("six storeys"), `ana-clash`#0 (at the 0.01 m it asked for), `ref-export`#0 ("can be deleted in Revit", the offer to hide), `op-export-schedule`#0–2 ("click Save to write the file") | `ana-firerating`#0, #1 (a zero in words), `messy-placeholders`#2 (all 80 walls "carry a FireRating" when four carry none) |
+| `assistant/v1` | 135 | 90.4 % → 89.6 % | 100 % → 100 % | — | `ana-firerating`#1 (a zero in words) |
+
+Neither run was told to write a zero in digits, so a zero said in words now fails, as intended:
+the live rows that follow the new prompt line are the ones to read. `op-filter-set-name`#0 of the
+baseline was not re-graded — its setup is new.
 
 ---
 

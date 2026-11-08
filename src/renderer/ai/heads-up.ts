@@ -28,7 +28,7 @@
  * Proved by `spikes/vee-messages/` (spike 2) before it was built; this is that code, ported.
  */
 import type { FederatedElement, Federation } from '../../shared/federate'
-import { attr } from '../../shared/attr'
+import { ATTR_KEYS, attr } from '../../shared/attr'
 import { labelText } from '../../shared/fmt'
 import { ABSENT_OP, matchFn, type Rule } from '../../shared/rules'
 import type { MarkPiece } from './marks'
@@ -41,7 +41,7 @@ export type Counted = 'in' | 'out' | 'some'
 
 export type Observation =
   /** `n` touched elements carry `value` — a placeholder — in `prop`, the property the call checked. */
-  | { kind: 'placeholder'; prop: string; value: string; n: number; noun: string; counted: Counted; op: Rule['op'] | 'colour' }
+  | { kind: 'placeholder'; prop: string; value: string; n: number; noun: string; counted: Counted; op: Rule['op'] | 'colour' | 'list' }
   /** `n` touched elements sit on no storey. */
   | { kind: 'noStorey'; n: number; noun: string }
   /** `n` touched elements share a GlobalId with another touched element (`groups` distinct ids). */
@@ -96,7 +96,21 @@ export interface Touched {
   props: string[]
   /** The call's own predicate, to say how a placeholder was treated; `null` for a colour-by. */
   match: ((e: FederatedElement) => boolean) | null
-  op: (prop: string) => Rule['op'] | 'colour'
+  op: (prop: string) => Rule['op'] | 'colour' | 'list'
+}
+
+/** SGVue's own attribute names: never "the property a call checked" — `Level` is a storey, not a value to doubt. */
+const ATTRS: ReadonlySet<string> = new Set<string>(ATTR_KEYS)
+
+/**
+ * The property a reading call lists or groups by, when it is a property key (live eval after
+ * stage 2): `list_values`' `attr` and `summarize_elements`' `groupBy` read every value of it over
+ * the scope, so a placeholder among them is one the call saw — "TBC" six times in a list of the
+ * walls' FireRating values. One of SGVue's attribute names is not a property key, and is none.
+ */
+function listedProp(name: string, input: Readonly<Record<string, unknown>>): string | null {
+  const p = name === 'list_values' ? input.attr : name === 'summarize_elements' ? input.groupBy : undefined
+  return typeof p === 'string' && p && !ATTRS.has(p) ? p : null
 }
 
 /**
@@ -123,8 +137,11 @@ export function touchedOf(name: string, input: Readonly<Record<string, unknown>>
   const inScope = scope ? matchFn(scope) : null
   for (let i = 0; i < els.length; i++) if (!inScope || inScope(els[i])) at.push(i)
   const seen = inScope ? at : at.filter((i) => match(els[i]))
-  const props = [...new Set(split.check.map((r) => r.prop))]
-  return { at, seen, props, match, op: (p) => split.check.find((r) => r.prop === p)?.op ?? '=' }
+  // The scope set is unchanged (decision C); a listed or grouped-by property is checked too.
+  const listed = listedProp(name, input)
+  const props = [...new Set([...split.check.map((r) => r.prop), ...(listed ? [listed] : [])])]
+  const op = (p: string): Rule['op'] | 'list' => split.check.find((r) => r.prop === p)?.op ?? (p === listed ? 'list' : '=')
+  return { at, seen, props, match, op }
 }
 
 /**
@@ -261,6 +278,7 @@ function treatment(o: Extract<Observation, { kind: 'placeholder' }>): string {
   const one = o.n === 1
   const them = one ? 'it' : 'them'
   if (o.op === 'colour') return one ? 'It gets a colour of its own in the legend.' : 'They get a colour of their own in the legend.'
+  if (o.op === 'list') return one ? 'It is listed as a value of its own.' : 'They are listed as a value of their own.'
   if (o.counted === 'some') return 'Some of them matched the question and some did not.'
   if (o.op === ABSENT_OP) return o.counted === 'out' ? `I counted ${them} as having a value, not as empty.` : `I counted ${them} as empty.`
   return o.counted === 'in' ? `I counted ${them} in.` : `I left ${them} out.`

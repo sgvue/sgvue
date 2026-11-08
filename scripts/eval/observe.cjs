@@ -198,7 +198,9 @@ function observation(turn, before, after, message) {
      * app-computed observation the reply shows (`{ kind, n, … }`), or null for none
      * (`prototypes/vee-messages/full/HANDOFF.md` §2). A build before stage 2 has none.
      */
-    headsUp: message && message.headsUp ? message.headsUp : null
+    headsUp: message && message.headsUp ? message.headsUp : null,
+    /** The IFC+SG question the reply put to the user (its lead-in), or null — stage 2. */
+    ask: message && message.ask ? { lead: message.ask.lead } : null
   }
   return {
     reply: turn.reply,

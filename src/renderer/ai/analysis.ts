@@ -76,6 +76,12 @@ export interface SummaryRow {
    * (2026-09-20).
    */
   from: Record<Metric, number>
+  /**
+   * The elements that carry no value at all for the grouping (live eval after stage 2): their
+   * group prints as the design's em dash, which reads like an authored `—`. Marked, so the
+   * result says it, and kept apart from a value a file authored as `—`.
+   */
+  noValue?: boolean
 }
 
 /** Which IFC measure types a summary's totals were summed from, per metric. */
@@ -97,11 +103,14 @@ export function summarize(
   const seen: Record<Metric, Set<string>> = { area: new Set(), volume: new Set(), length: new Set() }
   for (const e of els) {
     const v = attr(e, groupBy)
-    const k = v === undefined || v === '' ? '—' : String(v)
-    let row = rows.get(k)
+    const none = v === undefined || v === null || v === ''
+    const k = none ? '—' : String(v)
+    // No value is a group of its own, apart from one authored as `—` (a key no value can have).
+    const at = none ? '\u0000none' : k
+    let row = rows.get(at)
     if (!row) {
-      row = { k, n: 0, area: 0, volume: 0, length: 0, ids: [], from: { area: 0, volume: 0, length: 0 } }
-      rows.set(k, row)
+      row = { k, n: 0, area: 0, volume: 0, length: 0, ids: [], from: { area: 0, volume: 0, length: 0 }, ...(none ? { noValue: true } : {}) }
+      rows.set(at, row)
     }
     row.n++
     row.ids.push(e.id)

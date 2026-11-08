@@ -1923,3 +1923,61 @@ describe('re-grading a saved run (`eval/regrade.cjs`)', () => {
     expect(r.stale).toMatch(/setup or prompts changed/)
   })
 })
+
+/**
+ * 2026-11-08, the live eval after stage 2 — a zero said in words, the panel's table as a fact's
+ * evidence, a forbidden claim as a pattern, and the IFC+SG question really shown.
+ */
+describe('the live eval’s grader changes after stage 2', () => {
+  it('meets a zero fact with the digit 0 only — never a 0 inside another number or a measure (the owner: "digits only")', () => {
+    for (const t of ['**0** walls are missing a FireRating.', '0 names are used twice', '| Missing | 0 |']) {
+      expect([t, G.mentionsNumber(t, 0)]).toEqual([t, true])
+    }
+    for (const t of ['10 walls', '0.5 m of wall', 'a 2.0 m wall', '1,000 walls', '4.05 HR', 'No wall is missing the property outright.', 'none is blank', 'zero-width', 'L1–L3']) {
+      expect([t, G.mentionsNumber(t, 0)]).toEqual([t, false])
+    }
+    // The case's zero facts are plain number facts now: no word-based way round them.
+    for (const id of ['ana-firerating', 'ana-duplicates']) {
+      const facts = CASES.find((c: { id: string }) => c.id === id).expect.facts as Record<string, unknown>[]
+      expect([id, facts.every((f) => f.orZero === undefined && f.orAny === undefined)]).toEqual([id, true])
+    }
+    expect(G.factOk({ num: 'm' }, 'No wall is missing the property.', { m: 0 }).ok).toBe(false)
+    expect(G.factOk({ num: 'm' }, '**0** walls are missing it.', { m: 0 }).ok).toBe(true)
+    expect(G).not.toHaveProperty('saysZero')
+    expect(JSON.stringify(CASES)).not.toMatch(/orZero|forbidRe/)
+  })
+
+  it('lets a count be met by the panel’s table row the user sees, and by nothing else in the table', () => {
+    const store = { table: { groupBy: 'FireRating', rows: [{ k: 'TBC', n: 6 }, { k: '1 HR', n: 49 }] } }
+    expect(G.factOk({ num: 'tbc', orTableRow: 'TBC' }, 'Placeholders are in the table.', { tbc: 6 }, store).ok).toBe(true)
+    expect(G.factOk({ num: 'tbc', orTableRow: 'TBC' }, 'Placeholders are in the table.', { tbc: 7 }, store).ok).toBe(false)
+    expect(G.factOk({ num: 'tbc', orTableRow: 'n/a' }, 'x', { tbc: 6 }, store).ok).toBe(false)
+    expect(G.factOk({ num: 'tbc' }, 'x', { tbc: 6 }, store).ok).toBe(false)
+  })
+
+  it('keeps messy-placeholders’ literal forbid list, and fails "all 80 carry a rating" on its fact that some carry none', () => {
+    const kase = CASES.find((c: { id: string }) => c.id === 'messy-placeholders')
+    expect(kase.expect.forbid).toEqual(['every wall carries a FireRating', 'all walls carry a FireRating', 'all the walls carry a FireRating'])
+    expect(kase.expect).not.toHaveProperty('forbidRe')
+    // Its fact that some walls carry no FireRating is exactly as strict as before.
+    const facts = kase.expect.facts as { any?: string[]; orTableRow?: string }[]
+    expect(facts[1].orTableRow).toBe('TBC')
+    expect(facts[2].any).toEqual([
+      'carry no', 'have no', 'has no', 'no FireRating', 'without a FireRating', 'without FireRating', 'missing',
+      'no value', 'not carry', 'do not carry', 'does not carry', 'don’t carry', "don't carry", 'lack', 'no rating'
+    ])
+    const lie = 'All **80** `IfcWall` elements carry a `FireRating` value, but 19 of them are placeholders — "TBC", "n/a", "—", "-" and "0".'
+    expect(G.factOk(facts[2], lie, {}).ok).toBe(false)
+    expect(G.factOk(facts[2], '76 walls carry a FireRating and 4 carry none — they spell it Fire_Rating.', {}).ok).toBe(true)
+  })
+
+  it('needs the IFC+SG question really shown in sg-ask-once’s first turn: a refused ask_choice fails it', () => {
+    const kase = CASES.find((c: { id: string }) => c.id === 'sg-ask-once')
+    const turn1 = kase.turns[0].expect
+    expect(turn1.view.askShown).toBe(true)
+    const obs = (ask: unknown) => ({ reply: '', calls: [{ name: 'ask_choice', input: {}, ok: true }], view: {}, viewBefore: {}, store: { headsUp: null, ask } })
+    const grade = (ask: unknown) => G.gradeView(turn1, obs(ask), {}).find((c: { id: string }) => c.id === 'ask-shown')
+    expect(grade({ lead: 'These doors carry SGPset_Door values.' }).ok).toBe(true)
+    expect(grade(null).ok).toBe(false)
+  })
+})

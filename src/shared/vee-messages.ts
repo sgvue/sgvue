@@ -90,7 +90,7 @@ export const VeeHeadsUp = z.discriminatedUnion('kind', [
       n: count,
       noun,
       counted: z.enum(['in', 'out', 'some']),
-      op: z.enum(['=', '!=', '~', '>', '<', 'absent', 'colour'])
+      op: z.enum(['=', '!=', '~', '>', '<', 'absent', 'colour', 'list'])
     })
     .strict(),
   z.object({ kind: z.literal('noStorey'), n: count, noun }).strict(),

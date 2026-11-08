@@ -232,7 +232,7 @@ export const summarize_elements: Executor = (input, ctx) => {
   }
 
   const { rows, measures } = summarize(els, groupBy)
-  if (rows.length === 1 && rows[0].k === '—') {
+  if (rows.length === 1 && rows[0].noValue) {
     // A name that is not a key at all gets its nearest keys from `executeTool` (`names.ts`);
     // a real key these elements happen not to carry says where it is carried instead.
     const elsewhere = carriedInFederation(s, groupBy)
@@ -263,7 +263,8 @@ export const summarize_elements: Executor = (input, ctx) => {
     forModel: {
       message:
         `${els.length} elements in ${rows.length} groups by ${groupBy}: ` +
-        head.map((r) => `${r.k} ${r.n}${areaText(r)}`).join(', ') +
+        // The em dash is the design's "no value"; said in words, so it never reads as an authored dash.
+        head.map((r) => (r.noValue ? `— ${r.n} (carry no ${groupBy})` : `${r.k} ${r.n}${areaText(r)}`)).join(', ') +
         (partial ? ' Totals cover only the elements that carry the quantity — see areaFrom / volumeFrom.' : '') +
         (mixed.length ? ` No unit is stated for ${mixed.join(', ')}: the file's own unit for it is not one measure.` : ''),
       matched: els.length,
@@ -276,6 +277,7 @@ export const summarize_elements: Executor = (input, ctx) => {
       measuresSummed: measures,
       groups: shown.items.map((r) => ({
         value: r.k,
+        ...(r.noValue ? { noValue: true } : {}),
         count: r.n,
         area: r.area,
         volume: r.volume,

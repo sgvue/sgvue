@@ -25,6 +25,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DESIGN_SYSTEM_LINES,
   IFCSG_LINES,
+  SQL_FIRST_PARAGRAPH,
   buildRequest,
   contractText,
   requestSnapshot,
@@ -483,6 +484,8 @@ describe('the system contract', () => {
       'renders bold, inline code, lists and tables and no other Markdown',
       'Open with one sentence that answers the question',
       'its key number or name in **bold** and nothing else in bold',
+      // 2026-11-08, the owner: "digits only" — in this line, no line added (42 still).
+      'every count in digits, zero included — "**0** walls are missing a FireRating", never "none" or "no walls" for a count',
       // The design line's own intent, kept: a change to the view is reported with its count.
       'after you change the view, that sentence says what you did and how many elements it affected',
       'No preamble, and never repeat the question',
@@ -717,6 +720,17 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
     }
   })
 
+  it('reads a set a rule can say with a rule tool, and keeps query_sql first for what rules cannot express (live eval)', () => {
+    expect(SQL_FIRST_PARAGRAPH.startsWith('Reach for query_sql first whenever the question spans property sets, needs a value the rule grammar cannot express')).toBe(true)
+    expect(SQL_FIRST_PARAGRAPH).toContain(
+      'A set a rule can say — a class, a level, a property’s value — is read with a rule tool (query_elements, list_values, summarize_elements) rather than query_sql: only a rule-bearing read shows the user a heads-up about the elements it read, and only one lets ask_choice ask.'
+    )
+    expect(contractText()).toContain(SQL_FIRST_PARAGRAPH)
+    // No instruction line was added for it: the counts stand.
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(42)
+    expect(IFCSG_LINES).toHaveLength(4)
+  })
+
   it('asks for IFC terms in backticks, the file’s own spelling, and never a number, a value or an everyday word', () => {
     const line = DESIGN_SYSTEM_LINES.find((l) => l.startsWith('Write every IFC term you name in backticks'))!
     for (const said of ['exactly as the file spells it', '`IfcWall`', '`FireRating`, never Fire Rating', 'Never put backticks around a number', 'write "TBC" in quotes', 'Name, Level or Model']) {
@@ -753,6 +767,8 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
       expect([said, all.includes(said)]).toEqual([said, true])
     }
     expect(all).not.toMatch(/\b(Error|Warning) level|must carry|is required\b/)
+    // Live eval after stage 2: only a rule-bearing read lets ask_choice ask, so it says which.
+    expect(all).toContain('read those elements first with a rule tool — query_elements, list_values or summarize_elements, not query_sql, which ask_choice does not count')
     // About 600–800 tokens (HANDOFF §5), at about four characters a token.
     expect(all.length).toBeLessThan(3600)
   })

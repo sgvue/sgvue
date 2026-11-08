@@ -568,8 +568,9 @@ const CASES = [
       }
     },
     expect: {
-      // 2026-11-08 (F3): "none is missing", as the live baseline wrote it, says the zero too.
-      facts: [{ num: 'dash' }, { num: 'missing', orAny: ['none are missing', 'none is missing', 'every wall carries', 'all walls carry', 'no walls are missing'] }],
+      // 2026-11-08 (the owner: "digits only"): a zero is the digit 0 — Vee writes every count in
+      // digits, zero included — so the phrase lists that met it in words are gone.
+      facts: [{ num: 'dash' }, { num: 'missing' }],
       forbid: ['every wall is missing'],
       tools: {
         requireAny: [['query_sql', 'list_values', 'summarize_elements']],
@@ -694,11 +695,8 @@ const CASES = [
     },
     expect: {
       facts: [
-        // 2026-11-08 (F3): two more ways of saying zero, the live baseline's.
-        {
-          num: 'duplicateNames',
-          orAny: ['no duplicate', 'every name is unique', 'all names are unique', 'none are repeated', 'names are distinct', 'no name is used more than once']
-        }
+        // 2026-11-08 (the owner: "digits only"): the digit 0, as Vee is told to write it.
+        { num: 'duplicateNames' }
       ],
       tools: { requireAny: [['query_sql', 'audit_model', 'list_values']], forbidKinds: ['view'], maxCalls: 8 },
       view: { unchanged: true }
@@ -2419,7 +2417,8 @@ const VEE_CASES = [
       // list_values' "76 of 80 … 4 do not" contradicts. So the reply must say some carry none.
       facts: [
         { text: 'TBC' },
-        { num: 'tbc' },
+        // The TBC count may be read off the panel's table, which the user sees under the reply.
+        { num: 'tbc', orTableRow: 'TBC' },
         {
           any: [
             'carry no', 'have no', 'has no', 'no FireRating', 'without a FireRating', 'without FireRating', 'missing',
@@ -2427,6 +2426,7 @@ const VEE_CASES = [
           ]
         }
       ],
+      // (The fact above — some walls carry no FireRating — is what fails "All 80 walls carry one".)
       forbid: ['every wall carries a FireRating', 'all walls carry a FireRating', 'all the walls carry a FireRating'],
       tools: { require: ['summarize_elements'], forbidKinds: ['view'], maxCalls: 6 },
       table: { groupBy: 'FireRating', rows: 'byRating' },
@@ -2732,8 +2732,9 @@ const VEE_CASES = [
           ],
           reply: 'Before I answer I need one thing from you.'
         },
-        // Asked, and nothing about a sub-type yet: that waits for a yes.
-        expect: { tools: { exactlyOne: ['ask_choice'] }, view: { headsUp: null } }
+        // Asked — the question really shown, not a refused call — and nothing about a sub-type
+        // yet: that waits for a yes.
+        expect: { tools: { exactlyOne: ['ask_choice'] }, view: { headsUp: null, askShown: true } }
       },
       {
         prompt: 'Yes',
