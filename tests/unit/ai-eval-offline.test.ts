@@ -95,6 +95,7 @@ const { capabilityTags, missingCapabilities, whyMissing } = req('../../scripts/e
 type Turn = { reply: string; calls: Json[]; outcome: Json; usage: unknown; index: number }
 const O = req('../../scripts/eval/observe.cjs') as {
   collectTruth: (kase: Kase, ask: { sql: (s: string) => Promise<unknown>; tool: (n: string, i: Json) => Promise<unknown> }) => Promise<Json>
+  lateTruth: (kase: Kase, truth: Json, calls: Json[], ask: { tool: (n: string, i: Json) => Promise<unknown> }) => Promise<Json>
   oracleTurn: (kase: Kase, truth: Json) => { calls: { name: string; input: Json }[]; reply: string }
   nullTurn: () => Turn
   scriptedCalls: (calls: { name: string; input: Json }[], results: unknown[]) => Json[]
@@ -295,7 +296,9 @@ async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
     const applied = await readView()
     obs.afterApply = { view: applied.view, store: applied.store }
   }
-  return gradeCase(kase, JSON.parse(JSON.stringify(obs)) as Json, truth, kindOf)
+  // A probe that follows the turn's own call is run again now, as the window's runner does.
+  const graded = await O.lateTruth(kase, truth, obs.calls as Json[], { tool: (name, input) => runToolOnce(name, input) })
+  return gradeCase(kase, JSON.parse(JSON.stringify(obs)) as Json, graded, kindOf)
 }
 
 /* ────────────────────────────── the two runs ────────────────────────────── */
@@ -335,12 +338,15 @@ describe('the eval suite, offline', () => {
     // 66 until `op-base-point` went on 2026-10-08), so a case dropped from `cases.cjs` fails here
     // rather than shrinking the run.
     expect(CASES.length).toBe(85)
-    // n/a only for stage 2 of the Ask Vee redesign — today, its five cases — and the day the
-    // catalogue has `ask_choice` they are scored with the rest, with no edit here.
+    // n/a only for stage 2 of the Ask Vee redesign — its five cases until 2026-11-08, when the
+    // catalogue gained `ask_choice` and they began to be scored with the rest, with no edit here.
     for (const kase of CASES.filter((k) => !scored.includes(k))) {
       expect([kase.id, STAGE2.includes(kase.id), missingCapabilities(kase.requires, have)]).toEqual([kase.id, true, ['stage2']])
     }
     expect(scored.length).toBeGreaterThanOrEqual(CASES.length - STAGE2.length)
+    // Stage 2 is built: every case is scored.
+    expect(scored.map((k) => k.id)).toEqual(expect.arrayContaining(STAGE2))
+    expect(scored).toHaveLength(CASES.length)
   })
 
   // Each case this build cannot score yet, skipped where it can be seen, with its reason.

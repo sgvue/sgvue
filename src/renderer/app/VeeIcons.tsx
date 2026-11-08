@@ -100,3 +100,11 @@ export const Chevron = (): React.JSX.Element => (
     <path d="M9 5l7 7-7 7" />
   </svg>
 )
+
+/** 2026-11-08, stage 2 — the heads-up line's 12 px outline warning sign, in the line's own amber. */
+export const WarnSign = (): React.JSX.Element => (
+  <svg width="12" height="12" viewBox="0 0 24 24" strokeWidth="2.2" aria-hidden="true" {...line}>
+    <path d="M12 3 2 20h20L12 3z" />
+    <path d="M12 10v4.5M12 17.5v.01" />
+  </svg>
+)

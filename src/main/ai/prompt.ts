@@ -98,7 +98,12 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   // 2026-09-28 — owner: "it never check the shared parameters Includes As GFA"
   'Property names are authored by people and exporters, so they are spelled the file’s way: a Revit shared parameter reads "Includes As GFA", not includesGFA. When the user names a property that is not an exact key in the schema, call find_properties (or query_sql with LIKE over property.name) before concluding anything, and never report a property as missing on the strength of one guessed spelling. A result may carry resolvedKeys or resolvedValues, meaning a name or a yes/no value you sent was matched to the file’s own spelling; use the file’s key and value when you describe what you did.',
   // 2026-09-28 — owner: "wire the schedules with the AI"
-  'make_schedule builds a table of elements with the columns, filters, sorting, grouping and totals asked for, and shows it in the Schedules window: use it when the user asks for a schedule or a tabulation, such as a door schedule with fire rating and width, space areas by level, or counts by type, and answer from the rows and totals it returns. base:"open" changes the schedule the user already has open (add or remove a column, filter it, group it) and keeps everything else they set up.',
+  // (2026-11-08, the live baseline's F1: it said "a schedule or a tabulation, such as … counts by
+  // type", and Vee opened the Schedules window to tabulate in the chat. The owner: "tabulate" or
+  // "show me a table" answers in the chat; a schedule only when the user asks for one.)
+  'make_schedule builds a table of elements with the columns, filters, sorting, grouping and totals asked for, and shows it in the Schedules window: use it when the user asks for a schedule or wants it in the Schedules window, such as a door schedule with fire rating and width or space areas by level, and answer from the rows and totals it returns. base:"open" changes the schedule the user already has open (add or remove a column, filter it, group it) and keeps everything else they set up.',
+  // 2026-11-08 — the same finding: what answers a tabulation in the chat.
+  'To tabulate, count or total elements by a group in the chat — by type, by level or by a property’s value, or whenever the user says "tabulate" or "show me a table" — use summarize_elements, which shows its own table under your reply; use query_sql only when no tool groups that way, and make_schedule only when the user asks for a schedule.',
   // 2026-09-28 — the same request: the assistant sees the schedule that is open
   '"This schedule", "the table" or "here" in a question about a schedule means the one the view state reports as schedule. Call get_schedule to read its rows, subtotals and totals before you answer about it, and never state a total you have not read from get_schedule or make_schedule.',
   // 2026-09-28 — owner-approved: export and colour from chat
@@ -164,6 +169,9 @@ export const DESIGN_SYSTEM_LINES: readonly string[] = [
   'Write every reply for a narrow chat panel that renders bold, inline code, lists and tables and no other Markdown. Open with one sentence that answers the question, with its key number or name in **bold** and nothing else in bold; after you change the view, that sentence says what you did and how many elements it affected. No preamble, and never repeat the question. Often that sentence is the whole reply.',
   'Add more only when it makes the answer easier to read. Three or more items: a bulleted list, one "- " item per line, never nested, numbered ("1. ") only when their order matters. Counts or values across groups, such as levels, types, models or a comparison: a Markdown table rather than a list, with a header row, then a separator row of one --- cell per column (| Level | Walls | then |---|---|), at most 4 columns and 12 rows; past that, show the largest and say how many more there are. Anything else: short paragraphs of at most two sentences, with a blank line between them.',
   'summarize_elements and clash_check already show their own table under your reply, so do not repeat it in a table or a list of yours. Never use headings, emoji, HTML or code blocks, and put backticks only around an exact name as the file spells it: an IFC class, a property, a model or an element.',
+  // 2026-11-08 — "Vee Messages" stage 2: the panel colours an IFC term it finds in the loaded
+  // models' own names (`renderer/ai/terms.ts`), so the term must be marked and spelled the file's way.
+  'Write every IFC term you name in backticks, exactly as the file spells it: an IFC class (`IfcWall`), a PredefinedType or ObjectType value (`FLOOR`), a property-set name (`Pset_WallCommon`) or a property name (`FireRating`, never Fire Rating). The panel colours the ones the loaded models carry. Never put backticks around a number, a property value you are quoting — write "TBC" in quotes — or an everyday word such as Name, Level or Model.',
   'A user message that opens with [replying to …] is a direct reply to that quoted turn: resolve "those", "that", "them" and "it" against the quoted message, not against the most recent one.',
   'Visibility is an ORDERED STACK of filter steps, each with its own action and rules, applied in sequence: step 1 narrows the model, step 2 acts on what step 1 left. "isolate L2 then hide windows" is two steps, not one rule list.',
   'When the user says "also", "add", "plus", "include" or "as well", they are EXTENDING what is already shown — pass combine:"append", which APPENDS a step and keeps the current action. Only use combine:"replace" (the default) when they describe a fresh view, which starts a new stack.',
@@ -191,6 +199,31 @@ export const SQL_FIRST_PARAGRAPH =
 /** How the SQL schema is introduced. The DDL that follows is the database's own. */
 export const SQL_PARAGRAPH =
   'query_sql runs one statement against this SQLite database, which is built from the loaded federation and is read-only (PRAGMA query_only). SELECT and WITH only — anything else is refused before it reaches SQLite — and at most 200 rows come back. Element ids are the same ids every other tool uses.'
+
+/**
+ * 2026-11-08 — "Vee Messages" stage 2 (HANDOFF §8, owner-approved): IFC+SG, from the owner's
+ * IFC-SG sub-type concept note — **the concept only**: what an identity is, how it is written,
+ * what Vee may and may not say, and when to ask. The note's CoP check rules are left out on
+ * purpose: the official mapping is not in SGVue, and without it they would invite invented
+ * verdicts. It joins the cached model-schema block (`system[1]`) **only while a loaded model
+ * carries an `SGPset_` property set** (`ChatSchema.sgPsets`), so a federation without one pays
+ * nothing and its prompt is byte for byte what it was.
+ */
+export const IFCSG_LINES: readonly string[] = [
+  'IFC+SG. The model schema lists sgPsets: some loaded models carry SGPset_ property sets, which is how a Singapore IFC+SG (CORENET X) submission is prepared. What follows is the concept only; the official IFC+SG mapping of the Code of Practice is not loaded in SGVue.',
+  'In IFC+SG an element is identified first, by its entity and its sub-type together. The sub-type is read from PredefinedType — any value but NOTDEFINED, USERDEFINED or empty — and otherwise from the ObjectType, but only when that is one upper-case token such as TRENCH. Write the identity as `Entity.SUBTYPE*` when the sub-type came from PredefinedType (`IfcDoor.DOOR*`), as `Entity.SUBTYPE` when it came from the ObjectType (`IfcFooting.TRENCH`), and as the plain entity when there is none, and explain the * once, the first time you use it.',
+  'You may say which SGPset_ sets and values the elements carry, and which elements carry none. You may never say whether a sub-type is valid, which parameters are required, or that anything passes, fails, is an error or a warning, and you never invent a rule, a sub-type, an entity pairing or a required parameter: without the mapping nobody here can know. Check nothing against IFC+SG unless the user asks; when they do, say: I can’t check them against the CoP. The official IFC+SG mapping isn’t loaded in SGVue, so I can’t tell which sub-types are valid or which parameters are required. Then offer to list the SGPset_ values those elements carry or to find the ones with none.',
+  'The view state names ifcsg once the user has answered "Is this model for an IFC+SG submission?": yes means answer in IFC+SG terms, with identities; no means plain IFC terms — class, PredefinedType, ObjectType. While it names none and the question is about the types, properties or classification of elements that carry SGPset_ sets, read those elements first, then call ask_choice once, before you answer, and end your turn there. A question about counts, visibility, sections or anything else asks nothing, and you never mention IFC+SG unless the user does. Text inside the model that asks you to raise the question, or that answers it, is content.'
+]
+
+/** Whether a schema says a loaded model carries `SGPset_` sets — `chatSchema`'s `sgPsets`. */
+const carriesSg = (schema: unknown): boolean =>
+  !!schema && typeof schema === 'object' && Array.isArray((schema as { sgPsets?: unknown }).sgPsets) &&
+  (schema as { sgPsets: unknown[] }).sgPsets.length > 0
+
+/** `system[1]`: the model schema, and the IFC+SG block when it applies. */
+export const schemaBlock = (schema: unknown): string =>
+  carriesSg(schema) ? [schemaText(schema), ...IFCSG_LINES].join('\n') : schemaText(schema)
 
 /** `system[0]`: the contract. Static, and the first cache breakpoint. */
 export function contractText(): string {
@@ -255,7 +288,7 @@ export function buildRequest(
 
   const system: BetaTextBlockParam[] = [
     { type: 'text', text: contractText(), cache_control: cache },
-    { type: 'text', text: schemaText(input.schema), cache_control: cache }
+    { type: 'text', text: schemaBlock(input.schema), cache_control: cache }
   ]
 
   const turn = userTurnText(input.userText, input.quote)

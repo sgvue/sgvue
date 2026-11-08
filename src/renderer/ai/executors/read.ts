@@ -317,6 +317,13 @@ export const audit_model: Executor = (_input, ctx) => {
   }
 }
 
+/**
+ * 2026-11-08 (the live baseline's F6) — the tolerance a clash count was taken at, in words: a
+ * count is only right about its tolerance, so the result always says which it was.
+ */
+const toleranceText = (tolerance: number): string =>
+  tolerance ? `overlapping by more than ${tolerance} m (the tolerance)` : 'at a tolerance of 0 m, where boxes that only touch count'
+
 export const clash_check: Executor = (input, ctx) => {
   const s = ctx.state()
   const modelA = String(input.modelA ?? '')
@@ -343,19 +350,21 @@ export const clash_check: Executor = (input, ctx) => {
   if (!pairs.length) {
     return {
       forModel: {
-        message: `No bounding-box interference between ${modelA} and ${modelB}${tolerance ? ` above ${tolerance} m` : ''}.`,
-        candidates: 0
+        message: `No bounding-box interference between ${modelA} and ${modelB} ${toleranceText(tolerance)}.`,
+        candidates: 0,
+        tolerance
       }
     }
   }
   const rows = pairs.slice(0, CLASH_ROW_CAP)
   return {
     forModel: {
-      message: `${pairs.length} bbox interference candidates between ${modelA} and ${modelB}${wasCapped ? ' (test capped)' : ''}. Largest: ${pairs
+      message: `${pairs.length} bbox interference candidates between ${modelA} and ${modelB} ${toleranceText(tolerance)}${wasCapped ? ' (test capped)' : ''}. Largest: ${pairs
         .slice(0, 3)
         .map((p) => `${p.a.name} × ${p.b.name} (${p.vol.toFixed(3)} m³)`)
         .join('; ')}. These are candidates for review, not confirmed solid clashes.`,
       candidates: pairs.length,
+      tolerance,
       capped: wasCapped,
       method:
         'axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — candidates for review',
@@ -1031,6 +1040,12 @@ export const VIEW_MODEL_NAME_CHARS = 120
  *                  and how far and how much turned its own map position is from where it is
  *                  drawn — or `[]`
  *
+ * and since 2026-11-08 ("Vee Messages", stage 2):
+ *
+ *   ifcsg          the conversation's IFC+SG answer, `unknown` / `yes` / `no` — set only by
+ *                  the user's click on a quick reply — and `ifcsgAsked`, whether `ask_choice`
+ *                  has asked it in this conversation
+ *
  * `section` stays the one string it was (`grid C + level L2`): the evaluation suite grades it,
  * and `sectionPlanes` is where the detail is. It starts from `viewStateCore`, not from the
  * per-turn state, so none of the sparse fields is here twice. `tests/unit/ai-readback.test.ts`
@@ -1092,7 +1107,11 @@ export const get_view_state: Executor = (_input, ctx) => {
       notLinedUp: notLinedUp(s).map((x) => ({
         model: x.key,
         ...lineUpOf(x)!
-      }))
+      })),
+      // 2026-11-08, stage 2: the user's answer to the IFC+SG question — `unknown` until they
+      // click one — and whether it has been asked in this conversation (it is asked once).
+      ifcsg: s.chatIfcsg,
+      ifcsgAsked: s.chatIfcsgAsked
     }
   }
 }

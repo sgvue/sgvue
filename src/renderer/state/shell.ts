@@ -139,7 +139,8 @@ import {
   storeViews,
   viewsKeyFor
 } from './persist'
-import type { ChatChip, ChatPending, ChatTable, PendingAction, PlacedMarkup } from '../ai/executors/context'
+import type { ChatAsk, ChatChip, ChatPending, ChatTable, PendingAction, PlacedMarkup } from '../ai/executors/context'
+import type { Observation } from '../ai/heads-up'
 import type { ChatTrace } from '../ai/trace-facts'
 import { seedAudit } from '../ai/analysis'
 import type { MeasureRecord, SpotRecord, SpotShown } from '../viewer/annotations'
@@ -299,7 +300,23 @@ export interface ChatMessage {
    * what is not (`pickChat`). Never crosses to the Vee window.
    */
   models?: readonly SlotRecord[]
+  /**
+   * 2026-11-08, stage 2 — the heads-up line under the reply: the one observation the app made
+   * over what its last rule-bearing call touched (`ai/heads-up.ts`). Absent when it made none.
+   * Part of the reply: a quote of the reply does not include it, and `revert` does not touch it.
+   */
+  headsUp?: Observation | null
+  /**
+   * 2026-11-08, stage 2 — the IFC+SG question the reply asked (`ask_choice`): its lead-in, and
+   * once the user has clicked a quick reply, which (`chooseReply`).
+   */
+  ask?: ChatAsk & { chosen?: IfcsgAnswer }
 }
+
+/** 2026-11-08, stage 2 — the user's answer to "Is this model for an IFC+SG submission?". */
+export type IfcsgAnswer = 'yes' | 'no'
+/** …and the conversation's state of it: `unknown` until the user has clicked one. */
+export type IfcsgState = 'unknown' | IfcsgAnswer
 
 /** The federation's models as a reply's ids are numbered against them. */
 const slotRecords = (f: ShellState['federation']): SlotRecord[] =>
@@ -320,6 +337,9 @@ export interface ChatResult {
   placed?: readonly PlacedMarkup[]
   /** 2026-10-01 — the trace's summary, from `traceDone` (`ai/trace-store.ts`). */
   trace?: ChatTrace | null
+  /** 2026-11-08, stage 2 — the turn's heads-up and IFC+SG question (`TurnState`). */
+  headsUp?: Observation | null
+  ask?: ChatAsk | null
 }
 
 /** A hand-sized sidebar section: its height and its floor, in CSS pixels. */
@@ -464,6 +484,15 @@ export interface ShellState {
    * thing the renderer ever learns of the key); `null` until it has been asked.
    */
   hasKey: boolean | null
+  /**
+   * 2026-11-08, stage 2 — whether the model is for an IFC+SG submission, **as the user answered
+   * it** by clicking a quick reply under Vee's question (`chooseReply`), for this conversation:
+   * `unknown` until then. Nothing else sets it — not the model, not file text. And whether the
+   * question has been asked in this conversation at all: it is asked once. Both go with the
+   * conversation (`seedChat`), and neither is saved in a session or a project.
+   */
+  chatIfcsg: IfcsgState
+  chatIfcsgAsked: boolean
   /**
    * 2026-09-24 — the suggestion row, once the conversation has a user turn, folds behind one
    * `suggestions` chip; this is whether that chip has it open. `chipsFolded` decides.
@@ -646,6 +675,14 @@ export interface ShellState {
    */
   chatLocal: (text: string, reply: string, retry?: boolean) => void
   setHasKey: (hasKey: boolean) => void
+  /**
+   * 2026-11-08, stage 2 — the user's click on a quick reply under the conversation's open IFC+SG
+   * question: the newest message, asked and not yet answered. Sets `chatIfcsg` and marks that
+   * message answered; `false`, and nothing changes, when there is no such question or it was
+   * already answered. It does not send anything — the click's caller sends the reply's label.
+   * Its callers are the Vee window's `choose` intent (`model/vee-link.ts`) and the dev harness.
+   */
+  chooseReply: (value: IfcsgAnswer) => boolean
   applyPending: (index: number) => void
   dismissPending: (index: number) => void
   revertTurn: (index: number) => void
@@ -1118,6 +1155,8 @@ export const useShell = create<ShellState>((set, get) => ({
   chatReplyPart: null,
   chatEnd: null,
   hasKey: null,
+  chatIfcsg: 'unknown',
+  chatIfcsgAsked: false,
   chatSuggestOpen: false,
   sideStoreys: null,
   modelsOpen: true,
@@ -1735,6 +1774,17 @@ export const useShell = create<ShellState>((set, get) => ({
   setHasKey: (hasKey) => {
     if (get().hasKey !== hasKey) set({ hasKey })
   },
+  chooseReply: (value) => {
+    const st = get()
+    const last = st.chatMsgs.length - 1
+    const m = st.chatMsgs[last]
+    if (st.chatBusy || st.chatIfcsg !== 'unknown' || !m || m.role !== 'assistant' || !m.ask || m.ask.chosen) return false
+    set({
+      chatIfcsg: value,
+      chatMsgs: st.chatMsgs.map((x, j) => (j === last ? { ...x, ask: { ...m.ask!, chosen: value } } : x))
+    })
+    return true
+  },
   setChatSuggestOpen: (chatSuggestOpen) => set({ chatSuggestOpen }),
   setSideStoreys: (sideStoreys) => set({ sideStoreys }),
   toggleModels: () =>
@@ -1827,9 +1877,13 @@ export const useShell = create<ShellState>((set, get) => ({
           ...(result.placed?.length ? { placed: [...result.placed] } : {}),
           models: slotRecords(get().federation),
           // Only a turn that had a trace carries one; a message without is drawn as it always was.
-          ...(result.trace ? { trace: result.trace } : {})
+          ...(result.trace ? { trace: result.trace } : {}),
+          // Stage 2: the heads-up, and the IFC+SG question — asked once a conversation.
+          ...(result.headsUp ? { headsUp: result.headsUp } : {}),
+          ...(result.ask ? { ask: { lead: result.ask.lead } } : {})
         }
-      ]
+      ],
+      ...(result.ask ? { chatIfcsgAsked: true } : {})
     }))
   },
 
@@ -2098,7 +2152,10 @@ export const useShell = create<ShellState>((set, get) => ({
       chatMsgs: [{ role: 'assistant', text: seed.text, chips: seed.chips, at: Date.now(), models: slotRecords(s.federation) }],
       chatErr: '',
       chatEnd: null,
-      chatBusy: false
+      chatBusy: false,
+      // A new conversation: the IFC+SG question is unasked again.
+      chatIfcsg: 'unknown',
+      chatIfcsgAsked: false
     })
   },
 

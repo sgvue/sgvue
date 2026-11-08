@@ -14,7 +14,7 @@
  *
  * Proved by `spikes/vee-messages/` (spike 1) before it was built.
  */
-import { parseBlocks, plainBlock } from './blocks'
+import { parseBlocks, plainBlock, plainText } from './blocks'
 import { countText, nounFor } from './trace-facts'
 
 /** What both message shapes have in common for the split. */
@@ -27,6 +27,9 @@ export interface Splittable {
   pending?: object | null
   /** What became of the request (2026-11-08): its card stays, stamped. */
   settled?: object | null
+  /** Stage 2: the heads-up line, and a question with quick replies. */
+  headsUp?: object | null
+  ask?: { lead: string } | null
 }
 
 export type Part =
@@ -34,19 +37,35 @@ export type Part =
   | { kind: 'chips' }
   | { kind: 'rows' }
   | { kind: 'table' }
+  /**
+   * Stage 2 — the IFC+SG question, as two parts (its review): Vee's own lead-in, a text bubble
+   * like any other (`askLead`, absent when it is empty), then **the app's** question and its
+   * Yes / No (`ask`), drawn apart from Vee's words so that nothing Vee was steered to write can
+   * read as part of the question the buttons answer.
+   */
+  | { kind: 'askLead' }
+  | { kind: 'ask' }
+  /** Stage 2 — the heads-up line: at the end of the answer, before its consent card. */
+  | { kind: 'headsUp' }
   | { kind: 'consent' }
 
 /**
  * The parts of a message, in drawing order: one bubble per block of the text (the first is the
- * lead, which carries the time), the chips, the storey-rows card, the table card, the consent
- * card. A user's message is one part.
+ * lead, which carries the time), the IFC+SG question (stage 2), the chips, the storey-rows card,
+ * the table card, the heads-up line (stage 2: before the consent card, which it qualifies — the
+ * owner's decision of 2026-11-08) and the consent card. A user's message is one part.
  */
 export function partsOf(m: Splittable): Part[] {
   if (m.role === 'user') return [{ kind: 'text', block: 0, lead: true }]
   const parts: Part[] = parseBlocks(m.text).map((_, i) => ({ kind: 'text' as const, block: i, lead: i === 0 }))
+  if (m.ask) {
+    if (m.ask.lead.trim()) parts.push({ kind: 'askLead' })
+    parts.push({ kind: 'ask' })
+  }
   if (m.chips?.length) parts.push({ kind: 'chips' })
   if (m.trace?.rows.length) parts.push({ kind: 'rows' })
   if (m.table) parts.push({ kind: 'table' })
+  if (m.headsUp) parts.push({ kind: 'headsUp' })
   if (m.pending || m.settled) parts.push({ kind: 'consent' })
   return parts
 }
@@ -63,6 +82,9 @@ export const QUOTE_MAX = 220
  *   table   the result table's rows as text: `L1 9; L2 8`
  *   chips, consent   nothing: a chip is a button, and a request is the user's to answer, not
  *           to quote
+ *   askLead  Vee's lead-in to the IFC+SG question, flattened (stage 2)
+ *   ask, headsUp   nothing (stage 2): the app's question is answered with its buttons, and the
+ *           heads-up is the app's, not Vee's — a quote of the reply never includes either
  *
  * Cut to `QUOTE_MAX` as the whole-reply quote was. Out of range is `null`.
  */
@@ -71,6 +93,7 @@ export function quoteOfPart(m: Splittable, k: number): string | null {
   if (!part) return null
   let said: string
   if (part.kind === 'text') said = m.role === 'user' ? m.text : plainBlock(parseBlocks(m.text)[part.block])
+  else if (part.kind === 'askLead' && m.ask) said = plainText(m.ask.lead)
   else if (part.kind === 'rows' && m.trace) {
     const noun = m.trace.noun
     said = m.trace.rows.map((r) => `${r.label} ${countText(r.n)} ${nounFor(r.n, noun)}`).join('; ')

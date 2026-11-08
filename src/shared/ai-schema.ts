@@ -83,6 +83,30 @@ export interface ChatSchema {
   objectTypes: string[]
   psetKeys: string[]
   elementCount: number
+  /**
+   * 2026-11-08, stage 2 — the `SGPset_` property sets the loaded models carry, how a Singapore
+   * IFC+SG submission is prepared; **absent when there are none**, so a schema without them is
+   * byte for byte what it was. Its presence is what puts the IFC+SG block into the cached system
+   * prompt (`main/ai/prompt.ts`).
+   */
+  sgPsets?: string[]
+}
+
+/** How many `SGPset_` set names the schema lists. */
+export const SG_PSETS_CAP = 50
+
+/**
+ * The `SGPset_` property-set names any element of the federation carries, sorted, at most
+ * `SG_PSETS_CAP` — a prefix match on the names the index already holds (HANDOFF §8.2: any one
+ * set on any one element, no share threshold, because a model in preparation may carry them on
+ * only a few). Empty when there are none.
+ */
+export function sgPsetNames(federation: Pick<Federation, 'elements'>): string[] {
+  const names = new Set<string>()
+  for (const e of federation.elements as readonly VisElement[]) {
+    for (const set of Object.keys(e.psets)) if (set.startsWith('SGPset_')) names.add(set)
+  }
+  return [...names].sort().slice(0, SG_PSETS_CAP)
 }
 
 /** The sentence a truncated category ends with, so the model knows where the rest is. */
@@ -140,6 +164,7 @@ function psetKeyCategory(
  */
 export function chatSchema(federation: Federation): ChatSchema {
   const els = federation.elements as readonly VisElement[]
+  const sg = sgPsetNames(federation)
   return {
     models: federation.files.map((f) => ({ key: f.key, name: f.name || f.file })),
     storeys: federation.storeys.map((s) => s.name),
@@ -150,7 +175,8 @@ export function chatSchema(federation: Federation): ChatSchema {
     predefinedTypes: category(els, (e) => attrValues(e, 'PredefinedType').map(String)),
     objectTypes: category(els, (e) => e.objectType),
     psetKeys: psetKeyCategory(els, federation.propKeys),
-    elementCount: federation.elements.length
+    elementCount: federation.elements.length,
+    ...(sg.length ? { sgPsets: sg } : {})
   }
 }
 
@@ -216,6 +242,11 @@ export interface ChatViewState {
    * starts in `ft`, so its every turn says so.
    */
   units?: string
+  /**
+   * 2026-11-08, stage 2 — the user's answer to "Is this model for an IFC+SG submission?", only
+   * once there is one: `yes` or `no`. Set only by the user's click on a quick reply.
+   */
+  ifcsg?: 'yes' | 'no'
 }
 
 /* ────────────────────────────── display and section read-back ────────────────────────────── */
@@ -337,6 +368,8 @@ export interface ViewStateSource extends VisState, DisplaySource {
   tool: string
   /** The display unit (2026-10-09). */
   units?: string
+  /** 2026-11-08, stage 2 — the conversation's IFC+SG answer (`chatIfcsg`). */
+  chatIfcsg?: 'unknown' | 'yes' | 'no'
 }
 
 /* ────────────────────────────── the camera ────────────────────────────── */
@@ -377,7 +410,7 @@ export const MODELS_HIDDEN_CAP = 20
 /** The fields the per-turn view state carries only while something is off its default. */
 export type SparseViewState = Pick<
   ChatViewState,
-  'display' | 'tool' | 'modelsHidden' | 'modelsHiddenMore' | 'sectionPlanes' | 'camera' | 'units'
+  'display' | 'tool' | 'modelsHidden' | 'modelsHiddenMore' | 'sectionPlanes' | 'camera' | 'units' | 'ifcsg'
 >
 
 /**
@@ -422,6 +455,8 @@ export function sparseViewState(
 
   // The design's own `mm` (`SGVue.dc.html:851`) is the one the view state leaves unsaid.
   if (s.units && s.units !== DEFAULT_DISPLAY_UNIT) out.units = s.units
+
+  if (s.chatIfcsg === 'yes' || s.chatIfcsg === 'no') out.ifcsg = s.chatIfcsg
 
   return out
 }

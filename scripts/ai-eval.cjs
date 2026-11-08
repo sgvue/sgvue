@@ -35,7 +35,7 @@
  *   --null      an agent that does nothing. Must score 0 on every case.
  *   (neither)   LIVE. Needs ANTHROPIC_API_KEY already in the environment. Spends real money.
  *
- * Flags: --pilot[=<ids>], --only=<ids|groups|tags>, --fixture=<mock|mock-hostile|mock-messy>, --variant=v1,
+ * Flags: --regrade=<variant dir> (plain Node, no request — `eval/regrade.cjs`), --pilot[=<ids>], --only=<ids|groups|tags>, --fixture=<mock|mock-hostile|mock-messy>, --variant=v1,
  *        --flow=DIR, --reps=N, --timeout-s=N, --retries=N, --approve-harness;
  *        --no-report is accepted and does nothing (there has been no report since 2026-10-05).
  * Env:   SGVUE_APP_OUT=<dir> runs the suite against a saved build directory instead of `out/`.
@@ -85,6 +85,29 @@
  *     it should roughly cost, and writes it, beside what it measured per case, to `metrics.json`;
  *   · **stage 2** — a case that needs what is not built yet is n/a, with the reason printed.
  */
+/*
+ * 2026-11-08 — `--regrade=<variant dir>`: re-score a saved run with the graders as they are now,
+ * under plain Node — no Electron, no window, no request (`eval/regrade.cjs`). It writes
+ * `results.regrade.jsonl` and `metrics.regrade.json` beside the run's own files and touches none.
+ */
+const REGRADE = process.argv.find((a) => a.startsWith('--regrade='))
+if (REGRADE) {
+  const { join: joinPath, resolve: resolvePath } = require('node:path')
+  const dir = resolvePath(REGRADE.slice('--regrade='.length))
+  require('./eval/regrade.cjs')
+    .regradeDir(dir, joinPath(__dirname, '..'), require('./eval/cases.cjs').CASES)
+    .then((summary) => {
+      console.log(JSON.stringify(summary, null, 2))
+      console.log(`\nai-eval: re-graded ${summary.scored} of ${summary.rows} row(s) in ${dir} — written to metrics.regrade.json`)
+      process.exit(0)
+    })
+    .catch((error) => {
+      console.error(`ai-eval: --regrade failed — ${error.message}`)
+      process.exit(70)
+    })
+  return
+}
+
 const { app, BrowserWindow } = require('electron')
 const { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs')
 const { createHash } = require('node:crypto')
@@ -95,7 +118,7 @@ const { CASES, PILOT_IDS, PILOT_MAX, runsOf, selectCases } = require('./eval/cas
 const { capabilityTags, missingCapabilities, whyMissing } = require('./eval/capabilities.cjs')
 const { TRANSIENT_KINDS, failureClass, gradeCase } = require('./eval/graders.cjs')
 const { estimateRun, measuredTurn, money, runCost, turnCost } = require('./eval/cost.cjs')
-const { collectTruth, nullTurn, observation, oracleTurn, scriptedCalls, turnsOf, withEarlier } = require('./eval/observe.cjs')
+const { collectTruth, lateTruth, nullTurn, observation, oracleTurn, scriptedCalls, turnsOf, withEarlier } = require('./eval/observe.cjs')
 
 /* ────────────────────────────── arguments ────────────────────────────── */
 
@@ -611,7 +634,7 @@ async function runCase(kase, rep, caps, settings) {
         `window.__sgvueDev.tool(${JSON.stringify(step.tool)}, ${JSON.stringify(step.input || {})})`
       )
     }
-    const truth = await collectTruth(kase, probesIn(js))
+    const asked = await collectTruth(kase, probesIn(js))
     const start = await readView(js)
     // Every user turn in order, one conversation; the last is the case's own.
     const all = turnsOf(kase)
@@ -621,7 +644,7 @@ async function runCase(kase, rep, caps, settings) {
     let after = start
     let message = null
     for (let i = 0; i < all.length; i++) {
-      turn = await runTurn(js, all[i], truth)
+      turn = await runTurn(js, all[i], asked)
       after = await readView(js)
       message = turn.index >= 0 ? await jsonOf(js, `window.__sgvueDev.chat.messages()[${turn.index}]`) : null
       if (i < all.length - 1) {
@@ -642,6 +665,8 @@ async function runCase(kase, rep, caps, settings) {
       const t = caps.tools.find((x) => x.name === name)
       return t ? t.kind : 'unknown'
     }
+    // A probe that follows the turn's own call is run again now (`lateTruth`, 2026-11-08 F6).
+    const truth = await lateTruth(kase, asked, obs.calls, probesIn(js))
     const graded = gradeCase(kase, obs, truth, kindOf)
     const cost = turnCost(obs.usage, turn.model || settings.model, settings.cacheOneHour)
     return {

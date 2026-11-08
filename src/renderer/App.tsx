@@ -486,7 +486,7 @@ async function installDevTools(viewer: Viewer): Promise<void> {
       recorded: () => lastTurnRecord(),
       reset: () => {
         traceFail()
-        useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false })
+        useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatIfcsg: 'unknown', chatIfcsgAsked: false })
       },
       /**
        * 2026-09-20. One turn's tool sequence without the API, for `scripts/ai-audit.cjs`:
@@ -508,6 +508,12 @@ async function installDevTools(viewer: Viewer): Promise<void> {
       /** The cached schema block and the per-turn view-state message, as a turn builds them. */
       payloads: () => chatPayloads(),
       apply: (index: number) => shell().applyPending(index),
+      /**
+       * 2026-11-08, stage 2. A quick reply under the IFC+SG question, as the user's click sets it
+       * (`chooseReply`) — before the harness sends the reply's text as the next turn, which the
+       * Vee window's click does itself. Dev only, like every entry here.
+       */
+      choose: (value: 'yes' | 'no') => shell().chooseReply(value),
       dismiss: (index: number) => shell().dismissPending(index),
       revert: (index: number) => shell().revertTurn(index),
       /**

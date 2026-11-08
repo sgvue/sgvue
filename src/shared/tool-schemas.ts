@@ -408,12 +408,18 @@ export const MARKUP_POINT_MAX = 1e7
 
 /* ────────────────────────────── the design's fifteen ────────────────────────────── */
 
+/** `ask_choice`'s lead-in, at most this long (2026-11-08, stage 2). */
+export const ASK_LEAD_MAX = 300
+
 const DESIGN_TOOLS: readonly ToolSpec[] = [
   {
     name: 'summarize_elements',
     kind: 'read',
     description:
-      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so keep your own reply to one sentence.',
+      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so keep your own reply to one sentence. ' +
+      // 2026-11-08 (the live baseline's F1): the owner — "tabulate" or "show me a table" answers
+      // in the chat; a schedule only when the user asks for one.
+      'Use it whenever the user asks to tabulate, count or total elements by a group in the chat — by type, by level, by any property value, "show me a table" — rather than make_schedule, which is for when they ask for a schedule or want it in the Schedules window.',
     input_schema: obj(
       {
         rules: RULES,
@@ -439,12 +445,12 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     name: 'clash_check',
     kind: 'read',
     description:
-      'Bounding-box interference candidates between two loaded models, swept over every currently visible element of each. Read-only. modelA and modelB must both be loaded and different. tolerance is metres of allowed overlap before a pair counts. This is an axis-aligned box test in the files’ own world coordinates, not solid geometry, so it over-reports for anything rotated or diagonal — always describe the results as candidates for review, never as clashes. At most 25 pairs come back, largest overlap first.',
+      'Bounding-box interference candidates between two loaded models, swept over every currently visible element of each. Read-only. modelA and modelB must both be loaded and different. tolerance is metres of allowed overlap before a pair counts; it defaults to 0, where boxes that only touch count too, and the result states the tolerance it used. This is an axis-aligned box test in the files’ own world coordinates, not solid geometry, so it over-reports for anything rotated or diagonal — always describe the results as candidates for review, never as clashes. At most 25 pairs come back, largest overlap first.',
     input_schema: obj(
       {
         modelA: { type: 'string' },
         modelB: { type: 'string' },
-        tolerance: { type: 'number', description: 'metres of allowed overlap before it counts' }
+        tolerance: { type: 'number', description: 'metres of allowed overlap before it counts; default 0 — boxes that only touch count' }
       },
       ['modelA', 'modelB']
     ),
@@ -887,6 +893,27 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
       'sql'
     ]),
     strict: true
+  },
+  /*
+   * 2026-11-08, "Vee Messages" stage 2 (HANDOFF §8.3, owner-approved): the IFC+SG question. It
+   * asks — the user's click answers — and the answer is the app's (`chatIfcsg`), never the
+   * model's: the quick replies are drawn and answered by the app, so a file's text cannot set it.
+   */
+  {
+    name: 'ask_choice',
+    kind: 'read',
+    description:
+      'Ask the user whether the model is for an IFC+SG submission, with Yes and No buttons under your reply — only while the schema lists sgPsets and the view state has no ifcsg, and only when the question is about the types, properties or classification of elements that carry those SGPset_ sets. Read those elements by rule first (query_elements, for one): it refuses unless the last such call this turn touched an element that carries an SGPset_ set. Read-only: it changes nothing. The app adds the question itself, "Is this model for an IFC+SG submission?", after your lead; the user’s click is the answer, which the next turn’s view state carries as ifcsg. End your turn once it is asked, with at most one short sentence saying you need this before you answer, and do not repeat the question. It also refuses when no loaded model carries an SGPset_ set and once the question has been asked in this conversation, answered or not.',
+    input_schema: obj(
+      {
+        lead: {
+          type: 'string',
+          description: `One short sentence naming what carries the sets, e.g. "These doors carry SGPset_Door values." At most ${ASK_LEAD_MAX} characters.`
+        }
+      },
+      ['lead']
+    ),
+    strict: true
   }
 ]
 
@@ -1222,7 +1249,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
     // calculated-value editor set — filterLogic, itemize, a column's format and place, and
     // calculated columns — which until now it could only keep.
     description:
-      'Build a schedule — a table of elements with the columns, filters, sorting, grouping and totals asked for — and show it in the Schedules window, opening that window when it is closed; the user can undo it there. It returns the schedule as the window shows it: headings, the first rows as displayed text, each group’s count and subtotals and the grand totals, so answer from them. Use it for a door schedule with fire rating and width, room or space areas by level, counts by type. base:"open" changes the schedule the user already has open instead: columns are added — or, for a field it already shows, given the heading, total and format you pass, and moved when after is given — removeColumns takes columns away by heading or field, and filters, sortBy and groupBy replace their lists when given; everything else the user set up (other columns and their formats, colour rules, widths) is kept. category is one or more IFC classes, unioned. A field is one of the Schedules window’s own — Level, Name, Type, Family, IFC Class (or IfcEntity), Object Type, Predefined Type, Material, Model, GUID, Description, Tag (Revit ID), Level Elevation, Room / Space, Building, Site, Discipline — or any property name from the schema, matched the way rules match it; Pset.Name names one property set. A name that is not one refuses the whole call with the nearest names, and nothing is shown. Cells and totals are written in each column’s display unit — the unit on each schedule.columns entry of the result, e.g. mm — but filter numbers on lengths, areas and volumes are SI, the column’s filterUnit: metres, square metres, cubic metres, so 900 mm is 0.9; a number the file gives no unit compares as shown. ' +
+      'Build a schedule — a table of elements with the columns, filters, sorting, grouping and totals asked for — and show it in the Schedules window, opening that window when it is closed; the user can undo it there. It returns the schedule as the window shows it: headings, the first rows as displayed text, each group’s count and subtotals and the grand totals, so answer from them. Use it when the user asks for a schedule or wants the table in the Schedules window — a door schedule with fire rating and width, room or space areas by level; to tabulate, count or total in the chat, use summarize_elements instead. base:"open" changes the schedule the user already has open instead: columns are added — or, for a field it already shows, given the heading, total and format you pass, and moved when after is given — removeColumns takes columns away by heading or field, and filters, sortBy and groupBy replace their lists when given; everything else the user set up (other columns and their formats, colour rules, widths) is kept. category is one or more IFC classes, unioned; a class no loaded model carries is left out of the union and the result says so, and only a category with no class left refuses. A field is one of the Schedules window’s own — Level, Name, Type, Family, IFC Class (or IfcEntity), Object Type, Predefined Type, Material, Model, GUID, Description, Tag (Revit ID), Level Elevation, Room / Space, Building, Site, Discipline — or any property name from the schema, matched the way rules match it; Pset.Name names one property set. A name that is not one refuses the whole call with the nearest names, and nothing is shown. Cells and totals are written in each column’s display unit — the unit on each schedule.columns entry of the result, e.g. mm — but filter numbers on lengths, areas and volumes are SI, the column’s filterUnit: metres, square metres, cubic metres, so 900 mm is 0.9; a number the file gives no unit compares as shown. ' +
       'filterLogic:"or" lists what passes any filter rather than every one, and itemize:false collapses rows that read alike into one with a Count. calculated adds columns worked out per row from the other columns, named by their headings — Area * 1.15, [Clear Width] * 2, if(Area > 10, "Large", "Small"), contains(Type, "FD") — with + - * /, comparisons, && and ||, and round, floor, ceil, abs, sqrt, min, max, if, contains, starts, ends, number and len; a formula reads measures in SI as a filter does, so Width > 0.9 is wider than 900 mm; or percentageOf, each row’s share of a field’s total. A formula that does not parse, or names a heading the schedule has no column for, refuses the call with the reason. ' +
       `At most 40 columns, 8 filters, and 4 sort and group fields together, and ${SCHEDULE_CALCULATED_MAX} calculated columns. It changes only what the Schedules window shows — never the model.`,
     input_schema: obj({
@@ -1237,7 +1264,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
         type: 'array',
         items: { type: 'string' },
         description:
-          'IFC classes to list, unioned, at most 12 — e.g. ["IfcDoor"], or ["IfcWall","IfcWallStandardCase"] for walls across IFC2X3 and IFC4. Required for a new schedule.'
+          'IFC classes to list, unioned, at most 12 — e.g. ["IfcDoor"], or ["IfcWall","IfcCurtainWall"] for walls and curtain walls. Name the classes the schema lists. Required for a new schedule.'
       },
       columns: {
         type: 'array',

@@ -35,6 +35,7 @@
 import { z } from 'zod'
 import { HL } from '../../../shared/colors'
 import {
+  ASK_LEAD_MAX,
   FILTER_SET_NAME_MAX,
   INTERFACE_CARDS,
   INTERFACE_SEARCH_MAX,
@@ -333,6 +334,8 @@ export const TOOL_INPUTS = {
     limit: z.number().optional()
   }),
   query_sql: z.object({ sql: z.string() }),
+  // 2026-11-08, stage 2: the IFC+SG question's lead-in — the app's own question follows it.
+  ask_choice: z.object({ lead: z.string().max(ASK_LEAD_MAX, `at most ${ASK_LEAD_MAX} characters`) }),
 
   /* parity with the user (2026-10-02) */
   // Model keys are a handful; a list longer than any federation is refused before it is read.

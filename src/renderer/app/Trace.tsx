@@ -284,26 +284,69 @@ const MARK_STYLE: Record<Mark, string> = {
   m: 'font:400 11px/1 var(--mono)'
 }
 
-/** A run of pieces, each mark as an element and plain text as text. */
-const marked = (pieces: readonly { text: string; mark: Mark }[]): React.ReactNode[] =>
-  pieces.map((piece, k) =>
-    piece.mark ? (
-      <span key={k} style={s(MARK_STYLE[piece.mark])}>
+/**
+ * 2026-11-08 (stage 2) — which code spans of a reply are IFC terms (`ai/terms.ts`): their ordinals
+ * in render order, as the main window found them in the loaded models' vocabulary, and the
+ * ordinal this block's first span has. A coloured span is the `.ifc-term` class — mono medium in
+ * the one IFC-term colour — and no inline style; every other code span is the design's mono.
+ */
+export interface TermMarks {
+  terms: ReadonlySet<number>
+  first: number
+}
+const NO_TERMS: TermMarks = { terms: new Set(), first: 0 }
+
+/** How many code spans a line holds: where the next line's ordinals start. */
+const spansIn = (pieces: readonly { mark: Mark }[]): number => pieces.reduce((n, p) => n + (p.mark === 'm' ? 1 : 0), 0)
+
+/**
+ * A run of pieces, each mark as an element and plain text as text. `at` is the ordinal of the
+ * run's first code span, so a span is coloured exactly when `terms` holds its ordinal.
+ */
+const marked = (pieces: readonly { text: string; mark: Mark }[], at = 0, terms: ReadonlySet<number> = NO_TERMS.terms): React.ReactNode[] => {
+  let k = at
+  return pieces.map((piece, i) =>
+    piece.mark === 'm' && terms.has(k++) ? (
+      <span key={i} className="ifc-term">
+        {piece.text}
+      </span>
+    ) : piece.mark ? (
+      <span key={i} style={s(MARK_STYLE[piece.mark])}>
         {piece.text}
       </span>
     ) : (
       piece.text
     )
   )
+}
+
+/**
+ * One line of Vee's text with its two marks as elements and no colour — stage 2's IFC+SG question
+ * lead-in, which is not part of the message's text the IFC terms were found in.
+ */
+export function MarkedText({ text }: { text: string }): React.JSX.Element {
+  return <>{marked(splitMarks(text))}</>
+}
+
+/** Lines split into their pieces, each with the ordinal its first code span has. */
+function linesAt(lines: readonly string[], first: number): { pieces: ReturnType<typeof splitMarks>; at: number }[] {
+  let at = first
+  return lines.map((line) => {
+    const pieces = splitMarks(line)
+    const out = { pieces, at }
+    at += spansIn(pieces)
+    return out
+  })
+}
 
 /** A block's lines, a line break between each two, each line's marks as elements. */
-function Lines({ lines }: { lines: readonly string[] }): React.JSX.Element {
+function Lines({ lines, marks = NO_TERMS }: { lines: readonly { pieces: ReturnType<typeof splitMarks>; at: number }[]; marks?: TermMarks }): React.JSX.Element {
   return (
     <>
       {lines.map((line, i) => (
         <Fragment key={i}>
           {i ? <br /> : null}
-          {marked(splitMarks(line))}
+          {marked(line.pieces, line.at, marks.terms)}
         </Fragment>
       ))}
     </>
@@ -341,9 +384,16 @@ const TABLE_NUMBER =
  * can stand at the end of its last line — a list its items, a table the result table's look.
  * Nothing in it is ever HTML.
  */
-export function BlockView({ block }: { block: Block }): React.JSX.Element {
-  if (block.kind === 'p') return <Lines lines={block.lines} />
+export function BlockView({ block, marks = NO_TERMS }: { block: Block; marks?: TermMarks }): React.JSX.Element {
+  if (block.kind === 'p') return <Lines lines={linesAt(block.lines, marks.first)} marks={marks} />
   if (block.kind === 'table') {
+    // The cells in the order `ai/terms.ts` walks them: the header, then each row.
+    const cells = linesAt([...block.head, ...block.rows.flat()], marks.first)
+    let cell = 0
+    const next = (): React.ReactNode[] => {
+      const c = cells[cell++]
+      return marked(c.pieces, c.at, marks.terms)
+    }
     const last = block.head.length - 1
     const pad = (c: number, y: number): string => `padding:${y}px ${c === last ? 9 : 5}px ${y}px ${c === 0 ? 9 : 5}px`
     return (
@@ -351,9 +401,9 @@ export function BlockView({ block }: { block: Block }): React.JSX.Element {
         <table style={s('border-collapse:collapse;width:100%')}>
           <thead>
             <tr>
-              {block.head.map((cell, c) => (
+              {block.head.map((_, c) => (
                 <th key={c} scope="col" style={s(`${pad(c, 6)};${TABLE_HEAD};text-align:${block.cols[c].align}`)}>
-                  {marked(splitMarks(cell))}
+                  {next()}
                 </th>
               ))}
             </tr>
@@ -361,12 +411,12 @@ export function BlockView({ block }: { block: Block }): React.JSX.Element {
           <tbody>
             {block.rows.map((row, r) => (
               <tr key={r}>
-                {row.map((cell, c) => (
+                {row.map((_, c) => (
                   <td
                     key={c}
                     style={s(`${pad(c, 5)};${block.cols[c].num ? TABLE_NUMBER : TABLE_TEXT};text-align:${block.cols[c].align}`)}
                   >
-                    {marked(splitMarks(cell))}
+                    {next()}
                   </td>
                 ))}
               </tr>
@@ -380,9 +430,16 @@ export function BlockView({ block }: { block: Block }): React.JSX.Element {
   const List = ordered ? 'ol' : 'ul'
   /** Every number of a list as wide as its widest, so their full stops stand in a column. */
   const digits = ordered ? String(block.start + block.items.length - 1).length + 1 : 0
+  // Each item's lines, with the ordinals its code spans have — item after item, as `ai/terms.ts`.
+  let at = marks.first
+  const items = block.items.map((item) => {
+    const lines = linesAt(item, at)
+    for (const l of lines) at += spansIn(l.pieces)
+    return lines
+  })
   return (
     <List style={s(`margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:${ITEM_GAP}px`)}>
-      {block.items.map((item, k) => (
+      {block.items.map((_, k) => (
         <li key={k} style={s(`display:flex;align-items:baseline;gap:${MARKER_GAP}px`)}>
           {ordered ? (
             <span style={s(`${NUMBER_MARK};min-width:${digits}ch`)}>{block.start + k}.</span>
@@ -392,7 +449,7 @@ export function BlockView({ block }: { block: Block }): React.JSX.Element {
             </span>
           )}
           <span style={s('flex:1;min-width:0')}>
-            <Lines lines={item} />
+            <Lines lines={items[k]} marks={marks} />
           </span>
         </li>
       ))}

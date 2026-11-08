@@ -1164,7 +1164,25 @@ Anything not on this list is a defect.
   lift's type, 13px/1.42). The main window is unchanged but for Preferences telling the store
   whether a key is there. Not yet seen in a window: the e2e specs that drive it are edited and
   not run, and `tests/e2e/vee-trace.spec.ts` and `scripts/screenshot.cjs` still read the old
-  trace markup.
+  trace markup. *(Amended the same day — stage 2, owner-approved decisions B, C, D, HANDOFF §2,
+  §7, §8: in the Ask Vee window only, three more pieces. **A heads-up line** — at most one a
+  reply, after its answer and before its consent card, in `--warn-ink` with a 12 px outline
+  sign, no control: the app's own observation over the elements the reply's last rule-bearing
+  call touched — its matched set when its rules scope the whole model, and never a call that
+  acts on ids, the selection or a schedule — placeholder values in the checked property,
+  elements on no storey, a shared GlobalId, and, only after the user answered Yes to IFC+SG, an
+  ObjectType-only sub-type; drawn from a fixed template, its names mono and uncoloured, part of
+  the reply's announcement, never quoted. **IFC terms** — a code span of Vee's text that is
+  exactly a name the loaded models carry (class, PredefinedType / ObjectType value, set or
+  property name, `Entity.SUBTYPE*`), never SGVue's own attribute names, is drawn in one colour,
+  `--ifc-term` (`#859FF6`, light `#3B51BC`), mono 500; a user's words never. **The IFC+SG
+  question** — while a model carries an `SGPset_` set, and only once the turn has read by rule
+  elements that carry one, Vee may ask once a conversation, through `ask_choice`: its
+  one-sentence lead-in is a bubble of Vee's own, and the app's question, "Is this model for an
+  IFC+SG submission?", stands apart from it as a dashed part of its own ("Question from SGVue")
+  with app-drawn `Yes` / `No` quick replies (no tape, no card), keyboard-reachable and never
+  focused by themselves; only the user's click answers it. **New controls:** the quick replies.
+  Styled by `.vm` classes only; no inline string changed. Not yet seen in a window.)*
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1473,6 +1491,11 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-08 — **a reply records the models its ids were numbered against** (`ChatMessage.models`, never on the port); a pick goes through `pickChat` → `liveIds` (the revert's renumbering rule), and `pickNote` says what is no longer loaded.
 - 2026-11-08 — **every transcript row is a memoised `MessageRow` fed by `rowProps`, and the Vee window keeps a message's object while its `id` is unchanged** (`keepUnchanged`): a keystroke or a board update renders no row; a row's pop is decided once, when it is first drawn (`freshRow`).
 - 2026-11-08 — **e2e launches carry a stand-in `ANTHROPIC_API_KEY`** (`E2E_KEY`, never real, never on disk); a keyless spec passes `''`.
+- 2026-11-08 — **the heads-up is app code** (`ai/heads-up.ts`): `executeTool` checks each rule-bearing call over the elements it touched (decision C), its matched set for a check-only call; a call with `ids` / `selection` / `schedule` is not observed; the reply keeps the last one's single observation (`ChatMessage.headsUp`, strict `VeeHeadsUp` on the port), `objectTypeOnly` only after IFC+SG yes (decision B), an ObjectType is a sub-type only as `^[A-Z][A-Z0-9_]*$`; drawn from a fixed template, never through the marks parser.
+- 2026-11-08 — **IFC terms are coloured by exact lookup in the main window** (`ai/terms.ts`): classes, PredefinedType / ObjectType values, set and property names, `Entity.SUBTYPE[*]`, never `ATTR_KEYS` (decision D); sent as span ordinals (`VeeMessage.terms`, ≤ 2 000), recomputed per federation; `.ifc-term` only.
+- 2026-11-08 — **the IFC+SG answer is the user's**: `ask_choice { lead }` (read; the app owns the question and Yes / No) asks once a conversation, only when the turn's last rule-bearing call touched an `SGPset_` element (`TurnState.sgTouched`), its lead-in a bubble of Vee's and the app's question a separate part, while `chatSchema.sgPsets` exists — which also adds `IFCSG_LINES` (concept only) to `system[1]`; `chatIfcsg` / `chatIfcsgAsked` are set only by `chooseReply` (the Vee `choose` intent for the open question, and the dev harness; the readonly guard pins it); reported in `get_view_state`, and in the per-turn view state once not unknown; 38 tools.
+- 2026-11-08 — **the baseline's app fixes**: a tabulation answers in the chat through `summarize_elements`, and `make_schedule` only when a schedule is asked for (F1, 42 prompt lines); `make_schedule` drops a class no model carries from a union and says so (F2); `clash_check` states its tolerance (F6).
+- 2026-11-08 — **the graders read honest replies as honest** (number words 0–20, not `one`; a modal passive is no claim; "click Save to write the file"; offers to hide or schedule); a probe can follow the turn's own call (`fromCall`, `lateTruth`), recorded calls matched key-order-free; `ai-eval.cjs --regrade=<dir>` re-scores a saved run under plain Node, carrying the run's verdict for view checks, into `metrics.regrade.json`, and a row's `rep` must be a non-negative integer.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

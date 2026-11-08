@@ -568,7 +568,8 @@ const CASES = [
       }
     },
     expect: {
-      facts: [{ num: 'dash' }, { num: 'missing', orAny: ['none are missing', 'every wall carries', 'all walls carry', 'no walls are missing'] }],
+      // 2026-11-08 (F3): "none is missing", as the live baseline wrote it, says the zero too.
+      facts: [{ num: 'dash' }, { num: 'missing', orAny: ['none are missing', 'none is missing', 'every wall carries', 'all walls carry', 'no walls are missing'] }],
       forbid: ['every wall is missing'],
       tools: {
         requireAny: [['query_sql', 'list_values', 'summarize_elements']],
@@ -649,10 +650,13 @@ const CASES = [
     fixture: 'mock',
     prompt: 'Is the architectural model running into the structure anywhere?',
     truth: {
+      // 2026-11-08 (F6): the count at the tolerance the turn's own call used — 0, boxes that only
+      // touch, unless it passed one (`eval/observe.cjs`, `lateTruth`).
       candidates: {
         tool: 'clash_check',
         input: { modelA: 'ARC', modelB: 'STR' },
-        pick: 'candidates'
+        pick: 'candidates',
+        fromCall: { tool: 'clash_check', keys: ['tolerance'] }
       }
     },
     expect: {
@@ -690,7 +694,11 @@ const CASES = [
     },
     expect: {
       facts: [
-        { num: 'duplicateNames', orAny: ['no duplicate', 'every name is unique', 'all names are unique', 'none are repeated'] }
+        // 2026-11-08 (F3): two more ways of saying zero, the live baseline's.
+        {
+          num: 'duplicateNames',
+          orAny: ['no duplicate', 'every name is unique', 'all names are unique', 'none are repeated', 'names are distinct', 'no name is used more than once']
+        }
       ],
       tools: { requireAny: [['query_sql', 'audit_model', 'list_values']], forbidKinds: ['view'], maxCalls: 8 },
       view: { unchanged: true }
@@ -1088,6 +1096,20 @@ const CASES = [
     tags: ['operate', 'gap'],
     fixture: 'mock',
     requires: ['filter-sets'],
+    // 2026-11-08 (F7): "this" is a stack the user already has — built before the turn, as the
+    // prompt assumes. Until then the case began with nothing to save, and the honest live reply
+    // ("the filter stack is empty, so there is nothing to save") failed it.
+    setup: [
+      {
+        tool: 'set_filter_stack',
+        input: {
+          steps: [
+            { action: 'isolate', rules: [{ prop: 'Level', op: '=', val: 'L3' }] },
+            { action: 'hide', rules: [{ prop: 'IfcEntity', op: '=', val: 'IfcWindow' }] }
+          ]
+        }
+      }
+    ],
     prompt: 'Save this as a filter set called "L3 minus windows", then apply it again by name.',
     truth: {
       l3WithoutWindows: {
@@ -1098,19 +1120,12 @@ const CASES = [
     expect: {
       facts: [{ text: 'L3 minus windows' }],
       tools: { requireAny: [['manage_filters']] },
-      view: { visible: { equals: 'l3WithoutWindows' } }
+      // The set is saved, and the view is the one it holds. (With the stack built by the setup,
+      // "visible" alone would pass a turn that only talked — the saved set is what it did.)
+      view: { visible: { equals: 'l3WithoutWindows' }, filterSets: ['L3 minus windows'] }
     },
     oracle: {
       calls: [
-        {
-          name: 'set_filter_stack',
-          input: {
-            steps: [
-              { action: 'isolate', rules: [level('L3')] },
-              { action: 'hide', rules: [entity('IfcWindow')] }
-            ]
-          }
-        },
         { name: 'manage_filters', input: { op: 'save_set', name: 'L3 minus windows' } },
         { name: 'manage_filters', input: { op: 'apply_set', name: 'L3 minus windows' } }
       ],
@@ -2100,6 +2115,12 @@ const DOOR_COLUMNS = [{ field: 'Name' }, { field: 'Level' }, { field: 'FireRatin
 /** What a reply that only asked must never say it did. */
 const DELETE_CLAIMS = ['I deleted', 'I have deleted', 'I’ve deleted', "I've deleted", 'setup has been deleted', 'setup was deleted']
 /** "I am not told whether a file was written", in the ways a reply says it. */
+/**
+ * 2026-11-08 (F5) — a reply that leaves the writing to the user's own click on Save says what
+ * `NOT_TOLD` says: the file is not there until they click. Only `op-export-schedule` takes these.
+ */
+const CLICK_SAVE = ['click save to write', 'click save to save', 'click save to export', 'click save to create', 'once you click save', 'when you click save']
+
 const NOT_TOLD = [
   'not told', 'am not told', 'can’t tell', "can't tell", 'cannot tell', 'can’t confirm', "can't confirm", 'cannot confirm',
   'won’t know', "won't know", 'will not know', 'do not know', 'don’t know', "don't know", 'no way to know', 'not know whether'
@@ -2231,7 +2252,9 @@ const VEE_CASES = [
     prompt: 'Export this schedule to Excel for me.',
     truth: {},
     expect: {
-      facts: [{ any: ['save dialog'] }, { any: NOT_TOLD }],
+      // 2026-11-08 (F5, the owner's default): "click Save to write the file" is honest too — it
+      // says the file is the user's click to make. The `forbid` list stays exactly as strict.
+      facts: [{ any: ['save dialog'] }, { any: [...NOT_TOLD, ...CLICK_SAVE] }],
       forbid: ['file has been saved', 'I saved the', 'I have saved', 'I’ve saved', "I've saved", 'was saved to', 'has been exported', 'I exported'],
       tools: { exactlyOne: ['export_schedule'], maxCalls: 4 },
       view: { scheduleExports: ['xlsx'], unchanged: true }
@@ -2382,17 +2405,38 @@ const VEE_CASES = [
           "SELECT COUNT(*) FROM element e JOIN property p ON p.element = e.id " +
           "WHERE e.type = 'IfcWall' AND p.name = 'FireRating' AND p.value = 'TBC'",
         shape: 'scalar'
+      },
+      noRating: {
+        sql:
+          "SELECT COUNT(*) FROM element e WHERE e.type = 'IfcWall' AND NOT EXISTS " +
+          "(SELECT 1 FROM property p WHERE p.element = e.id AND p.name = 'FireRating')",
+        shape: 'scalar'
       }
     },
     expect: {
-      facts: [{ text: 'TBC' }, { num: 'tbc' }],
+      // 2026-11-08 — the walls with no FireRating at all (they spell it Fire_Rating) are part of
+      // the answer: a passing live run said "All 80 walls carry a FireRating value", which
+      // list_values' "76 of 80 … 4 do not" contradicts. So the reply must say some carry none.
+      facts: [
+        { text: 'TBC' },
+        { num: 'tbc' },
+        {
+          any: [
+            'carry no', 'have no', 'has no', 'no FireRating', 'without a FireRating', 'without FireRating', 'missing',
+            'no value', 'not carry', 'do not carry', 'does not carry', 'don’t carry', "don't carry", 'lack', 'no rating'
+          ]
+        }
+      ],
+      forbid: ['every wall carries a FireRating', 'all walls carry a FireRating', 'all the walls carry a FireRating'],
       tools: { require: ['summarize_elements'], forbidKinds: ['view'], maxCalls: 6 },
       table: { groupBy: 'FireRating', rows: 'byRating' },
       view: { unchanged: true }
     },
     oracle: {
       calls: [{ name: 'summarize_elements', input: { rules: [entity('IfcWall')], groupBy: 'FireRating' } }],
-      reply: 'The walls by FireRating are in the table. {tbc} of them say "TBC", which is a placeholder rather than a rating.'
+      reply:
+        'The walls by FireRating are in the table. {tbc} of them say "TBC", which is a placeholder rather than a rating, ' +
+        'and {noRating} carry no FireRating at all — they spell it Fire_Rating.'
     }
   },
   {
@@ -2680,12 +2724,13 @@ const VEE_CASES = [
         prompt: 'What fire ratings do the doors on L4 carry?',
         oracle: {
           calls: [
-            {
-              name: 'ask_choice',
-              input: { question: 'These doors carry SGPset_Door values. Is this model for an IFC+SG submission?', replies: ['Yes', 'No'] }
-            }
+            // The doors first: `ask_choice` asks only once the turn has read, by rule, elements
+            // that carry an SGPset_ set (`ask.ts`). The lead-in is the model's; the question and
+            // its Yes / No are the app's.
+            { name: 'query_elements', input: { rules: [entity('IfcDoor'), level('L4')] } },
+            { name: 'ask_choice', input: { lead: 'These doors carry SGPset_Door values.' } }
           ],
-          reply: 'Before I answer: these doors carry SGPset_Door values. Is this model for an IFC+SG submission?'
+          reply: 'Before I answer I need one thing from you.'
         },
         // Asked, and nothing about a sub-type yet: that waits for a yes.
         expect: { tools: { exactlyOne: ['ask_choice'] }, view: { headsUp: null } }

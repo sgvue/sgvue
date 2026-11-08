@@ -305,6 +305,12 @@ export interface Built {
   def: ScheduleDef
   /** Asked name → the file's property name, for every name that was read another way. */
   resolvedKeys: Record<string, string>
+  /**
+   * 2026-11-08 (the live baseline's F2) — each class of the category's union that no loaded
+   * model carries, left out of it, with the nearest classes; absent when none was. A union is
+   * refused only when no class of it is left.
+   */
+  dropped?: Record<string, string[]>
 }
 
 export interface Refused {
@@ -376,6 +382,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
 
   // ── the category ──
   let entities: string[] | null = null
+  let dropped: Record<string, string[]> | undefined
   if (ask.category !== undefined) {
     const known = store.entities.map((e) => e.entity)
     const cats: Record<string, string[]> = {}
@@ -386,7 +393,10 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
         if (!entities.includes(hit)) entities.push(hit)
       } else cats[asked] = nearestKeys(asked, known, FIELD_NEAREST_CAP)
     }
-    if (Object.keys(cats).length) {
+    // A class no loaded model carries is left out of a union — `["IfcWall","IfcWallStandardCase"]`
+    // on an IFC4 model is the walls — and the call is refused only when nothing is left.
+    if (Object.keys(cats).length && entities.length) dropped = cats
+    else if (Object.keys(cats).length) {
       return {
         error:
           Object.entries(cats)
@@ -606,7 +616,13 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
       const units = unitOptions(kind)
       const unit = unitAsked(spec.unit)
       if (!units.length) {
-        errors.push(`${heading} is not a length, an area, a volume, an angle or a mass, so it has no unit to set.`)
+        // 2026-11-08 (F2): a number the file gives no measure type is a plain number to the
+        // engine — and "Length is not a length" read as a bug when the column was called Length.
+        errors.push(
+          typeOf(store, def, col.field) === 'number'
+            ? `${heading} has no unit in the file — its numbers carry no measure type, so the engine cannot tell a length from an area or a count — and so no unit can be set on it; leave unit out and its cells show the file’s own numbers.`
+            : `${heading} is not a length, an area, a volume, an angle or a mass, so it has no unit to set.`
+        )
       } else if (!units.includes(unit)) {
         errors.push(`${heading} is ${kind === 'area' || kind === 'angle' ? 'an' : 'a'} ${kind}: its unit is one of ${units.join(', ')} — not "${spec.unit}".`)
       } else col.format = { ...col.format, display: unit }
@@ -668,7 +684,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
   } catch (error) {
     return { error: `That schedule could not be built: ${error instanceof Error ? error.message : String(error)}` }
   }
-  return { def: checked, resolvedKeys }
+  return { def: checked, resolvedKeys, ...(dropped ? { dropped } : {}) }
 }
 
 const NUMERIC_OPS: ReadonlySet<Op> = new Set<Op>(['>', '>=', '<', '<='])

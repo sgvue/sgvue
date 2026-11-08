@@ -134,8 +134,11 @@ describe('the design’s fifteen tools', () => {
     expect(toolByName('set_filter_stack')!.description).toBe(
       'Set the WHOLE ordered filter stack in one call. This is the main tool for any view with more than one condition — the array order IS the apply order. Use it instead of several apply_visibility calls.'
     )
+    // 2026-11-08 (the live baseline's F1): the design's sentences, verbatim, then one added — when
+    // to use it rather than make_schedule (the owner: "tabulate" answers in the chat).
     expect(toolByName('summarize_elements')!.description).toBe(
-      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so keep your own reply to one sentence.'
+      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so keep your own reply to one sentence. ' +
+        'Use it whenever the user asks to tabulate, count or total elements by a group in the chat — by type, by level, by any property value, "show me a table" — rather than make_schedule, which is for when they ask for a schedule or want it in the Schedules window.'
     )
     expect(toolByName('color_by_property')!.description).toContain(
       'This is the tool for "colour each X" / "colour by Y"'
@@ -332,7 +335,9 @@ describe('the read-only additions', () => {
       'measure_between',
       // 2026-09-20 — `docs/AI_REVIEW.md` §9 gap 7. Box arithmetic, and it says so.
       'find_nearby',
-      'query_sql'
+      'query_sql',
+      // 2026-11-08 — "Vee Messages" stage 2: the IFC+SG question. It only asks; the user's click answers.
+      'ask_choice'
     ])
     expect(extra.every((t) => t.kind === 'read')).toBe(true)
   })
@@ -589,7 +594,8 @@ describe('parity with the user — phase 1', () => {
     expect(TOOLS.slice(-10, -8).map((t) => t.name)).toEqual(['set_models', 'set_interface'])
     expect([models.kind, ui.kind]).toEqual(['view', 'view'])
     expect([models.strict, ui.strict]).toEqual([true, true])
-    expect(TOOLS).toHaveLength(37)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
+    expect(TOOLS).toHaveLength(38)
     // Neither name says anything a guard forbids, and neither takes a path.
     expect(isViewTool('set_models')).toBe(true)
     expect(isViewTool('set_interface')).toBe(true)
@@ -805,7 +811,8 @@ describe('parity with the user — phase 2', () => {
     expect(TOOLS.slice(-10, -4).map((t) => t.name)).toEqual([...PARITY_TOOL_NAMES])
     expect([views.kind, markups.kind]).toEqual(['view', 'view'])
     expect([views.strict, markups.strict]).toEqual([true, true])
-    expect(TOOLS).toHaveLength(37)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
+    expect(TOOLS).toHaveLength(38)
     // Phase 3 added `delete` and `clear` — which only ask (their own block is below) — and
     // phase 4 the two that place a markup and the one that sets a spot tag (theirs is last).
     // No other word that removes anything is offered, in either.
@@ -1046,7 +1053,8 @@ describe('parity with the user — phase 3: the consent gate', () => {
     expect(PARITY_TOOL_NAMES.slice(0, 5)).toEqual(['set_models', 'set_interface', 'manage_views', 'manage_markups', 'request_user_action'])
     expect(TOOLS.slice(-6, -5).map((t) => t.name)).toEqual(['request_user_action'])
     expect([ask.kind, ask.strict, ask.input_schema.additionalProperties]).toEqual(['view', true, false])
-    expect(TOOLS).toHaveLength(37)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
+    expect(TOOLS).toHaveLength(38)
     expect([...new Set(TOOLS.map((t) => t.kind))].sort()).toEqual(['read', 'view'])
   })
 
@@ -1255,7 +1263,8 @@ describe('parity with the user — phase 4: the Schedules window, and placing ma
     ])
     expect(TOOLS.slice(-5, -4).map((t) => t.name)).toEqual(['manage_schedules'])
     expect([manage.kind, manage.strict, manage.input_schema.additionalProperties]).toEqual(['view', true, false])
-    expect(TOOLS).toHaveLength(37)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
+    expect(TOOLS).toHaveLength(38)
     expect(Object.keys(manage.input_schema.properties)).toEqual(['op', 'name', 'to'])
     expect(manage.input_schema.required).toEqual(['op'])
     expect(manage.input_schema.properties.op.enum).toEqual(SCHEDULE_MANAGE_OPS)

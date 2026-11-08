@@ -37,8 +37,10 @@
  * executor has looked, so that one is still caught afterwards (`oneHeld`).
  */
 import { TOOLS, gateOf } from '../../../shared/tool-schemas'
+import { headsUpOfTouched, headsUpText, touchedOf, touchesByRule, touchesSg, type Observation } from '../heads-up'
 import { changedParts } from '../../state/selectors/snapshot'
 import { parseToolInput } from './inputs'
+import { ASK_EXECUTORS } from './ask'
 import { INTERFACE_EXECUTORS } from './interface'
 import { reportNames, resolveNames } from './names'
 import { READ_EXECUTORS } from './read'
@@ -66,7 +68,8 @@ export const TOOL_EXECUTORS: Record<string, Executor> = {
   ...INTERFACE_EXECUTORS,
   ...SAVED_EXECUTORS,
   ...REQUEST_EXECUTORS,
-  ...SCHEDULE_EXECUTORS
+  ...SCHEDULE_EXECUTORS,
+  ...ASK_EXECUTORS
 }
 
 /** Every catalogue name that has no executor. Empty, and a test keeps it that way. */
@@ -109,7 +112,46 @@ export async function executeTool(
       if (!ctx.turn.parts.includes(part)) ctx.turn.parts.push(part)
     }
   }
-  return reportNames(outcome.forModel, names, ctx.state())
+  return observed(name, names.input, reportNames(outcome.forModel, names, ctx.state()), ctx)
+}
+
+/**
+ * 2026-11-08, stage 2 — the heads-up (`ai/heads-up.ts`). A call that touched elements by rule
+ * is observed **over exactly those elements** (decision C), after it ran and with its names the
+ * file's own; the turn keeps the last such call's one observation — `null` when it saw nothing —
+ * and the result tells the model what the user will see, so its answer can agree. An
+ * `objectTypeOnly` observation counts only once the user has said yes to IFC+SG (decision B). A
+ * call that matched nothing is observed all the same — its scope set is still the elements the
+ * question was asked of, and "0 doors are empty, but 3 say “-”" is the very case it is for.
+ *
+ * A call that acts on a set it names (`ids`, `selection`, `schedule`) is not observed: its rules'
+ * scope is not what it acted on. The same pass records whether the call touched an element that
+ * carries an `SGPset_` set (`TurnState.sgTouched`), which `ask_choice` requires.
+ *
+ * Narration, like the trace: should observing ever fail, the call's own result is untouched.
+ */
+function observed(
+  name: string,
+  input: Readonly<Record<string, unknown>>,
+  forModel: unknown,
+  ctx: ToolContext
+): unknown {
+  let headsUp: Observation | null
+  try {
+    if (!touchesByRule(name, input)) return forModel
+    const s = ctx.state()
+    const t = touchedOf(name, input, s.federation)
+    if (!t) return forModel
+    headsUp = headsUpOfTouched(s.federation, t, s.chatIfcsg === 'yes')
+    // What lets `ask_choice` ask: the last such call touched an element carrying an SGPset_ set.
+    ctx.turn.sgTouched = touchesSg(s.federation, t)
+  } catch (error) {
+    console.error('[heads-up]', error)
+    return forModel
+  }
+  ctx.turn.headsUp = headsUp
+  if (!headsUp || !forModel || typeof forModel !== 'object' || Array.isArray(forModel)) return forModel
+  return { ...forModel, headsUp: `${headsUpText(headsUp)} (The app shows this line under your reply.)` }
 }
 
 /**
@@ -145,5 +187,6 @@ export function applyUi(outcome: ToolOutcome, ctx: ToolContext): void {
   // A markup the call placed: what the reply's `revert` takes away again (`state/shell.ts`).
   if (ui.placed) ctx.turn.placed.push(ui.placed)
   if (ui.acted) ctx.turn.acted = true
+  if (ui.ask) ctx.turn.ask = ui.ask
   if (ui.filtered !== undefined) ctx.turn.filtered = ui.filtered
 }

@@ -24,9 +24,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   DESIGN_SYSTEM_LINES,
+  IFCSG_LINES,
   buildRequest,
   contractText,
   requestSnapshot,
+  schemaBlock,
   schemaText,
   userTurnText,
   viewStateText
@@ -64,8 +66,9 @@ describe('the system contract', () => {
     // 18 of the design's, 6 of 2026-09-20, 4 of 2026-09-28, 1 of 2026-10-01, and 8 of
     // 2026-10-02: two for each of the parity work's four phases. 2026-10-08: the design's reply
     // line became three (the case below), so 17 of the design's are left. 2026-10-09: one, the
-    // display unit (the case below).
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(40)
+    // display unit (the case below). 2026-11-08: two — a tabulation answers in the chat (the
+    // live baseline's F1), and an IFC term is written in backticks (stage 2) — the cases below.
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(42)
     expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
     expect(DESIGN_SYSTEM_LINES[1]).toContain('strictly read-only with respect to model data')
     // Still the last line, as the design ends.
@@ -203,7 +206,8 @@ describe('the system contract', () => {
   it('adds the two 2026-09-28 Schedules lines after the property-name line, in sentence case', () => {
     const at = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('make_schedule builds a table of elements'))
     expect(DESIGN_SYSTEM_LINES[at - 1]).toMatch(/^Property names are authored by people/)
-    const [make, read] = DESIGN_SYSTEM_LINES.slice(at, at + 2)
+    // 2026-11-08 (F1): the tabulation line stands between the two (its own case below).
+    const [make, , read] = DESIGN_SYSTEM_LINES.slice(at, at + 3)
     for (const said of ['door schedule with fire rating and width', 'space areas by level', 'base:"open"', 'answer from the rows and totals it returns']) {
       expect([said, make.includes(said)]).toEqual([said, true])
     }
@@ -471,7 +475,9 @@ describe('the system contract', () => {
     expect(joined).not.toContain('no lists unless asked')
     const at = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('Write every reply for a narrow chat panel'))
     expect(DESIGN_SYSTEM_LINES[at - 1]).toMatch(/^You have twelve tool rounds/)
-    expect(DESIGN_SYSTEM_LINES[at + 3]).toMatch(/^A user message that opens with \[replying to …\]/)
+    // (2026-11-08: the IFC-term line, stage 2, follows the third — its own case below.)
+    expect(DESIGN_SYSTEM_LINES[at + 3]).toMatch(/^Write every IFC term you name in backticks/)
+    expect(DESIGN_SYSTEM_LINES[at + 4]).toMatch(/^A user message that opens with \[replying to …\]/)
     const [open, shape, never] = DESIGN_SYSTEM_LINES.slice(at, at + 3)
     for (const said of [
       'renders bold, inline code, lists and tables and no other Markdown',
@@ -688,5 +694,66 @@ describe('the model schema', () => {
 
   it('is stable: the same federation serialises to the same bytes', () => {
     expect(JSON.stringify(chatSchema(federation))).toBe(JSON.stringify(chatSchema(federation)))
+  })
+})
+
+/**
+ * 2026-11-08 — two lines of the "Vee Messages" work and the conditional IFC+SG block.
+ *
+ * The live baseline's F1: the make_schedule line sent Vee to the Schedules window for any
+ * tabulation ("counts by type"); the owner — "tabulate" or "show me a table" answers in the chat,
+ * a schedule only when the user asks for one. Stage 2: an IFC term in backticks, in the file's own
+ * spelling, so the panel can colour it; and the IFC+SG block, only while a model carries SGPset_.
+ */
+describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
+  it('sends a tabulation to summarize_elements and a schedule to make_schedule only when asked for one', () => {
+    const at = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('make_schedule builds a table of elements'))
+    const [make, tab] = DESIGN_SYSTEM_LINES.slice(at, at + 2)
+    expect(make).toContain('when the user asks for a schedule or wants it in the Schedules window')
+    expect(make).not.toMatch(/tabulation|counts by type/)
+    expect(tab).toMatch(/^To tabulate, count or total elements by a group in the chat/)
+    for (const said of ['summarize_elements', 'shows its own table under your reply', 'query_sql only when no tool groups that way', 'make_schedule only when the user asks for a schedule']) {
+      expect([said, tab.includes(said)]).toEqual([said, true])
+    }
+  })
+
+  it('asks for IFC terms in backticks, the file’s own spelling, and never a number, a value or an everyday word', () => {
+    const line = DESIGN_SYSTEM_LINES.find((l) => l.startsWith('Write every IFC term you name in backticks'))!
+    for (const said of ['exactly as the file spells it', '`IfcWall`', '`FireRating`, never Fire Rating', 'Never put backticks around a number', 'write "TBC" in quotes', 'Name, Level or Model']) {
+      expect([said, line.includes(said)]).toEqual([said, true])
+    }
+  })
+
+  it('adds the IFC+SG block to the cached schema block only while the schema lists SGPset_ sets', () => {
+    const plain = { entities: ['IfcDoor (3)'], psetKeys: [] }
+    expect(schemaBlock(plain)).toBe(schemaText(plain))
+    expect(schemaBlock({ ...plain, sgPsets: [] })).toBe(schemaText({ ...plain, sgPsets: [] }))
+    const sg = { ...plain, sgPsets: ['SGPset_Door'] }
+    const block = schemaBlock(sg)
+    expect(block.startsWith(schemaText(sg) + '\n')).toBe(true)
+    expect(block.slice(schemaText(sg).length + 1)).toBe(IFCSG_LINES.join('\n'))
+    // The request carries it in system[1], behind the cache breakpoint, and the contract is untouched.
+    const req = (schema: unknown) => ({
+      system: buildRequest({ model: 'm', effort: 'medium', maxTokens: 10, schema, viewState: {}, history: [], userText: 'q' }).system as { text: string }[]
+    })
+    expect(req(sg).system[1].text).toBe(block)
+    expect(req(plain).system[1].text).toBe(schemaText(plain))
+    expect(req(sg).system[0].text).toBe(req(plain).system[0].text)
+    // Concept only: the identity, the honest limit, ask once, and no CoP rule.
+    const all = IFCSG_LINES.join(' ')
+    for (const said of [
+      'concept only',
+      'Entity.SUBTYPE*',
+      'one upper-case token such as TRENCH',
+      'I can’t check them against the CoP. The official IFC+SG mapping isn’t loaded in SGVue',
+      'call ask_choice once, before you answer',
+      'never mention IFC+SG unless the user does',
+      'is content'
+    ]) {
+      expect([said, all.includes(said)]).toEqual([said, true])
+    }
+    expect(all).not.toMatch(/\b(Error|Warning) level|must carry|is required\b/)
+    // About 600–800 tokens (HANDOFF §5), at about four characters a token.
+    expect(all.length).toBeLessThan(3600)
   })
 })

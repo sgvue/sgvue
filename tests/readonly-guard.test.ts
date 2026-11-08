@@ -679,6 +679,32 @@ describe('read-only guard', () => {
   })
 
   /**
+   * 2026-11-08, "Vee Messages" stage 2 — the IFC+SG answer is the user's. `ask_choice` only asks;
+   * the store's `chooseReply` sets the answer, and exactly two things call it: the main window's
+   * end of the Vee port, for a `choose` intent naming the question that very message still asks,
+   * and the dev harness. Nothing a tool runs names it, so neither the model nor a file's text can
+   * answer the question — and the Vee window's own code reaches no store.
+   */
+  it('lets only the user’s click on a quick reply answer the IFC+SG question', () => {
+    const code = (path: string): string => stripComments(FILES.find((f) => f.path === path)!.text)
+    expect(aiFilesNaming(/\b(chooseReply|chatIfcsg\s*:|chatIfcsgAsked\s*:)/)).toEqual([])
+    const callers = FILES.filter(({ text }) => /\.chooseReply\(/.test(stripComments(text))).map(({ path }) => path)
+    expect(callers.sort()).toEqual(['src/renderer/App.tsx', 'src/renderer/model/vee-link.ts'])
+    const link = code('src/renderer/model/vee-link.ts')
+    expect(link.match(/\.chooseReply\(/g)).toHaveLength(1)
+    const chooseCase = /case 'choose': \{[\s\S]*?\n {6}return\n {4}\}/.exec(link)
+    expect(chooseCase, 'vee-link no longer handles `choose` in its own case').not.toBeNull()
+    expect(chooseCase![0]).toMatch(/if \(!named\(s, i\.index, i\.msg\) \|\| !askOpen\(s, i\.index\)\) return\n\s*if \(!s\.chooseReply\(i\.value\)\) return/)
+    const app = code('src/renderer/App.tsx')
+    expect(app.indexOf('.chooseReply(')).toBeGreaterThan(app.indexOf('async function installDevTools('))
+    expect(app.indexOf('.chooseReply(')).toBeLessThan(app.indexOf('export default function App('))
+    // The store writes the answer in `chooseReply` alone (and puts it back with a new conversation).
+    const shell = code('src/renderer/state/shell.ts')
+    expect(shell.match(/chatIfcsg: value/g)).toHaveLength(1)
+    expect([...shell.matchAll(/chatIfcsg: '(\w+)'/g)].map((m) => m[1])).toEqual(['unknown', 'unknown'])
+  })
+
+  /**
    * After review. `up(patch)` sets whatever keys it is handed, so the store's one general
    * mutation is a door too: `up({ views: [] })` from an executor would delete every viewpoint,
    * and no list of forbidden names would see it. So every call a tool makes to it is a flat

@@ -61,11 +61,43 @@ export const VEE_COPY_MS = 3000
 export const VEE_MAX_PARTS = 10_000
 /** The steps a reply's folded diary reopens to (2026-11-08, stage 1b) — `ai/trace.ts`'s `DIARY_STEPS_MAX`. */
 export const VEE_MAX_STEPS = 20
+/** Coloured IFC terms in one message (2026-11-08, stage 2) — `ai/terms.ts`'s `MAX_TERMS`. */
+export const VEE_MAX_TERMS = 2000
+/** A file value, property name or ObjectType in a heads-up (stage 2) — `ai/heads-up.ts`'s `OBS_TEXT_MAX`, with room for its ellipsis. */
+export const VEE_MAX_OBS_TEXT = 61
+/** The lead-in of an IFC+SG question (stage 2) — `ai/executors/ask.ts`'s `ASK_LEAD_MAX`, with room for its ellipsis. */
+export const VEE_MAX_ASK_LEAD = 301
 
 const label = z.string().max(VEE_MAX_LABEL)
 const int = z.number().int()
 const count = z.number().int().nonnegative()
 const finite = z.number().finite()
+const obsText = z.string().max(VEE_MAX_OBS_TEXT)
+const noun = z.string().max(80)
+
+/**
+ * 2026-11-08, stage 2 — the heads-up line's one app-computed observation (`ai/heads-up.ts`,
+ * `Observation`), field for field. The Vee window builds the line from it with the same fixed
+ * template; file text in it (a property name, a value, an ObjectType) went through `labelText`
+ * where it was observed, and is bounded again here.
+ */
+export const VeeHeadsUp = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('placeholder'),
+      prop: obsText,
+      value: obsText,
+      n: count,
+      noun,
+      counted: z.enum(['in', 'out', 'some']),
+      op: z.enum(['=', '!=', '~', '>', '<', 'absent', 'colour'])
+    })
+    .strict(),
+  z.object({ kind: z.literal('noStorey'), n: count, noun }).strict(),
+  z.object({ kind: z.literal('dupGlobalId'), n: count, groups: count, noun }).strict(),
+  z.object({ kind: z.literal('objectTypeOnly'), n: count, noun, example: obsText }).strict()
+])
+export type VeeHeadsUp = z.infer<typeof VeeHeadsUp>
 
 /* ────────────────────────────── the snapshot ────────────────────────────── */
 
@@ -121,6 +153,25 @@ export const VeeMessage = z
       .strict()
       .optional(),
     revertedAt: count.optional(),
+    /**
+     * 2026-11-08, stage 2 — the ordinals of the code spans of Vee's text that are IFC terms of the
+     * loaded models (`ai/terms.ts`), coloured here; the heads-up line under the reply, when the
+     * app saw something odd in what the reply's calls touched; and a question with quick replies
+     * (`ask_choice`): its lead-in, the app's own question, the two replies, what the user picked,
+     * and whether it can still be answered — the transcript's last message, not yet answered.
+     */
+    terms: z.array(count.max(VEE_MAX_TERMS)).max(VEE_MAX_TERMS).optional(),
+    headsUp: VeeHeadsUp.optional(),
+    ask: z
+      .object({
+        lead: z.string().max(VEE_MAX_ASK_LEAD),
+        question: label,
+        replies: z.array(z.object({ value: z.enum(['yes', 'no']), label: z.string().max(20) }).strict()).max(2),
+        chosen: z.enum(['yes', 'no']).nullable(),
+        open: z.boolean()
+      })
+      .strict()
+      .optional(),
     trace: z
       .object({
         status: label,
@@ -338,6 +389,12 @@ export const VeeIntent = z.discriminatedUnion('type', [
     .strict(),
   /** A table's `copy csv`. */
   z.object({ type: z.literal('copyCsv'), ...at }).strict(),
+  /**
+   * 2026-11-08, stage 2 — a quick reply under a question of Vee's (`ask`): the user's own answer,
+   * for the question that message showed. The main window sets the answer and sends its label as
+   * the user's message — only while that very message still asks it.
+   */
+  z.object({ type: z.literal('choose'), ...at, value: z.enum(['yes', 'no']) }).strict(),
   /** The answer to a `copy`: whether the text reached the clipboard. */
   z.object({ type: z.literal('copied'), n: count, ok: z.boolean() }).strict(),
   /** The panel's ×, or Esc. */

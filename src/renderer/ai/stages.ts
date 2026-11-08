@@ -65,7 +65,8 @@ export const TOOL_STAGE: Record<string, string> = {
   make_schedule: 'building the schedule',
   get_schedule: 'reading the schedule',
   export_schedule: 'opening the Save dialog',
-  color_by_schedule_column: 'colouring the model by the column'
+  color_by_schedule_column: 'colouring the model by the column',
+  ask_choice: 'asking you a question'
 }
 
 /** `request_user_action`, action by action: what is being asked of the user. */

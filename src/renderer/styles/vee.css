@@ -64,6 +64,9 @@
   --vis-ink: #15130b;
   --grid: rgba(148, 167, 164, 0.045);
   --glow: rgba(53, 196, 182, 0.55);
+  /* 2026-11-08, stage 2 — the one IFC-term colour (HANDOFF §7): periwinkle, not the accent's teal,
+     the heads-up's amber, the consent yellow, a red or a green; 6.0–6.6 : 1 on the window's grounds. */
+  --ifc-term: #859ff6;
   position: fixed;
   inset: 0;
   display: flex;
@@ -80,6 +83,7 @@
   --vis-ink: #1b1a12;
   --grid: rgba(27, 42, 44, 0.04);
   --glow: rgba(14, 138, 128, 0.35);
+  --ifc-term: #3b51bc;
 }
 
 /* The header: Vee, its presence, and the activity bars while a turn runs. */
@@ -260,6 +264,25 @@
 /* A reply's foot: its revert, when it has no consent card to stand on. */
 .vm-foot { display: flex; align-items: center; gap: 6px; margin: 2px 0 0 2px; font: 400 10.5px/1 var(--mono); color: var(--faint); }
 .vm-foot .vm-rv { margin-left: 0; padding: 4px 6px; font: 500 11.5px/1 var(--sans); }
+
+/*
+ * 2026-11-08, stage 2 ("Vee Messages", HANDOFF §2, §7, §8). An IFC term Vee names: mono at medium
+ * weight in the one IFC-term colour — the face is the second channel, so colour is never alone.
+ * The heads-up: one line of the app's own warn ink at the end of a reply, a 12 px outline sign,
+ * its count in bold and a name in mono but uncoloured, so amber keeps its one meaning. Quick
+ * replies under a question of Vee's: pills, no tape — a reply, not a view change.
+ */
+.vm .ifc-term { font: 500 11px/1 var(--mono); color: var(--ifc-term); }
+.vm-hu { display: flex; gap: 6px; align-items: flex-start; margin: 4px 2px 0; font: 400 12px/1.45 var(--sans); color: var(--warn-ink); max-width: 100%; }
+.vm-hu svg { flex: none; margin-top: 2px; }
+.vm-hu b { font-weight: 600; }
+.vm-hu code { font: 400 11.5px/1 var(--mono); color: inherit; }
+/* The app's question (not Vee's words): the system line's dashed look. */
+.vm-ask { align-self: stretch; display: flex; flex-direction: column; gap: 7px; margin: 3px 0 0; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--border-strong); }
+.vm-ask-q { font: 500 12.5px/1.4 var(--sans); color: var(--ink); }
+.vm-qr { display: flex; flex-wrap: wrap; gap: 6px; }
+.vm-qr button { font: 500 12px/1 var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--border-strong); border-radius: 999px; padding: 7px 12px; }
+.vm-qr button:hover, .vm-qr button:focus-visible { border-color: var(--accent); color: var(--sel-ink); }
 
 /* System lines — the app talking, not Vee — in neutral ink: amber is kept for the heads-up. */
 .vm-sys { align-self: center; display: flex; align-items: center; gap: 6px; margin: 12px 0 0; padding: 5px 10px; border-radius: 999px; border: 1px dashed var(--border-strong); font: 400 11px/1.3 var(--mono); color: var(--muted); max-width: 100%; flex: none; text-align: center; flex-wrap: wrap; justify-content: center; }

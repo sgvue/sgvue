@@ -43,7 +43,10 @@ import {
   VEE_MAX_INPUT,
   VEE_MAX_LABEL,
   VEE_MAX_STEPS,
+  VEE_MAX_ASK_LEAD,
+  VEE_MAX_OBS_TEXT,
   VEE_MAX_TABLE_ROWS,
+  VEE_MAX_TERMS,
   VEE_MAX_TEXT,
   type ToVee,
   type VeeBoard,
@@ -52,6 +55,8 @@ import {
 import { labelText } from '../../shared/fmt'
 import { abortChat, sendChat } from '../ai/bridge'
 import { quoteOfPart } from '../ai/parts'
+import { IFCSG_QUESTION, IFCSG_REPLIES } from '../ai/executors/ask'
+import { termsOf, vocabularyFor } from '../ai/terms'
 import { onTraceChange, traceEpoch, traceSnapshot, type TraceChange } from '../ai/trace-store'
 import { api } from '../api'
 import { copyingIn } from '../clipboard'
@@ -86,9 +91,44 @@ let composerRev = 0
 /** A label cut to the snapshot's bound, so that no one long string can make a whole snapshot invalid. */
 const cut = (text: string): string => text.slice(0, VEE_MAX_LABEL)
 
+/**
+ * 2026-11-08, stage 2 — the IFC terms of one message, as the ordinals of its code spans that are
+ * names the loaded models carry (`ai/terms.ts`). Worked out once per message object **and
+ * federation**, so a model unloaded or replaced since recolours an old reply: a name no longer in
+ * the vocabulary falls back to plain mono.
+ */
+const termCache = new WeakMap<ChatMessage, { fed: object; terms: number[] }>()
+function termsFor(m: ChatMessage): number[] {
+  const fed = useShell.getState().federation
+  const hit = termCache.get(m)
+  if (hit && hit.fed === fed) return hit.terms
+  const terms = m.role === 'assistant' && fed.elements.length ? termsOf(vocabularyFor(fed), m.text, m.role).slice(0, VEE_MAX_TERMS) : []
+  termCache.set(m, { fed, terms })
+  return terms
+}
+
+/** File text in a heads-up, cut to the port's bound (it was cut where it was observed). */
+const obsCut = (text: string): string => text.slice(0, VEE_MAX_OBS_TEXT)
+
+/** A heads-up as the port carries it (`VeeHeadsUp`). */
+function headsUpSent(h: NonNullable<ChatMessage['headsUp']>): NonNullable<VeeSnapshot['msgs'][number]['headsUp']> {
+  const noun = h.noun.slice(0, 80)
+  switch (h.kind) {
+    case 'placeholder':
+      return { kind: h.kind, prop: obsCut(h.prop), value: obsCut(h.value), n: h.n, noun, counted: h.counted, op: h.op }
+    case 'noStorey':
+      return { kind: h.kind, n: h.n, noun }
+    case 'dupGlobalId':
+      return { kind: h.kind, n: h.n, groups: h.groups, noun }
+    case 'objectTypeOnly':
+      return { kind: h.kind, n: h.n, noun, example: obsCut(h.example) }
+  }
+}
+
 /** A message as the snapshot carries it: no ids behind a chip or a row, and no request. */
-function sent(m: ChatMessage): VeeSnapshot['msgs'][number] {
+function sent(m: ChatMessage, open = false): VeeSnapshot['msgs'][number] {
   const v = messageView(m, messageId(m), m.pending ? pendingId(m.pending) : 0)
+  const terms = termsFor(m)
   return {
     id: v.id,
     role: v.role,
@@ -130,8 +170,32 @@ function sent(m: ChatMessage): VeeSnapshot['msgs'][number] {
           }
         : {}),
       ...(v.trace.title !== undefined ? { title: cut(v.trace.title) } : {})
-    }
+    },
+    // Stage 2: the coloured terms, the heads-up and the IFC+SG question.
+    ...(terms.length ? { terms } : {}),
+    ...(m.role === 'assistant' && m.headsUp ? { headsUp: headsUpSent(m.headsUp) } : {}),
+    ...(m.role === 'assistant' && m.ask
+      ? {
+          ask: {
+            lead: m.ask.lead.slice(0, VEE_MAX_ASK_LEAD),
+            question: IFCSG_QUESTION,
+            replies: IFCSG_REPLIES.map((r) => ({ ...r })),
+            chosen: m.ask.chosen ?? null,
+            open
+          }
+        }
+      : {})
   }
+}
+
+/**
+ * Whether reply `index` still asks its IFC+SG question: it is the transcript's newest message,
+ * nobody has answered, no turn runs and the conversation has no answer yet. The snapshot's
+ * `ask.open` and the `choose` intent read this one rule.
+ */
+export const askOpen = (s: ShellState, index: number): boolean => {
+  const m = s.chatMsgs[index]
+  return !!m?.ask && !m.ask.chosen && index === s.chatMsgs.length - 1 && !s.chatBusy && s.chatIfcsg === 'unknown'
 }
 
 /**
@@ -165,7 +229,7 @@ export function snapshotOf(s: ShellState): VeeSnapshot {
     suggestOpen: s.chatSuggestOpen,
     suggestions: chatExamples(s).slice(0, 4).map((t) => t.slice(0, 500)),
     composer: { text: s.chatInput.slice(0, VEE_MAX_INPUT), rev: composerRev },
-    msgs: s.chatMsgs.map(sent)
+    msgs: s.chatMsgs.map((m, i) => sent(m, askOpen(s, i)))
   }
 }
 
@@ -174,6 +238,8 @@ const SNAP_KEYS: readonly (keyof ShellState)[] = [
   'theme', 'units', 'chatBusy', 'chatErr', 'chatReplyTo', 'chatSuggestOpen', 'chatInput', 'chatMsgs',
   // 2026-11-08 — the messaging layout: the bubble replied to, whether Vee can answer, how a turn ended.
   'chatReplyPart', 'hasKey', 'chatEnd', 'federation',
+  // 2026-11-08, stage 2 — what decides whether a question still asks.
+  'chatIfcsg',
   // …and what the suggestions read (`chatExamples`).
   'sel', 'byId', 'stack', 'hidden', 'loaded', 'library'
 ]
@@ -385,6 +451,15 @@ export function receive(data: unknown): void {
     case 'copyCsv': {
       const table = named(s, i.index, i.msg)?.table
       if (table) copyingIn(copyInVee, () => void s.copyTable(table))
+      return
+    }
+    case 'choose': {
+      // The user's own answer, for the question that message showed — and only while it still
+      // asks. The answer is set first, so the turn it sends already carries it.
+      if (!named(s, i.index, i.msg) || !askOpen(s, i.index)) return
+      if (!s.chooseReply(i.value)) return
+      const reply = IFCSG_REPLIES.find((r) => r.value === i.value)
+      if (reply) void sendChat(reply.label)
       return
     }
     case 'copied':

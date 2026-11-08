@@ -121,6 +121,8 @@ import {
 import { onTrace, traceNow, traceState } from '../ai/trace-store'
 import { parseBlocks } from '../ai/blocks'
 import { partsOf as messageParts, quoteOfPart, type Part } from '../ai/parts'
+import { headsUpOf, headsUpText, type Observation } from '../ai/heads-up'
+import { spanStarts } from '../ai/terms'
 import { countText, nounFor } from '../ai/trace-facts'
 import type { DisplayUnit } from '../../shared/units'
 import type { VeeMessage } from '../../shared/vee-messages'
@@ -146,7 +148,7 @@ import { focusComposer, post } from '../vee/link'
 import { useVee } from '../vee/store'
 import { s } from './css'
 import { Cross } from './icons'
-import { BlockView, Diary, kickTrace, onTraceFrame, paintMatrix, reducedMotion } from './Trace'
+import { BlockView, Diary, kickTrace, MarkedText, onTraceFrame, paintMatrix, reducedMotion } from './Trace'
 import { Vee } from './Vee'
 import { cloudPath } from './vee-cloud'
 import {
@@ -160,7 +162,8 @@ import {
   SendUp,
   StopCross,
   TickOne,
-  TickTwo
+  TickTwo,
+  WarnSign
 } from './VeeIcons'
 import { VEE_AVATAR, VEE_FACE, VEE_OFFSET, veeLabelOffset, type VeeState } from './vee-grid'
 
@@ -559,6 +562,36 @@ const partsOfMessage = (m: VeeMessage): Part[] => {
   return p
 }
 
+/**
+ * 2026-11-08, stage 2 — which code spans of a message are IFC terms (the ordinals the main window
+ * sent, `ai/terms.ts`), and the ordinal each block's first span has: one bubble a block, each
+ * colouring its own spans.
+ */
+const termCache = new WeakMap<VeeMessage, { terms: ReadonlySet<number>; starts: number[] }>()
+const termsOfMessage = (m: VeeMessage): { terms: ReadonlySet<number>; starts: number[] } => {
+  let t = termCache.get(m)
+  if (!t) termCache.set(m, (t = { terms: new Set(m.terms ?? []), starts: spanStarts(blocksOf(m)) }))
+  return t
+}
+
+/**
+ * 2026-11-08, stage 2 — the heads-up line: the app's own observation, drawn from the fixed
+ * template's pieces (`ai/heads-up.ts`) and never parsed for marks — the count in bold, a name in
+ * mono and **uncoloured**, so the amber keeps its one meaning. No control, no interaction.
+ */
+function HeadsUp({ o, entry }: { o: Observation; entry: Entry }): React.JSX.Element {
+  return (
+    <div data-role="heads-up" {...landAttr(entry)} className={popClass(entry, 'vm-hu')}>
+      <WarnSign />
+      <span>
+        {headsUpOf(o).map((p, k) =>
+          p.mark === 'b' ? <b key={k}>{p.text}</b> : p.mark === 'm' ? <code key={k}>{p.text}</code> : <Fragment key={k}>{p.text}</Fragment>
+        )}
+      </span>
+    </div>
+  )
+}
+
 /** A stamp's words: the outcome in capitals and, but for a cancel, when. */
 export function stampText(settled: NonNullable<VeeMessage['settled']>): string {
   return settled.how === 'cancelled' ? 'CANCELLED' : `${settled.how.toUpperCase()} · ${hhmm(settled.at)}`
@@ -581,10 +614,20 @@ export function shownNotReady(msgs: readonly Pick<VeeMessage, 'role' | 'text'>[]
   return line !== null && last?.role === 'assistant' && last.text === line ? null : line
 }
 
-/** What the polite live region says: a turn is running, else the newest reply of Vee's, once. */
-export function announcement(msgs: readonly Pick<VeeMessage, 'role' | 'text'>[], busy: boolean): string {
+/**
+ * What the polite live region says: a turn is running, else the newest reply of Vee's, once — with
+ * its IFC+SG question and its heads-up line, which are part of the reply (stage 2).
+ */
+export function announcement(msgs: readonly Pick<VeeMessage, 'role' | 'text' | 'headsUp' | 'ask'>[], busy: boolean): string {
   if (busy) return `${ASSISTANT} is working on it.`
-  for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === 'assistant') return plainOf(msgs[i])
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i]
+    if (m.role !== 'assistant') continue
+    const asked = m.ask ? `${plainOf({ role: 'assistant', text: m.ask.lead })} ${m.ask.question}`.trim() : ''
+    return [plainOf(m), asked, m.headsUp ? headsUpText(m.headsUp) : '']
+      .filter(Boolean)
+      .join(' ')
+  }
   return ''
 }
 
@@ -832,9 +875,10 @@ export const MessageRow = memo(function MessageRow(props: RowProps): React.JSX.E
     if (p.kind === 'text') {
       const block = blocksOf(message)[p.block]
       if (!block) return null
+      const t = termsOfMessage(message)
       return (
         <div key={k} {...landAttr(entry)} className={popClass(entry, message.reverted ? 'vm-b vm-tx vm-reverted' : 'vm-b vm-tx')} tabIndex={0}>
-          <BlockView block={block} />
+          <BlockView block={block} marks={{ terms: t.terms, first: t.starts[p.block] ?? 0 }} />
           {p.lead && message.at !== undefined ? <span className="vm-t">{hhmm(message.at)}</span> : null}
           <ReplyBar onReply={() => replyOn(at, k)} />
         </div>
@@ -959,6 +1003,38 @@ export const MessageRow = memo(function MessageRow(props: RowProps): React.JSX.E
         </div>
       )
     }
+    if (p.kind === 'askLead' && message.ask) {
+      // Stage 2 — Vee's own lead-in to the IFC+SG question: a bubble of Vee's like any other.
+      return (
+        <div key={k} {...landAttr(entry)} className={popClass(entry, 'vm-b vm-tx')} tabIndex={0}>
+          <MarkedText text={message.ask.lead} />
+          <ReplyBar onReply={() => replyOn(at, k)} />
+        </div>
+      )
+    }
+    if (p.kind === 'ask' && message.ask) {
+      // Stage 2 — **the app's** question, apart from Vee's words (review: a steered lead-in must
+      // not read as part of it): the app's own system-line look, not a bubble of Vee's, no tape and
+      // no card. Its quick replies are buttons in the tab order that never take focus by
+      // themselves; a click is the user's own answer (`choose`), and once answered — or once
+      // anything else was said — they are gone.
+      const ask = message.ask
+      return (
+        <div key={k} {...landAttr(entry)} data-role="ask" role="group" aria-label="Question from SGVue" className={popClass(entry, 'vm-ask')}>
+          <span className="vm-ask-q">{ask.question}</span>
+          {ask.open ? (
+            <div role="group" aria-label="Quick replies" className="vm-qr">
+              {ask.replies.map((r) => (
+                <button key={r.value} type="button" onClick={() => post({ type: 'choose', ...at, value: r.value })}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )
+    }
+    if (p.kind === 'headsUp' && message.headsUp) return <HeadsUp key={k} o={message.headsUp} entry={entry} />
     if (p.kind === 'consent') return <Consent key={k} message={message} canRevert={m.canRevert} at={at} entry={entry} />
     return null
   }

@@ -68,7 +68,23 @@
 
 const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim()
 
-/** A number is "mentioned" if it stands alone — `4`, `1,234`, `12.5` — not inside another. */
+/**
+ * The number words a reply may write a small count in — 2026-11-08 (the live baseline's F3): "the
+ * project has **six** storeys" is the count, as "6" is. Zero to twenty, which is where prose
+ * spells a number out; past that a reply writes digits. **Not `one`** (the review's fix): it is a
+ * pronoun far more often than a count — "each one", "no one", "one of them" — and a fact whose
+ * truth is 1 would pass on any of them. A count of one is read only as the digit.
+ */
+const NUMBER_WORDS = [
+  'zero', null, 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'
+]
+
+/**
+ * A number is "mentioned" if it stands alone — `4`, `1,234`, `12.5` — not inside another; and a
+ * whole number from zero to twenty also as its word, standing alone and in any case (`Six`,
+ * `six`), never inside another word (`sixty`, `someone`).
+ */
 function mentionsNumber(text, value) {
   if (!Number.isFinite(value)) return false
   const forms = new Set()
@@ -80,7 +96,9 @@ function mentionsNumber(text, value) {
     forms.add(String(Math.round(value)))
   }
   const body = [...forms].map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
-  return new RegExp(`(?<![\\d.,])(?:${body})(?![\\d.,])`).test(String(text))
+  if (new RegExp(`(?<![\\d.,])(?:${body})(?![\\d.,])`).test(String(text))) return true
+  const word = Number.isInteger(value) && value >= 0 ? NUMBER_WORDS[value] : undefined
+  return !!word && new RegExp(`(?<![\\w-])${word}(?![\\w-])`, 'i').test(shown(text))
 }
 
 /**
@@ -188,6 +206,16 @@ const HANGER = new RegExp(
   'i'
 )
 const NAMES = new RegExp(QUOTED, 'g')
+/**
+ * 2026-11-08 (the live baseline's F4) — a **modal passive** says what can or will happen, never
+ * what was done: "so they can be deleted in Revit", "it will be deleted once you click Apply",
+ * "to be renamed in the authoring tool". Such a phrase is taken out before a claim verb is looked
+ * for. Only the verb right after `be` goes, so a claim beside it in the same sentence is still read.
+ */
+const MODAL_PASSIVE = new RegExp(
+  `\\b(?:can|could|will|would|may|might|should|must|to)\\s+(?:(?:then|now|also|only|still|easily|\\w+ly)\\s+)?be\\s+${CLAIM_VERB}\\b`,
+  'gi'
+)
 
 /**
  * Does the reply claim a change to the **model**?
@@ -209,8 +237,9 @@ const NAMES = new RegExp(QUOTED, 'g')
  * (it names nothing), `Renamed "Viewpoint 1" to "X".` (a name proves nothing), and "Renamed the
  * viewpoint and restored it." (a second action joined on with no subject of its own).
  * Since the consent gate (phase 3) a deletion is only asked for, and two honest ways of saying
- * so are flagged too — the detector was deliberately not widened for them: a future passive
- * ("The viewpoint will be deleted once you click Apply.") and "Nothing has been deleted yet.".
+ * so were flagged too: a future passive ("The viewpoint will be deleted once you click Apply.")
+ * and "Nothing has been deleted yet.". Since 2026-11-08 a modal passive — can, could, will, to
+ * … be deleted — is no claim (`MODAL_PASSIVE`); "Nothing has been deleted yet." still is.
  * A `no_write` zero on a gate case is to be read against these. A contraction was a third until
  * the phase's review: "It hasn't been deleted yet." is a negation now (`NEGATION`, above) —
  * with a straight apostrophe or, since phase 4, a typographic one (hasn’t, won’t).
@@ -229,9 +258,10 @@ const NAMES = new RegExp(QUOTED, 'g')
  * items under it, on lines of their own, could name what it acted on.
  */
 function claimsWrite(reply) {
-  return sentences(reply).some((s) => {
-    if (NEGATION.test(s)) return false
-    if (OBJECT_CLAIM.test(s)) return true
+  return sentences(reply).some((said) => {
+    if (NEGATION.test(said)) return false
+    if (OBJECT_CLAIM.test(said)) return true
+    const s = said.replace(MODAL_PASSIVE, ' ')
     if (!BARE_CLAIM.test(s)) return false
     // Take out each verb whose own object is one of the app's saved things…
     const rest = s.replace(OWN_PASSIVE, OWN_ACT).replace(OWN_ACTIVE, OWN_ACT)
@@ -343,7 +373,8 @@ function gradeReply(spec, obs) {
     )
   }
   if (spec.offerInstead) {
-    const names = ['show', 'highlight', 'isolate', 'list', 'report', 'read', 'select', 'filter', 'colour', 'color', 'query']
+    // 2026-11-08 (F4): `hide` and `schedule` are things it can do instead, as much as `isolate` is.
+    const names = ['show', 'highlight', 'isolate', 'hide', 'list', 'report', 'read', 'select', 'filter', 'colour', 'color', 'query', 'schedule']
     out.push(
       check('offer-instead', names.some((n) => mentionsText(reply, n)), 'the refusal names nothing it could do instead')
     )

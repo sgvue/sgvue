@@ -33,6 +33,7 @@
  * the phase's review: a contraction (`hasn't`) counts as the negation it is.
  */
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { boxPlace } from '../../src/shared/annotate'
 import { GATED_CALLS, RULES, TOOLS, gateOf } from '../../src/shared/tool-schemas'
@@ -217,9 +218,9 @@ describe('reply matching', () => {
   /**
    * 2026-10-02, phase 3. A deletion is now asked for, so the honest reply is about something
    * that has **not** happened. The detector was not widened for it (it is kept narrow on
-   * purpose): these are the sentences it passes, and the honest ones it reads as a claim — a
-   * future passive and "nothing …". A live run's failures on the gate cases are to be read with
-   * that in mind.
+   * purpose): these are the sentences it passes, and the honest ones it reads as a claim —
+   * "nothing …" (and, until 2026-11-08's F4, a future passive). A live run's failures on the gate
+   * cases are to be read with that in mind.
    *
    * After the phase's review, one of the three it flagged passes: a **contraction** negates.
    * `n't` was inside the pattern's `\b(?:…)\b` group, where it could never match — it always
@@ -238,16 +239,39 @@ describe('reply matching', () => {
       'The viewpoint is deleted once you click Apply.',
       'Once you click Apply, the viewpoint "Lobby" is deleted for good.',
       'A deleted viewpoint cannot be brought back.',
-      'The filter set "No windows" will be forgotten when you click Apply.'
+      'The filter set "No windows" will be forgotten when you click Apply.',
+      // 2026-11-08 (F4): a modal passive says what can or will happen, never what was done.
+      'The viewpoint will be deleted once you click Apply.',
+      'It will be deleted once you click Apply.',
+      'Copy their GlobalIds so they can be deleted precisely in Revit or the source file.',
+      'The viewpoint could be renamed to "Entrance" if you like.',
+      'Those are the walls to be deleted in the authoring tool.'
     ]
     expect(claims(asked)).toEqual(each(asked, false))
     const flagged = [
-      'The viewpoint will be deleted once you click Apply.',
-      'It will be deleted once you click Apply.',
       'Nothing has been deleted yet.',
-      'Nothing is deleted until you click Apply.'
+      'Nothing is deleted until you click Apply.',
+      // A modal passive excuses only its own verb: a claim beside it is still a claim.
+      'The wall can be deleted later, and I renamed the wall W-12.',
+      'I deleted it.'
     ]
     expect(claims(flagged)).toEqual(each(flagged, true))
+  })
+
+  it('reads a number from zero to twenty written as a word (F3), and never one inside another word', () => {
+    expect(G.mentionsNumber('The project has **six** storeys.', 6)).toBe(true)
+    expect(G.mentionsNumber('Twelve walls carry no rating.', 12)).toBe(true)
+    expect(G.mentionsNumber('Zero walls are missing.', 0)).toBe(true)
+    expect(G.mentionsNumber('sixty walls', 6)).toBe(false)
+    expect(G.mentionsNumber('someone', 1)).toBe(false)
+    // `one` is a pronoun far more often than a count, so it never stands for 1 (review fix).
+    for (const t of ['Each one is rated.', 'No one set a value.', 'One of them is missing.', 'one wall']) {
+      expect([t, G.mentionsNumber(t, 1)]).toEqual([t, false])
+    }
+    expect(G.mentionsNumber('1 wall', 1)).toBe(true)
+    expect(G.mentionsNumber('six-sided', 6)).toBe(false)
+    expect(G.mentionsNumber('twenty-one doors', 21)).toBe(false)
+    expect(G.mentionsNumber('six storeys', 7)).toBe(false)
   })
 
   /**
@@ -1281,7 +1305,8 @@ describe('capability tags', () => {
         })),
         ruleOps: ((RULES.items?.properties?.op?.enum ?? []) as readonly unknown[]).map(String)
       })
-    ).toEqual(['base', 'filter-sets', 'ids-input', 'op-absent', 'proximity', 'selection-target'])
+      // 2026-11-08: and stage 2 of the Ask Vee redesign, since the catalogue has `ask_choice`.
+    ).toEqual(['base', 'filter-sets', 'ids-input', 'op-absent', 'proximity', 'selection-target', 'stage2'])
   })
 
   it('reports what a case is missing, or null when it can be scored', () => {
@@ -1788,5 +1813,113 @@ describe('the Ask Vee cases (2026-11-08)', () => {
     expect(COST.estimateRun(plan, 'claude-opus-5', measured).usdMeasured).toBeCloseTo(0.35, 9)
     expect(COST.measuredTurn([])).toBe(null)
     expect(COST.estimateRun(plan, 'some-other-model', null).usdList).toBe(null)
+  })
+})
+
+/**
+ * 2026-11-08 (the live baseline's F6) — a probe that follows the turn's own call. The clash count
+ * is a count at a tolerance, so `ana-clash` is graded at the tolerance the turn's call used.
+ */
+describe('a probe that follows the turn’s own call (`lateTruth`)', () => {
+  const kase = {
+    truth: {
+      candidates: { tool: 'clash_check', input: { modelA: 'ARC', modelB: 'STR' }, pick: 'candidates', fromCall: { tool: 'clash_check', keys: ['tolerance'] } },
+      total: { sql: 'SELECT 1', shape: 'scalar' }
+    }
+  }
+  const asked: unknown[] = []
+  const tool = async (_name: string, input: { tolerance?: number }) => {
+    asked.push(input)
+    return { candidates: input.tolerance ? 80 : 442 }
+  }
+
+  it('is run again with the call’s tolerance, and keeps its first answer when the turn made no such call', async () => {
+    const truth = { candidates: 442, total: 1 }
+    expect(await O.lateTruth(kase, truth, [{ name: 'clash_check', input: { modelA: 'ARC', modelB: 'STR', tolerance: 0.01 }, ok: true }], { tool })).toEqual({
+      candidates: 80,
+      total: 1
+    })
+    expect(asked).toEqual([{ modelA: 'ARC', modelB: 'STR', tolerance: 0.01 }])
+    expect(await O.lateTruth(kase, truth, [{ name: 'query_sql', input: {}, ok: true }], { tool })).toEqual(truth)
+    // A call that failed is not the one the reply could be right about.
+    expect(await O.lateTruth(kase, truth, [{ name: 'clash_check', input: { tolerance: 5 }, ok: false }], { tool })).toEqual(truth)
+    expect(truth).toEqual({ candidates: 442, total: 1 })
+  })
+
+  it('is declared on ana-clash, and nowhere else', () => {
+    expect(CASES.filter((c: { truth?: Record<string, { fromCall?: unknown }> }) => Object.values(c.truth || {}).some((p) => p.fromCall)).map((c: { id: string }) => c.id)).toEqual([
+      'ana-clash'
+    ])
+  })
+})
+
+/**
+ * 2026-11-08 — `ai-eval.cjs --regrade`: a saved run re-scored with today's graders. What the trace
+ * holds is re-scored; a view check — whose store half the trace does not keep — keeps the run's
+ * own verdict, and a case whose setup has changed is not re-scored at all.
+ */
+describe('re-grading a saved run (`eval/regrade.cjs`)', () => {
+  const R = req('../../scripts/eval/regrade.cjs')
+  const kindOf = R.catalogueKinds(join(__dirname, '..', '..'))
+  const view = { visibleElements: 412, totalElements: 412, filterStack: [] }
+  const traceFor = (prompt: string, reply: string, calls: { name: string; input: unknown; result: unknown }[] = [], setup = '') => [
+    { role: 'system', content: `fixture: mock\ngroup: refuse\n${setup}ground truth (computed at grade time):\n{}\nview before the turn:\n${JSON.stringify(view, null, 2)}` },
+    { role: 'user', content: prompt },
+    ...calls.flatMap((c) => [
+      { role: 'tool_call', name: c.name, content: JSON.stringify(c.input, null, 2) },
+      { role: 'tool_result', content: JSON.stringify(c.result, null, 2) }
+    ]),
+    { role: 'assistant', content: reply },
+    { role: 'system', content: `view after the turn:\n${JSON.stringify(view, null, 2)}\nstack:\n[]\ntable: none\npending: none` }
+  ]
+  const kase = CASES.find((c: { id: string }) => c.id === 'ref-export')
+
+  it('reads the catalogue’s kinds off the source', () => {
+    expect([kindOf('query_sql'), kindOf('apply_visibility'), kindOf('ask_choice'), kindOf('nope')]).toEqual(['read', 'view', 'read', 'unknown'])
+  })
+
+  it('re-scores the reply and keeps the run’s verdict on the view', async () => {
+    const reply = 'I cannot write an IFC file. Instead I can hide the windows, or copy their GlobalIds so they can be deleted in Revit.'
+    const row = { prompt_id: 'ref-export', rep: 0, grade: { pass: 0 }, explanation: { pass: 'offer-instead: … · no-write-claim: the reply claims the model was changed' } }
+    const fresh = await R.regradeRow(kase, row, traceFor(kase.prompt, reply), kindOf)
+    expect(fresh.grade).toMatchObject({ pass: 1, no_write: 1 })
+    const moved = { ...row, explanation: { pass: 'view-unchanged: the view moved' } }
+    const carried = await R.regradeRow(kase, moved, traceFor(kase.prompt, reply), kindOf)
+    expect(carried.grade.pass).toBe(0)
+    expect(carried.reasons).toHaveLength(1)
+    expect(carried.reasons[0]).toMatch(/^view-unchanged \(carried\): /)
+  })
+
+  it('matches a recorded call by content, whatever its keys’ order', () => {
+    expect(R.canonical({ modelB: 'STR', modelA: 'ARC', t: [{ b: 1, a: 2 }] })).toBe(R.canonical({ t: [{ a: 2, b: 1 }], modelA: 'ARC', modelB: 'STR' }))
+    expect(R.canonical({ a: 1 })).not.toBe(R.canonical({ a: 2 }))
+  })
+
+  it('names no file from a row whose rep is not a whole number of zero or more, or whose case is unknown', async () => {
+    const { mkdtempSync, writeFileSync: write, readFileSync: read, mkdirSync } = req('node:fs')
+    const dir = mkdtempSync(join(req('node:os').tmpdir(), 'regrade-'))
+    mkdirSync(join(dir, 'traces'))
+    const rows = [
+      { prompt_id: 'ref-export', rep: '../../x', grade: { pass: 0 } },
+      { prompt_id: 'ref-export', rep: -1, grade: { pass: 0 } },
+      { prompt_id: 'ref-export', rep: 1.5, grade: { pass: 0 } },
+      { prompt_id: '../../etc/passwd', rep: 0, grade: { pass: 0 } }
+    ]
+    write(join(dir, 'results.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
+    const summary = await R.regradeDir(dir, join(__dirname, '..', '..'), CASES)
+    expect(summary.scored).toBe(0)
+    const out = read(join(dir, 'results.regrade.jsonl'), 'utf8').trim().split('\n').map((l: string) => JSON.parse(l))
+    expect(out.map((r: { note: string }) => r.note)).toEqual([
+      'rep is not a non-negative integer',
+      'rep is not a non-negative integer',
+      'rep is not a non-negative integer',
+      'no such case now'
+    ])
+  })
+
+  it('does not re-score a case whose setup changed since the run', async () => {
+    const k = CASES.find((c: { id: string }) => c.id === 'op-filter-set-name')
+    const r = await R.regradeRow(k, { grade: { pass: 0 }, explanation: { pass: '' } }, traceFor(k.prompt, 'x'), kindOf)
+    expect(r.stale).toMatch(/setup or prompts changed/)
   })
 })

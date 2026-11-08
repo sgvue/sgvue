@@ -26,6 +26,7 @@ import { matchFn, type Rule } from '../../../shared/rules'
 import type { PendingPatchKey } from '../../../shared/undo'
 import { turnSnapshot, type TurnPart, type TurnSnapshot } from '../../state/selectors/snapshot'
 import { getViewer, type ShellState } from '../../state/shell'
+import type { Observation } from '../heads-up'
 
 /** One clickable chip under a reply. `SGVue.dc.html:1361`. */
 export interface ChatChip {
@@ -147,6 +148,17 @@ export interface ToolUi {
    * turn's one request is then taken (`waitingOn`).
    */
   asked?: string
+  /**
+   * 2026-11-08, stage 2 — this call asked the user the IFC+SG question (`ask_choice`): its
+   * lead-in, the model's one sentence before the app's own question. Drawn under the reply with
+   * the app's Yes / No quick replies; only the user's click answers it.
+   */
+  ask?: ChatAsk
+}
+
+/** A question with quick replies under a reply — stage 2's IFC+SG question (`executors/ask.ts`). */
+export interface ChatAsk {
+  lead: string
 }
 
 export interface ToolOutcome {
@@ -179,6 +191,19 @@ export interface TurnState {
    * (`ToolUi.asked`): the Open or Save dialog, the unload confirmation. `null` until it has.
    */
   asked: string | null
+  /**
+   * 2026-11-08, stage 2 — the heads-up the reply shows: the last rule-bearing call's one
+   * observation over the elements it touched (`ai/heads-up.ts`, set by `executeTool`), `null`
+   * when that call saw nothing odd or the turn made no such call.
+   */
+  headsUp: Observation | null
+  /** 2026-11-08, stage 2 — the IFC+SG question this turn asked (`ask_choice`), or `null`. */
+  ask: ChatAsk | null
+  /**
+   * Stage 2's review — whether this turn's last rule-bearing call touched an element that carries
+   * an `SGPset_` set: `ask_choice` asks only then. `false` until such a call has run.
+   */
+  sgTouched: boolean
 }
 
 export const newTurnState = (): TurnState => ({
@@ -189,7 +214,10 @@ export const newTurnState = (): TurnState => ({
   parts: [],
   filtered: false,
   placed: [],
-  asked: null
+  asked: null,
+  headsUp: null,
+  ask: null,
+  sgTouched: false
 })
 
 /**

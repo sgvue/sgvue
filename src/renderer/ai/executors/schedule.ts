@@ -162,14 +162,19 @@ export const make_schedule: Executor = async (input, ctx) => {
 
   const said = edit ? 'Changed the open schedule' : 'Showed a new schedule'
   const renamed = Object.entries(built.resolvedKeys)
+  const dropped = Object.keys(built.dropped ?? {})
   return {
     forModel: {
       ...read.forModel,
       message:
         `${said} in the Schedules window, where the user can undo it. ${read.forModel.message as string}` +
+        (dropped.length
+          ? ` ${dropped.join(', ')} ${dropped.length === 1 ? 'is a class' : 'are classes'} no loaded model carries, so ${dropped.length === 1 ? 'it was' : 'they were'} left out of the category.`
+          : '') +
         (renamed.length
           ? ` Property names were read as the file spells them: ${renamed.map(([a, k]) => `${a} → ${k}`).join(', ')}.`
           : ''),
+      ...(dropped.length ? { categoryLeftOut: built.dropped } : {}),
       ...(renamed.length ? { resolvedKeys: built.resolvedKeys } : {})
     },
     ui: { chips: chipsOf(read) }

@@ -63,6 +63,34 @@ async function collectTruth(kase, ask) {
   return truth
 }
 
+/**
+ * 2026-11-08 (the live baseline's F6) — a probe whose answer depends on how the turn asked: the
+ * clash count is a count **at a tolerance**, and a reply that states the count `clash_check`
+ * returned at 0.01 m is right about 0.01 m. Such a probe names the call it follows —
+ * `fromCall: { tool, keys }` — and, once the turn is done, is run again with those keys of the
+ * turn's first successful call to that tool merged into its own input. A turn that made no such
+ * call keeps the answer `collectTruth` gave before it. Run after the turn by both runners.
+ *
+ * @param {object} kase
+ * @param {object} truth   what `collectTruth` collected; a copy with the re-run probes comes back
+ * @param {{name: string, input?: object, ok?: boolean}[]} calls  the case's own turn's calls
+ * @param {{ tool: (name: string, input: object) => Promise<unknown> }} ask
+ */
+async function lateTruth(kase, truth, calls, ask) {
+  const out = { ...truth }
+  for (const [name, probe] of Object.entries(kase.truth || {})) {
+    const from = probe.fromCall
+    if (!from || !probe.tool) continue
+    const call = (calls || []).find((c) => c.name === from.tool && c.ok !== false)
+    if (!call) continue
+    const merged = { ...(probe.input || {}) }
+    for (const k of from.keys || []) if (call.input && call.input[k] !== undefined) merged[k] = call.input[k]
+    const r = await ask.tool(probe.tool, merged)
+    out[name] = probe.pick ? pickFrom(r, probe.pick) : r
+  }
+  return out
+}
+
 /** `{key}` in an oracle's reply or tool input, filled from the probes. */
 function fillTemplate(value, truth) {
   if (typeof value === 'string') {
@@ -184,4 +212,4 @@ function observation(turn, before, after, message) {
   }
 }
 
-module.exports = { addUsage, collectTruth, fillTemplate, nullTurn, observation, oracleTurn, pickFrom, scriptedCalls, turnsOf, withEarlier }
+module.exports = { addUsage, collectTruth, fillTemplate, lateTruth, nullTurn, observation, oracleTurn, pickFrom, scriptedCalls, turnsOf, withEarlier }

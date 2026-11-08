@@ -215,6 +215,19 @@ describe('clash_check', () => {
     expect(turn.table!.clash).toBe(true)
   })
 
+  it('states the tolerance it used, the default 0 included (2026-11-08, F6)', async () => {
+    const at0 = await run('clash_check', { modelA: 'ARC', modelB: 'STR' })
+    expect(at0.tolerance).toBe(0)
+    expect(at0.message).toContain('at a tolerance of 0 m, where boxes that only touch count')
+    const at1 = await run('clash_check', { modelA: 'ARC', modelB: 'STR', tolerance: 0.01 })
+    expect(at1.tolerance).toBe(0.01)
+    expect(at1.message).toContain('overlapping by more than 0.01 m (the tolerance)')
+    expect(at1.candidates as number).toBeLessThan(at0.candidates as number)
+    const none = await run('clash_check', { modelA: 'ARC', modelB: 'STR', tolerance: 100 })
+    expect(none).toMatchObject({ candidates: 0, tolerance: 100 })
+    expect(none.message).toBe('No bounding-box interference between ARC and STR overlapping by more than 100 m (the tolerance).')
+  })
+
   it('refuses two names that are not both loaded, and lists what is', async () => {
     const body = await run('clash_check', { modelA: 'ARC', modelB: 'HVAC' })
     expect(body.message).toContain('Both models must be loaded')

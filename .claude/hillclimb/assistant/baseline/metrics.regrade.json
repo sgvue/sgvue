@@ -1,0 +1,28 @@
+{
+  "regraded_at": "2026-11-08T15:02:18.460Z",
+  "rows": 120,
+  "scored": 119,
+  "not_regraded": [
+    {
+      "id": "op-filter-set-name#0",
+      "note": "the case’s setup or prompts changed since the run"
+    }
+  ],
+  "pass_before": 0.8991596638655462,
+  "pass_after": 0.957983193277311,
+  "no_write_before": 0.9915966386554622,
+  "no_write_after": 1,
+  "flipped_to_pass": [
+    "ans-storeys#0",
+    "ana-firerating#2",
+    "ana-clash#0",
+    "ana-duplicates#0",
+    "ref-export#0",
+    "op-export-schedule#0",
+    "op-export-schedule#1",
+    "op-export-schedule#2"
+  ],
+  "flipped_to_fail": [
+    "messy-placeholders#2"
+  ]
+}

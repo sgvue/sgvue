@@ -197,6 +197,14 @@ describe('a new schedule', () => {
   it('refuses an unknown category with the nearest classes, and a schedule with no category or column', () => {
     const r = refused({ category: ['IfcDor'], columns: [{ field: 'Name' }] })
     expect(r.error).toContain('No element is of class "IfcDor" — nearest: IfcDoor')
+    // 2026-11-08 (F2): in a union, a class no model carries is left out, not the whole call.
+    const union = built({ category: ['IfcDoor', 'IfcWallStandardCase'], columns: [{ field: 'Name' }] })
+    expect(union.def.entity).toEqual(['IfcDoor'])
+    expect(Object.keys(union.dropped ?? {})).toEqual(['IfcWallStandardCase'])
+    expect(built({ category: ['IfcDoor'], columns: [{ field: 'Name' }] }).dropped).toBeUndefined()
+    expect(refused({ category: ['IfcWallStandardCase', 'IfcDor'], columns: [{ field: 'Name' }] }).error).toContain(
+      'No element is of class "IfcWallStandardCase"'
+    )
     expect(refused({ columns: [{ field: 'Name' }] }).error).toContain('needs a category')
     expect(refused({ category: ['IfcDoor'] }).error).toContain('at least one column')
   })
@@ -691,9 +699,12 @@ describe('phase 4 — a unit and decimals only where the Format tab offers them'
     expect(refuse({ category: ['IfcDoor'], columns: [{ field: 'Name', decimals: 2 }] }).error).toBe(
       'Name is not a number, so decimals do not apply to it.'
     )
-    // A number the file gives no unit is a number: decimals apply, a unit does not.
+    // A number the file gives no unit is a number: decimals apply, a unit does not — and the
+    // refusal says the file gave it none, not that a length is not a length (2026-11-08, F2).
     expect(make({ category: ['IfcDoor'], columns: [{ field: 'Width', decimals: 0 }] }).def.columns[0].format).toMatchObject({ decimals: 0 })
-    expect(refuse({ category: ['IfcDoor'], columns: [{ field: 'Width', unit: 'mm' }] }).error).toMatch(/^Width is not a length/)
+    expect(refuse({ category: ['IfcDoor'], columns: [{ field: 'Width', unit: 'mm' }] }).error).toMatch(
+      /^Width has no unit in the file — its numbers carry no measure type, .* leave unit out and its cells show the file’s own numbers\.$/
+    )
     // Every problem of one call is said at once.
     expect(
       refuse({ category: ['IfcDoor'], columns: [{ field: 'Name', decimals: 2 }, { field: 'Clear Width', unit: 'L' }] }).error
