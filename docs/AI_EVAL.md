@@ -377,7 +377,8 @@ mean measured cost per turn replaces it. On this build the a-priori figures are:
 
 These are not measurements. Every turn re-sends a prefix the server caches, and a cache read is a
 tenth of the input rate, so the real figure should be well under them — how far under is what
-the pilot is for.
+the pilot is for. Measured on this build (*Cost*, below): the pilot **$0.56**, a full pass
+**$5.51** (before stage 2) and **$6.92** (after it).
 
 ### The hostile fixture
 
@@ -700,12 +701,29 @@ At `claude-opus-5` list prices per million tokens:
 The TTL is read from the app's own prompt-cache setting, and the row records which was used. A
 model with no entry in the table is priced at `null` rather than at a neighbour's rate.
 
-**The first cost number must come from the pilot, and this page deliberately does not give you
-one.** `docs/AI_REVIEW.md` §7 arithmetic puts a typical two-round turn at roughly $0.06–$0.11
-on the reference model, but that was computed from `characters / 4` with no request made, and a
-token guess is routinely out by 3–10×. Run the pilot, read the `measured` line it prints, and
-multiply by the case count before committing to a full pass. After a full pass, replace any
-projected figure you wrote down with the measured one.
+**The first cost number must come from the pilot.** `docs/AI_REVIEW.md` §7 arithmetic puts a
+typical two-round turn at roughly $0.06–$0.11 on the reference model, but that was computed from
+`characters / 4` with no request made, and a token guess is routinely out by 3–10×. Run the
+pilot, read the `measured` line it prints, and multiply by the case count before committing to a
+full pass. After a full pass, replace any projected figure you wrote down with the measured one.
+
+**What the live runs cost, measured (2026-11-08, "Vee Messages", on the mock, `claude-opus-5`).**
+Each figure is the run's own `metrics.json` `cost_usd` — the API's `usage`, priced at the table
+above — except the pilot's, which was read off the line it printed:
+
+| Run | What | Rows | Pass | Cost |
+|---|---|--:|---|--:|
+| pilot | the five `PILOT_IDS`, once each | 5 | — | **$0.56** |
+| `assistant/baseline` | the full pass before stage 2 — 80 cases, the tagged ones three times; 15 rows n/a (the stage-2 cases, then unbuilt) | 130 | 103 / 115 (89.6 %); re-graded 92.4 % | **$5.51** |
+| `assistant/v1` | the full pass after stage 2 — 85 cases, every one scored | 135 | 122 / 135 (90.4 %); re-graded 89.6 % | **$6.92** |
+| `assistant/v2` | the re-run of the six cases the live fixes touched | 14 | 11 / 14; re-graded 12 / 14 | **$1.07** |
+| `assistant/v3` | the IFC+SG live check, `sg-ask-once` three times, after the app-added heads-up | 3 | 3 / 3 | **$0.66** |
+
+That is **$14.72** for all five. The a-priori figures (*Run counts*, above) were deliberately
+high — the pilot $1.38, a full pass $29.67 — and the pilot's own measured projection for the
+baseline was $11.98; the full passes came in at about half of that, because a cache read is a
+tenth of the input rate and the cached prefix is most of every turn: the baseline read 8.1 M
+tokens from the cache against 123 k sent uncached.
 
 Two things that move the bill and are worth knowing before you read a surprise:
 

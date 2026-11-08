@@ -1162,9 +1162,9 @@ Anything not on this list is a defect.
   the diary's fold toggle. The typed line lifts on a slant to the right. The OS window's minimum
   is 300 × 380. Styled by `.vm` classes in `styles/vee.css`; one inline string changed (the
   lift's type, 13px/1.42). The main window is unchanged but for Preferences telling the store
-  whether a key is there. Not yet seen in a window: the e2e specs that drive it are edited and
-  not run, and `tests/e2e/vee-trace.spec.ts` and `scripts/screenshot.cjs` still read the old
-  trace markup. *(Amended the same day — stage 2, owner-approved decisions B, C, D, HANDOFF §2,
+  whether a key is there. Not yet seen in a window: the e2e specs that drive it
+  (`tests/e2e/vee-trace.spec.ts`, rewritten for this layout, and `vee-stage2.spec.ts`) and the
+  `vm-*` captures in `scripts/screenshot.cjs`, one per prototype shot, are written and not run. *(Amended the same day — stage 2, owner-approved decisions B, C, D, HANDOFF §2,
   §7, §8: in the Ask Vee window only, three more pieces. **A heads-up line** — at most one a
   reply, after its answer and before its consent card, in `--warn-ink` with a 12 px outline
   sign, no control: the app's own observation over the elements the reply's last rule-bearing

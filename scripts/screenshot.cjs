@@ -42,8 +42,25 @@
  * states are a reply's own format: one answered in a plain sentence, then one answered with a
  * sentence, a bulleted list and a table, mid-reveal and settled, and one whose tool carries rules,
  * so the trace's rows stand under its blocks.
+ *
+ * 2026-11-08 ("Vee Messages"): since 2026-11-07 the chat is the **Ask Vee window**, a child window
+ * main opens (`main/vee-window.ts`), and this harness is its own main — so it opens that window
+ * itself when the page asks (`vee:open` / `vee:close`), joins the two pages with a private port as
+ * main does, and answers `settings:get` with a key or none (`SGVUE_VEE_*` below). The `vm-*`
+ * states are the approved prototype's shots one for one — `vm-01-first` beside
+ * `prototypes/vee-messages/full/shots/393-dark-01-first.png`, `vm-ifc-2-fire-answer` beside
+ * `ifc-393-dark-2-fire-answer.png`, `vm-sg-1-asked` beside `sg-393-dark-1-asked.png` — and each
+ * is captured **from the Ask Vee window** at the shot's window size (`<state>-<theme>.png`; the
+ * main window beside it as `-main.png`). Every other state captures the main window as before,
+ * plus the Ask Vee window as `-vee.png` while it is open; the `trace-*` and `fmt-*` states read and
+ * crop that window instead of the old in-stage panel.
+ *
+ *   SGVUE_VEE_RM   1 — the Ask Vee window asks for reduced motion: every sprite holds frame 0 and
+ *                  every state is at its end — the prototype's `-rm-` shots. Without it a sprite
+ *                  there runs on its own clock (that window has no dev harness to pin it), and one
+ *                  capture in about fourteen can catch a blink.
  */
-const { app, BrowserWindow, ipcMain, net, protocol } = require('electron')
+const { app, BrowserWindow, MessageChannelMain, ipcMain, net, protocol } = require('electron')
 const { mkdir, writeFile } = require('node:fs/promises')
 const { basename, dirname, join, resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
@@ -175,6 +192,98 @@ const CUE = { read: 2.4, filter: 4.2, check: 5.8, answer: 8.2 }
 const traceAt = (t) => `D.trace.pin(${TRACE.T0} + ${t})`
 const TRACE_INPUT = `$('[data-role="chatinput"]')`
 
+/* ── 2026-11-08: "Vee Messages" — the Ask Vee window beside the approved prototype ────────
+ * One chain, in order, on a fresh window per theme (`SGVUE_THEMES=dark`, then `light`), on the
+ * mock federation. Each `vm-*` state is named after the prototype's shot it stands beside
+ * (`prototypes/vee-messages/full/shots/`, the window inside each shot) and captured from the Ask
+ * Vee window at that shot's window size: 330 × 420, and 420 × 640 for the `ifc-` and `sg-` shots.
+ * The turns are stepped with the trace's clock pinned, as the `trace-*` states are, on the mock's
+ * own numbers: the prototype's fire-rating turn is its scripted walls; here it is the mock's D2
+ * entrance doors, whose `FireRating` is "-" — so the reply carries the app's heads-up, and
+ * isolating them is held by the 5 % guard behind a consent card. A key comes and goes through
+ * Preferences, as it does in the app: `key` sets what `settings:get` answers and opens Preferences,
+ * which tells the store, and the state closes it again.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const VM = { T0: 1000, small: [330, 420], large: [420, 640] }
+const vmAt = (t) => `D.trace.pin(${VM.T0} + ${t})`
+/** Preferences, opened by the harness for a key change, closed again by its own Escape. */
+const PREFS_CLOSE =
+  `await sleep(700); { const d = document.querySelector('[data-role="prefs"]');` +
+  ` if (d) d.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); } await sleep(300)`
+/** How many of the mock's doors say "-" as their FireRating: the reply's words count them. */
+const DASH_DOORS =
+  `D.federation().elements.filter((e) => e.type === 'IfcDoor' && ((e.psets || {}).Pset_DoorCommon || {}).FireRating === '-').length`
+const DOORS_Q = 'Which doors have no real fire rating? Show only those.'
+const DOORS_CALL =
+  `{ action: 'isolate', rules: [{ prop: 'IfcEntity', op: '=', val: 'IfcDoor' }, { prop: 'FireRating', op: '=', val: '-' }] }`
+/** The doors turn from Send until `at` seconds in: Read, Filter and Check at the cues of `CUE`. */
+const doorsTurn = (base, at) =>
+  `${vmAt(base)}; D.chat.step.begin(${JSON.stringify(DOORS_Q)}); ${vmAt(base + CUE.read)}; D.chat.step.start();` +
+  ` ${vmAt(base + CUE.read + 0.1)}; await D.chat.step.exec('apply_visibility', ${DOORS_CALL}); ${vmAt(base + at)}`
+/** …and its answer, settled: `reply` is a JavaScript expression of `n`, the doors counted. */
+const doorsDone = (base, reply) =>
+  `const n = ${DASH_DOORS}; ${vmAt(base + CUE.answer)}; D.chat.step.done(${reply}); ${vmAt(base + CUE.answer + 3)}`
+const DOORS_REPLY =
+  `'**' + n + ' doors** have no real fire rating: their \`FireRating\` reads “-”.\\n\\n` +
+  `Showing only them leaves ' + n + ' of 412 on screen, so it waits for your OK.'`
+const DOORS_REPLY_TERMS =
+  `'**' + n + ' doors** have no real fire rating: their \`FireRating\` reads “-”.\\n\\n` +
+  `All of them are \`IfcDoor\` of type \`D2 Double 2400x2400\`.'`
+/** The newest reply's consent card's own buttons, in the Ask Vee window. */
+const LAST_CARD = `[...document.querySelectorAll('[data-role="chatlog"] > [data-row]')].pop().querySelector('[data-role="consent"]')`
+
+const VM_STATES = {
+  // 01 — first open: the header, the board, today, the boot audit, the suggestions.
+  'vm-01-first': { size: VM.small, js: `${VEE_PIN} ${vmAt(-1)}; click(chatPill())`, shot: true },
+  // 03 — not ready, no key: Vee's one line, the composer disabled, no suggestions; the board stays.
+  'vm-03-nokey': { size: VM.small, key: false, js: PREFS_CLOSE, shot: true },
+  // 06 — the key back, and a plain answer with no tool: typing dots gave way to two bubbles.
+  'vm-06-plain': {
+    size: VM.small,
+    key: true,
+    js:
+      `${PREFS_CLOSE}; ${vmAt(100)}; D.chat.step.begin('What can you do?'); ${vmAt(101.6)};` +
+      ` D.chat.step.done('I find, count and check what is in the model, show or hide it, colour it and cut sections.\\n\\n` +
+      `I only look: nothing in the model ever changes.'); ${vmAt(104.6)}`,
+    shot: true
+  },
+  // 02a — the doors turn, the Check 1.2 s in: the diary with every step and its live count.
+  'vm-02a-fire-checking': { size: VM.small, js: doorsTurn(200, CUE.check + 1.2), shot: true },
+  // 05b — its answer: bubbles, the storey rows, the heads-up and the taped consent card.
+  'vm-05b-fire-answer': { size: VM.small, js: doorsDone(200, DOORS_REPLY), shot: true },
+  // 05d — the user's Apply: the stub torn, the stamp landed, Revert on it, the board isolated.
+  'vm-05d-fire-applied': { size: VM.small, js: '', vee: `click(${LAST_CARD}.querySelector('button.vm-go'))`, shot: true },
+  // 05e — Revert on the stamp: REVERTED, and the board back to all of it.
+  'vm-05e-fire-reverted': { size: VM.small, js: '', vee: `click(${LAST_CARD}.querySelector('.vm-done button.vm-rv'))`, shot: true },
+  // ifc-1 — the doors again, larger, the Check running: `Checking`, the matrix under it.
+  'vm-ifc-1-fire-diary': { size: VM.large, js: doorsTurn(300, CUE.check + 1.2), shot: true },
+  // ifc-2 — its answer: the diary folded to one line, IFC terms in their one colour, the heads-up.
+  'vm-ifc-2-fire-answer': { size: VM.large, js: doorsDone(300, DOORS_REPLY_TERMS), shot: true },
+  // sg-1 — the trees read by rule, then the IFC+SG question: Vee's lead-in, the app's question,
+  // Yes and No.
+  'vm-sg-1-asked': {
+    size: VM.large,
+    js:
+      `${vmAt(400)}; D.chat.step.begin('What types are the trees?'); ${vmAt(400 + CUE.read)}; D.chat.step.start();` +
+      ` ${vmAt(400 + CUE.read + 0.1)};` +
+      ` await D.chat.step.exec('query_elements', ${JSON.stringify({ rules: [{ prop: 'IfcEntity', op: '=', val: 'IfcGeographicElement' }] })});` +
+      ` await D.chat.step.exec('ask_choice', ${JSON.stringify({ lead: 'These elements carry `SGPset_Planting` and `SGPset_SoftLandscape` values.' })});` +
+      ` ${vmAt(400 + CUE.answer)}; D.chat.step.done('One thing first.'); ${vmAt(400 + CUE.answer + 3)}`,
+    shot: true
+  },
+  // 02 — every model unloaded through the sidebar's own Unload and delete: no model, so one line,
+  // no board, no suggestions; the composer stays.
+  'vm-02-nomodel': {
+    size: VM.small,
+    js:
+      `for (let k = 0; k < 8; k++) { const b = byTitle('Unload model')[0]; if (!b) break;` +
+      ` click(b); await sleep(300); click(byText('button', 'delete')); await sleep(1500); }`,
+    shot: true
+  },
+  // 04 — and no key either: the key line wins.
+  'vm-04-nokeynomodel': { size: VM.small, key: false, js: PREFS_CLOSE, shot: true }
+}
+
 /* ── 2026-10-08: a reply's own format ───────────────────────────────────────────
  * The owner: "the Ask VEE ai assistant answer are in one sentence, which is extremely difficult
  * to read". Three turns on the mock federation, the trace's clock pinned as above. The first has
@@ -217,17 +326,20 @@ const FMT = {
   ].join('\n')
 }
 /**
- * What a `fmt-*` capture also measures, printed as `[fmt] {…}`: the newest reply's bubble, its
- * text's box and each block's, how many of the reveal's pieces it has and how many are wholly in,
- * and the table's box and the log, each as client and scroll width — CSS px, read from the DOM.
+ * What a `fmt-*` capture also measures, printed as `[fmt] {…}` — **run in the Ask Vee window**
+ * since 2026-11-08, where a reply is one bubble per block (`ai/parts.ts`): each bubble's box and
+ * what it holds, how many of the reply's parts are still landing (`data-land`) and how many are
+ * wholly in, and the table's box and the log, each as client and scroll width — CSS px, read from
+ * the DOM.
  */
 const FMT_READ =
   `{ const row = [...document.querySelectorAll('[data-role="chatlog"] > [data-row]')].pop();` +
   ` const r = (e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map((v) => Math.round(v * 100) / 100) };` +
-  ` const text = row.querySelector('[data-part="text"]'); const table = text.querySelector('table'); const log = row.parentElement;` +
-  ` const pieces = [...row.querySelectorAll('[data-part="word"]')].map((w) => Number(getComputedStyle(w).opacity));` +
-  ` console.log('[fmt] ' + JSON.stringify({ bubble: r(row.querySelector('[data-part="bubble"]')), text: r(text),` +
-  ` blocks: [...text.children].map((e) => [e.tagName.toLowerCase(), ...r(e)]), pieces: pieces.length, in: pieces.filter((o) => o >= 1).length,` +
+  ` const bubbles = [...row.querySelectorAll('.vm-stack > .vm-b.vm-tx')]; const table = row.querySelector('table'); const log = row.parentElement;` +
+  ` const lands = [...row.querySelectorAll('[data-land]')].map((e) => (e.style.opacity === '' ? 1 : Number(e.style.opacity)));` +
+  ` console.log('[fmt] ' + JSON.stringify({ bubbles: bubbles.map((e) => [e.querySelector('table') ? 'table' : e.querySelector('ul, ol') ? 'list' : 'p', ...r(e)]),` +
+  ` cards: [...row.querySelectorAll('.vm-stack > .vm-card')].map((e) => [e.getAttribute('data-role'), ...r(e)]),` +
+  ` lands: lands.length, in: lands.filter((o) => o >= 1).length,` +
   ` table: table ? { client: table.parentElement.clientWidth, scroll: table.parentElement.scrollWidth } : null,` +
   ` log: { client: log.clientWidth, scroll: log.scrollWidth } })) }`
 
@@ -368,10 +480,12 @@ const APP_ONLY_STATES = {
   /* ── 2026-10-01: Vee — the assistant's name and its pixel mascot ───────────────
    * `tests/parity/2026-10-01-vee/README.md` has the commands and the measurements. Captured at
    * `SGVUE_SIZE=1280x820`, one chain in order on a fresh window per theme. Every state pins the
-   * sprite clock first (`D.vee.pin(0)`, `app/Vee.tsx`), so the header's sprite, each label's and
-   * the pill's stand at their own frames 5, 11 and 17 — eyes open — on every run. Each capture
-   * also writes one 8× crop per mounted sprite (`spriteCrops` below). A build from before Vee
-   * has no `D.vee` and no sprite; the first three states capture it as it was.
+   * main window's sprite clock first (`D.vee.pin(0)`, `app/Vee.tsx`), so the pill's sprite stands
+   * at its frame 17 — eyes open — on every run. Each capture also writes one 8× crop per mounted
+   * sprite (`spriteCrops` below). A build from before Vee has no `D.vee` and no sprite; the first
+   * three states capture it as it was. Since 2026-11-07 the panel is the Ask Vee window: `vee-open`
+   * opens it, and it is captured beside the main window (`-vee.png`, its sprites cropped from it);
+   * `vee-lane` is the main window's bottom row and property card, which no panel shares any more.
    * ──────────────────────────────────────────────────────────────────────────── */
   // The stage at rest: the pill closed.
   'vee-closed': `${VEE_PIN}`,
@@ -379,8 +493,9 @@ const APP_ONLY_STATES = {
   // reply label's, and the lit pill's.
   'vee-open': `${VEE_PIN} click(chatPill())`,
   // …then the four things that used to meet: a storey hidden (the reset pill), an element
-  // selected (the property card, and the panel in its lane) and the laser tool (its hint under
-  // the pill). The row's centre is two levels tall, so the panel and the card stop above it.
+  // selected (the property card in its lane) and the laser tool (its hint under the pill). The
+  // row's centre is two levels tall, so the card stops above it; since 2026-11-07 the panel is a
+  // window of its own and meets none of them.
   'vee-lane':
     `${VEE_PIN} click(byTitle('Show / hide storey')[2]); await sleep(600);` +
     ` click($('[role="tree"] [role="treeitem"]')); await sleep(300);` +
@@ -394,36 +509,38 @@ const APP_ONLY_STATES = {
   /* ── 2026-10-01: the thinking trace — the app's counterparts of the handoff's stills ──
    * `tests/parity/2026-10-01-vee/README.md` § 5 has the commands and the comparison. One chain,
    * in order, on a fresh window per theme, at `SGVUE_SIZE=1280x820 SGVUE_DPR=1`. Each state
-   * pins the trace's clock; the sprite clock is pinned at 0 throughout, so a sprite shows frame
-   * 0 of whatever state the trace puts it in. Each capture also writes the panel alone, at 1×
-   * and enlarged 3× without smoothing (`panelCrops` below).
+   * pins the trace's clock; the main window's sprite clock is pinned at 0 throughout. Each
+   * capture also writes the Ask Vee window alone, at 1× and enlarged 3× without smoothing
+   * (`veeCrops` below).
+   *
+   * 2026-11-08 ("Vee Messages", stage 1b): the handoff is the specification up to its Answer cue
+   * and no further — the app's answer is its own. So 01–06 are the handoff's instants in the Ask
+   * Vee window (03 now typing dots, 04–06 the diary), and 07–08 are the app's answer: its parts
+   * landing, 0.15 s in, and the diary folded once all is settled.
    * ──────────────────────────────────────────────────────────────────────────── */
-  // 01 — at rest, the question being typed: `Which wall`, the composer focused.
-  'trace-01-typing':
-    `${VEE_PIN} ${traceAt(-1)}; click(chatPill()); await sleep(400);` +
-    ` typeInto(${TRACE_INPUT}, 'Which wall'); ${TRACE_INPUT}.focus();` +
-    ` ${TRACE_INPUT}.setSelectionRange(10, 10)`,
-  // 02 — sent 0.45 s ago: the typed line two thirds of its way up, its bubble just starting to
-  // show, the button a stop, the placeholder not yet back.
-  'trace-02-lift':
-    `typeInto(${TRACE_INPUT}, ${JSON.stringify(TRACE.question)}); await sleep(100); ${traceAt(0)};` +
-    ` D.chat.step.begin(${JSON.stringify(TRACE.question)}); ${traceAt(0.45)}`,
-  // 03 — Think + 0.9 s: Vee beside its name, `Thinking` mid-shimmer, no bubble yet.
+  // 01 — at rest, the question being typed in the Ask Vee window: `Which wall`, the composer focused.
+  'trace-01-typing': {
+    js: `${VEE_PIN} ${traceAt(-1)}; click(chatPill())`,
+    vee: `typeInto(${TRACE_INPUT}, 'Which wall'); ${TRACE_INPUT}.focus(); ${TRACE_INPUT}.setSelectionRange(10, 10)`
+  },
+  // 02 — sent 0.45 s ago: the typed line on its slant up to its bubble on the right, the bubble
+  // just starting to show, the button a stop, the placeholder not yet back.
+  'trace-02-lift': `${traceAt(0)}; D.chat.step.begin(${JSON.stringify(TRACE.question)}); ${traceAt(0.45)}`,
+  // 03 — Think + 0.9 s: Vee's typing dots, no diary yet.
   'trace-03-thinking': `${traceAt(1.9)}`,
-  // 04 — Read + 1.3 s, the still's own instant: the bubble open, the wave almost across, the
+  // 04 — Read + 1.3 s, the still's own instant: the diary open, the wave almost across, the
   // count at 356 of 412.
   'trace-04-reading':
     `${traceAt(CUE.read)}; D.chat.step.start(); ${traceAt(CUE.read + 0.1)};` +
     ` await D.chat.step.exec('query_elements', ${TRACE.rules}); ${traceAt(CUE.read + 1.3)}`,
-  // 05 — Filter + 1.1 s: the walls regrouped, the last of them still landing.
+  // 05 — Filter + 1.1 s: Reading ticked, the walls regrouped, the last of them still landing.
   'trace-05-filtering': `${traceAt(CUE.filter + 1.1)}`,
   // 06 — Check + 1.35 s: the beam two thirds across, a ring at the cell it has just found.
   'trace-06-checking': `${traceAt(CUE.check + 1.35)}`,
-  // 07 — Answer + 0.6 s, the still's own instant: the first three words in and the fourth half
-  // way, the first flagged cells leaving for their rows.
+  // 07 — Answer + 0.15 s: the diary folding into its line, the first part landed, the next landing.
   'trace-07-answer':
-    `${traceAt(CUE.answer)}; D.chat.step.done(${JSON.stringify(TRACE.answer)}); ${traceAt(CUE.answer + 0.6)}`,
-  // 08 — done: the answer, its rows, the status, Vee with its V lit.
+    `${traceAt(CUE.answer)}; D.chat.step.done(${JSON.stringify(TRACE.answer)}); ${traceAt(CUE.answer + 0.15)}`,
+  // 08 — done: the folded line, the answer's bubbles and its storey rows, Vee with its V lit.
   'trace-08-done': `${traceAt(CUE.answer + 3)}`,
 
   /* ── 2026-10-08: a reply's own format — one chain, in order, on a fresh window per theme, at
@@ -437,22 +554,26 @@ const APP_ONLY_STATES = {
     `${VEE_PIN} ${traceAt(-1)}; click(chatPill()); await sleep(400);` +
     ` ${traceAt(0)}; D.chat.step.begin(${JSON.stringify(FMT.plain.question)}); ${traceAt(1.5)};` +
     ` D.chat.step.done(${JSON.stringify(FMT.plain.reply)}); ${traceAt(4.5)}`,
-  // A second turn answered with a sentence, a bulleted list and a table — 0.9 s into the answer,
-  // its pieces still coming in.
-  'fmt-mid':
-    `${traceAt(FMT.send)}; D.chat.step.begin(${JSON.stringify(FMT.question)}); ${traceAt(FMT.start)};` +
-    ` D.chat.step.start(); ${traceAt(FMT.start + 0.1)}; await D.chat.step.exec('query_sql', ${FMT.sql});` +
-    ` ${traceAt(FMT.answer)}; D.chat.step.done(${JSON.stringify(FMT.reply)}); ${traceAt(FMT.answer + 0.9)};` +
-    ` await sleep(200); ${FMT_READ}`,
+  // A second turn answered with a sentence, a bulleted list and a table — 0.2 s into the answer,
+  // its bubbles still landing (since 2026-11-08 they are all in by 0.5 s).
+  'fmt-mid': {
+    js:
+      `${traceAt(FMT.send)}; D.chat.step.begin(${JSON.stringify(FMT.question)}); ${traceAt(FMT.start)};` +
+      ` D.chat.step.start(); ${traceAt(FMT.start + 0.1)}; await D.chat.step.exec('query_sql', ${FMT.sql});` +
+      ` ${traceAt(FMT.answer)}; D.chat.step.done(${JSON.stringify(FMT.reply)}); ${traceAt(FMT.answer + 0.2)}`,
+    vee: `await sleep(200); ${FMT_READ}`
+  },
   // …and settled.
-  'fmt-done': `${traceAt(FMT.answer + 3)}; await sleep(200); ${FMT_READ}`,
+  'fmt-done': { js: `${traceAt(FMT.answer + 3)}`, vee: `await sleep(200); ${FMT_READ}` },
   // A third turn whose tool carries rules — the trace's own walls — answered with a sentence and a
-  // list: the rows under an answer stand under its blocks, its flagged cells in them.
-  'fmt-rows':
-    `${traceAt(FMT.send + 10)}; D.chat.step.begin(${JSON.stringify(TRACE.question)}); ${traceAt(FMT.start + 10)};` +
-    ` D.chat.step.start(); ${traceAt(FMT.start + 10.1)}; await D.chat.step.exec('query_elements', ${TRACE.rules});` +
-    ` ${traceAt(FMT.start + 10 + 5.8)}; D.chat.step.done(${JSON.stringify(FMT.rows)}); ${traceAt(FMT.start + 10 + 8.8)};` +
-    ` await sleep(200); ${FMT_READ}`,
+  // list: the storey-rows card stands under its bubbles.
+  'fmt-rows': {
+    js:
+      `${traceAt(FMT.send + 10)}; D.chat.step.begin(${JSON.stringify(TRACE.question)}); ${traceAt(FMT.start + 10)};` +
+      ` D.chat.step.start(); ${traceAt(FMT.start + 10.1)}; await D.chat.step.exec('query_elements', ${TRACE.rules});` +
+      ` ${traceAt(FMT.start + 10 + 5.8)}; D.chat.step.done(${JSON.stringify(FMT.rows)}); ${traceAt(FMT.start + 10 + 8.8)}`,
+    vee: `await sleep(200); ${FMT_READ}`
+  },
 
   /* ── 2026-10-09: the display unit — mm, m and feet and inches ────────────────
    * `tests/parity/2026-10-09-units/README.md` has the commands and the measurements. A chain
@@ -553,7 +674,8 @@ const STATE_JS = {
   ...ANNOTATION_STATES,
   ...COLOR_STATES,
   ...LANDING_STATES,
-  ...CHAT_STATES
+  ...CHAT_STATES,
+  ...VM_STATES
 }
 
 /**
@@ -589,28 +711,123 @@ async function spriteCrops(win, dir, stem) {
 }
 
 /**
- * 2026-10-01: the chat panel alone — its box and the pill under it — at 1× and enlarged 3×
- * without smoothing: `<stem>-panel.png`, `<stem>-panel-3x.png`. The handoff's stills are frames
- * of a video zoomed onto the panel; these are what stands beside them.
+ * 2026-10-01: the chat panel alone, at 1× and enlarged 3× without smoothing: `<stem>-panel.png`,
+ * `<stem>-panel-3x.png`. The handoff's stills are frames of a video zoomed onto the panel; these
+ * are what stands beside them. Since 2026-11-07 the panel is the Ask Vee window, so the crop is
+ * that window's whole page (`image`, its own capture).
  */
-async function panelCrops(win, dir, stem) {
-  const box = JSON.parse(
-    await win.webContents.executeJavaScript(
-      `(() => { const log = document.querySelector('[data-role="chatlog"]'); if (!log) return 'null';` +
-        ` const p = log.parentElement.getBoundingClientRect(); const stage = document.querySelector('[data-role="stage"]').getBoundingClientRect();` +
-        ` return JSON.stringify([Math.floor(p.x) - 8, Math.floor(p.y) - 8, Math.ceil(p.width) + 16, Math.ceil(stage.bottom - p.y) + 8]) })()`
-    )
-  )
-  if (!box) return
-  const crop = await win.webContents.capturePage({ x: box[0], y: box[1], width: box[2], height: box[3] })
-  await writeFile(join(dir, `${stem}-panel.png`), crop.toPNG())
-  const zoomed = await win.webContents.executeJavaScript(
-    `(async () => { const img = new Image(); img.src = ${JSON.stringify(crop.toDataURL())}; await img.decode();` +
+async function veeCrops(page, image, dir, stem) {
+  await writeFile(join(dir, `${stem}-panel.png`), image.toPNG())
+  const zoomed = await page.webContents.executeJavaScript(
+    `(async () => { const img = new Image(); img.src = ${JSON.stringify(image.toDataURL())}; await img.decode();` +
       ` const c = document.createElement('canvas'); c.width = img.width * 3; c.height = img.height * 3;` +
       ` const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, c.width, c.height);` +
       ` return c.toDataURL('image/png') })()`
   )
   await writeFile(join(dir, `${stem}-panel-3x.png`), Buffer.from(zoomed.split(',')[1], 'base64'))
+}
+
+/* ── 2026-11-08: the Ask Vee window, opened by this harness as main opens it ─────────────────
+ * `main/vee-window.ts` in miniature: one child window of the main window, `out/renderer/vee.html`
+ * on `out/preload/vee.js`, sandboxed as the app's; a fresh `MessageChannelMain` pair whenever it
+ * loads, one end to each page on `vee:port`; and, when it closes, the same post with no port, so
+ * the main window's panel closes. Its view is emulated at the main window's scale factor, so a
+ * capture is the window's content box × `SGVUE_DPR`.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const DPR = Number(process.env.SGVUE_DPR || 2)
+const VEE_RM = process.env.SGVUE_VEE_RM === '1'
+let veeWin = null
+let veeSize = [330, 420]
+/** What `settings:get` says: whether a key is stored. A state's `key` changes it. */
+let veeKey = true
+
+function emulateVee(w) {
+  w.webContents.enableDeviceEmulation({
+    screenPosition: 'desktop',
+    screenSize: { width: SIZE[0], height: SIZE[1] },
+    viewSize: { width: veeSize[0], height: veeSize[1] },
+    deviceScaleFactor: DPR,
+    viewPosition: { x: 0, y: 0 },
+    scale: 1
+  })
+}
+
+/** Size the open Ask Vee window to `veeSize`, standing where the panel stood in the main window. */
+function placeVee(w) {
+  w.setContentBounds({
+    x: Math.max(0, SIZE[0] - 12 - veeSize[0]),
+    y: Math.max(0, SIZE[1] - 52 - veeSize[1]),
+    width: veeSize[0],
+    height: veeSize[1]
+  })
+  emulateVee(w)
+}
+
+function openVeeWindow(main, theme) {
+  if (veeWin && !veeWin.isDestroyed()) {
+    veeWin.focus()
+    return
+  }
+  const w = new BrowserWindow({
+    parent: main,
+    title: 'Ask Vee',
+    width: veeSize[0],
+    height: veeSize[1],
+    minWidth: 300,
+    minHeight: 380,
+    useContentSize: true,
+    show: true,
+    backgroundColor: theme === 'light' ? '#FFFFFF' : '#171F20',
+    webPreferences: {
+      preload: join(ROOT, 'out/preload/vee.js'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: false
+    }
+  })
+  veeWin = w
+  placeVee(w)
+  w.webContents.on('console-message', (e) => console.log(`[vee:${e.level}] ${e.message}`))
+  w.webContents.on('did-finish-load', async () => {
+    emulateVee(w)
+    if (VEE_RM) {
+      // Reduced motion, asked for by this window alone, as the e2e suite asks for it.
+      try {
+        w.webContents.debugger.attach('1.3')
+        await w.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+          features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
+        })
+      } catch (error) {
+        console.log(`[vee] reduced motion not set: ${error.message}`)
+      }
+    }
+    if (main.isDestroyed() || w.isDestroyed()) return
+    const { port1, port2 } = new MessageChannelMain()
+    main.webContents.postMessage('vee:port', null, [port1])
+    w.webContents.postMessage('vee:port', null, [port2])
+  })
+  w.on('closed', () => {
+    if (veeWin !== w) return
+    veeWin = null
+    if (!main.isDestroyed()) main.webContents.postMessage('vee:port', null, [])
+  })
+  void w.loadFile(join(ROOT, 'out/renderer/vee.html'), { hash: `theme=${theme}` })
+}
+
+/** Until the Ask Vee window has loaded and drawn its log — or `false` after `ms`. */
+async function veeReady(ms = 8000) {
+  const start = Date.now()
+  while (Date.now() - start < ms) {
+    if (veeWin && !veeWin.isDestroyed() && !veeWin.webContents.isLoading()) {
+      const drawn = await veeWin.webContents
+        .executeJavaScript(`!!document.querySelector('[data-role="chatlog"]')`)
+        .catch(() => false)
+      if (drawn) return true
+    }
+    await wait(100)
+  }
+  return false
 }
 
 app.enableSandbox()
@@ -661,6 +878,23 @@ app.whenReady().then(async () => {
     process.env.SGVUE_UPDATE_LATEST ? { latest: process.env.SGVUE_UPDATE_LATEST } : null
   )
 
+  // 2026-11-08 — the Ask Vee window, as main opens and closes it (`main/vee-window.ts`), and the
+  // settings it reads `hasKey` from: a stand-in that names no key and stores nothing.
+  ipcMain.handle('vee:open', (_event, raw) => openVeeWindow(win, raw && raw.theme === 'light' ? 'light' : 'dark'))
+  ipcMain.handle('vee:close', () => {
+    if (veeWin && !veeWin.isDestroyed()) veeWin.close()
+  })
+  ipcMain.handle('settings:get', () => ({
+    model: 'claude-opus-5',
+    effort: 'medium',
+    cacheOneHour: false,
+    backend: 'auto',
+    preferNvidia: true,
+    hasKey: veeKey,
+    envKey: false,
+    keyStorageAvailable: true
+  }))
+
   // Phase 5 persists saved filter sets and viewpoints to `localStorage` under the design's own
   // keys, so a second capture run would start with the first run's sets already in the card.
   // Both sides clear it before loading, which is what makes `filter-saved-set` and
@@ -702,6 +936,11 @@ app.whenReady().then(async () => {
     win.webContents.executeJavaScript(
       `(async () => { const D = window.__sgvueDev; if (!D) return 'no-devtools'; ${UI}\n${js}; return 'ok'; })()`
     )
+  // 2026-11-08 — the same in the Ask Vee window, which has the DOM helpers and no dev harness.
+  const runVee = (js) =>
+    veeWin && !veeWin.isDestroyed()
+      ? veeWin.webContents.executeJavaScript(`(async () => { ${UI}\n${js}; return 'ok'; })()`)
+      : Promise.resolve('no-vee-window')
 
   for (const theme of THEMES) {
     await win.webContents.executeJavaScript(
@@ -715,7 +954,17 @@ app.whenReady().then(async () => {
         console.log(`unknown state "${state}" — known: ${Object.keys(STATE_JS).join(', ')}`)
         continue
       }
-      const { js, input, after } = typeof entry === 'string' ? { js: entry } : entry
+      const { js, input, after, vee, size, key, shot } = typeof entry === 'string' ? { js: entry } : entry
+      // 2026-11-08 — the Ask Vee window's size for this state, and a key that comes or goes the
+      // way it does in the app: through Preferences, which tells the store (the state closes it).
+      if (size && (size[0] !== veeSize[0] || size[1] !== veeSize[1])) {
+        veeSize = size
+        if (veeWin && !veeWin.isDestroyed()) placeVee(veeWin)
+      }
+      if (key !== undefined) {
+        veeKey = key
+        win.webContents.send('settings:open')
+      }
       const said = js ? await run(js) : 'ok'
       if (input) {
         // The state's own JavaScript may have started a 620 ms camera flight; hover is
@@ -725,25 +974,40 @@ app.whenReady().then(async () => {
       }
       // Phase 4: a menu the mouse has just opened, then chosen from.
       if (after) await run(after)
+      // 2026-11-08 — what this state does in the Ask Vee window, once that window is up.
+      const veeUp = vee || shot || (veeWin && !veeWin.isDestroyed()) ? await veeReady() : false
+      if ((vee || shot) && !veeUp) console.log(`[vee] ${state}: the Ask Vee window did not open`)
+      if (vee && veeUp) console.log(`[vee] ${state}: ${await runVee(vee)}`)
       await wait(SETTLE)
-      const image = await win.webContents.capturePage()
+      const own = await win.webContents.capturePage()
+      // A `vm-*` state is the Ask Vee window's capture; the main window stands beside it.
+      const veeImage = veeUp && veeWin && !veeWin.isDestroyed() ? await veeWin.webContents.capturePage() : null
+      const image = shot && veeImage ? veeImage : own
       const path = single ? OUT : join(dir, `${state}-${theme}.png`)
       await writeFile(path, image.toPNG())
+      if (!single && veeImage) {
+        if (shot) await writeFile(join(dir, `${state}-${theme}-main.png`), own.toPNG())
+        else await writeFile(join(dir, `${state}-${theme}-vee.png`), veeImage.toPNG())
+      }
       // The chrome's own geometry, beside the frame — the parity diff masks to it.
       if (!single) {
         await writeFile(join(dir, `${state}-${theme}.json`), await win.webContents.executeJavaScript(RECTS))
       }
       // 2026-10-01 — and each of Vee's sprites on screen, enlarged, so its pixels can be read.
-      // Not under `vee-sheet`, which covers them with its own, already enlarged.
+      // Not under `vee-sheet`, which covers them with its own, already enlarged. Since 2026-11-08
+      // the Ask Vee window's sprites too — its header's and its avatars' — for every `vm-*` state.
       if (!single && state.startsWith('vee-') && state !== 'vee-sheet') {
         await spriteCrops(win, dir, `${state}-${theme}`)
       }
-      // 2026-10-01 — and, for the thinking trace, the panel alone.
-      if (!single && (state.startsWith('trace-') || state.startsWith('fmt-'))) {
-        await panelCrops(win, dir, `${state}-${theme}`)
+      if (!single && veeImage && (state.startsWith('vee-') || shot)) {
+        await spriteCrops(veeWin, dir, `${state}-${theme}-vee`)
       }
-      const size = image.getSize()
-      console.log(`saved ${path} (${size.width}×${size.height}, ${said})`)
+      // 2026-10-01 — and, for the thinking trace, the panel alone: since 2026-11-07, the Ask Vee window.
+      if (!single && veeImage && (state.startsWith('trace-') || state.startsWith('fmt-'))) {
+        await veeCrops(veeWin, veeImage, dir, `${state}-${theme}`)
+      }
+      const shape = image.getSize()
+      console.log(`saved ${path} (${shape.width}×${shape.height}, ${said})`)
     }
   }
 

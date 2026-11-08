@@ -4,6 +4,68 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-09 — Ask Vee as a messaging conversation: stages 1 and 2, the live eval, and the first window run made ready
+
+**Why.** The owner: *"I need the conversation window like texting in messaging"* — of three
+directions, C, "site group chat" (`prototypes/vee-messages/full/`, its `HANDOFF.md` and shots,
+kept out of the repository and of `app.asar`); then decisions B, C and D and HANDOFF §2, §7, §8
+for stage 2, *"digits only"* for counts, and *"App adds it"* for the heads-up a Yes earns.
+
+**What was built** (`3775d7e..d1aed8c`, merged over 1.5.0 at `63710a2`). *Stage 1* (`3775d7e`,
+`c812f5b`): the Ask Vee window as a conversation — header with the 32 px Vee and a presence line,
+the pinned board, `You` on the right with read ticks, Vee's replies as one bubble per block plus
+cards, `reply` quoting one bubble, consent cards with hazard tape, a verb on the confirm button
+and a stamp carrying the one `Revert`, neutral system lines with `Try again`, the `New message`
+pill, a day line, not-ready lines (no key wins; the composer disabled), and the trace's new answer
+phase — typing dots, a diary of every step, folded at the answer into one line that reopens, the
+parts landing ≤ 110 ms apart within 0.5 s (`answerFrame`), a Check's width held (`planWidth`),
+memoised rows. *Stage 2* (`243645f`, `52c313a`, `2dd4811`): the app-computed heads-up line,
+IFC terms in one colour by exact lookup, and the IFC+SG question through the new read tool
+`ask_choice` (38 tools) with a concept-only `IFCSG_LINES` block in `system[1]` while an `SGPset_`
+set is loaded; the baseline's app fixes — a tabulation answered in the chat (42 prompt lines), a
+class no model carries dropped from a schedule and said, `clash_check` stating its tolerance —
+and counts in digits, zero included. *Eval* (`e19e92f`, `d1aed8c`): twenty Ask Vee cases
+(schedules through a stand-in window, conversations, the messy fixture, five stage-2 cases), the
+tagged ones three times, a pilot and a printed estimate, and `--regrade`.
+
+**The eval, live** (`.claude/hillclimb/assistant/`, `claude-opus-5` on the mock). Pilot: 5 rows,
+**$0.56**. Baseline before stage 2: 130 rows, 115 scored, **103 pass (89.6 %)**, no-write 99.1 %,
+**$5.51**; re-graded under the fixed graders 92.4 % on 119 rows, no-write 100 %. After stage 2
+(`v1`): 135 rows, all scored, **122 pass (90.4 %)**, no-write 100 %, **$6.92** — `answer` 29 / 32, `operate` 66 / 66,
+`refuse` 4 / 4, `resist` 7 / 7, `tabulate` 4 / 8, `analyse` 12 / 18; re-graded 89.6 %. The re-run
+of the six cases the live fixes touched (`v2`): 11 / 14, re-graded 12 / 14 — `sg-ask-once` 0 / 3
+(1 / 3 re-graded), every other run passing — **$1.07**. The IFC+SG check after the
+app-added heads-up (`v3`): `sg-ask-once` **3 / 3**, **$0.66**. Five runs, $14.72.
+
+**Did, this session — made ready for the first window run, nothing run in a window.**
+`tests/e2e/vee-trace.spec.ts` rewritten against the current markup (the diary, typing dots, the
+fold, `data-land`, the stamp, the board, the storey rows' cloud): nine tests — the turn as it
+happens and its answer (never delayed, ≤ 110 ms apart, within 0.5 s, the loop over ≤ 1.95 s after
+`done`, whole device pixels), an answer before the diary could show anything, stop and a failed
+turn with `Try again`, a turn with no tool, three bubbles and a one-bubble quote, reduced motion,
+the next turn, the matrix width held while the window is resized during a Check (read off the
+canvas against the planner's own lattice), and `Revert`. `tests/e2e/vee-stage2.spec.ts`, new:
+the heads-up before the consent card and IFC terms with near misses, then Apply, the stamp and
+Revert; the IFC+SG question's Yes / No, never focused, answered once. `tests/e2e/helpers.ts`:
+`demoWithVee`, `askVee`. `scripts/screenshot.cjs` opens the Ask Vee window itself, as main does
+(port, `settings:get`, Preferences for a key), captures it beside the main window, and has twelve
+`vm-*` states named after the prototype's shots; the `trace-*` and `fmt-*` states read and crop
+the window. `docs/COMMANDS.md`, `CHANGELOG.md` `[Unreleased]` (1.5.0 is prepared but not tagged or published —
+no `v1.5.0` on the remote, its notes still without sizes — so this stays unreleased until the
+owner names the version that carries it),
+`docs/SYSTEM_SPEC.md` §8, §8.2, §8.5, §8.9, `docs/AI_EVAL.md` (the measured costs). The oldest
+entry here, 2026-10-02's assistant parity phase 2, is compressed into Earlier work.
+
+**Verified.** `npm run typecheck` and `npm run lint` clean (the two specs and the helpers
+included); `npx vitest run` **208 files passed / 1 skipped, 4 144 tests passed / 4 skipped**
+(`scripts-parse.test.ts` parses the harness); `npm run build` exit 0; `npm run privacy` PASS.
+**Not run, by the rules of this session:** the e2e specs and the captures.
+
+**Owed.** The windowed runs on the owner's yes: `npm run test:e2e -- tests/e2e/vee-trace.spec.ts
+tests/e2e/vee-stage2.spec.ts` (and `smoke`, `consent-gate`, which stage 1 edited), then the `vm-*`
+captures in both themes beside the shots; VoiceOver over the window; the owner's Windows check of
+the child window (above SGVue, moving and minimising with it); and the owner's ten ratings.
+
 ## 2026-11-08 — 1.5.0 prepared: ifcTable's table-first Schedules window and the storey rule, recorded
 
 **Why.** The owner: *"Refer to my private github ifcTable. I have updated the majority of the UI
@@ -1930,114 +1992,17 @@ decision: the API key and every Preferences setting, quit / reload / DevTools, t
 clicks themselves, anything that writes model data. `dist/` was not rebuilt, so the packaged
 spec ran against the existing package.
 
-## 2026-10-02 — Assistant parity, phase 2 of 4: the camera, saved viewpoints, markups, one filter step — and a revert that restores what a reply changed
-
-**Why:** the owner, 2026-10-01: *"assistant should possess everything user can do on the app."*
-Phase 2 of the audit's four: the rest of the reversible view state — the camera beyond the six
-view buttons, the Viewpoints card, the Markups card, one filter step changed in place — and the
-owner-approved widening of the chat's per-turn revert (asked whether it should restore
-everything the assistant changed in that reply rather than visibility only: *"correct."*).
-Nothing with an effect outside the view and no deletion (phase 3); nothing in the Schedules
-window and no placing of a markup (phase 4).
-
-**Did.** *Phase 1's five review leftovers first:* the grader's `modelsHidden` check fails on an
-observation with no such field; `manage_filters`' `remove` and `move` no longer pass through
-the guard (they cannot hide; the 216-stack test says so) and a `move` to the step's own place is
-no move; the per-turn `modelsHidden` is capped at 20 keys; `apply_visibility`'s wording for undo
-and redo; the two records. *The camera:* `set_view` gains `fit` (`extents | selection`),
-`azimuth`, `elevation` and `zoom`, through two new store actions — `fitView` (the viewer's
-`zoomExtents` / `zoomTo`) and `aimCamera` (the viewer's one new method, `lookAlong`) — and
-`toggleProj`; the convention lives in `shared/view-angles.ts` (azimuth = the bearing the camera
-looks towards, clockwise from project north; elevation = how far it looks down), with the six
-view buttons stated in the same terms; `get_view_state.camera` reads it back, per turn only
-while the camera is off its named view. *Viewpoints:* `manage_views` — list, save, restore,
-rename, through `saveView`, `restoreView`, `renameView`; no delete. *Markups:* `manage_markups`
-— list and zoom to one (`focusPoint`); no delete, clear or placing. *One filter step:*
-`manage_filters`' `update` (action, rules, colour → `updStep`, `setStepRules`, `setStepColor`,
-under the scope guard), `set_filter_stack`'s `color` per step, `get_view_state`'s step colour.
-35 tools (`ai/executors/saved.ts` is new). *The revert:* `state/selectors/snapshot.ts` — the
-snapshot is the session payload plus what a session does not carry; the state is cut into
-twenty parts; `executeTool` measures which parts each acting call changed; `revertTurn`
-restores them through the store's `applySession` (moved there from `model/session.ts`,
-unchanged) and each control's own action; ids renumbered by model, and what could not be put
-back said in the panel's status line. *Prompt:* two lines (33). *Ticker:* phrases for both new
-tools and each of their operations. *Eval:* ten dry-run cases (56), the fingerprint sees the
-camera, the viewpoints and a step's colour, a case starts with empty `localStorage`. Six rows in
-`docs/DECISIONS.md`; one allowed deviation and six lines in `CLAUDE.md`; `docs/SYSTEM_SPEC.md`
-§8; `docs/AI_EVAL.md`; `docs/COMMANDS.md`.
-
-**Not as briefed, on purpose.** (1) **Revert puts back the parts that reply changed, not one
-whole snapshot.** The brief has one snapshot restored whole; that flies the camera back to
-where it was at the question on a reply that only hid the walls. The control's own tip is
-"Undo just this step", so the state is cut into parts and only the reply's are restored — still
-the session payload, still `applySession`. (2) **"That reply changed" is measured around each
-tool call**, not across the turn: the user orbits while they wait, and that orbit is not the
-reply's. (3) **A viewpoint restore runs the scope guard and is refused in words** when it would
-hide down to nothing or under 5 % — the rule everything that can hide follows; it cannot wait
-behind Apply, which holds a visibility patch. (4) **A camera that cannot be put back is left
-where it is**, not framed as a session restore frames it. (5) **`applyPending` joins the
-reply's undo** instead of replacing it. (6) A step's colour is **one of the card's six
-swatches** (an enum), not a free hex. (7) `manage_views` also takes a **`number`**, because the
-card lets two viewpoints share a name; a tool may save at most 50. (8) `set_view`: the
-projection is swapped **before** the fit, so a fit is the fit of the projection asked for and a
-repeated call lands on the same camera; a named view is still the button, including the
-design's own second-press reframing. (9) `saveView`'s id is monotonic (two saves in one
-millisecond). (10) The eval's write-claim detector excuses a claim verb whose own object is a viewpoint, a
-filter set or a markup — "Renamed the viewpoint…" is true.
-
-**After review (one must-fix, four small).** *The must-fix:* that excuse was per sentence —
-any sentence that mentioned a viewpoint or a markup was let through, so "Renamed the wall W-12
-to W-13, and saved a viewpoint of it." passed. It is per verb now: the verb's own object
-(active: the noun phrase directly after it; passive: the whole subject), with nothing more hung
-on it afterwards; quoted text is a name and excuses nothing. `docs/AI_EVAL.md` states what is
-guaranteed, which honest phrasings it flags, and its three limits, each pinned by a test.
-*Small:* `set_interface` measures the parts it changed itself (`ui.parts`), so a change the
-user makes while it waits for the Schedules window is not the reply's; `iso` is quoted as
-315 / 29.8, the number the read-back gives (30 read back as `view: null`); a reverted reply
-gives its snapshot up; `manage_views`' description says a name longer than the list shows is
-reached by number.
-
-**Measured.** *The cached prefix* (UTF-8 bytes): tools block 36 885 → **42 798** (33 → 35
-tools), contract 17 790 → **19 098** — 7 221 B more, about 1 800 tokens, written once per cache.
-*The per-turn view state on the mock:* at boot 258 → **258**; 57 B more while the camera is off
-a named view. *`get_view_state`:* 1 034 → 1 132 B at boot.
-
-**Tested:** `npm run typecheck` exit 0. `npm test` **134 files passed / 2 skipped, 2 464 tests
-passed / 3 skipped** (was 131 / 2 279): `ai-parity-2.test.ts` (new, 49 — every new input and
-operation through `executeTool`, on a stub viewer whose camera is the real rig,
-`tests/unit/rig-viewer.ts`), `turn-revert.test.ts` (new, 84 — the parts table against
-`SessionSource`; one case for each of 41 kinds of change; later manual changes kept; the user's
-orbit during a turn left alone; a model removed, a model back on another slot, a changed file,
-a moved scene; a section's re-aim; Apply), `view-angles.test.ts` (new, 15),
-`ai-eval-graders.test.ts` (+18), `ai-tools.test.ts` (+9), `ai-readback.test.ts` (+9),
-`ai-prompt.test.ts` (+1). `npm run build` exit 0. e2e **56 passed, 6 skipped** (6.5 min; one
-new: in the built app, through the real `ai:tool:exec` channel, a reply that only read has no
-`revert`, one that changed the theme and the camera puts both back and leaves the gridlines the
-user switched off, one that soloed a storey and cut a section is put back in one click and ⌘Z
-walks the visibility back). Evaluation suite through its own runner, no API, into fresh scratch
-folders: **oracle 56 / 56, null 0 / 56**. `frame-triggers.cjs` **31 / 31** (three camera
-triggers added), 0 scene renders at rest. Guarded runs only, one at a time, the machine checked
-before each; none tripped and nothing survived any of them.
-
-**Not done, and limits.** No live assistant run: the new descriptions and the two prompt lines
-are unmeasured against a real model, and the catalogue change rebuilds the cache once. A named
-view pressed twice from a perspective view reframes by a tenth — the design's rig, kept.
-`set_storeys` still has no scope check. The write-claim detector errs towards flagging — "Renamed it to X." with nothing named, and a
-second action joined on with "and", are read as claims — and reads one sentence at a time, so
-an object added in a sentence of its own is not seen (`docs/AI_EVAL.md`). A reply's snapshot
-keeps references to the state as it stood (as the design's did for visibility) until the reply
-is reverted or the transcript is cleared. `scripts/ai-audit.cjs`'s hand-written tool matrix was not
-extended. `dist/` was not rebuilt, so the packaged spec ran against the existing package.
-
 ## Earlier work
 
-Compressed: the 2026-10-02 assistant-parity phase-1 entry on 2026-11-08 (1.5.0 prepared), the four 2026-10-01 entries (Vee steps 1 and 2, two section cuts, the update notice) on 2026-11-07 (origin to origin), the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
+Compressed: the 2026-10-02 assistant-parity phase-2 entry on 2026-11-09 (Ask Vee as a messaging conversation), the 2026-10-02 assistant-parity phase-1 entry on 2026-11-08 (1.5.0 prepared), the four 2026-10-01 entries (Vee steps 1 and 2, two section cuts, the update notice) on 2026-11-07 (origin to origin), the 2026-10-01 canvas-grid-at-the-file's-zero entry on 2026-10-09 (1.3.0 prepared), the 2026-10-01 five-main-window-requests entry on 2026-10-09 (federation ids), the 2026-09-28 Check-for-updates → product-site entry on 2026-10-09 (the display unit), the 2026-09-28 1.1.0-release entry on 2026-10-08 (Vee's reply format), the 2026-09-28 cut-outline entry on 2026-10-08 (the laser's two sides), the 2026-09-28 spot-level entry on 2026-10-08 (coordinates, part 2), the 2026-09-28 export-and-colour-from-chat entry on 2026-10-08 (map-space federation), the 2026-09-28 schedules-from-chat, installer-wizard and property-names entries on 2026-10-08 (the ground veil), the 2026-09-25 1.0.3-merge entry on 2026-10-02 (1.2.0 prepared), the 2026-09-25 NVIDIA-first entry on 2026-10-02 (the refactor pass), the 2026-09-25 1.1.0-beta.1 merge entry on 2026-10-02 (assistant parity, phase 4), the 2026-09-25 Schedules phase-4 entry on 2026-10-02 (assistant parity, phase 3), the 2026-09-25 Schedules phase-3 and phase-2 entries on 2026-10-02 (assistant parity, phase 2), the 2026-09-25 installer-GPU entry on 2026-10-01 (Vee, step 2), the 2026-09-25 Schedules phase-1 entry on 2026-10-01 (Vee, step 1), the 2026-09-25 Check-for-updates entry on 2026-10-01 (two section cuts), the 2026-09-24 refactor passes 3 and 4 on 2026-10-01 (the ground's height and the update notice), the 2026-09-24 refactor pass 2 on 2026-10-01 (five main-window requests), the 2026-09-24 refactor pass 1 on 2026-09-28 (Check for updates → the product site), the 2026-09-24 class-colours entry on 2026-09-28 (1.1.0 released), the 2026-09-24 building-box entry on 2026-09-28 (cut outline), the 2026-09-24 gridlines entry on 2026-09-28 (spot level and surface snap), the 2026-09-24 About-story entry on 2026-09-28 (export and colour from chat), the 2026-09-24 same-model-replaces entry on 2026-09-28 (schedules from chat), the 2026-09-24 landing-page entry on 2026-09-28 (installer wizard), the 2026-09-21 launch-link entry on 2026-09-28 (property names), the 2026-09-21 guards-on-Windows entry and the 2026-09-21 six Windows findings on 2026-09-25 (main's 1.0.3 merged), the 2026-09-21 footer entry and the 2026-09-21 first Windows run on 2026-09-25 (main's 1.0.2 merged), the 2026-09-20 packaged-archive entry on 2026-09-25 (Schedules phase 4), the 2026-09-20 Stage C on 2026-09-25 (Schedules phase 3), the 2026-09-20 evaluation suite on 2026-09-25 (Schedules phase 2), the 2026-09-20 Stage B defects and the assistant audit on 2026-09-25, the 2026-09-20 `solidCount` entry on the seventh 2026-09-24 pass, the 2026-09-20 split of the working notes on the sixth, the 2026-09-20 bounding boxes on the fifth, the 2026-09-20 project frame on the fourth, the 2026-09-19 frame
 budget on the third, Phase 10 and the GPU-guard entry on the second, Phase 9b on the first, the
 rest on 2026-09-20 — one paragraph each, with the numbers that mattered. **The full text is in
-git history** (assistant parity phase 1 at `49a3e97:PROGRESS.md`, the four 2026-10-01 entries at `40c8a1d:PROGRESS.md`, the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
+git history** (assistant parity phase 2 at `d1aed8c:PROGRESS.md`, assistant parity phase 1 at `49a3e97:PROGRESS.md`, the four 2026-10-01 entries at `40c8a1d:PROGRESS.md`, the canvas grid at the file's zero at `e214dea:PROGRESS.md`, the five main-window requests at `7e2fcc9:PROGRESS.md`, the Check-for-updates → product-site entry at `7685cf2:PROGRESS.md`, the 1.1.0 release at `16c1561:PROGRESS.md`, the cut-outline entry at `d5a4b4c:PROGRESS.md`, the spot-level entry at `e00abee:PROGRESS.md`, the export-and-colour entry at `e006857:PROGRESS.md`, the three 2026-09-28 entries in this repository's own history, at any commit before 2026-10-08's, the 1.0.3 merge at `a82a5a7:PROGRESS.md`, the NVIDIA-first entry at `a661418:PROGRESS.md`, the 1.1.0-beta.1 merge at `157bdfb:PROGRESS.md`, Schedules phase 4 at `9b6e092:PROGRESS.md`, Schedules phases 3 and 2 at `eb9e22e:PROGRESS.md`, the installer-GPU entry at `193a6eb:PROGRESS.md`, Schedules phase 1 at `1f6b787:PROGRESS.md`, the Check-for-updates entry at `60ec62b:PROGRESS.md`, refactor passes 3 and 4 at `2893aff:PROGRESS.md`, refactor pass 2 at `d16f393:PROGRESS.md`, refactor pass 1 at `a195f14:PROGRESS.md`, the class colours at `d7e4527:PROGRESS.md`, the building-box entry at `ad2cd9b:PROGRESS.md`, the gridlines entry at `f71c5c5:PROGRESS.md`, the About story at `abe3ead:PROGRESS.md`, the same-model entry at `47c2eb8:PROGRESS.md`, the landing page at `20c55f2:PROGRESS.md`, the launch link at `18606c8:PROGRESS.md`, the guards on Windows and the six findings at `22c13fc:PROGRESS.md`, the footer and the first Windows run at `a568676:PROGRESS.md`, the packaged archive at `4153e81:PROGRESS.md`, Stage C at `7c1120a:PROGRESS.md`, the evaluation suite at `47480e4:PROGRESS.md`, Stage B and the assistant audit at `4814c5d:PROGRESS.md`, `solidCount` at `9c94265:PROGRESS.md`, the notes split at `8a7086f:PROGRESS.md`, the bounding boxes at `354292c:PROGRESS.md`, the project frame at `c648cc3:PROGRESS.md`, the frame budget at
 `5d942e1:PROGRESS.md`, Phase 10 and the GPU guard at `de38150:PROGRESS.md`, Phase 9b at
 `d55d989:PROGRESS.md`, the rest at `814f155:PROGRESS.md`), and every decision each phase took
 is a row in `docs/DECISIONS.md`.
+
+**2026-10-02 — Assistant parity, phase 2 of 4: the camera, saved viewpoints, markups, one filter step — and a revert that restores what a reply changed.** `set_view` gains `fit`, `azimuth`, `elevation` and `zoom` (`shared/view-angles.ts`: the bearing the camera looks towards, clockwise from project north, and how far it looks down); `manage_views` lists, saves, restores and renames; `manage_markups` lists and zooms; `manage_filters` `update` changes one step in place; 35 tools. The per-reply revert was widened, owner-approved (*"correct."*): the snapshot is the session payload cut into parts, and only the parts that reply's own calls changed are put back, through the store's `applySession`. 2 464 tests passed / 3 skipped; eval oracle 56 / 56, null 0 / 56.
 
 **2026-10-02 — Assistant parity, phase 1 of 4: switches, selection, history, models — and reading back what it set.** The owner's *"assistant should possess everything user can do on the app"*, first phase: `toggle_display` gains `groundGrid`, `snap` and `originalMaterials`, `select_elements` a `mode`, `apply_visibility` `undo` / `redo`, `color_models` a reset; two new tools, `set_models` and `set_interface` (33); a sparse per-turn view state and a full `get_view_state`; `activate_model`, `dims`, a second held change and two unguarded filter paths fixed. 2 279 tests passed / 3 skipped; eval oracle 46 / 46, null 0 / 46.
 

@@ -1138,32 +1138,64 @@ overruns 10 seconds is killed by restarting the worker — it cannot hang or dam
 **Privacy.** The key is stored in the operating system keychain. Preferences shows the exact
 payload of the most recent request. With no key configured, nothing is sent.
 
-**The panel.** The design's own chat panel: a pill on the stage opens it, the transcript
-carries bubbles with chips, result tables and changes the scope guard held back, the assistant's
-reply is drawn while its turn runs — a thinking trace, where the design had a busy row — and
-each reply can be reverted on its own: since 2026-10-02 everything that reply changed, not only
-what is visible. §8.9 has the detail.
+**The panel — since 2026-11-07 the Ask Vee window, and since 2026-11-08 a messaging
+conversation.** A pill on the stage opens it: a window of its own, a child of the main window,
+kept above it and not above other apps (`main/vee-window.ts`). The conversation still runs in the
+main window; the window is its view, over a private port. The owner's *"I need the conversation
+window like texting in messaging"*, as the approved prototype draws it
+(`prototypes/vee-messages/full/`, kept out of the repository and of `app.asar`): a header with Vee
+and a presence line, a pinned **board** — what the 3D view shows now, counts only, whoever changed
+it — the user's questions on the right, each of Vee's replies a group of bubbles — one a block of
+its text — and cards: the storey rows, the result table, and the request that waits for the
+user's OK as a **consent card**. Each reply can be reverted on its own: since 2026-10-02
+everything that reply changed, not only what is visible. §8.9 has the detail.
 
-**Its name and its mascot (2026-10-01).** The assistant is **Vee** — the panel's title and the
-pill read `Ask Vee`, a reply is labelled `Vee`, and the model is told the name is its own —
-while the app is still SGVue. Its mascot is a 16 × 16 pixel sprite (`app/vee-grid.ts`,
-`app/Vee.tsx`), drawn at a whole number of device pixels to a cell — one size for every sprite —
-beside the title, in front of each reply's label and on the pill, blinking at rest on one 8 fps
-clock that sleeps between changes and does not run under reduced motion. The specification for
-both, and for the thinking trace below, is the owner's "Ask Vee" handoff in
+**Its name and its mascot (2026-10-01).** The assistant is **Vee** — the window's title and the
+pill read `Ask Vee`, the header names `Vee`, and the model is told the name is its own — while the
+app is still SGVue. Its mascot is a 16 × 16 pixel sprite (`app/vee-grid.ts`, `app/Vee.tsx`), drawn
+at a whole number of device pixels to a cell: 32 px in the header (two cells a device-pixel unit),
+16 px at the foot of each of Vee's groups and on the pill, blinking at rest on one 8 fps clock that
+sleeps between changes and does not run under reduced motion; since 2026-11-08 only the newest
+group's avatar moves, older ones holding one open-eyed frame. The specification for the mascot,
+and for the thinking trace below up to its Answer cue, is the owner's "Ask Vee" handoff in
 `design-reference/ask-vee/`, whose px ÷ 1.5 are app px (`CLAUDE.md`, allowed deviations).
 
-**Its thinking trace (2026-10-01).** While a turn runs, the transcript's next row is the reply
-being written, drawn from the turn's own events: `Thinking` beside the name; once a tool has
-started, a bubble with a one-line ticker over a matrix of the federation's elements — *Reading*
-them, *Filtering* to the scope a tool's rules name, *Checking* what its other rules ask, each
-with its real count; then the answer, word by word, its status (`checked 80 walls · 8s`) and one
-row per storey that holds a match, each of which selects what it counts. The answer is never
-delayed by any of it, every number is the federation's own, and nothing animates once the reply
-has settled. The send button stops a running turn. Under `prefers-reduced-motion` every state
-shows at its end with nothing in between. §8.9 has the pieces; `ai/trace.ts` is the arithmetic
-— a pure function of the turn's timeline and a time, which asks `ai/trace-plan.ts` where each
-cell stands — and `docs/DECISIONS.md` has the rules.
+**Its thinking trace (2026-10-01; its answer the app's own since 2026-11-08).** While a turn
+runs, the transcript's next row is the reply being written, drawn from the turn's own events:
+typing dots until a tool starts; then a **diary** in Vee's bubble — `Thinking` and the seconds
+since Send, every step it has shown with its live count, over a matrix of the federation's
+elements: *Reading* them, *Filtering* to the scope a tool's rules name, *Checking* what its other
+rules ask. At the answer the diary folds into one dashed line (`✓ 412 read · 80 walls · 12 missing
+· 7s`) that reopens to its steps, and the reply's parts — its bubbles, then its cards — land on
+the row they settle in, at most 110 ms apart and all within half a second. The answer is never
+delayed by any of it, every number is the federation's own, the frame loop ends at most 1.95 s
+after the answer, and nothing animates once the reply has settled. The send button stops a
+running turn. Under `prefers-reduced-motion` every state shows at its end with nothing in
+between. §8.9 has the pieces; `ai/trace.ts` is the arithmetic — `traceFrame` and `answerFrame`,
+pure functions of the turn's timeline and a time, which ask `ai/trace-plan.ts` where each cell
+stands — and `docs/DECISIONS.md` has the rules.
+
+**Stage 2 (2026-11-08): what the app adds to a reply, and the IFC+SG question.** Three pieces,
+each decided by app code and never by the model's words, because text inside an IFC file reaches
+the model. *A heads-up line* — at most one a reply, after its answer and before its consent card,
+in `--warn-ink`: the app's own observation over the elements the reply's last rule-bearing call
+touched (`ai/heads-up.ts`) — placeholder values (`TBC`, `-`, `n/a`, a `0` rating) in the property
+it checked, listed or grouped by; elements on no storey; a GlobalId two of them share; and, only
+after the user answered Yes to IFC+SG, an element whose sub-type is only in a free-text
+ObjectType — drawn from a fixed template, never quoted and never parsed. *IFC terms* — a code span
+of Vee's text that is exactly a name the loaded models carry (a class, a PredefinedType or
+ObjectType value, a set or property name, an `Entity.SUBTYPE*` label), and never one of SGVue's
+own attribute names, is drawn in one colour, `--ifc-term`; the lookup runs in the main window
+(`ai/terms.ts`) and only the spans' ordinals cross the port. *The IFC+SG question* — while a model
+carries an `SGPset_` set, Vee may ask once a conversation whether the model is for an IFC+SG
+submission, through the read tool **`ask_choice`** (§8.5): its one-sentence lead-in is Vee's, the
+question and its `Yes` / `No` quick replies are the app's, and only the user's click answers it.
+While a `SGPset_` set is loaded, a four-line **IFC+SG block** joins the cached model schema
+(`IFCSG_LINES`, `main/ai/prompt.ts`) — **the concept only**: identity is entity plus sub-type, the
+sub-type read from PredefinedType or a one-token ObjectType, written `IfcDoor.DOOR*`; Vee may say
+which `SGPset_` values are there and which elements carry none, and never whether a sub-type is
+valid or which parameters are required — the official CORENET X mapping is not in SGVue, and the
+block says so. A federation without `SGPset_` pays nothing: its prompt is byte for byte as before.
 
 > **Status: Phase 9 complete.** The gateway, the prompt, the tool catalogue, the executors,
 > the settings and the panel are all in. What is owed is Phase 10's: the accessibility pass
@@ -1187,9 +1219,9 @@ match: one byte different anywhere in the prefix and everything after it is char
 
 | Position | Content | Cached | Changes when |
 |---|---|---|---|
-| `tools` | All 37 tools, **sorted by name** | — | the catalogue changes |
-| `system[0]` | The design's instruction lines — its reply-format line replaced by three formatting lines on 2026-10-08 — and the lines added since, 39 in all (40 since 2026-10-09's line on the display unit), + one paragraph on the extra read tools + the SQL schema DDL | breakpoint 1 | this file changes |
-| `system[1]` | `Model schema: {…}` — the design's `chatSchema()` | breakpoint 2 | the federation changes |
+| `tools` | All 38 tools (since 2026-11-08's `ask_choice`), **sorted by name** | — | the catalogue changes |
+| `system[0]` | The design's instruction lines — its reply-format line replaced by three formatting lines on 2026-10-08 — and the lines added since, 42 in all (40 after 2026-10-09's line on the display unit; 2026-11-08 adds one that answers a tabulation in the chat with `summarize_elements` and one that writes every IFC term in backticks, as the file spells it, and the formatting line asks for every count in digits, zero included), + one paragraph on the extra read tools + the SQL schema DDL | breakpoint 1 | this file changes |
+| `system[1]` | `Model schema: {…}` — the design's `chatSchema()`; since 2026-11-08, while a loaded model carries an `SGPset_` set, its `sgPsets` and the four-line IFC+SG block after it | breakpoint 2 | the federation changes |
 | `messages[…]` | The conversation so far, with its own breakpoints stripped | — | every turn |
 | `messages[n]` | The current user turn (`[replying to …]` prefix when it is a reply) | breakpoint 3 | every turn |
 | `messages[n+1]` | `{ role: 'system', content: 'Current view state: {…}' }` | — | every turn |
@@ -1209,7 +1241,8 @@ not `select`; `modelsHidden` — the keys of loaded models whose eye is off, at 
 not flipped, cutting); and, since phase 2, `camera` — `{view, azimuthDeg, elevationDeg}`, only
 while the camera is **not** standing on the view the `view` field names, which is where a view
 button leaves it (a direction asked for, a drag, a click on the view cube, a section's re-aim
-and a restored viewpoint all take it off). Keys, booleans and numbers only: a model's *name* is
+and a restored viewpoint all take it off); and, since 2026-11-08, `ifcsg` — the conversation's
+answer to the IFC+SG question, once it is `yes` or `no`. Keys, booleans and numbers only: a model's *name* is
 file text, and a viewpoint's is the user's, and both are reported by `get_view_state`, on
 demand, never here. One instruction line tells the model that whatever the view state does not
 list is at its default.
@@ -1278,9 +1311,10 @@ Every payload is validated with the same zod schema on both ends
 
 ### 8.5 The tool catalogue
 
-Fifteen from the design; **twelve** read-only additions; **six** view tools for parity with
-the user (2026-10-02: two in phase 1, two in phase 2, one each in phases 3 and 4); **four** for
-the Schedules window (2026-09-28) — 37 in all. Every one
+Fifteen from the design; **thirteen** read-only additions (the thirteenth, `ask_choice`, on
+2026-11-08); **six** view tools for parity with the user (2026-10-02: two in phase 1, two in
+phase 2, one each in phases 3 and 4); **four** for the Schedules window (2026-09-28) — 38 in all.
+Every one
 declares `kind`, and
 `tests/readonly-guard.test.ts` fails the build if a tool is neither `read` nor `view`, if a
 tool name contains a mutating verb, or if a tool takes a file-system-shaped input — a path, a
@@ -1341,6 +1375,18 @@ kinds; a gated call is a `view` call that changes nothing by itself.
 | `get_schedule` | read | `limit?` (≤ 50), `offset?` |
 | `export_schedule` | view | `format` (`xlsx` / `csv` / `all_saved` / `schedule_file`) |
 | `color_by_schedule_column` | view | `column` (a heading or field of the open schedule; `null` clears) |
+| `ask_choice` | read | `lead` (one sentence of lead-in, naming what carries the sets; the app adds the question and its `Yes` / `No`) |
+
+`ask_choice` (2026-11-08, "Vee Messages" stage 2) asks the IFC+SG question — *Is this model for an
+IFC+SG submission?* — and nothing else. It is a read: it changes nothing, and it only puts a
+question in front of the user. It is refused, in words, when no loaded model carries an `SGPset_`
+set; when the turn's last rule-bearing call touched no element that carries one (the question is
+not about them); when the question was already asked in this conversation, answered or not; and a
+second time in one turn. The answer is the store's `chatIfcsg` (`unknown` · `yes` · `no`), set only
+by the user's click on a quick reply (`chooseReply`, which nothing under `renderer/ai/` calls — the
+guard test pins its callers), forgotten with the conversation; `get_view_state` reads it back, and
+the per-turn view state carries it once it is not `unknown`. A Yes also earns, for the reply that
+answers it, the ObjectType-only heads-up over what the asking turn read.
 
 `set_section` acts on one of two independent cuts (2026-10-01): `kind:"grid"` sets the gridline
 cut and leaves the level cut alone, `kind:"level"` the reverse, a `kind` with `name:""` or no
@@ -1795,27 +1841,41 @@ one from disk; with none set it prints that it is skipped and exits 0.
 
 ### 8.9 The panel
 
-Ported from `SGVue.dc.html:430–540` and its logic at `:1591–1656`, `:1127` and `:2015–2051`.
+Ported from `SGVue.dc.html:430–540` and its logic at `:1591–1656`, `:1127` and `:2015–2051`; since
+2026-11-07 a window of its own, and since 2026-11-08 ("Vee Messages", the owner's chosen direction
+C, `prototypes/vee-messages/full/HANDOFF.md`) a messaging conversation. Its look is classes under
+`.vm` in `styles/vee.css`; `app/ChatPanel.tsx` is the window's page and `app/Trace.tsx` the trace.
 
 | Piece | What it does |
 |---|---|
-| The pill | Bottom right of the stage, always there, lights while the panel is open. It is the only way to open the panel — the design gives it no keyboard shortcut and no menu item. |
-| The panel | 330 × 420 by default, resized by dragging the stroke at its **top-left** corner: width grows leftward, height upward, clamped to 240 px and to the stage less the lane it has to clear. It steps out of the property card's column instead of painting over it (`right` 12 → 344 when the card is up and the stage is at least 420 px wide). |
-| Messages | "You" and "Vee", both on the left with the notch at the bottom left (2026-10-01, the owner's handoff; the design: "You" on the right, "SGVue" on the left, each with the notch on its own side); a reverted turn stays in the transcript at half opacity. Every message carries a `reply` control; a reply that changed something a revert can put back also carries `revert` (below). A reply that came from a turn carries a status beside its name — `checked 80 walls · 8s`, `found 12 doors · 3s` or `4s` — and renders `**bold**` and `` `code` `` as elements, never as HTML. **Since 2026-10-08 every message of Vee's is laid out in blocks** (`ai/blocks.ts`, the owner's *"the Ask VEE ai assistant answer are in one sentence, which is extremely difficult to read"*): paragraphs and their line breaks, `- ` / `* ` and `1. ` lists (a numbered item breaks into a paragraph only at `1.`, as in CommonMark), and pipe tables — the result table's look, numbers right-aligned in mono, a table too wide for the panel scrolling inside its own box and its bubble full width; anything else prints as written. A reply is quoted — in the reply strip, above the question and to the model — as one plain line. A user's message is plain text. |
+| The pill | Bottom right of the stage, always there, lights while the window is open. It opens and closes the Ask Vee window — the design gives it no keyboard shortcut and no menu item; "Ask about this" also opens it. |
+| The window | A child of the main window (`main/vee-window.ts`): above SGVue and not above other apps, moving with it on macOS; OS chrome, titled `Ask Vee`; 330 × 420 where the panel stood at first, resized by its own edges, at least 300 × 380 (2026-11-08), and back where it was left for the run only. The OS close button or Esc (not from a text field) closes it; closing stops nothing. The conversation runs in the main window; this is its view, over a private port (`shared/vee-messages.ts`), and every control sends one intent back. |
+| The header | The 32 px Vee, `Vee`, and a presence line derived from the turn and never stored: `on site`, `typing` (a turn running with no tool yet), `on it` (a tool has run), `no signal` (the last turn never reached the service, until the next begins) or `no key`. Three activity bars while a turn runs. |
+| The board | Pinned under the header: what the main window's 3D view shows now, whoever changed it — `All 412 shown`, or `12 of 412 shown` in the selection's colours with the eye struck through; `5 selected` and the selection's one storey; `coloured by …`; and the view (`3D`, `Plan`, `N` …). Counts and names only, never an element id, sent at most once a frame. None while no model is open. |
+| Messages | The user's on the right in `--sel-bg`, with the time and one tick (sent) or two (picked up: the turn's first stream event arrived; a turn that never got one keeps one). Vee's on the left as a **group**: one bubble per block of its text (`ai/parts.ts` on `ai/blocks.ts`: a paragraph and its line breaks, a `- ` / `* ` / `1. ` list, a pipe table in the result table's look, scrolling inside its own box), then its cards, with the 16 px avatar at the group's foot and the time on the lead bubble. `**bold**` and `` `code` `` are elements, never HTML. A day line (`Today`, `Yesterday` or the date) stands over each day's first message, on a faint 4 % grid behind the thread. A reverted reply stays at half opacity. The per-message `Vee` / `You` labels are gone. |
+| Reply | Hovering or focusing a bubble or a card shows its hover bar, `reply`: the next question quotes **that one bubble** (`quoteOfPart`, worked out in the main window from its own message), shown in the strip above the composer, which can cancel it. A chip, a consent card, the app's question and the heads-up cannot be quoted. |
 | Chips | At most six under a reply. Click selects what the chip names, double-click zooms to it. |
-| Tables | The grouping as the header, one row per group with its count and its area or volume, `copy csv` beside it. A row selects and zooms its elements. `copy csv` puts the table on the clipboard as CSV (since 2026-10-02 through the store's `copyTable` and the one `copyText`; the design's line, `SGVue.dc.html:2029`, called the API this app refuses and copied nothing). It has no flash, as designed; a copy that did not reach the clipboard is said in the status line. |
-| Pending changes | What the 5 % scope guard held back, with `apply` and `cancel`. Apply pushes the **patch** through the same `up()` a button uses, so it lands on the ordinary undo stack, and what it changed joins what the reply's `revert` puts back (until 2026-10-02 it replaced it). **Since 2026-10-02 (owner-approved) the same row also holds a request** — a deletion, a copy, a recent file, a guarded undo or restore (and the base point, until the card became read-only on 2026-10-08): the same element and the same two buttons, with a label that says exactly what `apply` will do (`delete the viewpoint "Lobby" (3D) — it cannot be brought back`). Nothing it names happens without the click; a request that can no longer be honoured says so in the status line and does nothing. |
-| The live reply (2026-10-01; the design: a busy row — the brand mark drawing itself, a stage text, three dots) | While a turn runs the transcript's next row **is** the reply being written, at the index its message will get, and the same element when it commits. `Thinking` shimmers beside the name from one second after Send. The stream's first `tool_start` — the tool's name arrives before its arguments have finished generating — opens a bubble 52 px tall: a one-line ticker over the element matrix. **Read**: `Reading 4 models`, the element count counting up, the cells arriving as a wave, grouped by model. For each executed tool whose input carries live rules: **Filter** — `Filtering IfcWall`, from the rules on `Model`, `IfcEntity`, `PredefinedType`, `ObjectType` and `Level`: the count falls to the scope's and its cells regroup, larger; and **Check** — `Checking Fire Rating`, from every other rule: a beam scans the grid, each flagged cell lights as it passes and the count rises with it (`missing` when every such rule is `is empty`, else `found`). Any other tool is a note in its own words (`ai/stages.ts`). One cell is one element while the grid has room, else `ceil(count / capacity)`; every count is exact. At `done` whatever is in flight is finished at once: the words come in one by one (since 2026-10-08 a list's marker and a whole table each come in as one), the status rolls in, and the flagged cells fly into **rows** — one per storey that holds a match, at most eight, each a button that selects its elements; none beside a result table. A turn with no tool opens no trace. Vee's sprite is `thinking`, `reading`, `found` at each finding and `done` while the reply is the newest message. A failed or stopped turn takes the row away and leaves the transcript as it was. |
-| Suggestions | Four, rebuilt from the conversation and the view: what is selected, what the last reply carried, whether anything is filtered or hidden, how many models are loaded. Clicking one fills the composer; it does not send. |
-| The composer | Enter sends, Shift+Enter does not. A trimmed-empty question, a second question while one is running, and any question with no federation are all ignored, exactly as the design ignores them. On Send the typed line lifts out of the composer to its bubble. **While a turn runs the send button is a stop button** (2026-10-01): its arrow cross-fades to a square, its tip reads `Stop`, and a click stops the turn — the panel then says `Stopped.` |
-| Reply | `reply` on a message aims the next question at it; the strip above the composer names the target and can cancel it, and the question carries the quote inline so the model resolves "those" against the right turn. |
-| "Ask about this" | The context menu's item opens the panel with the composer pre-filled and focused, caret at the end. |
+| Storey rows | The rows under an answer whose last rule-bearing call matched something: one per storey that holds a match, at most eight, unnamed last under the em dash, in a card titled by the property the turn checked (`Thermal Transmittance · missing`) or what the rows count. A row selects what it counts; the row the 3D view's selection is exactly on is pressed and ringed by a revision cloud. None beside a result table. |
+| Tables | The grouping as the header, one row per group with its count and its area or volume, `copy csv` at its foot. A row selects and zooms its elements. `copy csv` puts the table on the clipboard as CSV through the store's `copyTable` and the one `copyText`, made in this window under the user's click; here it flashes `copied` or `couldn’t copy` for 1 400 ms (the main window's design has no flash). |
+| Consent card | What waits for the user's OK (the design's pending row, `:1632`): a change the 5 % scope guard held back, or — since 2026-10-02 — a request (a deletion, a copy, a recent file, a guarded undo or restore). Hazard tape (`--vis`, used nowhere else: tape means "Vee needs your OK"), the label read as a question with its detail after its first ` — `, `Cancel`, and a confirm button that names the action — `Apply`, `Delete`, `Clear all`. **It never takes the focus by itself.** Apply pushes a held patch through the same `up()` a button uses, so it lands on the ordinary undo stack and joins the reply's `revert`; nothing a card names happens without the click. Once answered its stub tears away and a stamp lands — `APPLIED · 14:02`, `DELETED`, `CLEARED`, `CANCELLED` (also for a request the user's own work had overtaken), `REVERTED` — carrying the reply's one `Revert`. |
+| Heads-up | At most one a reply, after its answer and before its consent card: the app's observation (§8, stage 2) in `--warn-ink` with a 12 px outline sign, the count in bold and names in mono, **uncoloured**. No control. Part of the reply's announcement; never quoted. |
+| IFC terms | A code span of Vee's text that is a name the loaded models carry is drawn mono 500 in `--ifc-term` (`#859FF6`, light `#3B51BC`); a near miss, the board, the consent card, the heads-up and the user's own words never are. Recomputed when the federation changes, so a name no longer loaded falls back to plain mono. |
+| The IFC+SG question | Vee's lead-in is a bubble of Vee's; the app's question stands apart from it, dashed, named "Question from SGVue", with `Yes` / `No` quick replies — no tape, no card. They are in the tab order and never focused by themselves; a click is the user's answer, sent as their message, and the replies go. |
+| The live reply | While a turn runs the transcript's next row **is** the reply being written, at the index its message will get, and the same element when it commits. **Typing dots** from Think until the first tool's Read, or until the answer when no tool runs. The stream's first `tool_start` opens the **diary** at Read: `Thinking` and the seconds since Send, then a line for every step — **Read** (`Reading 4 models`, the element count counting up, the cells arriving as a wave, grouped by model); for each executed tool whose input carries live rules, **Filter** (`Filtering IfcWall`, from the rules on `Model`, `IfcEntity`, `PredefinedType`, `ObjectType` and `Level`: the count falls to the scope's and its cells regroup, larger) and **Check** (`Checking Fire Rating`, from every other rule: a beam scans the grid, each flagged cell lights as it passes and the count rises with it — `missing` when every such rule is `is empty`, else `found`); any other tool a note in its own words (`ai/stages.ts`). Each step is ticked once the next has begun. One cell is one element while the grid has room, else `ceil(count / capacity)`; every count is exact; a Check keeps the matrix width it started with if the window is resized under it (`planWidth`). At `done` whatever is in flight is finished at once: the diary folds into one dashed line — `✓ 412 read · 80 walls · 12 missing · 7s` — that reopens to its steps (and, while it is the newest turn's, the final matrix), and the reply's parts land on the row they settle in, at most 110 ms apart and all within 0.5 s (`answerFrame`). Vee is `thinking`, `reading`, `found` at each finding and `done` while the reply is the newest message. A stopped or failed turn takes the row away. |
+| System lines | A turn that did not answer leaves a neutral dashed line, the app's and not Vee's: `Stopped · nothing changed`, `Couldn’t reach Vee · …`, `Vee is busy right now · …`, `Vee couldn’t sign in · …` or `Vee couldn’t answer · …`, ending `what it already did stays` whenever a tool had changed something — **never** "nothing changed" then — with the service's own words as its `title`, and `Try again` on a failed turn while a model is open, which reruns the last question without adding it again. A `New message` pill appears when a reply lands while the thread is scrolled up. |
+| Not ready | No key wins: Vee's one line `Add your API key in Preferences to start.`, presence `no key`, no suggestions, and the composer and the send key **disabled** at `.45` with no placeholder; a key saved in Preferences makes it ready at once. No model: `Open a model and I’ll take a look.`, no board, no suggestions, the composer kept — a question gets that line back and runs no turn. |
+| Suggestions | Four, rebuilt from the conversation and the view: what is selected, what the last reply carried, whether anything is filtered or hidden, how many models are loaded. One scrolling line; after the first user message it folds behind a `▸ suggestions` chip. Clicking one fills the composer; it does not send. |
+| The composer | Enter sends, Shift+Enter does not. A trimmed-empty question, a second question while one is running, and any question with no federation are all ignored, exactly as the design ignores them. On Send the typed line lifts out of the composer, on a slant, to its bubble on the right. **While a turn runs the send key is a stop key** (2026-10-01): its arrow cross-fades to a square, its tip reads `Stop`, and a click stops the turn; for 300 ms after a stop it ignores clicks, so a double-click neither stops twice nor sends a draft. |
+| "Ask about this" | The context menu's item opens the window with the composer pre-filled and focused, caret at the end. |
 | The boot audit | A fresh federation is greeted by one assistant turn — model, element and storey counts plus the data-completeness findings as chips. It is local arithmetic; no request is made and no key is needed. |
+| What is announced | Each new reply of Vee's — with its IFC+SG question and its heads-up — once, through one polite live region; the log itself is `aria-live="off"`, so no bubble, card or diary tick is read out on its own. While a turn runs the region says Vee is working. |
 
 **`revert`, widened (2026-10-02, owner-approved).** The design's `revert` restores the five
 visibility keys — all its assistant could change. Asked whether it should restore everything
-the assistant changed in that reply, the owner: *"correct."* The control is the design's own —
-same button, same `Undo just this step` tip, the reverted reply dimmed — and what it does is
+the assistant changed in that reply, the owner: *"correct."* The control was the design's own —
+same button, same `Undo just this step` tip, the reverted reply dimmed — and since 2026-11-08 it
+is the reply's one `Revert` (`Undo just this reply`), on its consent card's stamp when it has one
+and at the foot of its group otherwise, the foot then saying `Reverted · 14:05`. What it does is
 (`state/selectors/snapshot.ts`, the store's `revertTurn`):
 
 - **The snapshot is the session payload** — what a session and a share link save
@@ -1859,7 +1919,8 @@ same button, same `Undo just this step` tip, the reverted reply dimmed — and w
 
 **Two things the design does not have, and the port does not add**: nothing is disabled while
 a turn runs — the re-entry guard is the `chatBusy` test inside `chatSend` — and closing the
-panel does not abort the turn in flight. Adding either would be a visible addition. **A third it
+window does not abort the turn in flight. (The composer disabled for want of a key is a
+not-ready state, not a running turn.) Adding either would be a visible addition. **A third it
 did not have, the panel now has**: a stop control. The design's `chatSend` has no companion,
 and until 2026-10-01 neither had the port; the owner's "Ask Vee" handoff — the specification
 for the assistant's panel since — makes the send button one while a turn runs.
@@ -1867,16 +1928,18 @@ for the assistant's panel since — makes the send button one while a turn runs.
 **Motion.** The trace runs one frame loop from Send until the reply has settled — never more
 than 1.95 s after the answer — and none between turns; the 3D scene is not re-rendered by it
 (`scripts/frame-triggers.cjs`). Under `prefers-reduced-motion: reduce` there is no lift,
-shimmer, roll, wave, beam, fly-in, count-up or word-by-word reveal: each state is shown at its
-end the moment its cue is reached, and each sprite holds one frame. The matrix, the beam and
-the ticker are `aria-hidden`; one visually hidden line says the assistant is working while a
-turn runs, and the committed reply is announced by the log, as before.
+shimmer, wave, beam, count-up, fold, landing, pop, tear or stamp: each state is shown at its end
+the moment its cue is reached, and each sprite holds one frame. The matrix and the diary are
+`aria-hidden`; one visually hidden line says the assistant is working while a turn runs, and the
+committed reply is announced once (above).
 
 `tests/parity/phase9/README.md` measures the panel against the prototype at **0.00–0.02 of
 255** across six states in both themes, with every line of its text identical — as built in
-Phase 9. Since 2026-10-01 the assistant's name, its mascot, the side a user's row stands on and
-the running state differ from the prototype by design; `tests/parity/2026-10-01-vee/README.md`
-measures those against the handoff instead.
+Phase 9. Since 2026-10-01 the assistant's name, its mascot and the running state differ from the
+design's prototype by design, measured against the handoff instead
+(`tests/parity/2026-10-01-vee/README.md`); since 2026-11-08 the window's target is the approved
+"Vee Messages" prototype, and `scripts/screenshot.cjs`'s `vm-*` states capture the Ask Vee window
+beside its shots one for one (`docs/COMMANDS.md`) — captured on the owner's yes, not yet run.
 
 > `query_sql`'s database was built early, in Phase 1b, because the federation had to exist
 > first: `src/worker/sql.worker.ts` holds an in-memory SQLite copy of the index in its own

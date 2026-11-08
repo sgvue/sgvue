@@ -129,6 +129,36 @@ export async function openVee(app: ElectronApplication, page: Page): Promise<Pag
 /** Whether the Ask Vee window is open. */
 export const veeIsOpen = (app: ElectronApplication): boolean => app.windows().some(isVee)
 
+/** The landing page's demo button (2026-09-24): the design's own four-model mock federation. */
+export const DEMO = 'try the demo building →'
+
+/**
+ * 2026-11-08 ("Vee Messages") — the demo building open in the main window, the Ask Vee window
+ * open on it, and main's turn handlers held (`holdTurns`). `main` is the main window — the model,
+ * the property card, the toolbar — and `vee` the Ask Vee window, where every chat control and the
+ * trace are. With `media`, both windows ask for it: each asks for reduced motion on its own, and
+ * the trace is drawn in the Vee window.
+ */
+export async function demoWithVee(
+  userData: string,
+  media?: { reducedMotion: 'reduce' }
+): Promise<{ app: ElectronApplication; main: Page; vee: Page }> {
+  const { app, page: main } = await launch(userData)
+  if (media) await main.emulateMedia(media)
+  await main.getByRole('button', { name: DEMO }).click()
+  await expect(main.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
+  const vee = await openVee(app, main)
+  if (media) await vee.emulateMedia(media)
+  await holdTurns(app)
+  return { app, main, vee }
+}
+
+/** Type a question into the Ask Vee window's composer and press Enter, as a hand does. */
+export async function askVee(vee: Page, text: string): Promise<void> {
+  await vee.locator('[data-role="chatinput"]').fill(text)
+  await vee.locator('[data-role="chatinput"]').press('Enter')
+}
+
 /** The session `main/sessions.ts` wrote into this profile. */
 export const readSession = async (userData: string): Promise<{ payload: Record<string, unknown> }> =>
   JSON.parse(await readFile(join(userData, 'sessions', 'last.json'), 'utf8'))

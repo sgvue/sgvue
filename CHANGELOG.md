@@ -8,6 +8,63 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+### Added
+
+- **Ask Vee reads like a conversation in a messaging app.** Your questions stand on the right
+  with the time and a tick — two once Vee has picked the question up. Vee's answer stands on the
+  left as one bubble per paragraph, list or table, then its cards: the storey rows, the result
+  table and anything that waits for your OK. A header shows Vee and what it is doing — `on site`,
+  `typing`, `on it`, `no signal` — and a line under it always shows what the 3D view shows now:
+  how many elements are visible, what is selected and on which storey, what it is coloured by,
+  and which view it is on. Each day starts with its date.
+- **Reply to one bubble.** Point at a bubble or a card (or move the keyboard onto it) and click
+  **reply**: your next question quotes that bubble, not the whole answer.
+- **Try again.** When Vee could not be reached or could not answer, the line that says so offers
+  **Try again**, which asks the same question once more without repeating it in the conversation.
+- **A request that needs your OK is a card that says what it does.** It is marked with hazard
+  tape, asks its question in plain words — with the detail under it — and its button names the
+  action: **Apply**, **Delete** or **Clear all**, beside **Cancel**. It never takes the keyboard
+  by itself. Once answered it keeps a stamp — `APPLIED · 14:02`, `DELETED`, `CLEARED`, `CANCELLED`
+  or `REVERTED` — and the answer's **Revert** sits on it.
+- **Ask Vee says when it is not ready.** With no API key: "Add your API key in Preferences to
+  start.", and the box you type in is greyed out until a key is saved — no restart needed. With no
+  model open: "Open a model and I'll take a look."
+- **A new answer animation.** While Vee works you see typing dots, then a small diary: every step
+  it takes — reading the models, narrowing them down, checking a property — each with its live
+  count, over a field of dots that stand for the elements. When the answer arrives the diary folds
+  into one line, such as `✓ 412 read · 80 walls · 12 missing · 7s`, which you can click to open
+  again, and the answer's bubbles come in one after another, all within half a second. The storey
+  row that matches what is selected in 3D is marked with a revision cloud.
+- **A heads-up line.** Under some answers, in amber, SGVue points out something odd it saw in the
+  elements Vee just looked at: a placeholder value such as `TBC` or `-` in the property it
+  checked, elements on no storey, or a GlobalId shared by two elements. It is written by SGVue from
+  what it read, never by Vee, and most answers have none.
+- **IFC names in one colour.** When Vee names a class, a PredefinedType or ObjectType value, a
+  property set or a property exactly as your models spell it — `IfcWall`, `FireRating` — it is
+  shown in one colour. A name your models do not carry stays plain.
+- **The IFC+SG question.** When a model carries `SGPset_` property sets and you ask about the types
+  or properties of elements that carry them, Vee asks once per conversation whether the model is
+  for an IFC+SG submission, with **Yes** and **No** buttons. Yes: answers name each element's
+  IFC+SG identity, such as `IfcDoor.DOOR*`. No: plain IFC terms. Vee never says whether a sub-type
+  is valid or which parameters are required — the official IFC+SG mapping is not in SGVue — and
+  only your click answers the question.
+- A **New message** button appears when an answer arrives while you are scrolled up, and
+  **copy csv** on a result table says `copied` or `couldn't copy`.
+
+### Changed
+
+- Questions that ask to tabulate — counts by storey, by type, by value — are answered with a table
+  in the chat. Vee makes a schedule in the Schedules window only when you ask for one.
+- Vee writes every count in digits, zero included: "**0** walls are missing a FireRating".
+- A stopped or failed turn is a neutral line, such as "Stopped · nothing changed". It says
+  "nothing changed" only when nothing did; otherwise "what it already did stays".
+- In Ask Vee your messages are on the right, and the `Vee` / `You` labels above each message and
+  the panel's own × are gone — the window's own close button and Esc close it. The status beside
+  Vee's name and the answer appearing word by word are replaced by the diary and its folded line.
+- The Ask Vee window is at least 300 × 380.
+- When Vee makes a schedule for several classes and one of them is in no loaded model, it leaves
+  that class out and says so. An interference check states the tolerance it used.
+
 ## [1.5.0] - 2026-11-08
 
 ### Added
