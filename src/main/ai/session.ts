@@ -152,6 +152,10 @@ export function registerAiIpc(): void {
       if (!wc.isDestroyed()) wc.send(CH_AI_EVENT, { type: 'error', turnId: turn.turnId, kind, message } satisfies AiEvent)
     }
 
+    // 2026-11-09 — a new conversation forgets the old one first, before any early return below:
+    // the renderer counts the conversation as started again once this call resolves.
+    if (turn.fresh) sessions.get(wc.id)?.gateway.forget()
+
     const key = apiKey() ?? ''
     if (!key) {
       fail(

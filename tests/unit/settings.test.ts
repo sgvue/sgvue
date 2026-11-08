@@ -8,7 +8,7 @@
  * The assertion that matters most is the negative one: the view the renderer receives carries
  * `hasKey` and never the key, and the key is not in the file as plaintext either.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -122,15 +122,61 @@ describe('defaults', () => {
     expect(settings.view().model).toBe('claude-opus-5')
   })
 
-  it('keeps the model an older install stored; only the default is Sonnet 5.5 (2026-11-09)', () => {
-    // What every build before this one wrote with the key: the whole object, its default model in it.
-    writeFileSync(join(dir, 'settings.json'), JSON.stringify({ model: 'claude-opus-5', effort: 'medium' }))
-    settings.resetCache()
-    expect(settings.view().model).toBe('claude-opus-5')
-    // A file that names no model takes the new default.
-    writeFileSync(join(dir, 'settings.json'), JSON.stringify({ effort: 'medium' }))
+  it('names Sonnet 5.5 when there is no file at all, and writes nothing to say so', () => {
+    rmSync(join(dir, 'settings.json'), { force: true })
     settings.resetCache()
     expect(settings.view().model).toBe('claude-sonnet-5-5')
+    expect(existsSync(join(dir, 'settings.json'))).toBe(false)
+  })
+})
+
+describe('the one switch from Opus 5 (2026-11-09, the owner: "Yes, switch once")', () => {
+  const write = (o: Record<string, unknown>): void => writeFileSync(join(dir, 'settings.json'), JSON.stringify(o))
+
+  it('moves an older install’s claude-opus-5 to the new default, once, and marks the file', () => {
+    // What every build before this one wrote with the key: the whole object, its default model in it.
+    write({ model: 'claude-opus-5', effort: 'high', cacheOneHour: true, backend: 'auto', preferNvidia: false, apiKeyEnc: 'Y2lwaGVy' })
+    settings.resetCache()
+    expect(settings.view().model).toBe('claude-sonnet-5-5')
+    // Written at once, everything else as it was — the key's ciphertext byte for byte.
+    expect(stored()).toEqual({
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      cacheOneHour: true,
+      backend: 'auto',
+      preferNvidia: false,
+      apiKeyEnc: 'Y2lwaGVy',
+      modelMigrated: true
+    })
+    // The mark is main's: the renderer's view does not carry it.
+    expect(settings.view()).not.toHaveProperty('modelMigrated')
+  })
+
+  it('keeps claude-opus-5 once the file is marked — a user who picks it on purpose keeps it', () => {
+    write({ model: 'claude-sonnet-5-5', modelMigrated: true })
+    settings.resetCache()
+    expect(settings.update({ model: 'claude-opus-5' }).model).toBe('claude-opus-5')
+    expect(stored()).toMatchObject({ model: 'claude-opus-5', modelMigrated: true })
+    settings.resetCache()
+    expect(settings.view().model).toBe('claude-opus-5')
+  })
+
+  it('leaves any other stored model alone, and marks the file so it is never looked at again', () => {
+    write({ model: 'claude-haiku-5-5', apiKeyEnc: 'a2V5' })
+    settings.resetCache()
+    expect(settings.view().model).toBe('claude-haiku-5-5')
+    expect(stored()).toMatchObject({ model: 'claude-haiku-5-5', apiKeyEnc: 'a2V5', modelMigrated: true })
+    // A choice of Opus 5 after that is the user's.
+    settings.update({ model: 'claude-opus-5' })
+    settings.resetCache()
+    expect(settings.view().model).toBe('claude-opus-5')
+  })
+
+  it('a file that names no model takes the default, and the key survives the switch', () => {
+    write({ effort: 'medium', apiKeyEnc: Buffer.from('enc:sk-ant-k'.split('').reverse().join('')).toString('base64') })
+    settings.resetCache()
+    expect(settings.view()).toMatchObject({ model: 'claude-sonnet-5-5', hasKey: true })
+    expect(settings.apiKey()).toBe('sk-ant-k')
   })
 
   it('falls back to the defaults rather than refusing to start on a corrupt file', () => {

@@ -1518,6 +1518,9 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-09 — **the Ask Vee header's `New conversation` button** sends the strict `{ type: 'newChat' }`; the main window alone, and not while a turn runs, calls `traceFail()` and `seedChat()` — which with no model open leaves the transcript empty — and what earlier replies did to the view stays.
 - 2026-11-09 — **the live eval takes `--model=<id>`**, set in the run's own throwaway settings; `metrics.json` gains `model_asked` and `latency_by_model` (`median_s`, `p90_s`, `s_per_turn`); `PRICES` gains Sonnet 5.5 and Haiku 5.5 (two cards, split at a 100 000-token prompt), and `claude-sonnet-5` is corrected to $2 / $10.
 
+- 2026-11-09 — **existing installs move once from Opus 5 to the new default** (the owner: *"Yes, switch once"*): the first read of a settings file with no `modelMigrated` mark turns a stored `claude-opus-5` into `DEFAULT_MODEL` and writes the mark (main-only, never in `view()`); any other model is left alone, and a model chosen after that, `claude-opus-5` included, is kept.
+- 2026-11-09 — **a `fresh` turn empties main's transcript before anything can refuse it** (`AiGateway.forget`, first in `ai:turn:start`); **a live eval row is priced per API request** (`pricedUsage`; a conversation's `rounds` are summed).
+
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
 ---

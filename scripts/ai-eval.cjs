@@ -117,7 +117,7 @@ const ROOT = join(__dirname, '..')
 const { CASES, PILOT_IDS, PILOT_MAX, runsOf, selectCases } = require('./eval/cases.cjs')
 const { capabilityTags, missingCapabilities, whyMissing } = require('./eval/capabilities.cjs')
 const { TRANSIENT_KINDS, failureClass, gradeCase } = require('./eval/graders.cjs')
-const { estimateRun, latencySummary, measuredTurn, money, runCost, turnCost } = require('./eval/cost.cjs')
+const { estimateRun, latencySummary, measuredTurn, money, pricedUsage, runCost, turnCost } = require('./eval/cost.cjs')
 const { collectTruth, lateTruth, nullTurn, observation, oracleTurn, scriptedCalls, turnsOf, withEarlier } = require('./eval/observe.cjs')
 
 /* ────────────────────────────── arguments ────────────────────────────── */
@@ -677,7 +677,8 @@ async function runCase(kase, rep, caps, settings) {
     // A probe that follows the turn's own call is run again now (`lateTruth`, 2026-11-08 F6).
     const truth = await lateTruth(kase, asked, obs.calls, probesIn(js))
     const graded = gradeCase(kase, obs, truth, kindOf)
-    const cost = turnCost(obs.usage, turn.model || settings.model, settings.cacheOneHour)
+    // Priced per request (`pricedUsage`): Haiku 5.5's rate card is chosen by one request's prompt.
+    const cost = turnCost(pricedUsage(obs), turn.model || settings.model, settings.cacheOneHour)
     return {
       obs,
       truth,

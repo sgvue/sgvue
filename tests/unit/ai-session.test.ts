@@ -245,3 +245,42 @@ describe('building the client (C1, review)', () => {
     expect(wc.sent).toEqual([])
   })
 })
+
+describe('a fresh turn forgets the old conversation, even when refused early (2026-11-09)', () => {
+  const said = (r: { messages: { role: string; content: unknown }[] }): string => JSON.stringify(r.messages)
+
+  it('empties the transcript before the no-key refusal, so the next turn starts new', async () => {
+    const wc = window()
+    script = [message([{ type: 'text', text: 'old answer' }], 'end_turn'), message([{ type: 'text', text: 'b' }], 'end_turn')]
+    await start(wc, 't1', { userText: 'the old question' })
+    // The renderer starts again; this turn is refused before it reaches the gateway…
+    key = ''
+    await start(wc, 't2', { fresh: true })
+    expect(events(wc).at(-1)).toMatchObject({ type: 'error', turnId: 't2', kind: 'no_key' })
+    // …and the next one, no longer `fresh`, carries nothing of the old conversation.
+    key = 'sk-ant-one'
+    await start(wc, 't3', { userText: 'a new question' })
+    const last = requests.at(-1)!
+    expect(said(last)).toContain('a new question')
+    expect(said(last)).not.toContain('the old question')
+    expect(said(last)).not.toContain('old answer')
+  })
+
+  it('…and before the oversized-view-state refusal', async () => {
+    const wc = window()
+    script = [message([{ type: 'text', text: 'old answer' }], 'end_turn'), message([{ type: 'text', text: 'b' }], 'end_turn')]
+    await start(wc, 't1', { userText: 'the old question' })
+    await start(wc, 't2', { fresh: true, viewState: { big: 'x'.repeat(AI_JSON_MAX_CHARS) } })
+    expect(events(wc).at(-1)).toMatchObject({ type: 'error', turnId: 't2', kind: 'bad_request' })
+    await start(wc, 't3', { userText: 'a new question' })
+    expect(said(requests.at(-1)!)).not.toContain('the old question')
+  })
+
+  it('keeps the conversation for a turn that is not fresh', async () => {
+    const wc = window()
+    script = [message([{ type: 'text', text: 'old answer' }], 'end_turn'), message([{ type: 'text', text: 'b' }], 'end_turn')]
+    await start(wc, 't1', { userText: 'the old question' })
+    await start(wc, 't2', { userText: 'a follow-up' })
+    expect(said(requests.at(-1)!)).toContain('the old question')
+  })
+})

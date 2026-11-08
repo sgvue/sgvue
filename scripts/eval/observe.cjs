@@ -124,12 +124,18 @@ function turnsOf(kase) {
   return [...(kase.turns || []), { prompt: kase.prompt, oracle: kase.oracle, expect: kase.expect, choice: kase.choice }]
 }
 
-/** Two turns' `usage` summed, counter by counter; null only when neither was billed. */
+/**
+ * Two turns' `usage` summed, counter by counter; null only when neither was billed. `rounds` — how
+ * many API requests the counters were summed from (`TurnUsage.rounds`) — is summed too since
+ * 2026-11-09: it is what a per-request rate card (Haiku 5.5's) is chosen by, and the first turn's
+ * alone made a conversation's mean request look two or three times its size.
+ */
 function addUsage(a, b) {
   if (!a) return b || null
   if (!b) return a
   const out = { ...a }
   for (const k of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheCreateTokens']) out[k] = (a[k] || 0) + (b[k] || 0)
+  if (Number.isFinite(a.rounds) || Number.isFinite(b.rounds)) out.rounds = (a.rounds || 0) + (b.rounds || 0)
   return out
 }
 

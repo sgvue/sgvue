@@ -406,6 +406,16 @@ export class AiGateway {
     return this.history.length
   }
 
+  /**
+   * 2026-11-09 — a new conversation: the transcript is emptied. Called by the IPC handler for a
+   * `fresh` turn before anything can end it early, so a turn refused before it reaches `run` (no
+   * key, an oversized view state, a client that could not be built) still leaves main as new as
+   * the renderer believes it is.
+   */
+  forget(): void {
+    this.history = []
+  }
+
   /** For the report and the tests: which fallbacks this session has had to take. */
   get fallbacks(): { systemMessages: boolean; strictTools: boolean } {
     return { systemMessages: this.systemMessages, strictTools: this.strictTools }

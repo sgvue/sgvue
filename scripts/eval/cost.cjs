@@ -214,6 +214,23 @@ function latencySummary(rows) {
   return out
 }
 
+/**
+ * 2026-11-09 — the usage a live row is priced from: the observation's own, with `rounds` — the
+ * API requests its counters were summed from — as the app counted them (one per `usage` event,
+ * `TurnUsage.rounds`), else as its outcome implies, one request a tool round plus the answer's.
+ * Pure; the runner prices every live row through it.
+ *
+ * @param {{usage?: object|null, outcome?: {rounds?: number}|null, earlier?: object[]}} obs
+ */
+function pricedUsage(obs) {
+  const u = obs && obs.usage
+  if (!u) return null
+  if (Number.isFinite(u.rounds) && u.rounds > 0) return u
+  const turns = 1 + ((obs.earlier && obs.earlier.length) || 0)
+  const tools = (obs.outcome && Number.isFinite(obs.outcome.rounds) ? obs.outcome.rounds : 0) || 0
+  return { ...u, rounds: tools + turns }
+}
+
 /** `$0.0123`, or `—` when nothing could be priced. */
 const money = (usd) => (typeof usd === 'number' ? `$${usd.toFixed(4)}` : '—')
 
@@ -228,5 +245,6 @@ module.exports = {
   ROUGH_TURN,
   measuredTurn,
   estimateRun,
-  latencySummary
+  latencySummary,
+  pricedUsage
 }

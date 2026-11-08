@@ -62,8 +62,8 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 - Questions that ask to tabulate — counts by storey, by type, by value — are answered with a table
   in the chat. Vee makes a schedule in the Schedules window only when you ask for one.
 - Vee writes every count in digits, zero included: "**0** walls are missing a FireRating".
-- **Sonnet 5.5 is the default model** for new installs (`claude-sonnet-5-5`). A model you set in
-  Preferences is kept — and so is the model an earlier version saved with your API key.
+- **Sonnet 5.5 is the default model** (`claude-sonnet-5-5`). Existing installs move once from
+  Opus 5 to the new default model; a model you choose later is kept.
 - A follow-up keeps to what Vee just found: after "Which walls are missing a fire rating?",
   "Tabulate them by type" tabulates those walls, not every wall. Say "all the walls" for all.
 - IFC names coloured in Vee's answers are bold as well, and only an exact match of your files'

@@ -1367,6 +1367,30 @@ describe('cost', () => {
     expect(s.unknown).toEqual({ cases: 1, turns: 1, median_s: 3, p90_s: 3, s_per_turn: 3 })
   })
 
+  it('prices a live row per request, through the runner’s own path, a conversation included (2026-11-09)', async () => {
+    const OBS = req('../../scripts/eval/observe.cjs')
+    const { addUsage: appUsage } = await import('../../src/renderer/ai/bridge')
+    // As the app sums a turn: one `usage` event a request, `rounds` counting them.
+    const turnOf = (requests: number) => {
+      let u = null
+      for (let k = 0; k < requests; k++) u = appUsage(u, { inputTokens: 70_000, outputTokens: 500, cacheReadTokens: 0, cacheCreateTokens: 0 })
+      return { reply: 'r', calls: [], outcome: { type: 'done', rounds: requests - 1 }, usage: u }
+    }
+    const view = { view: {}, store: {} }
+    const earlier = [OBS.observation(turnOf(3), view, view, null)]
+    const obs = OBS.withEarlier(OBS.observation(turnOf(2), view, view, null), earlier, view)
+    // Five requests of 70 000 tokens each: Haiku 5.5's short card, whatever the turns summed to.
+    expect(obs.usage.rounds).toBe(5)
+    const cost = COST.turnCost(COST.pricedUsage(obs), 'claude-haiku-5-5', false)
+    expect(cost.rates).toMatchObject({ in: 0.1, out: 0.5 })
+    expect(cost.usd).toBeCloseTo((350_000 * 0.1 + 2_500 * 0.5) / 1e6, 12)
+    // A usage that says nothing of its requests: one a tool round, plus each turn's answer.
+    const bare = { usage: { inputTokens: 300_000, outputTokens: 0 }, outcome: { rounds: 2 }, earlier: [{}] }
+    expect(COST.pricedUsage(bare).rounds).toBe(4)
+    expect(COST.turnCost(COST.pricedUsage(bare), 'claude-haiku-5-5', false).rates).toMatchObject({ in: 0.1 })
+    expect(COST.pricedUsage({ usage: null })).toBe(null)
+  })
+
   it('refuses to guess a rate for a model it has no entry for', () => {
     expect(COST.turnCost({ inputTokens: 100 }, 'some-other-model', false).usd).toBe(null)
   })

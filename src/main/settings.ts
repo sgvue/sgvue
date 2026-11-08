@@ -25,10 +25,18 @@ import type { GpuSwitchFailure } from './gpu-choice'
 
 /**
  * The plan's pinned model (`CLAUDE.md` → Decisions). `claude-sonnet-5-5` since 2026-11-09 — the
- * owner: *"set the sonnet 5.5 for all future installer"*. Only the default: a stored `model`
- * still wins, so a settings file an earlier build wrote keeps the model it names.
+ * owner: *"set the sonnet 5.5 for all future installer"*. A stored `model` wins, but for one
+ * switch, once (`OLD_DEFAULT_MODEL`, below).
  */
 const DEFAULT_MODEL = 'claude-sonnet-5-5'
+/**
+ * 2026-11-09 — the owner: *"Yes, switch once"*. Every build before this one wrote the whole
+ * settings object whenever anything was saved — the key included — so a stored `claude-opus-5`
+ * is almost always that build's default, never chosen. The first read of a file that has no
+ * `modelMigrated` mark moves exactly that model to `DEFAULT_MODEL` and writes the mark, whatever
+ * the file named; a model chosen after that, `claude-opus-5` included, is kept.
+ */
+const OLD_DEFAULT_MODEL = 'claude-opus-5'
 const DEFAULT_EFFORT: AiEffort = 'medium'
 const DEFAULT_BACKEND: RendererBackend = 'auto'
 
@@ -45,6 +53,11 @@ interface StoredSettings {
   gpuSwitchFailed?: GpuSwitchFailure
   /** base64 `safeStorage` ciphertext, or absent. Never plaintext. */
   apiKeyEnc?: string
+  /**
+   * Main-only, never in `view()` (2026-11-09): the one switch from `OLD_DEFAULT_MODEL` has been
+   * made for this file — or there was nothing to switch — so the stored `model` is the user's.
+   */
+  modelMigrated: true
 }
 
 const DEFAULTS: StoredSettings = {
@@ -52,7 +65,8 @@ const DEFAULTS: StoredSettings = {
   effort: DEFAULT_EFFORT,
   cacheOneHour: false,
   backend: DEFAULT_BACKEND,
-  preferNvidia: true
+  preferNvidia: true,
+  modelMigrated: true
 }
 
 const filePath = (): string => join(app.getPath('userData'), 'settings.json')
@@ -76,18 +90,33 @@ function read(): StoredSettings {
   } catch {
     raw = null
   }
-  const o = (raw ?? {}) as Partial<StoredSettings>
+  const o = (raw !== null && typeof raw === 'object' ? raw : {}) as Partial<Omit<StoredSettings, 'modelMigrated'>> & {
+    modelMigrated?: unknown
+  }
   const effort = SettingsView.shape.effort.safeParse(o.effort)
   const backend = SettingsView.shape.backend.safeParse(o.backend)
   const failed = failureOf(o.gpuSwitchFailed)
+  // A file an earlier build wrote, read for the first time by this one: its model switches once.
+  const migrate = raw !== null && o.modelMigrated !== true
+  const stored = typeof o.model === 'string' && o.model ? o.model : DEFAULTS.model
   cache = {
-    model: typeof o.model === 'string' && o.model ? o.model : DEFAULTS.model,
+    model: migrate && stored === OLD_DEFAULT_MODEL ? DEFAULT_MODEL : stored,
     effort: effort.success ? effort.data : DEFAULTS.effort,
     cacheOneHour: o.cacheOneHour === true,
     backend: backend.success ? backend.data : DEFAULTS.backend,
     preferNvidia: o.preferNvidia !== false,
     ...(failed ? { gpuSwitchFailed: failed } : {}),
-    ...(typeof o.apiKeyEnc === 'string' && o.apiKeyEnc ? { apiKeyEnc: o.apiKeyEnc } : {})
+    ...(typeof o.apiKeyEnc === 'string' && o.apiKeyEnc ? { apiKeyEnc: o.apiKeyEnc } : {}),
+    modelMigrated: true
+  }
+  if (migrate) {
+    // Written at once, so the switch is made once even if nothing else is ever saved. A file that
+    // cannot be written is no reason not to start: the next launch tries again.
+    try {
+      write(cache)
+    } catch {
+      /* the settings still read as migrated for this run */
+    }
   }
   return cache
 }
