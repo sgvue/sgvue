@@ -41,7 +41,9 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   what it read, never by Vee, and most answers have none.
 - **IFC names in one colour.** When Vee names a class, a PredefinedType or ObjectType value, a
   property set or a property exactly as your models spell it — `IfcWall`, `FireRating` — it is
-  shown in one colour. A name your models do not carry stays plain.
+  shown in one colour, and so are the names in the diary's steps and in the storey rows' title,
+  which use the file's own spelling — `Checking FireRating`, not "Fire Rating". A name your
+  models do not carry stays plain.
 - **The IFC+SG question.** When a model carries `SGPset_` property sets and you ask about the types
   or properties of elements that carry them, Vee asks once per conversation whether the model is
   for an IFC+SG submission, with **Yes** and **No** buttons. Yes: answers name each element's

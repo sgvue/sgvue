@@ -123,3 +123,38 @@ export function termsOf(v: Vocabulary, text: string, role: 'user' | 'assistant')
   })
   return out
 }
+
+/**
+ * 2026-11-08 — the names in one of the trace's own lines: a diary step's mono part (`IfcWall`,
+ * `FireRating, IsExternal`) or the storey-rows card's title (`FireRating · missing`). Split at
+ * the two separators those lines are written with, `, ` and ` · `, each kept as a piece of its
+ * own; never at a space, since a name can hold one (`D2 Double 2400x2400`). `name` marks a piece
+ * that is not a separator. Pure, and what both windows split with.
+ */
+export function namePieces(text: string): { text: string; name: boolean }[] {
+  return text
+    .split(/(, | · )/)
+    .filter((t) => t !== '')
+    .map((t) => ({ text: t, name: t !== ', ' && t !== ' · ' }))
+}
+
+/** The bound on the trace's coloured names a message carries over the port. */
+export const MAX_TRACE_TERMS = 48
+
+/**
+ * 2026-11-08 — the names in a finished reply's trace that are IFC terms of the loaded models: in
+ * its storey-rows card's title and in its diary's steps. Worked out in the main window, where the
+ * vocabulary is, whenever the snapshot is — so a name no longer loaded falls back to plain mono,
+ * as a term in Vee's text does.
+ */
+export function traceTermsOf(
+  v: Vocabulary,
+  trace: { title?: string; steps?: readonly { mono: string }[] } | null | undefined
+): string[] {
+  if (!trace) return []
+  const out = new Set<string>()
+  for (const line of [trace.title ?? '', ...(trace.steps ?? []).map((st) => st.mono)]) {
+    for (const p of namePieces(line)) if (p.name && out.size < MAX_TRACE_TERMS && isTerm(v, p.text)) out.add(p.text)
+  }
+  return [...out]
+}

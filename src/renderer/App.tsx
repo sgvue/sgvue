@@ -344,6 +344,14 @@ async function installDevTools(viewer: Viewer): Promise<void> {
     },
     /** The real pipeline, from a path: admit → token → protocol stream → worker → rows. */
     openPath: (path: string) => openLibrary([{ key: path, name: path, file: path, swatch: '', path }]),
+    /**
+     * 2026-11-08 — unload a model by its key, **the last one included**, as the sidebar's
+     * `delete` does (`fed.removeModel`). The app offers no × for the last model (the design's
+     * `canRemove`), so the Ask Vee window's no-model state — reached in the app when, say, a
+     * project opens with every model missing while the window is open — has no designed control
+     * a capture could click. `scripts/screenshot.cjs`'s `vm-02-nomodel` reaches it here.
+     */
+    unload: (key: string) => fed.removeModel(key),
     uploads: () => shell().uploads,
     booted: () => shell().booted,
     initErr: () => shell().initErr,

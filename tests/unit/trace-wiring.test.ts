@@ -155,8 +155,9 @@ describe('a real turn, as the trace hears it', () => {
       facts: {
         name: 'query_elements',
         rules: {
-          filter: { what: 'IfcWall', count: 80, noun: 'wall' },
-          check: { props: 'Thermal Transmittance', count: 24, unit: 'missing' }
+          // The file's own spelling, and the names that are IFC terms of the demo (2026-11-08).
+          filter: { what: 'IfcWall', count: 80, noun: 'wall', terms: ['IfcWall'] },
+          check: { props: 'ThermalTransmittance', count: 24, unit: 'missing', terms: ['ThermalTransmittance'] }
         }
       }
     })
@@ -189,9 +190,10 @@ describe('a real turn, as the trace hears it', () => {
       ]
     })
     expect(traceState().timeline!.calls[0].facts.rules!.check).toEqual({
-      props: 'Thermal Transmittance',
+      props: 'ThermalTransmittance',
       count: 24,
-      unit: 'missing'
+      unit: 'missing',
+      terms: ['ThermalTransmittance']
     })
     scriptedTurn.fail('Stopped.')
   })
@@ -234,9 +236,9 @@ describe('what a finished reply keeps', () => {
       steps: [
         { label: 'Reading 4 models', mono: '', n: 412, unit: 'elements' },
         { label: 'Filtering ', mono: 'IfcWall', n: 80, unit: 'walls' },
-        { label: 'Checking Thermal Transmittance', mono: '', n: 24, unit: 'missing' }
+        { label: 'Checking ', mono: 'ThermalTransmittance', n: 24, unit: 'missing' }
       ],
-      title: 'Thermal Transmittance · missing'
+      title: 'ThermalTransmittance · missing'
     })
     // The rows' ids are the federation's, and they are exactly the walls that carry no value.
     const ids = reply.trace!.rows.flatMap((r) => r.ids)

@@ -40,6 +40,7 @@ import { join } from 'node:path'
 import { quoteOfPart } from '../../src/renderer/ai/parts'
 import { columnsIn, traceLattice } from '../../src/renderer/ai/trace-plan'
 import { askVee, demoWithVee, emit, tool, type Held } from './helpers'
+import { layoutKey } from './layout-key'
 
 const QUESTION = 'Which walls have no thermal transmittance?'
 const ANSWER = '**24 of 80 walls** have no Thermal Transmittance. Every `EW 200 Brick` wall carries one.'
@@ -52,7 +53,8 @@ const WALLS = {
 }
 /** The demo's walls, and those of them with no thermal transmittance. */
 const WALLS_N = 80
-const STEPS = ['Reading 4 models · 412 elements', 'Filtering IfcWall · 80 walls', 'Checking Thermal Transmittance · 24 missing']
+// The names a step shows are the file's own (2026-11-08, the owner's IFC-term decision).
+const STEPS = ['Reading 4 models · 412 elements', 'Filtering IfcWall · 80 walls', 'Checking ThermalTransmittance · 24 missing']
 const FOLD = /^412 read · 80 walls · 24 missing · \d+s$/
 const ROWS = ['L15 walls', 'L25 walls', 'L35 walls', 'L45 walls', 'Roof4 walls']
 /** The answer's parts land at most this far apart, and all of them within `ANSWER_TOTAL_MS`. */
@@ -129,6 +131,12 @@ const RUNS = `(canvas) => {
 
 type Picture = (canvas: HTMLCanvasElement | null) => { picture: string; inked: boolean }
 
+/** A picture (`PICTURE`) as a diagnosis prints it: `WxH · N solid pixels · colours a,b`. */
+const pictureText = (picture: string): string => {
+  const [size, solid, , colours] = picture.split(':')
+  return `${size} · ${solid} solid pixels · colours ${colours || 'none'}`
+}
+
 /** A part landing: its opacity (as the trace writes it — none written is 1) and its lift, CSS px. */
 interface Land {
   op: number
@@ -159,10 +167,31 @@ interface Seen {
   vee: string
   /** The typed line on its way up, while it shows. */
   lift: { top: number; left: number; text: string } | null
+  /**
+   * The log's `data-moving`: the trace's painter has more to draw for this turn — set by
+   * `frame()` from Send until the answer has settled. It is the loop's state, **not motion**: under
+   * reduced motion it stays set for the whole running turn, while the painter wakes only at cues.
+   */
   moving: boolean
+  /**
+   * What is in motion now, each as `element property (progress)`: every running CSS animation or
+   * transition long enough to be seen (over 1 ms — `design.css`'s reduced-motion rule cuts each to
+   * 0.01 ms), and every opacity or lift the painter left part of the way on the last row.
+   */
+  motion: string[]
   /** The diary's matrix as drawn (`PICTURE`), and whether anything is drawn on it at all. */
   matrix: string
   inked: boolean
+  /** The matrix canvas's CSS width, its backing width and its parent's width — for a diagnosis. */
+  canvas: { css: number; backing: number; parent: number } | null
+  /** Whether the thread shows a scrollbar (it narrows everything in it). */
+  scrollbar: boolean
+  /**
+   * The matrix's **layout** (`layout-key.ts`; the owner: *"Compare layout, not pixels"*) — which
+   * cells are drawn, where, in which colour role — as a hash of its key, its cell count and its
+   * colours. Only when `watch` is asked for it: it walks every pixel.
+   */
+  layout: { hash: string; cells: number; colours: string } | null
 }
 
 /**
@@ -170,10 +199,20 @@ interface Seen {
  * `Seen` says — so a test can ask afterwards what was shown, when and in what order, without
  * racing the animation.
  */
-async function watch(page: Page): Promise<void> {
+async function watch(page: Page, opts: { layout?: boolean } = {}): Promise<void> {
   await page.evaluate(`window.__picture = ${PICTURE}`)
+  await page.evaluate(`window.__layoutKey = ${opts.layout ? layoutKey.toString() : 'null'}`)
   await page.evaluate(() => {
     const picture = (window as unknown as { __picture: Picture }).__picture
+    const keyOf = (window as unknown as { __layoutKey: typeof layoutKey | null }).__layoutKey
+    /** A canvas's layout, its key hashed (FNV-1a) so a sample stays small. */
+    const layoutOf = (c: HTMLCanvasElement | null): Seen['layout'] => {
+      if (!keyOf || !c || !c.width) return null
+      const k = keyOf(c.width, c.height, c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, c.width, c.height).data)
+      let h = 2166136261
+      for (let i = 0; i < k.key.length; i++) h = Math.imul(h ^ k.key.charCodeAt(i), 16777619)
+      return { hash: (h >>> 0).toString(16), cells: k.cells, colours: k.colours }
+    }
     const flat = (e: Element | null | undefined): string => (e?.textContent || '').replace(/\s+/g, ' ').trim()
     const visible = (e: Element | null | undefined): boolean => {
       if (!e) return false
@@ -186,6 +225,34 @@ async function watch(page: Page): Promise<void> {
     const liftOf = (style: string): number => {
       const m = /translateY\((-?[\d.]+)px\)/.exec(style)
       return m ? Number(m[1]) : 0
+    }
+    /** An element as a diagnosis names it: its role or part, else its classes, else its tag. */
+    const nameOf = (e: Element | null): string => {
+      if (!e) return '(none)'
+      const role = e.getAttribute('data-role') ?? e.getAttribute('data-part')
+      if (role) return role
+      const cls = typeof e.className === 'string' ? e.className.trim() : ''
+      return cls ? '.' + cls.split(/\s+/).join('.') : e.tagName.toLowerCase()
+    }
+    /** What moves now (`Seen.motion`). */
+    const motionIn = (row: Element | undefined): string[] => {
+      const out: string[] = []
+      for (const a of document.getAnimations()) {
+        if (a.playState !== 'running' || !a.effect) continue
+        const timing = a.effect.getComputedTiming()
+        const span = Number(timing.activeDuration ?? 0)
+        if (!(span > 1)) continue
+        const what = a instanceof CSSAnimation ? a.animationName : a instanceof CSSTransition ? a.transitionProperty : 'animation'
+        const target = a.effect instanceof KeyframeEffect ? a.effect.target : null
+        out.push(`${nameOf(target)} ${what} (${Math.round(Number(timing.progress ?? 0) * 100)}%)`)
+      }
+      for (const e of row?.querySelectorAll<HTMLElement>('[style]') ?? []) {
+        const o = e.style.opacity
+        if (o !== '' && Number(o) > 0 && Number(o) < 1) out.push(`${nameOf(e)} opacity ${o}`)
+        const y = liftOf(e.style.transform)
+        if (y !== 0) out.push(`${nameOf(e)} translateY ${y}px`)
+      }
+      return out
     }
     const sample = (): Seen => {
       const log = document.querySelector('[data-role="chatlog"]')!
@@ -201,7 +268,8 @@ async function watch(page: Page): Promise<void> {
             : 'folded'
       const steps = diaryEl ? [...diaryEl.querySelectorAll<HTMLElement>('li.vm-step')].filter((li) => visible(li)) : []
       const lift = document.querySelector<HTMLElement>('[data-part="lift"]')
-      const drawn = picture(diaryEl?.querySelector('canvas') ?? null)
+      const mx = diaryEl?.querySelector('canvas') ?? null
+      const drawn = picture(mx)
       return {
         t: performance.now(),
         rows: all.length,
@@ -227,8 +295,12 @@ async function watch(page: Page): Promise<void> {
             ? { top: lift.getBoundingClientRect().top, left: lift.getBoundingClientRect().left, text: flat(lift) }
             : null,
         moving: log.hasAttribute('data-moving'),
+        motion: motionIn(row),
         matrix: drawn.picture,
-        inked: drawn.inked
+        inked: drawn.inked,
+        canvas: mx ? { css: parseFloat(mx.style.width) || 0, backing: mx.width, parent: mx.parentElement?.clientWidth ?? 0 } : null,
+        scrollbar: (log as HTMLElement).offsetWidth - log.clientWidth > 0,
+        layout: layoutOf(mx)
       }
     }
     const w = window as unknown as { __seen: Seen[]; __sample: () => Seen; __watch?: number }
@@ -349,7 +421,7 @@ test('a turn is drawn as it happens — dots, then a diary of every step — and
     expect(inOrder(running, (s) => s.steps.map((t) => t.split(' · ')[0]))).toEqual([
       'Reading 4 models',
       'Filtering IfcWall',
-      'Checking Thermal Transmittance'
+      'Checking ThermalTransmittance'
     ])
     const counts = (label: string): number[] =>
       inOrder(running, (s) => s.steps.filter((t) => t.startsWith(label)).map(countOf))
@@ -368,6 +440,8 @@ test('a turn is drawn as it happens — dots, then a diary of every step — and
     expect(checking).toEqual([...checking].sort((a, b) => a - b))
     expect(checking.length).toBeGreaterThan(4)
     expect((await now(page)).ticked).toEqual([true, true, false])
+    // The live diary's names are IFC terms of the demo: drawn as Vee's text draws one.
+    await expect(log.locator(':scope > [data-row]').last().locator('[data-part="diary"] .ifc-term')).toHaveText(['IfcWall', 'ThermalTransmittance'])
     // The matrix moved: many pictures while the diary ran.
     expect(new Set(running.filter((s) => s.diary === 'live').map((s) => s.matrix)).size).toBeGreaterThan(20)
     // Vee, at the foot of the reply being written: thinking, then reading — and a hop at a finding.
@@ -434,7 +508,9 @@ test('a turn is drawn as it happens — dots, then a diary of every step — and
     await expect(bubbles.first().locator('.ifc-term')).toHaveText(['EW 200 Brick'])
     await expect(reply.locator('[data-part="diary-sum"] > span').nth(1)).toHaveText(FOLD)
     const rows = reply.locator('[data-role="storey-rows"]')
-    await expect(rows.locator('.vm-sn-hd')).toHaveText(/^Thermal Transmittance · missing\s*24$/)
+    await expect(rows.locator('.vm-sn-hd')).toHaveText(/^ThermalTransmittance · missing\s*24$/)
+    // …the property in the file's spelling and in the one IFC-term colour, as Vee's text draws one.
+    await expect(rows.locator('.vm-sn-hd .ifc-term')).toHaveText(['ThermalTransmittance'])
     await expect(rows.locator('.vm-sn-row')).toHaveText(ROWS)
     // The reply is announced, once, by the live region; the trace under it never was.
     await expect(page.locator('[data-role="vee-announce"]')).toHaveText(new RegExp(`^${ANSWER_TEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
@@ -460,6 +536,7 @@ test('a turn is drawn as it happens — dots, then a diary of every step — and
     await expect(sum).toHaveAttribute('aria-expanded', 'true')
     await expect.poll(async () => (await now(page)).steps).toEqual(STEPS)
     expect((await now(page)).ticked).toEqual([true, true, true])
+    await expect(reply.locator('[data-part="diary"] .ifc-term')).toHaveText(['IfcWall', 'ThermalTransmittance'])
     await expect.poll(async () => (await now(page)).inked).toBe(true)
     await expect(reply.locator('[data-part="diary"] canvas')).toHaveAttribute('aria-hidden', 'true')
     for (const c of await devicePixels(page)) expect(c).toEqual({ what: c.what, whole: true })
@@ -656,10 +733,12 @@ test('a reply written as a sentence, a list and a table is three bubbles, and a 
     '- All 4 walls on the roof are missing it.',
     '- Every `EW 200 Brick` wall carries one.',
     '',
-    '| Level | Walls | Missing | Type |',
-    '|---|---:|---:|---|',
-    '| L1 | 19 | 5 | `SB_ARC_R25_EXTERNAL_WALL_TYPE_WITHOUT_THERMAL_TRANSMITTANCE` |',
-    '| Roof | 4 | 4 | all |'
+    // Wider than any bubble at this window: numbers are set in the mono face and never wrap,
+    // where a long word in text would only break (a bubble is `overflow-wrap: anywhere`).
+    '| Level | Walls | Missing | Area | Volume | Length | Height |',
+    '|---|---:|---:|---:|---:|---:|---:|',
+    '| L1 | 19 | 5 | 1,234.567 m² | 456.789 m³ | 98,765.432 mm | 3,000.000 mm |',
+    '| Roof | 4 | 4 | 312.250 m² | 62.450 m³ | 24,500.000 mm | 1,200.000 mm |'
   ].join('\n')
   const { app, vee: page } = await ready()
   try {
@@ -683,7 +762,7 @@ test('a reply written as a sentence, a list and a table is three bubbles, and a 
       '•Every EW 200 Brick wall carries one.'
     ])
     const table = bubbles.nth(2).locator('table')
-    await expect(table.locator('th')).toHaveText(['Level', 'Walls', 'Missing', 'Type'])
+    await expect(table.locator('th')).toHaveText(['Level', 'Walls', 'Missing', 'Area', 'Volume', 'Length', 'Height'])
     await expect(table.locator('tbody tr')).toHaveCount(2)
     for (const b of await bubbles.all()) expect(await words(b)).not.toMatch(/\*\*|`|\||---/)
     // The header is the result table's capitals; a column of numbers is right-aligned, in mono.
@@ -726,7 +805,7 @@ test('with reduced motion every state shows at its end, and nothing in between',
   try {
     const log = page.locator('[data-role="chatlog"]')
     await expect.poll(() => page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true)
-    await watch(page)
+    await watch(page, { layout: true })
     await askVee(page, QUESTION)
     await tool(app, 'query_elements', WALLS)
     await expect.poll(async () => (await now(page)).steps.join(' | '), { timeout: 20_000 }).toBe(STEPS.join(' | '))
@@ -738,11 +817,42 @@ test('with reduced motion every state shows at its end, and nothing in between',
     // Dots, then the diary — each the moment its cue is reached.
     expect(live.some((s) => s.dots && s.diary === 'none')).toBe(true)
     expect(live.some((s) => s.dots && s.diary !== 'none')).toBe(false)
-    // The matrix is three pictures — read, filtered, checked — and none between them.
-    expect(new Set(live.filter((s) => s.diary === 'live').map((s) => s.matrix)).size).toBe(3)
+    // The matrix is three layouts — read, filtered, checked — and none between them. A layout is
+    // which cells are drawn, where and in which colour role (`layout-key.ts`, held to that by
+    // `tests/unit/layout-key.test.ts`): the owner's "Compare layout, not pixels". The same frame
+    // read back twice once differed by 160 corner pixels — anti-aliasing the GPU and the CPU
+    // rasteriser cover differently, which no one can see — and a pixel count called that a fourth
+    // picture. A cell moved, added or changing colour still makes a layout of its own. On a
+    // failure the message lists each layout as it was first seen: when (ms after the diary
+    // opened), the diary, the steps then, the canvas's CSS / backing / parent width, whether the
+    // thread had a scrollbar, the layout (its key's hash, its cells and their colours) and the
+    // picture's backing size, solid pixels and solid colours.
+    const shown = live.filter((s) => s.diary === 'live' && s.layout)
+    const layoutOfSample = (s: Seen): string => s.layout!.hash
+    const pictures = [...new Map(shown.map((s) => [layoutOfSample(s), s])).keys()].map(
+      (h) => shown.find((s) => layoutOfSample(s) === h)!
+    )
+    const diagnosis = pictures
+      .map(
+        (s) =>
+          `+${Math.round(s.t - shown[0].t)} ms · ${s.diary} · ${s.steps.length} steps (${s.steps.map((x) => x.split(' · ')[0]).join(', ')})` +
+          ` · canvas ${s.canvas ? `${s.canvas.css} css / ${s.canvas.backing} backing / ${s.canvas.parent} parent` : 'none'}` +
+          ` · ${s.scrollbar ? 'scrollbar' : 'no scrollbar'}` +
+          ` · layout ${s.layout!.hash}: ${s.layout!.cells} cells, ${s.layout!.colours} · ${pictureText(s.matrix)}`
+      )
+      .join('\n  ')
+    console.log(`[reduced matrix] ${pictures.length} layouts:\n  ${diagnosis}`)
+    expect(pictures.length, `matrix layouts under reduced motion:\n  ${diagnosis}`).toBe(3)
+    // Each in the order of its cue: the read grid, then the walls regrouped, then the walls checked.
+    expect(pictures.map((s) => s.steps.length)).toEqual([1, 2, 3])
     // Vee holds one frame of each state: thinking, reading, a finding.
     expect(inOrder(live, (s) => [s.vee])).toEqual(['thinking', 'reading', 'found'])
-    expect(live.some((s) => s.moving)).toBe(false)
+    // Nothing moves while the turn runs: no running animation or transition anyone could see, and
+    // nothing the painter left part of the way. (`moving` is not this: the log's `data-moving` is
+    // set for the whole running turn, motion or not — it says the painter is not done.) On a
+    // failure the message says what moved, when (ms after the first sample of the turn) and how far.
+    const moved = live.flatMap((s) => s.motion.map((m) => `+${Math.round(s.t - live[0].t)} ms · ${m}`))
+    expect(moved, `in motion under reduced motion:\n  ${[...new Set(moved)].slice(0, 30).join('\n  ')}`).toEqual([])
 
     await forget(page)
     await emit(app, { type: 'done', text: ANSWER, rounds: 2 })
@@ -756,6 +866,8 @@ test('with reduced motion every state shows at its end, and nothing in between',
     expect(after.every((s) => s.diary === 'folded' && FOLD.test(s.fold))).toBe(true)
     expect(after.every((s) => s.lands.every((l) => l.op === 1 && l.y === 0))).toBe(true)
     expect(after.some((s) => s.moving)).toBe(false)
+    const movedAfter = after.flatMap((s) => s.motion.map((m) => `+${Math.round(s.t - after[0].t)} ms after the answer · ${m}`))
+    expect(movedAfter, `in motion under reduced motion:\n  ${[...new Set(movedAfter)].slice(0, 30).join('\n  ')}`).toEqual([])
     expect(after[after.length - 1].vee).toBe('done')
     await expect(reply.locator('[data-role="storey-rows"] .vm-sn-row')).toHaveText(ROWS)
     // The consent card and a fresh bubble pop in only with motion: under reduced motion there is
@@ -792,15 +904,24 @@ test('the next turn leaves the reply before it finished and at rest, however soo
     /** The first reply as it stands: what the trace may have left on it, and what it shows. */
     const reading = (): Promise<{ inline: string[]; lands: number; diary: string; fold: string; rows: string[]; vee: string | null }> =>
       first.evaluate((row) => {
-        const touched = [
-          row.querySelector<HTMLElement>('.vm-av')!,
-          ...row.querySelectorAll<HTMLElement>('.vm-stack > *'),
-          ...row.querySelectorAll<HTMLElement>('[data-part="diary-sum"], [data-part="diary-body"]')
-        ]
         const diary = row.querySelector<HTMLElement>('[data-part="diary"]')!
+        const body = row.querySelector<HTMLElement>('[data-part="diary-body"]')!
+        const sum = row.querySelector<HTMLElement>('[data-part="diary-sum"]')!
+        const you = row.previousElementSibling?.querySelector<HTMLElement>('[data-part="bubble"]') ?? null
+        // Exactly what the painter writes (`ChatPanel.tsx`: `applySend`, `applyFold`, `applyLands`,
+        // `applyFrame`) and on what — and not a style the design writes itself: the chips card's
+        // `display:flex` is React's, there from the first render.
+        const written = [
+          ...[row.querySelector<HTMLElement>('.vm-av')!, ...row.querySelectorAll<HTMLElement>('.vm-stack > *')].flatMap((e) => [
+            e.style.opacity,
+            e.style.transform
+          ]),
+          ...[diary, body].flatMap((e) => [e.style.display, e.style.height, e.style.overflow, e.style.opacity]),
+          sum.style.opacity,
+          ...(you ? [you.style.opacity, you.style.transform, you.style.transformOrigin] : [])
+        ]
         return {
-          // Every style the trace writes, on every element it writes it on.
-          inline: [...new Set(touched.flatMap((e) => [e.style.opacity, e.style.transform, e.style.height, e.style.display]))],
+          inline: [...new Set(written)],
           lands: row.querySelectorAll('[data-land]').length,
           diary: diary.className,
           fold: (row.querySelector('[data-part="diary-sum"] > span:nth-child(2)')?.textContent || '').trim(),
@@ -956,9 +1077,9 @@ test('revert puts back everything that reply changed — theme, camera, visibili
       await settled()
       await emit(app, { type: 'done', text: 'Done.', rounds: 2 })
       await expect(send).toHaveAttribute('aria-label', 'Send (Enter)')
-      const reply = rows.last()
-      await expect(reply).not.toHaveAttribute('aria-hidden', 'true')
-      return reply
+      await expect(rows.last()).not.toHaveAttribute('aria-hidden', 'true')
+      // Pinned by its place: `.last()` would be re-resolved to whatever row is newest when used.
+      return log.locator(`:scope > [data-row="${await rows.last().getAttribute('data-row')}"]`)
     }
 
     await expect(html).toHaveAttribute('data-theme', 'dark')

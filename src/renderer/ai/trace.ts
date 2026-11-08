@@ -397,10 +397,15 @@ export interface StepCount {
  * turn has shown stays, ticked once the next has begun).
  */
 export interface DiaryStep {
-  /** `Reading 4 models`, `Filtering `, `Checking Fire Rating`, a note. */
+  /** `Reading 4 models`, `Filtering `, `Checking `, a note. */
   label: string
-  /** What follows the label in the mono face: `IfcWall`. */
+  /**
+   * What follows the label in the mono face, as the file spells it: `IfcWall`, `FireRating`
+   * (since 2026-11-08 a Check's property is here, not prettified in the label).
+   */
   mono: string
+  /** The names in `mono` that are IFC terms of the loaded models: drawn in the one IFC-term colour. */
+  terms: readonly string[]
   /** The count on the right, or `null`. */
   count: StepCount | null
   /** A later step has begun (or the turn is answered): the step is ticked. */
@@ -460,17 +465,23 @@ interface Scene {
   check: number | null
 }
 
-/** A step's label and mono, at its end. */
-function stepWords(tl: Timeline, step: TraceStep): { label: string; mono: string } {
+const NO_TERMS: readonly string[] = []
+
+/**
+ * A step's label and mono, at its end. 2026-11-08 — the names a step shows are the file's own
+ * (`Checking FireRating`, the owner's IFC-term decision), in the mono part, with the ones that are
+ * IFC terms listed.
+ */
+function stepWords(tl: Timeline, step: TraceStep): { label: string; mono: string; terms: readonly string[] } {
   if (step.kind === 'read') {
     const models = tl.read.models.filter((n) => n > 0).length
-    return { label: `Reading ${countText(models)} ${nounFor(models, 'model')}`, mono: '' }
+    return { label: `Reading ${countText(models)} ${nounFor(models, 'model')}`, mono: '', terms: NO_TERMS }
   }
   const facts = tl.calls[step.call].facts
   const r = facts.rules
-  if (step.kind === 'filter' && r?.filter) return { label: 'Filtering ', mono: r.filter.what }
-  if (step.kind === 'check' && r?.check) return { label: `Checking ${r.check.props}`, mono: '' }
-  return { label: facts.note, mono: '' }
+  if (step.kind === 'filter' && r?.filter) return { label: 'Filtering ', mono: r.filter.what, terms: r.filter.terms ?? NO_TERMS }
+  if (step.kind === 'check' && r?.check) return { label: 'Checking ', mono: r.check.props, terms: r.check.terms ?? NO_TERMS }
+  return { label: facts.note, mono: '', terms: NO_TERMS }
 }
 
 /**

@@ -169,7 +169,10 @@ test('the IFC+SG question: Yes and No that never take the focus, answered once b
     )
     const results = await toolResults(app)
     expect(results[results.length - 1]).toMatchObject({ ok: true, result: { asked: true } })
-    const reply = log.locator(':scope > [data-row]').last()
+    // The asking reply, pinned by its place: `.last()` is re-resolved at every use, and once the
+    // Yes is sent the last row is the next reply being written.
+    const at = await log.locator(':scope > [data-row]').last().getAttribute('data-row')
+    const reply = log.locator(`:scope > [data-row="${at}"]`)
 
     // Vee's lead-in is a bubble of Vee's; the question is the app's own, apart from it — no tape,
     // no card — with its two quick replies.
@@ -189,14 +192,17 @@ test('the IFC+SG question: Yes and No that never take the focus, answered once b
     await expect(vee.locator('[data-role="vee-announce"]')).toContainText('Is this model for an IFC+SG submission?')
 
     // The user's click answers it: the reply's text is sent as the user's message, once, and the
-    // quick replies are gone — there is nothing left to answer it with.
+    // quick replies are gone — there is nothing left to answer it with. The question itself stays
+    // where it was, as the approved prototype keeps it (shot `sg-*-2-yes-answer`), and the answer
+    // is the user's own bubble under it.
     const before = (await held(app)).id
     await replies.filter({ hasText: 'Yes' }).click()
     await expect.poll(async () => (await held(app)).id).not.toBe(before)
     expect((await held(app)).asked?.userText).toBe('Yes')
+    await expect(ask).toHaveCount(1)
     await expect(ask.locator('button')).toHaveCount(0)
     await expect(ask.locator('.vm-ask-q')).toHaveText('Is this model for an IFC+SG submission?')
-    await expect(log.locator(':scope > [data-mine]').last()).toContainText('Yes')
+    await expect(log.locator(`:scope > [data-row="${Number(at) + 1}"][data-mine]`)).toContainText('Yes')
     await expect(log.locator(':scope > [data-mine]', { hasText: /^Yes/ })).toHaveCount(1)
 
     // The answer is the conversation's now: the view state reads it back, and Vee cannot ask again.

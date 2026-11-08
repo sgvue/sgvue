@@ -56,7 +56,7 @@ import { labelText } from '../../shared/fmt'
 import { abortChat, sendChat } from '../ai/bridge'
 import { quoteOfPart } from '../ai/parts'
 import { IFCSG_QUESTION, IFCSG_REPLIES } from '../ai/executors/ask'
-import { termsOf, vocabularyFor } from '../ai/terms'
+import { termsOf, traceTermsOf, vocabularyFor } from '../ai/terms'
 import { onTraceChange, traceEpoch, traceSnapshot, type TraceChange } from '../ai/trace-store'
 import { api } from '../api'
 import { copyingIn } from '../clipboard'
@@ -97,15 +97,21 @@ const cut = (text: string): string => text.slice(0, VEE_MAX_LABEL)
  * federation**, so a model unloaded or replaced since recolours an old reply: a name no longer in
  * the vocabulary falls back to plain mono.
  */
-const termCache = new WeakMap<ChatMessage, { fed: object; terms: number[] }>()
-function termsFor(m: ChatMessage): number[] {
+const termCache = new WeakMap<ChatMessage, { fed: object; terms: number[]; trace: string[] }>()
+function messageTerms(m: ChatMessage): { terms: number[]; trace: string[] } {
   const fed = useShell.getState().federation
   const hit = termCache.get(m)
-  if (hit && hit.fed === fed) return hit.terms
-  const terms = m.role === 'assistant' && fed.elements.length ? termsOf(vocabularyFor(fed), m.text, m.role).slice(0, VEE_MAX_TERMS) : []
-  termCache.set(m, { fed, terms })
-  return terms
+  if (hit && hit.fed === fed) return hit
+  const live = m.role === 'assistant' && fed.elements.length > 0
+  const v = live ? vocabularyFor(fed) : null
+  const terms = v ? termsOf(v, m.text, m.role).slice(0, VEE_MAX_TERMS) : []
+  // …and the names its trace shows that are terms: its diary's steps and its storey-rows title.
+  const trace = v ? traceTermsOf(v, m.trace) : []
+  const entry = { fed, terms, trace }
+  termCache.set(m, entry)
+  return entry
 }
+const termsFor = (m: ChatMessage): number[] => messageTerms(m).terms
 
 /** File text in a heads-up, cut to the port's bound (it was cut where it was observed). */
 const obsCut = (text: string): string => text.slice(0, VEE_MAX_OBS_TEXT)
@@ -169,7 +175,9 @@ function sent(m: ChatMessage, open = false): VeeSnapshot['msgs'][number] {
               .map((st) => ({ label: cut(st.label), mono: cut(st.mono), n: st.n, unit: cut(st.unit) }))
           }
         : {}),
-      ...(v.trace.title !== undefined ? { title: cut(v.trace.title) } : {})
+      ...(v.trace.title !== undefined ? { title: cut(v.trace.title) } : {}),
+      // 2026-11-08 — the names above that are IFC terms of the loaded models, recomputed per federation.
+      ...(messageTerms(m).trace.length ? { terms: messageTerms(m).trace.map(cut) } : {})
     },
     // Stage 2: the coloured terms, the heads-up and the IFC+SG question.
     ...(terms.length ? { terms } : {}),

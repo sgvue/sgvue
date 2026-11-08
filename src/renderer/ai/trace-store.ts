@@ -27,6 +27,7 @@ import type { Federation } from '../../shared/federate'
 import { wordCount } from './blocks'
 import { traceReduce, traceSummary, type Timeline, type TraceEvent } from './trace'
 import { readFacts, toolFacts, type ChatTrace } from './trace-facts'
+import { isTerm, vocabularyFor } from './terms'
 
 /** What the view reads. A new object whenever any of it changes. */
 export interface TraceState {
@@ -107,7 +108,9 @@ export function traceToolExec(
 ): void {
   // Nothing to add to a turn that is not running — and no reason to walk the elements for it.
   if (!state.timeline || state.timeline.answer !== null) return
-  feed({ type: 'tool_exec', at: traceNow(), facts: toolFacts(name, input, federation) })
+  // The diary's names in the one IFC-term colour where the loaded models carry them (2026-11-08).
+  const vocabulary = vocabularyFor(federation)
+  feed({ type: 'tool_exec', at: traceNow(), facts: toolFacts(name, input, federation, (n) => isTerm(vocabulary, n)) })
 }
 
 /**

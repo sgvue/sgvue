@@ -44,6 +44,7 @@ import {
   type TraceFrame
 } from '../ai/trace'
 import { countText } from '../ai/trace-facts'
+import { namePieces } from '../ai/terms'
 import { traceNow, traceState } from '../ai/trace-store'
 import { Chevron, TickOne } from './VeeIcons'
 
@@ -183,7 +184,10 @@ export function paintMatrix(
     canvas.style.width = cssLength(w, dpr)
     canvas.style.height = cssLength(h, dpr)
   }
-  const ctx = canvas.getContext('2d')
+  // Software rasterising from the start: the matrix is read back every frame by the e2e suite and
+  // the dev harness, and without this flag Chromium swaps rasterisers after repeated readbacks, so
+  // one frame drawn twice gives its rounded cells different corner coverage (2026-11-08).
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, w, h)
@@ -457,6 +461,55 @@ export function BlockView({ block, marks = NO_TERMS }: { block: Block; marks?: T
   )
 }
 
+/* ────────────────────────────── the trace's own names ────────────────────────────── */
+
+/**
+ * 2026-11-08 — the owner's IFC-term decision, in the trace's own lines: a diary step's names
+ * (`Filtering IfcWall`, `Checking FireRating`) and the storey-rows card's title (`FireRating ·
+ * missing`) are the file's spelling, and a name that is an IFC term of the loaded models — `terms`,
+ * decided in the main window — is drawn as Vee's text draws one: `.ifc-term`, mono 500 in the one
+ * colour. Everything else stays as it was. Text only, never HTML.
+ */
+export function TermText({ text, terms }: { text: string; terms: readonly string[] | undefined }): React.JSX.Element {
+  if (!terms?.length) return <>{text}</>
+  return (
+    <>
+      {namePieces(text).map((p, k) =>
+        p.name && terms.includes(p.text) ? (
+          <span key={k} className="ifc-term">
+            {p.text}
+          </span>
+        ) : (
+          <Fragment key={k}>{p.text}</Fragment>
+        )
+      )}
+    </>
+  )
+}
+
+/** What each painted node shows now, so it is rebuilt only when its text or terms change. */
+const painted = new WeakMap<HTMLElement, string>()
+
+/** The same for a node the trace's painter writes: rebuilt only when its text or terms change. */
+export function paintTermText(node: HTMLElement, text: string, terms: readonly string[]): void {
+  const key = terms.length ? `${text}\u0000${terms.join('\u0000')}` : text
+  if (painted.get(node) === key && node.textContent === text) return
+  painted.set(node, key)
+  if (!terms.length) {
+    node.textContent = text
+    return
+  }
+  node.replaceChildren(
+    ...namePieces(text).map((p) => {
+      if (!p.name || !terms.includes(p.text)) return document.createTextNode(p.text)
+      const span = document.createElement('span')
+      span.className = 'ifc-term'
+      span.textContent = p.text
+      return span
+    })
+  )
+}
+
 /* ────────────────────────────── the diary ────────────────────────────── */
 
 /** One step a finished reply keeps (`ChatTrace.steps`). */
@@ -495,7 +548,8 @@ export const Diary = memo(function Diary({
   steps,
   slots,
   timeline,
-  owned
+  owned,
+  terms
 }: {
   /** The folded line, or `null` while the turn runs. */
   fold: string | null
@@ -506,6 +560,8 @@ export const Diary = memo(function Diary({
   /** The answered turn's timeline, while it is this reply's. */
   timeline: Timeline | null
   owned: boolean
+  /** The names in the finished steps that are IFC terms (`VeeMessage.trace.terms`). */
+  terms?: readonly string[]
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -577,7 +633,11 @@ export const Diary = memo(function Diary({
                   </span>
                   <span className="vm-sl">
                     {st.label}
-                    {st.mono ? <code>{st.mono}</code> : null}
+                    {st.mono ? (
+                      <code>
+                        <TermText text={st.mono} terms={terms} />
+                      </code>
+                    ) : null}
                   </span>
                   <span className="vm-n">
                     {st.n !== null ? (

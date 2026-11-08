@@ -1147,14 +1147,15 @@ Anything not on this list is a defect.
   through, the selection colours); a faint 4 % grid behind the thread; not-ready lines — no
   key wins (`Add your API key in Preferences to start.`, composer disabled at `.45`, no
   placeholder), no model (`Open a model and I'll take a look.`; no board, no suggestions; a
-  question gets the line back and runs no turn). **The trace's answer is the app's own** — the
+  question gets the line back and runs no turn); a not-ready line carries the day line and its
+  time, as a first message does. **The trace's answer is the app's own** — the
   handoff (`design-reference/ask-vee/`) is the specification up to its Answer cue: while a turn
   runs Vee's bubble is typing dots, then a diary of every step shown with its live count over
   the element matrix; at the answer it folds into one dashed line (`✓ 412 read · 80 walls ·
   12 missing · 7s ›`, a dashed card) that reopens to its steps, and the reply's parts land ≤ 110 ms apart, all
   within 0.5 s, on the row they settle in — no re-layout. The status beside the name, the ticker
   bubble and the word-by-word reveal are gone. The selected storey row is pressed and ringed by
-  a revision cloud; the storey-rows card is titled by the checked property; a fresh bubble pops
+  a revision cloud; the storey-rows card is titled by the checked property in the file's spelling (its IFC terms coloured, their case kept inside the capitalised title); a fresh bubble pops
   once — none of the motion under reduced motion. The table card's `copy csv` flashes `copied` /
   `couldn’t copy` for 1 400 ms here (2026-10-02's "no flash" stands for the main window).
   **Removed:** the per-message `Vee` / `You` labels and the header's ×; `Ask Vee` is the OS
@@ -1498,6 +1499,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-08 — **the baseline's app fixes**: a tabulation answers in the chat through `summarize_elements`, and `make_schedule` only when a schedule is asked for (F1, 42 prompt lines); `make_schedule` drops a class no model carries from a union and says so (F2); `clash_check` states its tolerance (F6).
 - 2026-11-08 — **the graders read honest replies as honest** (number words 0–20, not `one`; a modal passive is no claim; "click Save to write the file"; offers to hide or schedule); a probe can follow the turn's own call (`fromCall`, `lateTruth`), recorded calls matched key-order-free; `ai-eval.cjs --regrade=<dir>` re-scores a saved run under plain Node, carrying the run's verdict for view checks, into `metrics.regrade.json`, and a row's `rep` must be a non-negative integer; a zero is the digit 0 alone — Vee writes every count in digits, zero included (the owner: "digits only") — and never a 0 inside another number or a measure; a count may be met by the panel's table (`orTableRow`); `askShown` needs the IFC+SG question really shown.
 - 2026-11-08 — **`summarize_elements` marks the elements with no value for its grouping** (`noValue: true`, "— N (carry no X)"), apart from an authored "—", the table keeping the design's em dash; a set a rule can say is read with a rule tool, not `query_sql`, since only a rule-bearing read gives the heads-up and lets `ask_choice` ask.
+- 2026-11-08 — **the trace's names are the file's own, coloured as IFC terms**: `toolFacts` takes the main window's `isTerm` and marks which shown names are terms (`filter.terms` / `check.terms`); the diary's steps, the folded line and the storey-rows title read `FireRating`, not "Fire Rating"; a finished reply's terms are worked out per snapshot (`traceTermsOf`), so a name no longer loaded falls back to plain; an `.ifc-term` keeps its case inside a capitalised header (`text-transform: none`).
+- 2026-11-08 — **the matrix canvas is `willReadFrequently`, and the reduced-motion e2e compares the matrix by layout, not pixels** (the owner: "Compare layout, not pixels"): the e2e's per-frame readbacks made one reduced-motion frame rasterise twice with 160 corner pixels apart; `layoutKey` (`tests/e2e/layout-key.ts`) names a picture by its cells' boxes and centre colours, so sub-pixel corner coverage is the same picture and a moved, added or recoloured cell is not.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

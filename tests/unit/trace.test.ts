@@ -256,7 +256,8 @@ describe('the handoff’s scene, driven by events', () => {
     expect(readFacts(fed)).toEqual({ models: [140, 244, 20, 8], total: 412 })
     const r = WALL_FACTS.rules!
     expect(r.filter).toEqual({ what: 'IfcWall', count: 86, noun: 'wall' })
-    expect(r.check).toEqual({ props: 'Fire Rating', count: 9, unit: 'missing' })
+    // The file's own spelling since 2026-11-08 (the owner's IFC-term decision).
+    expect(r.check).toEqual({ props: 'FireRating', count: 9, unit: 'missing' })
     expect(r.scope).toEqual(R.WALLS)
     expect(r.matched).toEqual(R.FLAGGED.map((k) => R.WALLS[k]))
     expect(r.rows.map((row) => [row.label, row.n])).toEqual(R.LEVELS)
@@ -380,7 +381,7 @@ describe('the handoff’s scene, driven by events', () => {
       const want = [
         { at: CUES.Read, roll: CUES.Read + 0.1, label: 'Reading 4 models', mono: '', n: n1, unit: n1 === 1 ? 'element' : 'elements', accent: false, next: CUES.Filter },
         { at: CUES.Filter, roll: CUES.Filter, label: 'Filtering ', mono: 'IfcWall', n: n2, unit: 'walls', accent: false, next: CUES.Check },
-        { at: CUES.Check, roll: CUES.Check, label: 'Checking Fire Rating', mono: '', n: missing, unit: 'missing', accent: missing > 0, next: Infinity }
+        { at: CUES.Check, roll: CUES.Check, label: 'Checking ', mono: 'FireRating', n: missing, unit: 'missing', accent: missing > 0, next: Infinity }
       ].filter((w) => T >= w.at)
       const f = frameAt(T)
       expect([T, f.steps.map((l) => l.label + l.mono)]).toEqual([T, want.map((w) => w.label + w.mono)])
@@ -398,8 +399,8 @@ describe('the handoff’s scene, driven by events', () => {
     expect(said(CUES.Read + 0.9)).toBe('Reading 4 models · 206 elements')
     expect(said(CUES.Filter - 0.1)).toBe('Reading 4 models · 412 elements')
     expect(said(CUES.Filter + 1.2)).toBe('Reading 4 models · 412 elements | Filtering IfcWall · 86 walls')
-    expect(said(CUES.Check + 0.35)).toBe('Reading 4 models · 412 elements | Filtering IfcWall · 86 walls | Checking Fire Rating · 0 missing')
-    expect(said(CUES.Check + 2.3)).toMatch(/Checking Fire Rating · 9 missing$/)
+    expect(said(CUES.Check + 0.35)).toBe('Reading 4 models · 412 elements | Filtering IfcWall · 86 walls | Checking FireRating · 0 missing')
+    expect(said(CUES.Check + 2.3)).toMatch(/Checking FireRating · 9 missing$/)
     // The number lights only once it is above 0.
     expect(frameAt(CUES.Check + 0.35).steps[2].count!.accent).toBe(false)
     expect(frameAt(CUES.Check + 1.0).steps[2].count!.accent).toBe(true)
@@ -407,7 +408,7 @@ describe('the handoff’s scene, driven by events', () => {
     expect(frameAt(CUES.Answer).steps.map((st) => [stepText(st), st.done, st.y, st.opacity])).toEqual([
       ['Reading 4 models · 412 elements', true, 0, 1],
       ['Filtering IfcWall · 86 walls', true, 0, 1],
-      ['Checking Fire Rating · 9 missing', true, 0, 1]
+      ['Checking FireRating · 9 missing', true, 0, 1]
     ])
   })
 
@@ -520,9 +521,9 @@ describe('the handoff’s scene, driven by events', () => {
       steps: [
         { label: 'Reading 4 models', mono: '', n: 412, unit: 'elements' },
         { label: 'Filtering ', mono: 'IfcWall', n: 86, unit: 'walls' },
-        { label: 'Checking Fire Rating', mono: '', n: 9, unit: 'missing' }
+        { label: 'Checking ', mono: 'FireRating', n: 9, unit: 'missing' }
       ],
-      title: 'Fire Rating · missing'
+      title: 'FireRating · missing'
     })
     expect(traceSummary(SCENE).rows.flatMap((r) => r.ids)).toHaveLength(9)
   })
@@ -599,7 +600,7 @@ describe('the cues, from real events', () => {
       'Reading 4 models',
       'Reading the file header',
       'Filtering IfcWall',
-      'Checking Fire Rating',
+      'Checking FireRating',
       'Moving the camera'
     ])
     // …and under a note that follows a Check the matrix stays as the Check left it.
@@ -640,7 +641,7 @@ describe('the cues, from real events', () => {
     const restart = traceFrame(again, 12.05, REF_LAYOUT)
     expect(restart.cells).toHaveLength(412)
     expect(restart.cells.every((c) => c.scale === 1 && c.opacity === 1 && c.size === J(3.2))).toBe(true)
-    expect(restart.steps.slice(-2).map((l) => l.label + l.mono)).toEqual(['Checking Fire Rating', 'Filtering STR'])
+    expect(restart.steps.slice(-2).map((l) => l.label + l.mono)).toEqual(['Checking FireRating', 'Filtering STR'])
     // The Check before it keeps its final count in the diary.
     expect(restart.steps[2].count!.n).toBe(9)
     // 244 elements of STR: more than the 86 the filter grid holds one each, so 3 to a cell.
@@ -830,7 +831,7 @@ describe('a large model: each cell stands for several elements, and every number
     expect(facts.rules!.filter).toEqual({ what: 'IfcWall', count: 2_767, noun: 'wall' })
     const unrated = big.elements.filter((e) => e.type === 'IfcWall' && !('FireRating' in (e.psets.Pset_Common ?? {})))
     expect(unrated).toHaveLength(395)
-    expect(facts.rules!.check).toEqual({ props: 'Fire Rating', count: 395, unit: 'missing' })
+    expect(facts.rules!.check).toEqual({ props: 'FireRating', count: 395, unit: 'missing' })
     expect(facts.rules!.matched).toHaveLength(395)
   })
 
@@ -1024,7 +1025,7 @@ describe('reduced motion: every state at its end, and nothing in between', () =>
     expect(read.cells).toHaveLength(412)
     expect(read.cells.every((c) => c.scale === 1 && c.opacity === 1 && c.t === 1 && c.b === 'cell')).toBe(true)
     expect(read.steps).toEqual([
-      { label: 'Reading 4 models', mono: '', count: { n: 412, text: '412', unit: 'elements', accent: false }, done: false, y: 0, opacity: 1 }
+      { label: 'Reading 4 models', mono: '', terms: [], count: { n: 412, text: '412', unit: 'elements', accent: false }, done: false, y: 0, opacity: 1 }
     ])
     expect(read.sprite.state).toBe('reading')
     // Filter: 86 cells in the filter grid, nothing else.
@@ -1040,7 +1041,7 @@ describe('reduced motion: every state at its end, and nothing in between', () =>
     expect(check.beam).toBeNull()
     expect(check.cells.filter((c) => c.a === 'hit' && c.scale === 1 && c.ring === -1)).toHaveLength(9)
     expect(check.cells.filter((c) => c.a === 'dim' && c.t === 0)).toHaveLength(77)
-    expect(check.steps.at(-1)).toMatchObject({ label: 'Checking Fire Rating', count: { n: 9, text: '9', unit: 'missing', accent: true } })
+    expect(check.steps.at(-1)).toMatchObject({ label: 'Checking ', mono: 'FireRating', count: { n: 9, text: '9', unit: 'missing', accent: true } })
     expect(check.sprite.state).toBe('found')
     expect(at(CUES.Check + 0.51).sprite.state).toBe('reading')
     // Answer: the final state, at once — the diary folded and every part in.
@@ -1155,9 +1156,9 @@ describe('what the answer carries', () => {
     expect(mid.beam).not.toBeNull()
     const end = traceFrame(tl, 8.9, REF_LAYOUT)
     expect(end.cells.filter((c) => c.a === 'hit')).toHaveLength(9)
-    expect(end.steps.map((l) => [l.label, l.count!.n, l.count!.unit])).toEqual([
+    expect(end.steps.map((l) => [l.label + l.mono, l.count!.n, l.count!.unit])).toEqual([
       ['Reading 4 models', 412, 'elements'],
-      ['Checking Fire Rating', 9, 'missing']
+      ['Checking FireRating', 9, 'missing']
     ])
     expect(traceStatus(tl)).toBe('checked 412 elements · 9s')
   })

@@ -24,7 +24,6 @@ import { ruleGroups } from '../../shared/ai-schema'
 import type { Federation } from '../../shared/federate'
 import { DASH, group } from '../../shared/fmt'
 import { ABSENT_OP, matchFn, type Rule } from '../../shared/rules'
-import { prettyKey } from '../state/selectors/props'
 import { toolPhrase } from './stages'
 
 /* ────────────────────────────── scope and check ────────────────────────────── */
@@ -119,7 +118,7 @@ const upToTwo = (names: readonly string[], counted: string): string =>
 
 /** One scope rule's value as the ticker words it: the value, with its operator when not `=`. */
 function scopeValue(r: Rule): string {
-  if (r.op === ABSENT_OP) return `no ${prettyKey(r.prop)}`
+  if (r.op === ABSENT_OP) return `no ${r.prop}`
   const v = String(r.val)
   return r.op === '=' ? v : r.op === '!=' ? `≠ ${v}` : `${r.op} ${v}`
 }
@@ -145,10 +144,17 @@ export interface ReadFacts {
 }
 
 export interface RuleFacts extends ReadFacts {
-  /** `Filtering {what}` and its count — `null` when the call has no scope rule. */
-  filter: { what: string; count: number; noun: string } | null
-  /** `Checking {props}` and its count — `null` when it has no check rule. */
-  check: { props: string; count: number; unit: 'missing' | 'found' } | null
+  /**
+   * `Filtering {what}` and its count — `null` when the call has no scope rule. `terms` (2026-11-08,
+   * the owner's IFC-term decision): the names in `what` that are IFC terms of the loaded models,
+   * exactly as the file spells them — drawn in the one IFC-term colour; absent when none is.
+   */
+  filter: { what: string; count: number; noun: string; terms?: string[] } | null
+  /**
+   * `Checking {props}` and its count — `null` when it has no check rule. `props` is in the file's
+   * own spelling (`FireRating`, not `Fire Rating`, since 2026-11-08); `terms` as for `filter`.
+   */
+  check: { props: string; count: number; unit: 'missing' | 'found'; terms?: string[] } | null
   /**
    * The scope set as ascending positions in the read order (an index into the federation's
    * element list), or `null` when there is no scope rule: everything.
@@ -193,12 +199,23 @@ function classSpelling(federation: Federation, value: string): string {
 /**
  * The facts of one executed tool call. `input` is the executor's own — after `resolveNames`, so
  * a property is spelled as the file spells it.
+ *
+ * `isTerm` (2026-11-08): whether a name is an IFC term of the loaded models (`ai/terms.ts`,
+ * passed in by the caller, where the vocabulary is). The names a step shows — its classes, its
+ * scope value, its properties — keep the file's spelling, and those that are terms are listed, so
+ * the diary draws them in the one IFC-term colour, as Vee's own text does.
  */
 export function toolFacts(
   name: string,
   input: Readonly<Record<string, unknown>>,
-  federation: Federation
+  federation: Federation,
+  isTerm: (name: string) => boolean = () => false
 ): ToolFacts {
+  /** The names among `names` that are terms, or nothing — so a fact without one is as it was. */
+  const termsIn = (names: readonly string[]): { terms?: string[] } => {
+    const terms = names.filter(isTerm)
+    return terms.length ? { terms } : {}
+  }
   const note = noteFor(name, input)
   const rules = Array.isArray(input.rules) ? (input.rules as Rule[]) : undefined
   const match = matchFn(rules)
@@ -233,21 +250,26 @@ export function toolFacts(
       split.groups.every((g) => g.scope.some(named)) &&
       split.scope.every((r) => r.prop !== 'IfcEntity' || r.op === '=')
     if (classes.length === 1 && outright) noun = classNoun(classes[0])
+    const what = classes.length ? upToTwo(classes, 'classes') : scopeValue(split.scope[0])
     filter = {
-      what: classes.length ? upToTwo(classes, 'classes') : scopeValue(split.scope[0]),
+      what,
       count: scopeCount,
-      noun
+      noun,
+      // The classes named, when they are shown (two at most); else the one scope value shown.
+      ...termsIn(classes.length ? (classes.length <= 2 ? classes : []) : [what])
     }
   }
 
   /* ── Check ── */
   let check: RuleFacts['check'] = null
   if (split.check.length) {
-    const props = [...new Set(split.check.map((r) => prettyKey(r.prop)))]
+    // The file's own spelling: a property shown in the diary is a name in the model.
+    const props = [...new Set(split.check.map((r) => r.prop))]
     check = {
       props: upToTwo(props, 'properties'),
       count: matched.length,
-      unit: split.check.every((r) => r.op === ABSENT_OP) ? 'missing' : 'found'
+      unit: split.check.every((r) => r.op === ABSENT_OP) ? 'missing' : 'found',
+      ...termsIn(props.length <= 2 ? props : [])
     }
   }
 
@@ -329,7 +351,7 @@ export interface ChatTrace {
   /**
    * 2026-11-08 — the diary folded into one line (`412 read · 80 walls · 12 missing · 7s`), the
    * steps it reopens to, each at its final count, and the storey-rows card's title when the turn
-   * checked a property (`Fire Rating · missing`). Absent on a reply written before then.
+   * checked a property (`FireRating · missing`, the file's own spelling since 2026-11-08). Absent on a reply written before then.
    */
   fold?: string
   steps?: { label: string; mono: string; n: number | null; unit: string }[]

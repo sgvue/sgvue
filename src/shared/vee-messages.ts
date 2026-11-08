@@ -63,6 +63,8 @@ export const VEE_MAX_PARTS = 10_000
 export const VEE_MAX_STEPS = 20
 /** Coloured IFC terms in one message (2026-11-08, stage 2) — `ai/terms.ts`'s `MAX_TERMS`. */
 export const VEE_MAX_TERMS = 2000
+/** The trace's coloured names a message carries: `ai/terms.ts`'s `MAX_TRACE_TERMS`. */
+export const VEE_MAX_TRACE_TERMS = 48
 /** A file value, property name or ObjectType in a heads-up (stage 2) — `ai/heads-up.ts`'s `OBS_TEXT_MAX`, with room for its ellipsis. */
 export const VEE_MAX_OBS_TEXT = 61
 /** The lead-in of an IFC+SG question (stage 2) — `ai/executors/ask.ts`'s `ASK_LEAD_MAX`, with room for its ellipsis. */
@@ -188,7 +190,12 @@ export const VeeMessage = z
           .array(z.object({ label, mono: label, n: count.nullable(), unit: label }).strict())
           .max(VEE_MAX_STEPS)
           .optional(),
-        title: label.optional()
+        title: label.optional(),
+        /**
+         * 2026-11-08 — the names in `title` and the steps' `mono` that are IFC terms of the loaded
+         * models (`ai/terms.ts`, `traceTermsOf`): drawn in the one IFC-term colour, as file text.
+         */
+        terms: z.array(label).max(VEE_MAX_TRACE_TERMS).optional()
       })
       .strict()
       .nullable()
@@ -250,8 +257,12 @@ const positions = z.array(count).max(VEE_MAX_POSITIONS)
 const ReadFacts = z.object({ models: z.array(count).max(10_000), total: count }).strict()
 
 const RuleFacts = ReadFacts.extend({
-  filter: z.object({ what: label, count, noun: label }).strict().nullable(),
-  check: z.object({ props: label, count, unit: z.enum(['missing', 'found']) }).strict().nullable(),
+  // 2026-11-08 — `terms`: the names shown that are IFC terms (two at most, `toolFacts`).
+  filter: z.object({ what: label, count, noun: label, terms: z.array(label).max(2).optional() }).strict().nullable(),
+  check: z
+    .object({ props: label, count, unit: z.enum(['missing', 'found']), terms: z.array(label).max(2).optional() })
+    .strict()
+    .nullable(),
   scope: positions.nullable(),
   matched: positions,
   scopeCount: count,

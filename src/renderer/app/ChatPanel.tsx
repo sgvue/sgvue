@@ -148,7 +148,7 @@ import { focusComposer, post } from '../vee/link'
 import { useVee } from '../vee/store'
 import { s } from './css'
 import { Cross } from './icons'
-import { BlockView, Diary, kickTrace, MarkedText, onTraceFrame, paintMatrix, reducedMotion } from './Trace'
+import { BlockView, Diary, kickTrace, MarkedText, onTraceFrame, paintMatrix, paintTermText, reducedMotion, TermText } from './Trace'
 import { Vee } from './Vee'
 import { cloudPath } from './vee-cloud'
 import {
@@ -508,7 +508,8 @@ function applyFrame(n: Parts, f: TraceFrame, dpr: number): void {
     slot.li.style.opacity = alpha(step.opacity)
     slot.li.style.transform = step.y ? `translateY(${px(step.y)})` : ''
     setText(slot.label, step.label)
-    setText(slot.mono, step.mono)
+    // The file's own names, an IFC term in its one colour (2026-11-08).
+    paintTermText(slot.mono, step.mono, step.terms)
     // Nothing in the mono face: no piece for the line's gap to stand beside.
     slot.mono.style.display = step.mono ? '' : 'none'
     slot.count.style.display = step.count ? '' : 'none'
@@ -612,6 +613,21 @@ export function newestVee(msgs: readonly Pick<VeeMessage, 'role'>[], live: boole
 export function shownNotReady(msgs: readonly Pick<VeeMessage, 'role' | 'text'>[], line: string | null): string | null {
   const last = msgs[msgs.length - 1]
   return line !== null && last?.role === 'assistant' && last.text === line ? null : line
+}
+
+/**
+ * When the not-ready line was first said (2026-11-08, the prototype's `02-nomodel` / `04-nokeynomodel`
+ * shots): it is a message of Vee's like any other, so it carries a time and stands under a day line.
+ * The time is kept while the line says the same thing — it does not tick with the clock — and taken
+ * afresh when the line changes (the key line giving way to the model line); `null` once Vee is ready.
+ */
+export function notReadyStamp(
+  was: { text: string; at: number } | null,
+  line: string | null,
+  now: number
+): { text: string; at: number } | null {
+  if (line === null) return null
+  return was && was.text === line ? was : { text: line, at: now }
 }
 
 /**
@@ -916,7 +932,7 @@ export const MessageRow = memo(function MessageRow(props: RowProps): React.JSX.E
           <div className="vm-sn-hd">
             <span className="vm-hole" aria-hidden="true" />
             {/* The property the turn checked, when it checked one (stage 1b); else what the rows count. */}
-            <span>{trace.title ?? `${nounFor(2, noun)} · by storey`}</span>
+            <span>{trace.title !== undefined ? <TermText text={trace.title} terms={trace.terms} /> : `${nounFor(2, noun)} · by storey`}</span>
             <b>{countText(total)}</b>
           </div>
           <div className="vm-sn-rows">
@@ -1051,6 +1067,7 @@ export const MessageRow = memo(function MessageRow(props: RowProps): React.JSX.E
             slots={0}
             timeline={props.timeline}
             owned={owned}
+            terms={trace.terms}
           />
         ) : null}
         {list.map(piece)}
@@ -1180,6 +1197,8 @@ export default function ChatPanel(): React.JSX.Element | null {
   const hold = useRef<{ send: number; at: WidthHold } | null>(null)
   /** How many messages there were when the window first drew: the ones after it pop in. */
   const firstCount = useRef<number | null>(null)
+  /** When the not-ready line now shown was first said (`notReadyStamp`). */
+  const notReadySince = useRef<{ text: string; at: number } | null>(null)
   /** Each row's pop, decided once (`freshRow`), and the transcript length it was decided for. */
   const freshMemo = useRef(new Map<string, boolean>())
   const freshLen = useRef(0)
@@ -1227,10 +1246,27 @@ export default function ChatPanel(): React.JSX.Element | null {
       // The width the matrix is planned for: the canvas's, but held while a Check's beam runs.
       const measured = n.canvas?.parentElement?.clientWidth ?? 0
       const was = hold.current && hold.current.send === timeline.send ? hold.current.at : null
-      const at = planWidth(timeline, T, measured > 0 ? measured : (was?.width ?? 0), was)
-      hold.current = { send: timeline.send, at }
-      const shown = traceFrame(timeline, T, { width: at.width, dpr, textH: 0, reduced })
+      let at = planWidth(timeline, T, measured > 0 ? measured : (was?.width ?? 0), was)
+      let shown = traceFrame(timeline, T, { width: at.width, dpr, textH: 0, reduced })
       applyFrame(n, shown, dpr)
+      // What this very frame just did to the diary can change the matrix's width: the diary
+      // opening at Read (it was hidden, so it measured nothing), or a step's line coming in and
+      // the thread's scrollbar coming or going with it. The canvas is then sized for the width it
+      // has now (`paintMatrix` reads it), while its cells were planned for the width measured
+      // before. So measure again, and if the plan would follow, plan and draw again — before
+      // anything is painted. Otherwise that mismatched picture stands on screen: for a frame with
+      // motion, and under reduced motion until the next cue or second, which draws the state again
+      // as a second picture of it (`planWidth` still holds a running Check's width).
+      const after = n.canvas?.parentElement?.clientWidth ?? 0
+      if (after > 0 && after !== at.width) {
+        const next = planWidth(timeline, T, after, was)
+        if (next.width !== at.width) {
+          at = next
+          shown = traceFrame(timeline, T, { width: at.width, dpr, textH: 0, reduced })
+          applyFrame(n, shown, dpr)
+        }
+      }
+      hold.current = { send: timeline.send, at }
       applyLands(n, ans)
       if (veeNow.current !== shown.sprite.state) {
         veeNow.current = shown.sprite.state
@@ -1335,6 +1371,8 @@ export default function ChatPanel(): React.JSX.Element | null {
   freshLen.current = st.chatMsgs.length
 
   const notReady = shownNotReady(st.chatMsgs, notReadyLine(st.hasKey, st.hasModel))
+  notReadySince.current = notReadyStamp(notReadySince.current, notReady, Date.now())
+  const notReadyAt = notReadySince.current?.at ?? 0
   const noKey = st.hasKey === false
   const presence = presenceOf({ hasKey: st.hasKey, busy: st.chatBusy, toolRan: !!timeline && timeline.tool !== null, end: st.chatEnd })
   const newest = newestVee(st.chatMsgs, live, notReady !== null)
@@ -1475,6 +1513,12 @@ export default function ChatPanel(): React.JSX.Element | null {
         >
           {thread}
 
+          {/* The not-ready line is a message of Vee's: under a day line when it is the day's first. */}
+          {notReady !== null && dayLabel(notReadyAt, now) !== day ? (
+            <div key="nr-day" className="vm-day">
+              {dayLabel(notReadyAt, now)}
+            </div>
+          ) : null}
           {notReady !== null ? (
             <div key="nr" data-role="vee-not-ready" className="vm-grp vm-vee">
               <span className="vm-av" data-part="sprite">
@@ -1488,7 +1532,10 @@ export default function ChatPanel(): React.JSX.Element | null {
                 />
               </span>
               <div className="vm-stack">
-                <div className="vm-b">{notReady}</div>
+                <div className="vm-b">
+                  <span data-part="text">{notReady}</span>
+                  <span className="vm-t">{hhmm(notReadyAt)}</span>
+                </div>
               </div>
             </div>
           ) : st.chatMsgs.length === 0 && !hideSuggest ? (

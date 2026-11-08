@@ -16,6 +16,8 @@
  *     every message that did not change — so none of them renders again;
  *   · the revision cloud's path and the consent card's split, as pure functions.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -28,7 +30,7 @@ import { boardOf, canRetry, connect, messageId, receive, snapshotOf } from '../.
 import { handleEvent, sendChat } from '../../src/renderer/ai/bridge'
 import { consentText, NO_MODEL_LINE } from '../../src/renderer/state/selectors/chat'
 import { useShell } from '../../src/renderer/state/shell'
-import ChatPanel, { freshRow, MessageRow, rowPressed, rowProps, type RowContext, type RowProps } from '../../src/renderer/app/ChatPanel'
+import ChatPanel, { freshRow, MessageRow, notReadyStamp, rowPressed, rowProps, type RowContext, type RowProps } from '../../src/renderer/app/ChatPanel'
 import { cloudPath } from '../../src/renderer/app/vee-cloud'
 import { keepUnchanged, takeBoard, takeSnapshot, useVee } from '../../src/renderer/vee/store'
 import { resetShell } from './stub-viewer'
@@ -167,6 +169,57 @@ describe('the answer phase, rendered', () => {
     expect(rowPressed({ label: 'L2', n: 5 }, 'L2', 5)).toBe(true)
     expect(rowPressed({ label: 'L2', n: 5 }, 'L2', 6)).toBe(false)
     expect(rowPressed({ label: 'L2', n: 5 }, null, 5)).toBe(false)
+  })
+
+  it('keeps an IFC term in the storey-rows title in the file’s own case, in its one colour (2026-11-08)', () => {
+    // The card's title is set in capitals (`.vm-sn-hd`); the term is its own span, which the
+    // window's style keeps in the file's spelling — `FireRating · MISSING`, as the prototype's
+    // `ifc-*-2-fire-answer` shot reads.
+    const html = render({ msgs: [vmsg({ trace: { ...TRACE, title: 'FireRating · found', terms: ['FireRating'] } })] })
+    expect(html).toContain('<span><span class="ifc-term">FireRating</span> · found</span>')
+    // A name the models do not carry as a term stays a plain word of the title.
+    expect(render({ msgs: [vmsg({ trace: { ...TRACE, title: 'Fire Rating · found', terms: ['FireRating'] } })] })).toContain(
+      '<span>Fire Rating · found</span>'
+    )
+    const css = readFileSync(join(process.cwd(), 'src/renderer/styles/vee.css'), 'utf8')
+    const rule = (selector: string): string => {
+      const at = css.indexOf(`${selector} {`)
+      expect(at, selector).toBeGreaterThanOrEqual(0)
+      return css.slice(at, css.indexOf('}', at))
+    }
+    expect(rule('.vm-sn-hd')).toMatch(/text-transform:\s*uppercase/)
+    expect(rule('.vm .ifc-term')).toMatch(/text-transform:\s*none/)
+    expect(rule('.vm .ifc-term')).toMatch(/letter-spacing:\s*0/)
+  })
+
+  it('dates and times the not-ready line as a first message of the day — the key line winning, the composer disabled', () => {
+    // No key and no model (the prototype's `04-nokeynomodel`): a day line, then the key line, its time on it.
+    const html = render({ msgs: [], hasKey: false, hasModel: false })
+    const nr = html.indexOf('data-role="vee-not-ready"')
+    expect(nr).toBeGreaterThan(0)
+    // (`nr` is the attribute's place, inside the group's own `<div `.)
+    expect(html.slice(0, nr)).toMatch(/<div class="vm-day">Today<\/div><div $/)
+    expect(html.slice(nr)).toMatch(
+      /<span data-part="text">Add your API key in Preferences to start\.<\/span><span class="vm-t">\d\d:\d\d<\/span>/
+    )
+    expect(html).toMatch(/<input[^>]*data-role="chatinput"[^>]*disabled=""[^>]*placeholder=""/)
+    expect(html).not.toContain('data-role="vee-board"')
+    // No model, a key (`02-nomodel`): the model line, dated and timed the same way.
+    const model = render({ msgs: [], hasKey: true, hasModel: false })
+    expect(model).toMatch(/<div class="vm-day">Today<\/div>\s*<div data-role="vee-not-ready"/)
+    expect(model).toContain('<span data-part="text">Open a model and I’ll take a look.</span>')
+    // Under a conversation already dated today, no second day line.
+    const after = render({ msgs: [vmsg({ role: 'user', text: 'hi', at: Date.now() })], hasKey: false, hasModel: true })
+    expect((after.match(/class="vm-day"/g) ?? []).length).toBe(1)
+    expect(after).toContain('data-role="vee-not-ready"')
+  })
+
+  it('keeps the not-ready line’s time while it says the same, and takes a new one when it changes', () => {
+    const first = notReadyStamp(null, 'A', 1000)
+    expect(first).toEqual({ text: 'A', at: 1000 })
+    expect(notReadyStamp(first, 'A', 5000)).toBe(first)
+    expect(notReadyStamp(first, 'B', 5000)).toEqual({ text: 'B', at: 5000 })
+    expect(notReadyStamp(first, null, 5000)).toBeNull()
   })
 
   it('reads a consent card’s request as a question and a detail', () => {

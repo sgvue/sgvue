@@ -232,6 +232,12 @@ const DOORS_REPLY_TERMS =
 /** The newest reply's consent card's own buttons, in the Ask Vee window. */
 const LAST_CARD = `[...document.querySelectorAll('[data-role="chatlog"] > [data-row]')].pop().querySelector('[data-role="consent"]')`
 
+/** The Ask Vee window open, then every model gone, then a fresh conversation (`vm-02`, `vm-04`). */
+const NO_MODEL =
+  `D.chat.setState({ chatOpen: true }); await sleep(1500);` +
+  ` for (const key of D.federation().models.map((m) => m.meta.modelKey)) { await D.unload(key); await sleep(400) }` +
+  ` await sleep(800); D.chat.reset(); await sleep(300)`
+
 const VM_STATES = {
   // 01 — first open: the header, the board, today, the boot audit, the suggestions.
   'vm-01-first': { size: VM.small, js: `${VEE_PIN} ${vmAt(-1)}; click(chatPill())`, shot: true },
@@ -271,17 +277,16 @@ const VM_STATES = {
       ` ${vmAt(400 + CUE.answer)}; D.chat.step.done('One thing first.'); ${vmAt(400 + CUE.answer + 3)}`,
     shot: true
   },
-  // 02 — every model unloaded through the sidebar's own Unload and delete: no model, so one line,
-  // no board, no suggestions; the composer stays.
-  'vm-02-nomodel': {
-    size: VM.small,
-    js:
-      `for (let k = 0; k < 8; k++) { const b = byTitle('Unload model')[0]; if (!b) break;` +
-      ` click(b); await sleep(300); click(byText('button', 'delete')); await sleep(1500); }`,
-    shot: true
-  },
-  // 04 — and no key either: the key line wins.
-  'vm-04-nokeynomodel': { size: VM.small, key: false, js: PREFS_CLOSE, shot: true }
+  // 02 — no model open: one line, no board, no suggestions; the composer stays — on a fresh
+  // conversation, as the prototype's shot is. As the real case goes: the Ask Vee window open first
+  // (there is no Ask pill once no model is open, so it is opened while one still is — through the
+  // panel's own `chatOpen`, as the pill sets it, whether or not an earlier state left it open),
+  // then every model unloaded through the dev harness's `D.unload` (the sidebar's own delete: the
+  // app offers no × for the last model, so the sidebar alone always left the demo's MEP — 8
+  // elements — on screen), then a fresh conversation.
+  'vm-02-nomodel': { size: VM.small, js: NO_MODEL, shot: true },
+  // 04 — and no key either: the key line wins. The same steps first, so it stands on its own too.
+  'vm-04-nokeynomodel': { size: VM.small, key: false, js: `${PREFS_CLOSE}; ${NO_MODEL}`, shot: true }
 }
 
 /* ── 2026-10-08: a reply's own format ───────────────────────────────────────────
@@ -687,19 +692,32 @@ const STATE_JS = {
  */
 async function spriteCrops(win, dir, stem) {
   const PAD = 6
-  const slots = JSON.parse(
+  const { view, slots } = JSON.parse(
     await win.webContents.executeJavaScript(
-      `JSON.stringify([...document.querySelectorAll('[data-role="vee"]')].map((e) => {` +
-        ` const b = e.getBoundingClientRect(); return { slot: Math.round(b.width), box: [b.x, b.y, b.width, b.height] } }))`
+      `JSON.stringify({ view: [innerWidth, innerHeight], slots: [...document.querySelectorAll('[data-role="vee"]')].map((e) => {` +
+        ` const b = e.getBoundingClientRect(); return { slot: Math.round(b.width), box: [b.x, b.y, b.width, b.height] } }) })`
     )
   )
   for (const [n, { slot, box }] of slots.entries()) {
-    const crop = await win.webContents.capturePage({
-      x: Math.floor(box[0] - PAD),
-      y: Math.floor(box[1] - PAD),
-      width: Math.ceil(box[2] + 2 * PAD),
-      height: Math.ceil(box[3] + 2 * PAD)
-    })
+    // 2026-11-08 — only what is in the view. A sprite scrolled out of a long thread stands above
+    // the page's top, and a rectangle reaching outside the view is what `capturePage` failed on
+    // with `UnknownVizError` (the `vm-02a-fire-checking` run, whose thread scrolls).
+    const x0 = Math.max(0, Math.floor(box[0] - PAD))
+    const y0 = Math.max(0, Math.floor(box[1] - PAD))
+    const x1 = Math.min(view[0], Math.ceil(box[0] + box[2] + PAD))
+    const y1 = Math.min(view[1], Math.ceil(box[1] + box[3] + PAD))
+    if (x1 - x0 < 4 || y1 - y0 < 4) {
+      console.log(`[crop] ${stem} sprite ${n}: out of view, skipped`)
+      continue
+    }
+    let crop
+    try {
+      crop = await win.webContents.capturePage({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+    } catch (error) {
+      console.log(`[crop] ${stem} sprite ${n}: not captured (${error.message})`)
+      continue
+    }
+    if (crop.isEmpty()) continue
     const zoomed = await win.webContents.executeJavaScript(
       `(async () => { const img = new Image(); img.src = ${JSON.stringify(crop.toDataURL())}; await img.decode();` +
         ` const c = document.createElement('canvas'); c.width = img.width * 8; c.height = img.height * 8;` +
@@ -741,7 +759,19 @@ let veeSize = [330, 420]
 /** What `settings:get` says: whether a key is stored. A state's `key` changes it. */
 let veeKey = true
 
+/**
+ * Device emulation for the Ask Vee window's view — **only once its page has loaded**. The first
+ * run of this harness called it on a window that had not navigated yet, right after creating it,
+ * and the whole process ended on SIGSEGV the moment the first `vm-*` state opened the window: a
+ * `webContents` with no page has no view to emulate. The main window is emulated only after its
+ * `loadFile` resolves for the same reason, and the app's own `main/vee-window.ts` never emulates.
+ */
 function emulateVee(w) {
+  if (w.isDestroyed() || w.webContents.isDestroyed() || w.webContents.isLoading() || !w.webContents.getURL()) {
+    console.log('[vee] emulation deferred: the page has not loaded yet')
+    return
+  }
+  console.log(`[vee] emulating ${veeSize[0]} × ${veeSize[1]} at ${DPR}x`)
   w.webContents.enableDeviceEmulation({
     screenPosition: 'desktop',
     screenSize: { width: SIZE[0], height: SIZE[1] },
@@ -760,6 +790,11 @@ function placeVee(w) {
     width: veeSize[0],
     height: veeSize[1]
   })
+}
+
+/** A new size for the open window: its bounds, then its emulated view to match. */
+function resizeVee(w) {
+  placeVee(w)
   emulateVee(w)
 }
 
@@ -768,6 +803,8 @@ function openVeeWindow(main, theme) {
     veeWin.focus()
     return
   }
+  console.log(`[vee] open: ${veeSize[0]} × ${veeSize[1]}, ${theme}`)
+  // As `main/vee-window.ts` builds it: a child of the main window, not shown until it can paint.
   const w = new BrowserWindow({
     parent: main,
     title: 'Ask Vee',
@@ -776,7 +813,10 @@ function openVeeWindow(main, theme) {
     minWidth: 300,
     minHeight: 380,
     useContentSize: true,
-    show: true,
+    modal: false,
+    resizable: true,
+    fullscreenable: false,
+    show: false,
     backgroundColor: theme === 'light' ? '#FFFFFF' : '#171F20',
     webPreferences: {
       preload: join(ROOT, 'out/preload/vee.js'),
@@ -788,13 +828,22 @@ function openVeeWindow(main, theme) {
   })
   veeWin = w
   placeVee(w)
+  w.removeMenu()
+  w.on('ready-to-show', () => {
+    console.log('[vee] ready to show')
+    if (!w.isDestroyed()) w.show()
+  })
   w.webContents.on('console-message', (e) => console.log(`[vee:${e.level}] ${e.message}`))
+  w.webContents.on('render-process-gone', (_e, d) => console.log(`[vee] page gone: ${d.reason}`))
   w.webContents.on('did-finish-load', async () => {
+    console.log('[vee] loaded')
+    if (w.isDestroyed()) return
     emulateVee(w)
+    console.log('[vee] emulated')
     if (VEE_RM) {
       // Reduced motion, asked for by this window alone, as the e2e suite asks for it.
       try {
-        w.webContents.debugger.attach('1.3')
+        if (!w.webContents.debugger.isAttached()) w.webContents.debugger.attach('1.3')
         await w.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
           features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
         })
@@ -802,17 +851,22 @@ function openVeeWindow(main, theme) {
         console.log(`[vee] reduced motion not set: ${error.message}`)
       }
     }
-    if (main.isDestroyed() || w.isDestroyed()) return
+    // As `connectVee` does: a fresh pair at every load, one end to each live page.
+    if (main.isDestroyed() || main.webContents.isDestroyed() || w.isDestroyed() || w.webContents.isDestroyed()) return
     const { port1, port2 } = new MessageChannelMain()
     main.webContents.postMessage('vee:port', null, [port1])
     w.webContents.postMessage('vee:port', null, [port2])
+    console.log('[vee] port joined')
   })
   w.on('closed', () => {
+    console.log('[vee] closed')
     if (veeWin !== w) return
     veeWin = null
-    if (!main.isDestroyed()) main.webContents.postMessage('vee:port', null, [])
+    if (!main.isDestroyed() && !main.webContents.isDestroyed()) main.webContents.postMessage('vee:port', null, [])
   })
-  void w.loadFile(join(ROOT, 'out/renderer/vee.html'), { hash: `theme=${theme}` })
+  w.loadFile(join(ROOT, 'out/renderer/vee.html'), { hash: `theme=${theme}` }).catch((error) =>
+    console.log(`[vee] load failed: ${error.message}`)
+  )
 }
 
 /** Until the Ask Vee window has loaded and drawn its log — or `false` after `ms`. */
@@ -880,8 +934,12 @@ app.whenReady().then(async () => {
 
   // 2026-11-08 — the Ask Vee window, as main opens and closes it (`main/vee-window.ts`), and the
   // settings it reads `hasKey` from: a stand-in that names no key and stores nothing.
-  ipcMain.handle('vee:open', (_event, raw) => openVeeWindow(win, raw && raw.theme === 'light' ? 'light' : 'dark'))
+  ipcMain.handle('vee:open', (_event, raw) => {
+    console.log('[vee] open asked')
+    openVeeWindow(win, raw && raw.theme === 'light' ? 'light' : 'dark')
+  })
   ipcMain.handle('vee:close', () => {
+    console.log('[vee] close asked')
     if (veeWin && !veeWin.isDestroyed()) veeWin.close()
   })
   ipcMain.handle('settings:get', () => ({
@@ -954,60 +1012,73 @@ app.whenReady().then(async () => {
         console.log(`unknown state "${state}" — known: ${Object.keys(STATE_JS).join(', ')}`)
         continue
       }
-      const { js, input, after, vee, size, key, shot } = typeof entry === 'string' ? { js: entry } : entry
-      // 2026-11-08 — the Ask Vee window's size for this state, and a key that comes or goes the
-      // way it does in the app: through Preferences, which tells the store (the state closes it).
-      if (size && (size[0] !== veeSize[0] || size[1] !== veeSize[1])) {
-        veeSize = size
-        if (veeWin && !veeWin.isDestroyed()) placeVee(veeWin)
-      }
-      if (key !== undefined) {
-        veeKey = key
-        win.webContents.send('settings:open')
-      }
-      const said = js ? await run(js) : 'ok'
-      if (input) {
-        // The state's own JavaScript may have started a 620 ms camera flight; hover is
-        // evaluated where the pointer is *when it moves*, so wait for the camera first.
+      // 2026-11-08 — one state that fails (a capture the compositor refuses, a control that is not
+      // there) is logged and the run goes on to the next, instead of ending every capture after it.
+      try {
+        const { js, input, after, vee, size, key, shot } = typeof entry === 'string' ? { js: entry } : entry
+        // 2026-11-08 — step logs: the last line before a crash names the state and the step it reached.
+        console.log(`[state] ${state} (${theme}): start`)
+        // 2026-11-08 — the Ask Vee window's size for this state, and a key that comes or goes the
+        // way it does in the app: through Preferences, which tells the store (the state closes it).
+        if (size && (size[0] !== veeSize[0] || size[1] !== veeSize[1])) {
+          veeSize = size
+          if (veeWin && !veeWin.isDestroyed()) resizeVee(veeWin)
+        }
+        if (key !== undefined) {
+          veeKey = key
+          win.webContents.send('settings:open')
+        }
+        const said = js ? await run(js) : 'ok'
+        if (input) {
+          // The state's own JavaScript may have started a 620 ms camera flight; hover is
+          // evaluated where the pointer is *when it moves*, so wait for the camera first.
+          await wait(SETTLE)
+          for (const step of input) await sendInput(win, step)
+        }
+        // Phase 4: a menu the mouse has just opened, then chosen from.
+        if (after) await run(after)
+        // 2026-11-08 — what this state does in the Ask Vee window, once that window is up.
+        const veeUp = vee || shot || (veeWin && !veeWin.isDestroyed()) ? await veeReady() : false
+        if ((vee || shot) && !veeUp) console.log(`[vee] ${state}: the Ask Vee window did not open`)
+        if (vee && veeUp) console.log(`[vee] ${state}: ${await runVee(vee)}`)
         await wait(SETTLE)
-        for (const step of input) await sendInput(win, step)
+        console.log(`[state] ${state}: capturing`)
+        const own = await win.webContents.capturePage()
+        // A `vm-*` state is the Ask Vee window's capture; the main window stands beside it.
+        // One handle for the whole capture: `veeWin` goes null the moment the window closes.
+        const shotWin = veeUp && veeWin && !veeWin.isDestroyed() && !veeWin.webContents.isDestroyed() ? veeWin : null
+        const veeImage = shotWin ? await shotWin.webContents.capturePage() : null
+        // A `vm-*` state is the Ask Vee window's capture or none: never the main window in its place.
+        if (shot && !veeImage) throw new Error('the Ask Vee window is not open, so there is nothing of it to capture')
+        const image = shot ? veeImage : own
+        const path = single ? OUT : join(dir, `${state}-${theme}.png`)
+        await writeFile(path, image.toPNG())
+        if (!single && veeImage) {
+          if (shot) await writeFile(join(dir, `${state}-${theme}-main.png`), own.toPNG())
+          else await writeFile(join(dir, `${state}-${theme}-vee.png`), veeImage.toPNG())
+        }
+        // The chrome's own geometry, beside the frame — the parity diff masks to it.
+        if (!single) {
+          await writeFile(join(dir, `${state}-${theme}.json`), await win.webContents.executeJavaScript(RECTS))
+        }
+        // 2026-10-01 — and each of Vee's sprites on screen, enlarged, so its pixels can be read.
+        // Not under `vee-sheet`, which covers them with its own, already enlarged. Since 2026-11-08
+        // the Ask Vee window's sprites too — its header's and its avatars' — for every `vm-*` state.
+        if (!single && state.startsWith('vee-') && state !== 'vee-sheet') {
+          await spriteCrops(win, dir, `${state}-${theme}`)
+        }
+        if (!single && veeImage && !shotWin.isDestroyed() && (state.startsWith('vee-') || shot)) {
+          await spriteCrops(shotWin, dir, `${state}-${theme}-vee`)
+        }
+        // 2026-10-01 — and, for the thinking trace, the panel alone: since 2026-11-07, the Ask Vee window.
+        if (!single && veeImage && !shotWin.isDestroyed() && (state.startsWith('trace-') || state.startsWith('fmt-'))) {
+          await veeCrops(shotWin, veeImage, dir, `${state}-${theme}`)
+        }
+        const shape = image.getSize()
+        console.log(`saved ${path} (${shape.width}×${shape.height}, ${said})`)
+      } catch (error) {
+        console.log(`[state] ${state} (${theme}): failed — ${error && error.message ? error.message : error}; on to the next state`)
       }
-      // Phase 4: a menu the mouse has just opened, then chosen from.
-      if (after) await run(after)
-      // 2026-11-08 — what this state does in the Ask Vee window, once that window is up.
-      const veeUp = vee || shot || (veeWin && !veeWin.isDestroyed()) ? await veeReady() : false
-      if ((vee || shot) && !veeUp) console.log(`[vee] ${state}: the Ask Vee window did not open`)
-      if (vee && veeUp) console.log(`[vee] ${state}: ${await runVee(vee)}`)
-      await wait(SETTLE)
-      const own = await win.webContents.capturePage()
-      // A `vm-*` state is the Ask Vee window's capture; the main window stands beside it.
-      const veeImage = veeUp && veeWin && !veeWin.isDestroyed() ? await veeWin.webContents.capturePage() : null
-      const image = shot && veeImage ? veeImage : own
-      const path = single ? OUT : join(dir, `${state}-${theme}.png`)
-      await writeFile(path, image.toPNG())
-      if (!single && veeImage) {
-        if (shot) await writeFile(join(dir, `${state}-${theme}-main.png`), own.toPNG())
-        else await writeFile(join(dir, `${state}-${theme}-vee.png`), veeImage.toPNG())
-      }
-      // The chrome's own geometry, beside the frame — the parity diff masks to it.
-      if (!single) {
-        await writeFile(join(dir, `${state}-${theme}.json`), await win.webContents.executeJavaScript(RECTS))
-      }
-      // 2026-10-01 — and each of Vee's sprites on screen, enlarged, so its pixels can be read.
-      // Not under `vee-sheet`, which covers them with its own, already enlarged. Since 2026-11-08
-      // the Ask Vee window's sprites too — its header's and its avatars' — for every `vm-*` state.
-      if (!single && state.startsWith('vee-') && state !== 'vee-sheet') {
-        await spriteCrops(win, dir, `${state}-${theme}`)
-      }
-      if (!single && veeImage && (state.startsWith('vee-') || shot)) {
-        await spriteCrops(veeWin, dir, `${state}-${theme}-vee`)
-      }
-      // 2026-10-01 — and, for the thinking trace, the panel alone: since 2026-11-07, the Ask Vee window.
-      if (!single && veeImage && (state.startsWith('trace-') || state.startsWith('fmt-'))) {
-        await veeCrops(veeWin, veeImage, dir, `${state}-${theme}`)
-      }
-      const shape = image.getSize()
-      console.log(`saved ${path} (${shape.width}×${shape.height}, ${said})`)
     }
   }
 

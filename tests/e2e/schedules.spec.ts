@@ -20,6 +20,7 @@ import { join, resolve } from 'node:path'
 import {
   DROP_COPY,
   emit,
+  escapeClosesVee,
   handClick,
   holdTurns,
   launch,
@@ -28,7 +29,6 @@ import {
   TINY,
   tool as liveTool,
   toolResults,
-  veeIsOpen,
   veeWindow
 } from './helpers'
 
@@ -1389,8 +1389,7 @@ async function openChat(app: ElectronApplication, page: Page): Promise<void> {
 async function closeChat(app: ElectronApplication): Promise<void> {
   const vee = await veeWindow(app)
   await vee.locator('[data-role="chatinput"]').evaluate((el) => (el as HTMLInputElement).blur())
-  await vee.keyboard.press('Escape')
-  await expect.poll(() => veeIsOpen(app)).toBe(false)
+  await escapeClosesVee(app)
 }
 
 /** The windows but the Ask Vee window: the main window and, when it is open, Schedules. */

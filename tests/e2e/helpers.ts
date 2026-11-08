@@ -129,6 +129,22 @@ export async function openVee(app: ElectronApplication, page: Page): Promise<Pag
 /** Whether the Ask Vee window is open. */
 export const veeIsOpen = (app: ElectronApplication): boolean => app.windows().some(isVee)
 
+/**
+ * Press Esc in the Ask Vee window, and wait until Esc has closed it. The key is sent by main,
+ * as the OS sends one (`webContents.sendInputEvent`), and nothing waits on the page that the key
+ * closes: Playwright's own `keyboard.press` is still waiting on that page for the key-up when the
+ * window goes, and throws "Target page closed". The window must close; `veeIsOpen` says it did.
+ */
+export async function escapeClosesVee(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => /\/vee\.html(#|$)/.test(x.webContents.getURL()))
+    if (!w) throw new Error('no Ask Vee window to press Esc in')
+    w.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+    w.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+  })
+  await expect.poll(() => veeIsOpen(app)).toBe(false)
+}
+
 /** The landing page's demo button (2026-09-24): the design's own four-model mock federation. */
 export const DEMO = 'try the demo building →'
 

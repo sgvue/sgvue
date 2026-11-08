@@ -21,6 +21,7 @@ import {
   actionText,
   DROP_COPY,
   emit,
+  escapeClosesVee,
   HIGH_FIRST,
   holdTurns,
   launch,
@@ -655,6 +656,8 @@ test('the assistant panel opens from its pill, seeds the audit, and is not ready
     const log = vee.locator('[data-role="chatlog"]')
     await expect(log).toBeVisible()
     // …lit while the window is open, as it was while the panel was.
+    // (With the pointer off it: the pill's own hover, `.hv-accent-line:hover`, is that same accent.)
+    await page.mouse.move(5, 5)
     await expect.poll(() => pill.evaluate((b) => getComputedStyle(b).borderColor)).not.toBe(unlit)
     // The window: a child of the main window — above it, not above other apps — titled
     // `Ask Vee`, at the panel's size, and no smaller than the messaging layout's 300 × 380.
@@ -684,7 +687,9 @@ test('the assistant panel opens from its pill, seeds the audit, and is not ready
 
     // 2 — not ready for want of a key: Vee's one line, the composer and the send key there but
     // disabled — so nothing can be typed that could not be sent — and no suggestions.
-    await expect(log.locator('[data-role="vee-not-ready"]')).toHaveText('Add your API key in Preferences to start.')
+    await expect(log.locator('[data-role="vee-not-ready"] [data-part="text"]')).toHaveText('Add your API key in Preferences to start.')
+    // A message of Vee's like any other (2026-11-08, the prototype's `03-nokey`): its time on it.
+    await expect(log.locator('[data-role="vee-not-ready"] .vm-t')).toHaveText(/^\d\d:\d\d$/)
     const input = vee.locator('[data-role="chatinput"]')
     await expect(input).toBeDisabled()
     await expect(input).toHaveAttribute('placeholder', '')
@@ -824,8 +829,10 @@ test('the assistant panel opens from its pill, seeds the audit, and is not ready
     await asking.waitForTimeout(300)
     expect(veeIsOpen(app)).toBe(true)
     await ready.evaluate((el) => (el as HTMLInputElement).blur())
-    await asking.keyboard.press('Escape')
-    await expect.poll(() => veeIsOpen(app)).toBe(false)
+    await escapeClosesVee(app)
+    // The pointer is still where it last clicked the pill, and a key moves no pointer: off the pill
+    // first, or its hover border (`.hv-accent-line:hover`, the accent) reads as lit.
+    await page.mouse.move(5, 5)
     await expect.poll(() => pill.evaluate((b) => getComputedStyle(b).borderColor)).toBe(unlit)
   } finally {
     await app.close()

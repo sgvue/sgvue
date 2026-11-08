@@ -100,6 +100,14 @@ import {
 } from './context'
 import { emptyTargetMessage, namesSet, resolveTargets, unknownFields, unknownText } from './targets'
 import { carriedInFederation, valueHints } from './names'
+import { ELEMENT, nounFor } from '../trace-facts'
+
+/**
+ * A count of elements as a held change's label says it — `1 element`, `3 elements` — the one
+ * rule for every pending label that counts elements (2026-11-08: the consent card read
+ * "Isolate 1 elements?").
+ */
+export const elementsText = (n: number): string => `${n} ${nounFor(n, ELEMENT)}`
 
 /** `SGVue.dc.html:1464` / `:1412`. Below this share of the model, a change waits for a click. */
 export const SCOPE_GUARD = 0.05
@@ -857,7 +865,7 @@ export const apply_visibility: Executor = (input, ctx) => {
       },
       ui: {
         pending: {
-          label: `${mode} ${hit.length} elements — leaves ${would} of ${total} visible`,
+          label: `${mode} ${elementsText(hit.length)} — leaves ${would} of ${total} visible`,
           patch: { stack: nextStack, stepSel: step.id }
         }
       }
@@ -950,8 +958,8 @@ function visibilityByIds(input: Record<string, unknown>, ctx: ToolContext): Tool
     t.source === 'selection'
       ? 'the selection'
       : t.source === 'schedule'
-        ? `the ${ids.length} elements the open schedule lists`
-        : `${ids.length} elements`
+        ? `the ${elementsText(ids.length)} the open schedule lists`
+        : elementsText(ids.length)
   const tail = unknownText(t)
   const scope = scopeCheck(would, total, mode === 'show')
 

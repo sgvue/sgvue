@@ -107,7 +107,7 @@ describe('scope rules and check rules', () => {
     // that carry no fire rating.
     expect(f.matched).toHaveLength(els.filter((e) => e.type === 'IfcWall' || attr(e, 'FireRating') === undefined).length)
     expect(f.matched).toHaveLength(131)
-    expect(f.check).toEqual({ props: 'Fire Rating', count: 131, unit: 'missing' })
+    expect(f.check).toEqual({ props: 'FireRating', count: 131, unit: 'missing' })
   })
 })
 
@@ -115,7 +115,8 @@ describe('Filter and Check, from one call’s rules', () => {
   it('“which walls have no thermal transmittance?” — 80 walls, 24 missing, by storey', () => {
     const f = facts([rule('IfcEntity', '=', 'IfcWall'), rule('ThermalTransmittance', 'absent', null, 'and')])
     expect(f.filter).toEqual({ what: 'IfcWall', count: 80, noun: 'wall' })
-    expect(f.check).toEqual({ props: 'Thermal Transmittance', count: 24, unit: 'missing' })
+    // The file's own spelling since 2026-11-08 (the owner's IFC-term decision).
+    expect(f.check).toEqual({ props: 'ThermalTransmittance', count: 24, unit: 'missing' })
     expect([f.total, f.models, f.scopeCount, f.noun]).toEqual([412, [140, 244, 20, 8], 80, 'wall'])
     // The scope and the matched set are positions in the read order, ascending — and exactly
     // what a plain count over the elements finds.
@@ -132,13 +133,13 @@ describe('Filter and Check, from one call’s rules', () => {
 
   it('counts `found` unless every check asks for a missing value', () => {
     expect(facts([rule('IfcEntity', '=', 'IfcWall'), rule('AcousticRating', '=', 'STC 45', 'and')]).check).toEqual({
-      props: 'Acoustic Rating',
+      props: 'AcousticRating',
       count: 8,
       unit: 'found'
     })
     // One `absent`, one not: found.
     const mixed = facts([rule('IfcEntity', '=', 'IfcWall'), rule('AcousticRating', 'absent', null, 'and'), rule('LoadBearing', '=', 'true', 'and')])
-    expect(mixed.check).toEqual({ props: 'Acoustic Rating, Load Bearing', count: 12, unit: 'found' })
+    expect(mixed.check).toEqual({ props: 'AcousticRating, LoadBearing', count: 12, unit: 'found' })
     // Three properties are counted, not listed; a repeated one is one.
     const three = facts([
       rule('FireRating', '=', '2 HR'),

@@ -212,7 +212,12 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     await expect(revertSpot).toHaveCount(1)
     await revertSpot.click()
     await expect(revertSpot).toHaveCount(0)
-    await expect(spot.row).toHaveCSS('opacity', '0.5')
+    // 2026-11-08 ("Vee Messages"): the reverted reply is not dimmed as a whole row any more. As
+    // the approved prototype draws it (`.b.reverted{opacity:.55}`, shot `05e-fire-reverted`), its
+    // text bubbles fade to .55 and its foot says when it was reverted.
+    await expect(spot.row.locator('.vm-stack > .vm-b.vm-tx').first()).toHaveCSS('opacity', '0.55')
+    for (const bubble of await spot.row.locator('.vm-stack > .vm-b.vm-tx').all()) await expect(bubble).toHaveCSS('opacity', '0.55')
+    await expect(spot.row.locator('.vm-foot')).toHaveText(/^Reverted · \d\d:\d\d$/)
     expect(await actionText(page)).toBe('1 measuresclear')
     await expect(laserRows).toHaveText(['M1'])
     await expect(status).toHaveCount(0)
@@ -258,9 +263,12 @@ test('the assistant places a spot coordinate and a laser measurement: the record
     expect((await folded.textContent())!.trim()).toBe(mine.tag)
     expect(await firstSpotRow.textContent()).toBe(mine.row)
     await expect(laserRows).toHaveText(['M1'])
-    // The reply is dimmed, and offers revert no more.
+    // The reply is dimmed, and offers revert no more — as the approved prototype dims it (2026-11-08):
+    // its text bubbles at .55, and its foot says when it was reverted.
     await expect(revert).toHaveCount(0)
-    await expect(second.row).toHaveCSS('opacity', '0.5')
+    await expect(second.row.locator('.vm-stack > .vm-b.vm-tx').first()).toHaveCSS('opacity', '0.55')
+    for (const bubble of await second.row.locator('.vm-stack > .vm-b.vm-tx').all()) await expect(bubble).toHaveCSS('opacity', '0.55')
+    await expect(second.row.locator('.vm-foot')).toHaveText(/^Reverted · \d\d:\d\d$/)
     console.log(
       `\n[markups] a reply's revert: before — action bar "${before.bar}", ${before.tags} spot tags, card rows ${JSON.stringify(before.rows)}; ` +
         `after — action bar "${await actionText(page)}", ${await folded.count()} spot tag, card rows ${JSON.stringify(await spotRows.allTextContents())}, ` +

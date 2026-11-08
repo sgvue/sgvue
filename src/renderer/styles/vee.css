@@ -272,7 +272,9 @@
  * its count in bold and a name in mono but uncoloured, so amber keeps its one meaning. Quick
  * replies under a question of Vee's: pills, no tape — a reply, not a view change.
  */
-.vm .ifc-term { font: 500 11px/1 var(--mono); color: var(--ifc-term); }
+/* An IFC term keeps the file's own spelling wherever it stands — also in the storey-rows title and a
+   table's header, which are set in capitals: `FireRating · MISSING`, as the prototype's `.ifc-term` has it. */
+.vm .ifc-term { font: 500 11px/1 var(--mono); color: var(--ifc-term); letter-spacing: 0; text-transform: none; }
 .vm-hu { display: flex; gap: 6px; align-items: flex-start; margin: 4px 2px 0; font: 400 12px/1.45 var(--sans); color: var(--warn-ink); max-width: 100%; }
 .vm-hu svg { flex: none; margin-top: 2px; }
 .vm-hu b { font-weight: 600; }
