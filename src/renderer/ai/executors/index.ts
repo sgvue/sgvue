@@ -37,7 +37,7 @@
  * executor has looked, so that one is still caught afterwards (`oneHeld`).
  */
 import { TOOLS, gateOf } from '../../../shared/tool-schemas'
-import { headsUpOfTouched, headsUpText, SG_SET_MAX, touchedOf, touchesByRule, touchesSg, type Observation } from '../heads-up'
+import { betterObservation, headsUpOfTouched, headsUpText, SG_SET_MAX, touchedOf, touchesByRule, touchesSg, type Observation } from '../heads-up'
 import { changedParts } from '../../state/selectors/snapshot'
 import { parseToolInput } from './inputs'
 import { ASK_EXECUTORS } from './ask'
@@ -118,8 +118,9 @@ export async function executeTool(
 /**
  * 2026-11-08, stage 2 — the heads-up (`ai/heads-up.ts`). A call that touched elements by rule
  * is observed **over exactly those elements** (decision C), after it ran and with its names the
- * file's own; the turn keeps the last such call's one observation — `null` when it saw nothing —
- * and the result tells the model what the user will see, so its answer can agree. An
+ * file's own; the turn keeps, of all such calls' observations, the first of the highest kind
+ * (`betterObservation`, since 2026-11-09: it was the last call's, `null` included), and the result
+ * tells the model what the user will see, so its answer can agree. An
  * `objectTypeOnly` observation counts only once the user has said yes to IFC+SG (decision B). A
  * call that matched nothing is observed all the same — its scope set is still the elements the
  * question was asked of, and "0 doors are empty, but 3 say “-”" is the very case it is for.
@@ -137,6 +138,7 @@ function observed(
   ctx: ToolContext
 ): unknown {
   let headsUp: Observation | null
+  let askNow = false
   try {
     if (!touchesByRule(name, input)) return forModel
     const s = ctx.state()
@@ -147,14 +149,38 @@ function observed(
     // and, kept with the question, what that call touched, for the heads-up after a "Yes".
     ctx.turn.sgTouched = touchesSg(s.federation, t)
     ctx.turn.sgSet = ctx.turn.sgTouched && t.seen.length <= SG_SET_MAX ? t.seen.map((i) => s.federation.elements[i].id) : null
+    // 2026-11-09 — and, once a conversation, the nudge to ask it (`IFCSG_NUDGE`): a read, of
+    // elements that carry an SGPset_ set, in a conversation that has neither an answer nor a
+    // question yet. All of it the app's own state; nothing the file says can raise it.
+    askNow =
+      READ_NAMES.has(name) && ctx.turn.sgTouched && s.chatIfcsg === 'unknown' && !s.chatIfcsgAsked && !ctx.turn.ask
   } catch (error) {
     console.error('[heads-up]', error)
     return forModel
   }
-  ctx.turn.headsUp = headsUp
-  if (!headsUp || !forModel || typeof forModel !== 'object' || Array.isArray(forModel)) return forModel
-  return { ...forModel, headsUp: `${headsUpText(headsUp)} (The app shows this line under your reply.)` }
+  // 2026-11-09 — the turn keeps the first observation of the highest kind any of its calls made
+  // (`betterObservation`): the order one call's own observations are picked in, across calls.
+  ctx.turn.headsUp = betterObservation(ctx.turn.headsUp, headsUp)
+  if (!forModel || typeof forModel !== 'object' || Array.isArray(forModel)) return forModel
+  if (!headsUp && !askNow) return forModel
+  return {
+    ...forModel,
+    ...(headsUp ? { headsUp: `${headsUpText(headsUp)} (The app shows this line under your reply.)` } : {}),
+    ...(askNow ? { ifcsg: IFCSG_NUDGE } : {})
+  }
 }
+
+/**
+ * 2026-11-09 — the live runs on Sonnet 5.5 and Haiku 5.5 (`assistant/v4`, `v5`): neither ever
+ * called `ask_choice`; both answered the question. The design is "answer **and** ask in the same
+ * reply", so a read that sets `sgTouched` says so — once a conversation, and only in words the app
+ * wrote.
+ */
+export const IFCSG_NUDGE =
+  'These elements carry SGPset_ property sets, and the user has not said whether this model is for an IFC+SG submission. If the question is about their types, properties or classification, answer it now in plain IFC terms and, in this same reply, call ask_choice once with a one-sentence lead-in; for counts, visibility or anything else, do not ask.'
+
+/** The read tools: only a read can raise the IFC+SG nudge. */
+const READ_NAMES: ReadonlySet<string> = new Set(TOOLS.filter((t) => t.kind === 'read').map((t) => t.name))
 
 /**
  * A second held change in one turn is refused, in words (2026-10-02).

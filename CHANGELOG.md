@@ -68,6 +68,13 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   "Tabulate them by type" tabulates those walls, not every wall. Say "all the walls" for all.
 - IFC names coloured in Vee's answers are bold as well, and only an exact match of your files'
   spelling is coloured.
+- When you ask about the types or properties of elements that carry `SGPset_` sets, Vee answers
+  and asks the IFC+SG question in the same reply, once per conversation — it no longer holds the
+  answer back, or forgets to ask.
+- When one answer looks at the model several ways, its heads-up line is the most telling thing
+  SGVue saw — a placeholder in the property you asked about, first — not whatever the last look
+  found.
+- Vee uses a database query whenever you ask for "the database", "SQL" or "a query".
 - A stopped or failed turn is a neutral line, such as "Stopped · nothing changed". It says
   "nothing changed" only when nothing did; otherwise "what it already did stays".
 - In Ask Vee your messages are on the right, and the `Vee` / `You` labels above each message and

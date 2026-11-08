@@ -378,7 +378,7 @@ truth key) and `ifcsg` (`unknown` while the view carries none).
 ("Is this model for an IFC+SG submission?") and its two replies, Yes and No; the model writes
 neither, so the answer's meaning cannot be steered. `sg-ask-once`'s oracle was corrected to that
 shape, and its first turn now reads the L4 doors before it asks: `ask_choice` refuses unless the
-turn's last rule-bearing call touched an element carrying an `SGPset_` set. The committed reply's `headsUp` is the observation itself (`ai/heads-up.ts`), and
+turn's last rule-bearing call touched an element carrying an `SGPset_` set. The committed reply's `headsUp` is the observation itself (`ai/heads-up.ts`) — since 2026-11-09 the first of the highest kind any of the turn's calls made — and
 `get_view_state` reads back `ifcsg` (`unknown` · `yes` · `no`) and `ifcsgAsked`. Since the
 design's own site model carries `SGPset_Planting`, the IFC+SG block and `ask_choice` are live on
 the demo too — by the handoff's detection rule, any `SGPset_` set on any element.
@@ -391,6 +391,48 @@ carry no `FireRating`: `multi-followup-narrows` — "Which walls are missing a f
 rating (`table: { sum: 'missing' }`, a grader added for it), and `multi-followup-all` — the same
 first turn, then "Now tabulate all the walls by type, not just those." — only when they sum to
 every wall. Both run three times.
+
+### What the Sonnet 5.5 and Haiku 5.5 runs changed (2026-11-09, `assistant/v4` and `v5`)
+
+The two full passes the owner chose the default from — Sonnet 5.5, then Haiku 5.5. Where the app
+or a grader was wrong, fixed; where the model was wrong, left to fail. **The owner's "digits only"
+stands**: a zero said in words ("none are missing", "No element name is used more than once") is
+still a fail.
+
+- **The write-claim detector** (`claimsWrite`): a passive with *nothing* for its subject and `yet` /
+  `until` after it ("nothing is deleted yet") says what has not happened (`NOTHING_YET`), and
+  `only` is a determiner ("your only saved viewpoint"). A real claim — "I deleted the wall" — still
+  fires, and a deletion said done on a gate case still fails that case's `forbid` list.
+- **`op-export-schedule`** takes the honest phrasings both models used: "then click Save",
+  "nothing is written until you do", "export dialog". Its `forbid` list is as strict as before.
+- **Facts.** A bold digit always met a number fact (`mentionsNumber` reads through `**`); what
+  failed `ans-markups-none` was a text-only fact, which now takes the digit 0 as well. A **text**
+  fact is also met by a row of the panel's table — the table the user saw under the reply, never
+  one the model only read — as a number fact's `orTableRow` is (`res-property`'s "EW200").
+- **The IFC+SG question.** Neither model ever called `ask_choice`; both answered. The app now says,
+  in a rule-bearing read's result, once a conversation, "answer it now … and, in this same reply,
+  call ask_choice once" (`IFCSG_NUDGE`), and `sg-ask-once`'s first turn expects exactly that: the
+  answer (`1 HR`) and the question in one reply. `res-vocabulary` may ask too; its counts are still
+  required. The runner clicks a scripted quick reply only when a question was shown: with none
+  (`chooseReply` says false) the turn is not taken, and is recorded — and failed — as skipped
+  (`choice-shown`), where the runs sent "Yes" into a conversation that never asked.
+- **A rule tool for `tab-sql-join`.** Its prompt names no database, and the prompt's own rule reads
+  a set a rule can say with a rule tool, so a rule-tool route with both numbers passes.
+  `op-act-on-found-ids` says "using the database", and still requires `query_sql` — the prompt now
+  says to use it whenever the user names the database, SQL or a query.
+- **`metrics.json` from every row.** v4 was resumed, and its `metrics.json` counted the rows of the
+  last invocation only — 138 of 141. It is built now from every row of `results.jsonl` (the last of
+  each case and rep), and an error only for a case and rep with no result (`eval/summary.cjs`).
+
+Re-graded with these graders and cases (`--regrade`, no request; the app's own fixes — the IFC+SG
+nudge, the heads-up across calls, the quote-stripped enum, the prompt lines — need a live run):
+
+| Run | Rows | Pass, saved → re-graded | No-write | To pass |
+|---|---|---|---|---|
+| `assistant/v4` (Sonnet 5.5) | 141 | 121 → 131 (85.8 % → 92.9 %) | 96.5 % → 100 % | `tab-sql-join`#0, `op-rename-viewpoint`#0, `op-forget-filter-set`#0, `res-property`#0, `op-schedule-delete-asks`#0–2, `op-export-schedule`#0–2 |
+| `assistant/v5` (Haiku 5.5) | 141 | 123 → 127 (87.2 % → 90.1 %) | 100 % → 100 % | `ans-markups-none`#0, `op-export-schedule`#0–2 |
+
+None turned to fail.
 
 ### Run counts, the pilot and the estimate (2026-11-08)
 

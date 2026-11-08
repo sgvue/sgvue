@@ -98,6 +98,7 @@ const O = req('../../scripts/eval/observe.cjs') as {
   lateTruth: (kase: Kase, truth: Json, calls: Json[], ask: { tool: (n: string, i: Json) => Promise<unknown> }) => Promise<Json>
   oracleTurn: (kase: Kase, truth: Json) => { calls: { name: string; input: Json }[]; reply: string }
   nullTurn: () => Turn
+  skippedTurn: (choice: string) => Turn
   scriptedCalls: (calls: { name: string; input: Json }[], results: unknown[]) => Json[]
   observation: (turn: Turn, before: Snapshot, after: Snapshot, message: unknown) => Json & { store: Json }
   turnsOf: (kase: Kase) => (Json & { prompt: string; choice?: string })[]
@@ -246,10 +247,10 @@ async function readView(): Promise<Snapshot> {
  * window's runner calls `__sgvueDev.chat.choose`; here it is the store action a stage-2 build
  * gives that hook, `chooseReply`. Only a stage-2 case has one, and those are n/a until then.
  */
-function choose(value: string): void {
-  const act = (st() as unknown as { chooseReply?: (v: string) => void }).chooseReply
+function choose(value: string): boolean {
+  const act = (st() as unknown as { chooseReply?: (v: string) => boolean }).chooseReply
   if (typeof act !== 'function') throw new Error('this build has no chooseReply, which a case with a quick reply needs')
-  act(value)
+  return act(value) === true
 }
 
 async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
@@ -270,15 +271,19 @@ async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
   for (let i = 0; i < all.length; i++) {
     if (mode === 'null') turn = O.nullTurn()
     else {
-      if (all[i].choice !== undefined) choose(String(all[i].choice))
-      const { calls, reply } = O.oracleTurn(all[i] as Kase, truth)
-      const out = await runTurnOnce(all[i].prompt, calls, reply)
-      turn = {
-        reply,
-        calls: O.scriptedCalls(calls, out.results),
-        outcome: { type: 'done', rounds: out.results.length ? 1 : 0 },
-        usage: null,
-        index: out.index
+      // As the window's runner: a quick reply with no question to answer is not clicked, and
+      // its turn is not taken (`skippedTurn`, 2026-11-09).
+      if (all[i].choice !== undefined && !choose(String(all[i].choice))) turn = O.skippedTurn(String(all[i].choice))
+      else {
+        const { calls, reply } = O.oracleTurn(all[i] as Kase, truth)
+        const out = await runTurnOnce(all[i].prompt, calls, reply)
+        turn = {
+          reply,
+          calls: O.scriptedCalls(calls, out.results),
+          outcome: { type: 'done', rounds: out.results.length ? 1 : 0 },
+          usage: null,
+          index: out.index
+        }
       }
     }
     after = await readView()

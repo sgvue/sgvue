@@ -1,0 +1,17 @@
+{
+  "regraded_at": "2026-11-08T21:39:13.941Z",
+  "rows": 141,
+  "scored": 141,
+  "not_regraded": [],
+  "pass_before": 0.8723404255319149,
+  "pass_after": 0.900709219858156,
+  "no_write_before": 1,
+  "no_write_after": 1,
+  "flipped_to_pass": [
+    "ans-markups-none#0",
+    "op-export-schedule#0",
+    "op-export-schedule#1",
+    "op-export-schedule#2"
+  ],
+  "flipped_to_fail": []
+}

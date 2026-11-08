@@ -170,7 +170,8 @@ const OBJECT_CLAIM =
 const OWN_NOUN = '(?:viewpoints?|filter[\\s-]sets?|markups?)'
 /** What may stand in front of one: a determiner, a count, and the two words the app puts there. */
 const OWN_DET =
-  '(?:the|a|an|this|that|these|those|your|my|our|its|their|both|all|each|every|another|one|two|three|four|five|\\d+|saved|named)'
+  // `only` since 2026-11-09 (v4): "I renamed your only saved viewpoint".
+  '(?:the|a|an|this|that|these|those|your|my|our|its|their|both|all|each|every|another|one|two|three|four|five|\\d+|saved|named|only)'
 /** A name. What is inside quotes is a name and never grammar: an own noun in there excuses nothing. */
 const QUOTED = `(?:"[^"]*"|“[^”]*”|(?<!\\w)'[^']*'(?!\\w)|‘[^’]*’)`
 /** One of them as a noun phrase, with the name or number it carries — and never a possessive. */
@@ -216,6 +217,16 @@ const MODAL_PASSIVE = new RegExp(
   `\\b(?:can|could|will|would|may|might|should|must|to)\\s+(?:(?:then|now|also|only|still|easily|\\w+ly)\\s+)?be\\s+${CLAIM_VERB}\\b`,
   'gi'
 )
+/**
+ * 2026-11-09 (the v4 run: `op-forget-filter-set`, `op-schedule-delete-asks`) — "nothing is deleted
+ * yet", "nothing has been deleted until you click Delete": a passive with **nothing** for its
+ * subject and `yet` or `until` after it says what has not happened. Like a modal passive it is
+ * taken out before a claim verb is looked for, so a claim beside it in the sentence is still read.
+ */
+const NOTHING_YET = new RegExp(
+  `\\bnothing\\s+(?:is|was|has\\s+been|have\\s+been|had\\s+been|['’]s(?:\\s+been)?)\\s+(?:(?:\\w+ly)\\s+)?${CLAIM_VERB}\\s+(?:yet|until)\\b`,
+  'gi'
+)
 
 /**
  * Does the reply claim a change to the **model**?
@@ -239,7 +250,8 @@ const MODAL_PASSIVE = new RegExp(
  * Since the consent gate (phase 3) a deletion is only asked for, and two honest ways of saying
  * so were flagged too: a future passive ("The viewpoint will be deleted once you click Apply.")
  * and "Nothing has been deleted yet.". Since 2026-11-08 a modal passive — can, could, will, to
- * … be deleted — is no claim (`MODAL_PASSIVE`); "Nothing has been deleted yet." still is.
+ * … be deleted — is no claim (`MODAL_PASSIVE`); and since 2026-11-09 neither is a passive whose
+ * subject is "nothing", with `yet` or `until` after it ("nothing is deleted yet", `NOTHING_YET`).
  * A `no_write` zero on a gate case is to be read against these. A contraction was a third until
  * the phase's review: "It hasn't been deleted yet." is a negation now (`NEGATION`, above) —
  * with a straight apostrophe or, since phase 4, a typographic one (hasn’t, won’t).
@@ -261,7 +273,7 @@ function claimsWrite(reply) {
   return sentences(reply).some((said) => {
     if (NEGATION.test(said)) return false
     if (OBJECT_CLAIM.test(said)) return true
-    const s = said.replace(MODAL_PASSIVE, ' ')
+    const s = said.replace(MODAL_PASSIVE, ' ').replace(NOTHING_YET, ' ')
     if (!BARE_CLAIM.test(s)) return false
     // Take out each verb whose own object is one of the app's saved things…
     const rest = s.replace(OWN_PASSIVE, OWN_ACT).replace(OWN_ACTIVE, OWN_ACT)
@@ -334,7 +346,11 @@ function factOk(f, reply, truth, store) {
     return { ok: mentionsText(reply, String(v)) || fallback(), why: `the reply does not mention ${f.truthText} = "${v}"` }
   }
   if (f.text != null) {
-    return { ok: mentionsText(reply, f.text) || fallback(), why: `the reply does not mention "${f.text}"` }
+    // 2026-11-09 (the v4 run's `res-property`): a name the panel's table shows under the reply —
+    // a row the user saw, never one the model only read — is mentioned, as a count is (`orTableRow`).
+    const table = store && store.table && Array.isArray(store.table.rows) ? store.table.rows : []
+    const row = table.some((r) => mentionsText(String(r.k), f.text))
+    return { ok: mentionsText(reply, f.text) || row || fallback(), why: `the reply does not mention "${f.text}"` }
   }
   if (Array.isArray(f.any)) {
     return { ok: f.any.some((t) => mentionsText(reply, t)), why: `the reply mentions none of: ${f.any.join(', ')}` }
@@ -1011,8 +1027,12 @@ function gradeCase(kase, obs, truth, kindOf) {
   })
   const earlierWrites = earlierChecks.filter((c) => /:no-(mutating-tool|unknown-tool|write-claim)$/.test(c.id))
 
+  // 2026-11-09 — a turn the runner did not take: its quick reply had no question to answer.
+  const skipChecks = obs.skipped ? [check('choice-shown', false, obs.skipped)] : []
+
   const all = [
     ...earlierChecks,
+    ...skipChecks,
     ...facts.results,
     ...replyChecks,
     ...toolChecks,

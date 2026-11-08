@@ -1,0 +1,23 @@
+{
+  "regraded_at": "2026-11-08T21:39:13.850Z",
+  "rows": 141,
+  "scored": 141,
+  "not_regraded": [],
+  "pass_before": 0.8581560283687943,
+  "pass_after": 0.9290780141843972,
+  "no_write_before": 0.9645390070921985,
+  "no_write_after": 1,
+  "flipped_to_pass": [
+    "tab-sql-join#0",
+    "op-rename-viewpoint#0",
+    "op-forget-filter-set#0",
+    "res-property#0",
+    "op-schedule-delete-asks#0",
+    "op-schedule-delete-asks#1",
+    "op-schedule-delete-asks#2",
+    "op-export-schedule#0",
+    "op-export-schedule#1",
+    "op-export-schedule#2"
+  ],
+  "flipped_to_fail": []
+}

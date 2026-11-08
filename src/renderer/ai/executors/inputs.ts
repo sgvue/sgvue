@@ -78,23 +78,38 @@ import { isSafeName } from '../../../schedule/messages'
 import { MAX_FILTERS, MAX_SORT_LEVELS, type Op } from '../../../schedule/schedule/def'
 import { DECIMALS_MAX, DECIMALS_MIN } from '../../../schedule/schedule/format'
 
+/**
+ * 2026-11-09 (the v4 run: Sonnet 5.5 sent `base: "\"open\""`) — a value that arrives wrapped in a
+ * stray pair of quotes, straight or typographic, is read without them. Only for a fixed choice
+ * (`en`, below): a free string is the model's text and is never rewritten. Pure.
+ */
+export function unquote(v: unknown): unknown {
+  if (typeof v !== 'string') return v
+  const t = v.trim()
+  const m = /^(?:"([^"]*)"|'([^']*)'|“([^”]*)”|‘([^’]*)’)$/.exec(t)
+  return m ? (m[1] ?? m[2] ?? m[3] ?? m[4]).trim() : v
+}
+
+/** One of a fixed set of values, as `z.enum` — with a stray pair of wrapping quotes taken off first. */
+const en = <const T extends readonly [string, ...string[]]>(values: T) => z.preprocess(unquote, z.enum(values))
+
 const Rule = z.object({
   prop: z.string(),
   // `absent` ignores `val` and is the one operator the design does not have (2026-09-20).
-  op: z.enum(['=', '!=', '~', '>', '<', 'absent']),
+  op: en(['=', '!=', '~', '>', '<', 'absent']),
   // The schema says `string`; a model that sends the number it means is not wrong, and
   // `matchFn` stringifies anyway (`shared/rules.ts`).
   val: z.union([z.string(), z.number(), z.boolean(), z.null()]),
-  join: z.enum(['and', 'or']).optional()
+  join: en(['and', 'or']).optional()
 })
 
 const Rules = z.array(Rule)
 
 const nullableString = z.union([z.string(), z.null()])
 
-const StepAction = z.enum(['isolate', 'hide', 'highlight'])
+const StepAction = en(['isolate', 'hide', 'highlight'])
 /** A step's highlight colour: one of the Filter card's six swatches (2026-10-02). */
-const StepColor = z.enum(HL)
+const StepColor = en(HL)
 
 /**
  * The id-list target (2026-09-20). The cap is refused **here**, before any executor runs, so
@@ -131,7 +146,7 @@ const MarkupMetres = z
 const SchedField = z.string().min(1).max(200)
 const SchedValue = z.union([z.string().max(500), z.number(), z.boolean()])
 const ScheduleInput = z.object({
-  base: z.enum(['new', 'open']).optional(),
+  base: en(['new', 'open']).optional(),
   // (Phase 4: a title becomes a saved setup's name when the schedule is saved, so it is held
   // to what a name may be: nothing unseen in it.)
   title: z
@@ -145,7 +160,7 @@ const ScheduleInput = z.object({
       z.object({
         field: SchedField,
         heading: z.string().max(120).optional(),
-        total: z.enum(SCHEDULE_TOTALS).optional(),
+        total: en(SCHEDULE_TOTALS).optional(),
         // 2026-10-02, phase 4 — the Format tab, and a column's place.
         hidden: z.boolean().optional(),
         decimals: z
@@ -155,7 +170,7 @@ const ScheduleInput = z.object({
           .max(DECIMALS_MAX, `between ${DECIMALS_MIN} and ${DECIMALS_MAX}`)
           .optional(),
         unit: z.string().min(1).max(8).optional(),
-        align: z.enum(SCHEDULE_ALIGNS).optional(),
+        align: en(SCHEDULE_ALIGNS).optional(),
         after: z.string().max(200).optional()
       })
     )
@@ -169,18 +184,18 @@ const ScheduleInput = z.object({
         name: z.string().min(1).max(120),
         formula: z.string().max(SCHEDULE_FORMULA_CHARS, `at most ${SCHEDULE_FORMULA_CHARS} characters`).optional(),
         percentageOf: SchedField.optional(),
-        result: z.enum(SCHEDULE_RESULTS).optional()
+        result: en(SCHEDULE_RESULTS).optional()
       })
     )
     .max(SCHEDULE_CALC_CAP, `at most ${SCHEDULE_CALC_CAP} calculated columns in one call`)
     .optional(),
-  filterLogic: z.enum(['and', 'or']).optional(),
+  filterLogic: en(['and', 'or']).optional(),
   itemize: z.boolean().optional(),
   filters: z
     .array(
       z.object({
         field: SchedField,
-        op: z.enum(SCHEDULE_OPS as [Op, ...Op[]]),
+        op: en(SCHEDULE_OPS as [Op, ...Op[]]),
         value: SchedValue.optional(),
         values: z
           .array(z.union([z.string().max(500), z.number()]))
@@ -209,10 +224,10 @@ export const TOOL_INPUTS = {
   }),
   set_filter_stack: z.object({
     steps: z.array(z.object({ action: StepAction, rules: Rules, color: StepColor.optional() })),
-    combine: z.enum(['replace', 'append']).optional()
+    combine: en(['replace', 'append']).optional()
   }),
   manage_filters: z.object({
-    op: z.enum([
+    op: en([
       'list',
       'enable',
       'disable',
@@ -238,8 +253,8 @@ export const TOOL_INPUTS = {
   apply_visibility: z.object({
     rules: Rules.optional(),
     // `undo` / `redo` (2026-10-02) are the action bar's two buttons.
-    action: z.enum(['isolate', 'hide', 'highlight', 'show', 'reset', 'undo', 'redo']).optional(),
-    combine: z.enum(['replace', 'append']).optional(),
+    action: en(['isolate', 'hide', 'highlight', 'show', 'reset', 'undo', 'redo']).optional(),
+    combine: en(['replace', 'append']).optional(),
     ids: Ids.optional(),
     selection: z.boolean().optional(),
     // 2026-10-02, phase 4 — the open schedule's rows, as a set (`targets.ts`).
@@ -250,7 +265,7 @@ export const TOOL_INPUTS = {
     rules: Rules.optional(),
     zoom: z.boolean().optional(),
     // 2026-10-02 — what happens to the selection there already is. Omitted: `replace`.
-    mode: z.enum(['replace', 'add', 'remove', 'clear']).optional(),
+    mode: en(['replace', 'add', 'remove', 'clear']).optional(),
     ids: Ids.optional(),
     selection: z.boolean().optional(),
     schedule: z.boolean().optional()
@@ -258,10 +273,10 @@ export const TOOL_INPUTS = {
   set_storeys: z.object({ visible: z.array(z.string()) }),
   activate_model: z.object({ key: nullableString }),
   set_view: z.object({
-    view: z.enum(['iso', 'top', 'north', 'south', 'east', 'west']).optional(),
-    projection: z.enum(['persp', 'ortho']).optional(),
+    view: en(['iso', 'top', 'north', 'south', 'east', 'west']).optional(),
+    projection: en(['persp', 'ortho']).optional(),
     // 2026-10-02 — the camera, freely. Degrees; a whole turn either way is as far as it goes.
-    fit: z.enum(VIEW_FITS).optional(),
+    fit: en(VIEW_FITS).optional(),
     azimuth: z.number().min(-360, 'between -360 and 360 degrees').max(360, 'between -360 and 360 degrees').optional(),
     elevation: z.number().min(-90, 'between -90 and 90 degrees').max(90, 'between -90 and 90 degrees').optional(),
     zoom: z
@@ -271,7 +286,7 @@ export const TOOL_INPUTS = {
       .optional()
   }),
   set_section: z.object({
-    kind: z.union([z.enum(['grid', 'level']), z.null()]),
+    kind: z.union([en(['grid', 'level']), z.null()]),
     name: z.string().optional(),
     offset: z.number().optional(),
     flip: z.boolean().optional(),
@@ -345,41 +360,41 @@ export const TOOL_INPUTS = {
       .max(MAX_MODEL_KEYS, `at most ${MAX_MODEL_KEYS} model keys`)
   }),
   set_interface: z.object({
-    theme: z.enum(INTERFACE_THEMES).optional(),
-    units: z.enum(INTERFACE_UNITS).optional(),
-    treeMode: z.enum(INTERFACE_TREE_MODES).optional(),
-    sidebar: z.enum(INTERFACE_SIDEBAR).optional(),
-    card: z.enum(INTERFACE_CARDS).optional(),
-    tool: z.enum(INTERFACE_TOOLS).optional(),
+    theme: en(INTERFACE_THEMES).optional(),
+    units: en(INTERFACE_UNITS).optional(),
+    treeMode: en(INTERFACE_TREE_MODES).optional(),
+    sidebar: en(INTERFACE_SIDEBAR).optional(),
+    card: en(INTERFACE_CARDS).optional(),
+    tool: en(INTERFACE_TOOLS).optional(),
     search: z
       .string()
       .max(INTERFACE_SEARCH_MAX, `at most ${INTERFACE_SEARCH_MAX} characters`)
       .optional(),
-    schedulesWindow: z.enum(['open']).optional()
+    schedulesWindow: en(['open']).optional()
   }),
   // The lookup name is what the user called a viewpoint, so it may be longer than one the
   // assistant may give; both are bounded, and a number is a position in the list.
   manage_views: z.object({
-    op: z.enum(VIEW_OPS),
+    op: en(VIEW_OPS),
     name: z.string().max(200, 'at most 200 characters').optional(),
     number: z.number().int('a whole number').min(1, '1 or more').optional(),
     to: z.string().max(VIEW_NAME_MAX, `at most ${VIEW_NAME_MAX} characters`).optional()
   }),
   manage_markups: z.object({
-    op: z.enum(MARKUP_OPS),
+    op: en(MARKUP_OPS),
     name: z.string().max(20, 'a markup is named M1, C2 …').optional(),
     // `clear` (2026-10-02, phase 3): which of the card's two lists.
-    kind: z.enum(MARKUP_KINDS).optional(),
+    kind: en(MARKUP_KINDS).optional(),
     // Placing (phase 4): an element and a place on its box, or a point; a spot tag's state.
     id: z.number().optional(),
-    at: z.enum(MARKUP_PLACES).optional(),
+    at: en(MARKUP_PLACES).optional(),
     point: z.object({ x: MarkupMetres, y: MarkupMetres, z: MarkupMetres }).optional(),
-    show: z.enum(SPOT_SHOWS).optional()
+    show: en(SPOT_SHOWS).optional()
   }),
   // 2026-10-02, phase 3 — the consent gate. Nothing here is a path: `recent` is a file's name,
   // looked up on the app's own recent list, and a name has no separator in it.
   request_user_action: z.object({
-    action: z.enum(REQUEST_ACTIONS),
+    action: en(REQUEST_ACTIONS),
     recent: z
       .string()
       .max(RECENT_NAME_MAX, `at most ${RECENT_NAME_MAX} characters`)
@@ -393,7 +408,7 @@ export const TOOL_INPUTS = {
   // 2026-10-02, phase 4 — the Schedules window's own controls. What is sent on is the
   // operation and these two names, and nothing else.
   manage_schedules: z.object({
-    op: z.enum(SCHEDULE_MANAGE_OPS),
+    op: en(SCHEDULE_MANAGE_OPS),
     name: ScheduleName.optional(),
     to: ScheduleName.optional()
   }),
@@ -402,7 +417,7 @@ export const TOOL_INPUTS = {
   make_schedule: ScheduleInput,
   get_schedule: z.object({ limit: z.number().optional(), offset: z.number().optional() }),
   // A format and nothing else: no name, no path, no content (the read-only guard pins it).
-  export_schedule: z.object({ format: z.enum(SCHEDULE_EXPORT_FORMATS) }),
+  export_schedule: z.object({ format: en(SCHEDULE_EXPORT_FORMATS) }),
   color_by_schedule_column: z.object({ column: z.union([z.string().min(1).max(200), z.null()]) })
 } as const
 

@@ -161,6 +161,14 @@ function withEarlier(obs, earlier, start) {
   }
 }
 
+/**
+ * 2026-11-09 — a turn whose quick reply was not clicked because no question was shown: nothing
+ * sent, nothing called, and why, which the graders fail it on (`choice-shown`).
+ */
+function skippedTurn(choice) {
+  return { ...nullTurn(), skipped: `no IFC+SG question was shown, so the quick reply "${choice}" was not clicked and the turn was not sent` }
+}
+
 /** The null agent's turn: nothing called, nothing said. */
 function nullTurn() {
   return { reply: '', calls: [], outcome: { type: 'done', rounds: 0 }, usage: null, model: null, index: -1 }
@@ -213,6 +221,7 @@ function observation(turn, before, after, message) {
     calls: turn.calls,
     outcome: turn.outcome,
     usage: turn.usage,
+    ...(turn.skipped ? { skipped: turn.skipped } : {}),
     view: after.view,
     viewBefore: before.view,
     store,
@@ -220,4 +229,4 @@ function observation(turn, before, after, message) {
   }
 }
 
-module.exports = { addUsage, collectTruth, fillTemplate, lateTruth, nullTurn, observation, oracleTurn, pickFrom, scriptedCalls, turnsOf, withEarlier }
+module.exports = { addUsage, collectTruth, fillTemplate, lateTruth, nullTurn, observation, oracleTurn, pickFrom, scriptedCalls, skippedTurn, turnsOf, withEarlier }

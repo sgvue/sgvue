@@ -1187,8 +1187,9 @@ stands — and `docs/DECISIONS.md` has the rules.
 **Stage 2 (2026-11-08): what the app adds to a reply, and the IFC+SG question.** Three pieces,
 each decided by app code and never by the model's words, because text inside an IFC file reaches
 the model. *A heads-up line* — at most one a reply, after its answer and before its consent card,
-in `--warn-ink`: the app's own observation over the elements the reply's last rule-bearing call
-touched (`ai/heads-up.ts`) — placeholder values (`TBC`, `-`, `n/a`, a `0` rating) in the property
+in `--warn-ink`: the app's own observation over the elements a rule-bearing call of the reply
+touched (`ai/heads-up.ts`; since 2026-11-09, of all such calls' observations the first of the
+highest kind, the order one call's own are picked in — `betterObservation`) — placeholder values (`TBC`, `-`, `n/a`, a `0` rating) in the property
 it checked, listed or grouped by; elements on no storey; a GlobalId two of them share; and, only
 after the user answered Yes to IFC+SG, an element whose sub-type is only in a free-text
 ObjectType — drawn from a fixed template, never quoted and never parsed. *IFC terms* — a code span
@@ -1409,6 +1410,14 @@ by the user's click on a quick reply (`chooseReply`, which nothing under `render
 guard test pins its callers), forgotten with the conversation; `get_view_state` reads it back, and
 the per-turn view state carries it once it is not `unknown`. A Yes also earns, for the reply that
 answers it, the ObjectType-only heads-up over what the asking turn read.
+
+**Answered and asked in one reply (2026-11-09).** A read that touches, by rule, elements carrying
+an `SGPset_` set — while the conversation has no IFC+SG answer and the question has not been
+asked, in it or in this turn — carries one line of the app's own in its result, `ifcsg`
+(`IFCSG_NUDGE`, `ai/executors/index.ts`): answer the question in plain IFC terms and, if it is about
+those elements' types, properties or classification, call `ask_choice` once in the same reply. Only
+a read raises it, only from the app's own state, never from file text; once asked
+(`chatIfcsgAsked`) it is never said again in the conversation.
 
 `set_section` acts on one of two independent cuts (2026-10-01): `kind:"grid"` sets the gridline
 cut and leaves the level cut alone, `kind:"level"` the reverse, a `kind` with `name:""` or no

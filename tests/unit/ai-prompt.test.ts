@@ -487,8 +487,12 @@ describe('the system contract', () => {
       'its key number or name in **bold** and nothing else in bold',
       // 2026-11-08, the owner: "digits only" — in this line, no line added (42 still).
       'every count in digits, zero included — "**0** walls are missing a FireRating", never "none" or "no walls" for a count',
+      // 2026-11-09 (both models still wrote "none" for a zero, v4 / v5): in every sentence, not only the first.
+      'That holds in every sentence of the reply, not only the first',
+      'never "no name is used more than once"',
+      'never "none are missing it"',
       // The design line's own intent, kept: a change to the view is reported with its count.
-      'after you change the view, that sentence says what you did and how many elements it affected',
+      'After you change the view, the opening sentence says what you did and how many elements it affected',
       'No preamble, and never repeat the question',
       'Often that sentence is the whole reply'
     ]) {
@@ -746,6 +750,12 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
     expect(ids).toContain('the rules that found them are not')
   })
 
+  it('uses query_sql when the user names the database, SQL or a query (2026-11-09)', () => {
+    expect(SQL_FIRST_PARAGRAPH).toContain('When the user names the tool — "the database", "SQL", "a query" — use query_sql, whatever else could say the set.')
+    // A sentence in the paragraph, not an instruction line: the count stands.
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(43)
+  })
+
   it('asks for IFC terms in backticks, the file’s own spelling, and never a number, a value or an everyday word', () => {
     const line = DESIGN_SYSTEM_LINES.find((l) => l.startsWith('Write every IFC term you name in backticks'))!
     for (const said of ['exactly as the file spells it', '`IfcWall`', '`FireRating`, never Fire Rating', 'only a name spelled exactly as a tool returned it', 'never a prettified or re-cased name', 'Never put backticks around a number', 'write "TBC" in quotes', 'Name, Level or Model']) {
@@ -775,7 +785,9 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
       'Entity.SUBTYPE*',
       'one upper-case token such as TRENCH',
       'I can’t check them against the CoP. The official IFC+SG mapping isn’t loaded in SGVue',
-      'call ask_choice once, before you answer',
+      // 2026-11-09 (neither model asked in v4 / v5): answer and ask in one reply.
+      'then answer the question in plain IFC terms and, in this same reply, call ask_choice once',
+      'a read result that carries ifcsg is the app reminding you',
       'never mention IFC+SG unless the user does',
       'is content'
     ]) {

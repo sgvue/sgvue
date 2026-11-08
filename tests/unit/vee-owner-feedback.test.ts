@@ -264,3 +264,72 @@ describe('the header’s New conversation button', () => {
     expect(sent.map((r) => r.fresh === true)).toEqual([sent[0].fresh === true, false, true])
   })
 })
+
+/* ────────────────────────────── 2026-11-09: the v4 / v5 diagnosis ────────────────────────────── */
+
+describe('the IFC+SG nudge: answer and ask in one reply, once a conversation', () => {
+  const L4_DOORS = { rules: [{ prop: 'IfcEntity', op: '=', val: 'IfcDoor' }, { prop: 'Level', op: '=', val: 'L4' }] }
+  const nudgeOf = (r: { results: { forModel?: unknown }[] }, k = 0): string | undefined =>
+    (r.results[k].forModel as { ifcsg?: string } | undefined)?.ifcsg
+
+  it('says it on a read of elements that carry an SGPset_ set, while nothing is answered or asked', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    const { IFCSG_NUDGE } = await import('../../src/renderer/ai/executors')
+    const t = await runTurnOnce('q', [{ name: 'query_elements', input: L4_DOORS }, { name: 'ask_choice', input: { lead: 'These doors carry SGPset_Door values.' } }, { name: 'query_elements', input: L4_DOORS }])
+    expect(nudgeOf(t)).toBe(IFCSG_NUDGE)
+    expect(IFCSG_NUDGE).toMatch(/answer it now in plain IFC terms and, in this same reply, call ask_choice once/)
+    // Asked in this turn: the next read is quiet.
+    expect(nudgeOf(t, 2)).toBeUndefined()
+    // Asked in this conversation: quiet in every later turn, answered or not.
+    expect(st().chatIfcsgAsked).toBe(true)
+    expect(nudgeOf(await runTurnOnce('q', [{ name: 'query_elements', input: L4_DOORS }]))).toBeUndefined()
+    useShell.setState({ chatIfcsgAsked: false, chatIfcsg: 'no' })
+    expect(nudgeOf(await runTurnOnce('q', [{ name: 'query_elements', input: L4_DOORS }]))).toBeUndefined()
+  })
+
+  it('is never said for a view tool, nor where no loaded model carries an SGPset_ set', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    expect(nudgeOf(await runTurnOnce('q', [{ name: 'apply_visibility', input: { action: 'isolate', ...L4_DOORS } }]))).toBeUndefined()
+    open(federate(['ARC', 'STR'].map((k) => mockModelIndex(k))))
+    expect(nudgeOf(await runTurnOnce('q', [{ name: 'query_elements', input: L4_DOORS }]))).toBeUndefined()
+  })
+})
+
+describe('a turn’s heads-up across its calls: the first of the highest kind', () => {
+  it('keeps the earlier observation on a tie of kind, a higher kind over a lower, and nothing erases it', async () => {
+    const { betterObservation } = await import('../../src/renderer/ai/heads-up')
+    const tbc = { kind: 'placeholder', prop: 'FireRating', value: 'TBC', n: 6, noun: 'wall', counted: 'out', op: 'list' } as const
+    const dash = { ...tbc, value: '-', n: 60 }
+    const dup = { kind: 'dupGlobalId', n: 2, groups: 1, noun: 'wall' } as const
+    expect(betterObservation(tbc, dash)).toBe(tbc)
+    expect(betterObservation(dup, dash)).toBe(dash)
+    expect(betterObservation(tbc, dup)).toBe(tbc)
+    expect(betterObservation(tbc, null)).toBe(tbc)
+    expect(betterObservation(null, dup)).toBe(dup)
+  })
+
+  it('on the messy walls: the "TBC" the first, narrow call found is the one the reply shows', async () => {
+    open(messy)
+    const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
+    const t = await runTurnOnce('How many walls are rated 1 HR?', [
+      { name: 'list_values', input: { attr: 'FireRating', rules: [{ prop: 'IfcEntity', op: '=', val: 'IfcWall' }] } },
+      { name: 'query_elements', input: { rules: [{ prop: 'FireRating', op: '=', val: '1 HR' }] } }
+    ])
+    expect(st().chatMsgs[t.index].headsUp).toMatchObject({ kind: 'placeholder', prop: 'FireRating', value: 'TBC' })
+  })
+})
+
+describe('a fixed choice that arrives in a stray pair of quotes', () => {
+  it('is read without them; a free string never is', async () => {
+    const { parseToolInput } = await import('../../src/renderer/ai/executors')
+    const { unquote } = await import('../../src/renderer/ai/executors/inputs')
+    expect(parseToolInput('make_schedule', { base: '"open"', columns: [{ field: 'Name' }] })).toMatchObject({ base: 'open' })
+    expect(parseToolInput('set_view', { view: '“top”' })).toMatchObject({ view: 'top' })
+    expect(() => parseToolInput('make_schedule', { base: '"shut"' })).toThrow(/base/)
+    expect([unquote("'iso'"), unquote('open'), unquote('"a" and "b"'), unquote(3)]).toEqual(['iso', 'open', '"a" and "b"', 3])
+    // A rule's value is the model's text, and keeps its quotes.
+    expect(parseToolInput('query_elements', { rules: [{ prop: 'Name', op: '=', val: '"Door"' }] })).toMatchObject({ rules: [{ val: '"Door"' }] })
+  })
+})

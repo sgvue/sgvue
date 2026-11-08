@@ -239,7 +239,9 @@ describe('the heads-up: observed over the elements the call touched, never the w
     expect(unknown.ui.headsUp).toBeNull()
   })
 
-  it('commits the last rule-bearing call’s heads-up on the reply, and a later clean one takes it away', async () => {
+  // 2026-11-09 (the v4 run's hu-placeholder: the first call found the 6 "TBC" walls, a wider one
+  // later "-" ×60, and the last one won): the first observation of the highest kind is kept.
+  it('commits the first heads-up of the highest kind any rule-bearing call made, and a later clean call takes nothing away', async () => {
     open(mock)
     const { runTurnOnce } = await import('../../src/renderer/ai/bridge')
     const dashThenClean = await runTurnOnce('q', [
@@ -251,7 +253,9 @@ describe('the heads-up: observed over the elements the call touched, never the w
       { name: 'query_elements', input: { rules: [entity('IfcDoor'), { prop: 'FireRating', op: 'absent', val: '' }] } },
       { name: 'query_elements', input: { rules: [entity('IfcSlab')] } }
     ])
-    expect(st().chatMsgs[cleanLast.index].headsUp).toBeUndefined()
+    expect(st().chatMsgs[cleanLast.index].headsUp).toMatchObject({ kind: 'placeholder' })
+    const nothing = await runTurnOnce('q', [{ name: 'query_elements', input: { rules: [entity('IfcSlab')] } }])
+    expect(st().chatMsgs[nothing.index].headsUp).toBeUndefined()
     // A quote of the reply never includes it.
     const m = st().chatMsgs[dashThenClean.index]
     const parts = partsOf(m)

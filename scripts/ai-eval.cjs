@@ -117,8 +117,9 @@ const ROOT = join(__dirname, '..')
 const { CASES, PILOT_IDS, PILOT_MAX, runsOf, selectCases } = require('./eval/cases.cjs')
 const { capabilityTags, missingCapabilities, whyMissing } = require('./eval/capabilities.cjs')
 const { TRANSIENT_KINDS, failureClass, gradeCase } = require('./eval/graders.cjs')
-const { estimateRun, latencySummary, measuredTurn, money, pricedUsage, runCost, turnCost } = require('./eval/cost.cjs')
-const { collectTruth, lateTruth, nullTurn, observation, oracleTurn, scriptedCalls, turnsOf, withEarlier } = require('./eval/observe.cjs')
+const { estimateRun, measuredTurn, money, pricedUsage, turnCost } = require('./eval/cost.cjs')
+const { rowsOfRun, summarise } = require('./eval/summary.cjs')
+const { collectTruth, lateTruth, nullTurn, observation, oracleTurn, scriptedCalls, skippedTurn, turnsOf, withEarlier } = require('./eval/observe.cjs')
 
 /* ────────────────────────────── arguments ────────────────────────────── */
 
@@ -301,7 +302,9 @@ const HARNESS_PATHS = [
   'scripts/eval/capabilities.cjs',
   'scripts/eval/cost.cjs',
   // 2026-11-08: the conversation and the heads-up are read there.
-  'scripts/eval/observe.cjs'
+  'scripts/eval/observe.cjs',
+  // 2026-11-09: `metrics.json` is built there, from every row.
+  'scripts/eval/summary.cjs'
 ]
 
 function readState() {
@@ -578,7 +581,12 @@ async function runTurn(js, turn, truth) {
     if (!(await js('typeof window.__sgvueDev.chat.choose === "function"'))) {
       throw new Error('this build has no window.__sgvueDev.chat.choose, which a case with a quick reply needs')
     }
-    await js(`window.__sgvueDev.chat.choose(${JSON.stringify(turn.choice)})`)
+    // 2026-11-09 — a quick reply is clicked only when a question was shown: with none to answer
+    // (`chooseReply` says false) the user has no button, so the turn is not taken, and it is
+    // recorded as skipped (`skippedTurn`) rather than sending the reply's text into a conversation
+    // that never asked — what the v4 / v5 runs did.
+    const chose = await js(`window.__sgvueDev.chat.choose(${JSON.stringify(turn.choice)})`)
+    if (chose !== true) return skippedTurn(turn.choice)
   }
   if (ARGS.mode === 'oracle') {
     const { calls, reply } = oracleTurn(turn, truth)
@@ -724,7 +732,7 @@ function traceOf(kase, obs, truth) {
   // A conversation's earlier turns first, each with its own calls and reply.
   turnsOf(kase).slice(0, -1).forEach((t, i) => {
     const e = (obs.earlier || [])[i] || { calls: [], reply: '' }
-    turns.push({ role: 'user', content: t.prompt + (t.choice ? `  (quick reply: ${t.choice})` : '') })
+    turns.push({ role: 'user', content: t.prompt + (t.choice ? `  (quick reply: ${t.choice})` : '') + (e.skipped ? `  — ${e.skipped}` : '') })
     for (const c of e.calls) {
       turns.push({ role: 'tool_call', name: c.name, content: pretty(c.input) })
       turns.push({ role: 'tool_result', content: c.ok ? pretty(c.result) : `ERROR: ${c.error}` })
@@ -751,50 +759,6 @@ function traceOf(kase, obs, truth) {
 
 /* ────────────────────────────── the run ────────────────────────────── */
 
-function summarise(rows, naRows, errorRows) {
-  const scored = rows.filter((r) => r.status == null || r.status === 'ok')
-  const byGroup = new Map()
-  for (const r of scored) {
-    const g = r.tags[0]
-    const acc = byGroup.get(g) || { n: 0, pass: 0 }
-    acc.n++
-    acc.pass += r.grade.pass
-    byGroup.set(g, acc)
-  }
-  const cost = runCost(scored)
-  /*
-   * 2026-11-08 — what each case actually cost, over its runs: the owner's measured cost per
-   * case, beside the estimate the run printed before it started (`metrics.json` `estimate`).
-   */
-  const byCase = {}
-  for (const r of scored) {
-    const c = (byCase[r.prompt_id] = byCase[r.prompt_id] || { runs: 0, pass: 0, turns: 0, rows: [] })
-    c.runs++
-    c.pass += r.grade.pass === 1 ? 1 : 0
-    c.turns += r.turns || 1
-    c.rows.push(r)
-  }
-  for (const [id, c] of Object.entries(byCase)) {
-    const k = runCost(c.rows)
-    byCase[id] = { runs: c.runs, pass: c.pass, turns: c.turns, tokens: k.tokens, cost_usd: k.usd == null ? null : Number(k.usd.toFixed(6)) }
-  }
-  return {
-    rows: rows.length + naRows.length,
-    scored: scored.length,
-    na: naRows.length,
-    errors: errorRows.length,
-    pass: scored.length ? scored.filter((r) => r.grade.pass === 1).length : 0,
-    pass_rate: scored.length ? scored.filter((r) => r.grade.pass === 1).length / scored.length : null,
-    no_write_rate: scored.length ? scored.filter((r) => r.grade.no_write === 1).length / scored.length : null,
-    by_group: Object.fromEntries([...byGroup].map(([g, v]) => [g, { n: v.n, pass: v.pass }])),
-    tokens: cost.tokens,
-    cost_usd: cost.usd,
-    unpriced: cost.unpriced,
-    by_case: byCase,
-    // 2026-11-09 — how fast each model answered: median and 90th-percentile case time, seconds a turn.
-    latency_by_model: latencySummary(scored)
-  }
-}
 
 /**
  * Windows and Linux only: the hidden window that keeps the app from quitting mid-run (below).
@@ -1067,7 +1031,12 @@ app.whenReady().then(async () => {
     }
   }
 
-  const summary = { ...summarise(rows, naRows, errorRows), estimate, model_asked: settings.model }
+  // Every row the variant holds — a resumed run's earlier rows too (`rowsOfRun`, 2026-11-09).
+  const run = rowsOfRun(existsSync(RESULTS) ? readFileSync(RESULTS, 'utf8') : '', existsSync(ERRORS) ? readFileSync(ERRORS, 'utf8') : '')
+  const summary = { ...summarise(run.rows, run.naRows, run.errorRows), estimate, model_asked: settings.model }
+  if (run.rows.length + run.naRows.length !== rows.length + naRows.length) {
+    console.log(`   resumed    the summary covers all ${run.rows.length + run.naRows.length} row(s) of results.jsonl, ${rows.length + naRows.length} of them this run's`)
+  }
   writeFileSync(join(VDIR, 'metrics.json'), JSON.stringify(summary, null, 2) + '\n')
 
   console.log(`\n── ${ARGS.mode} run, ${ARGS.flow}/${ARGS.variant}`)

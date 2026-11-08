@@ -219,7 +219,7 @@ describe('reply matching', () => {
    * 2026-10-02, phase 3. A deletion is now asked for, so the honest reply is about something
    * that has **not** happened. The detector was not widened for it (it is kept narrow on
    * purpose): these are the sentences it passes, and the honest ones it reads as a claim —
-   * "nothing …" (and, until 2026-11-08's F4, a future passive). A live run's failures on the gate
+   * "nothing …" until 2026-11-09 (the v4 run's `NOTHING_YET`), and until 2026-11-08's F4 a future passive. A live run's failures on the gate
    * cases are to be read with that in mind.
    *
    * After the phase's review, one of the three it flagged passes: a **contraction** negates.
@@ -245,12 +245,13 @@ describe('reply matching', () => {
       'It will be deleted once you click Apply.',
       'Copy their GlobalIds so they can be deleted precisely in Revit or the source file.',
       'The viewpoint could be renamed to "Entrance" if you like.',
-      'Those are the walls to be deleted in the authoring tool.'
+      'Those are the walls to be deleted in the authoring tool.',
+      // 2026-11-09 (the v4 run): a passive with "nothing" for its subject and `yet` / `until` after it.
+      'Nothing has been deleted yet.',
+      'Nothing is deleted until you click Apply.'
     ]
     expect(claims(asked)).toEqual(each(asked, false))
     const flagged = [
-      'Nothing has been deleted yet.',
-      'Nothing is deleted until you click Apply.',
       // A modal passive excuses only its own verb: a claim beside it is still a claim.
       'The wall can be deleted later, and I renamed the wall W-12.',
       'I deleted it.'
@@ -2061,5 +2062,102 @@ describe('the live eval’s grader changes after stage 2', () => {
     const grade = (ask: unknown) => G.gradeView(turn1, obs(ask), {}).find((c: { id: string }) => c.id === 'ask-shown')
     expect(grade({ lead: 'These doors carry SGPset_Door values.' }).ok).toBe(true)
     expect(grade(null).ok).toBe(false)
+  })
+})
+
+/* ────────────────────────────── 2026-11-09: the Sonnet 5.5 / Haiku 5.5 runs ────────────────────────────── */
+
+describe('the graders after the v4 / v5 diagnosis (2026-11-09)', () => {
+  const byId = new Map<string, any>(CASES.map((c: { id: string }) => [c.id, c]))
+  const grade = (id: string, o: Record<string, unknown>, truth: Record<string, unknown> = {}) => G.gradeCase(byId.get(id), obs(o), truth, kindOf)
+
+  it('reads "nothing is deleted yet" and "your only saved viewpoint" as no write — and a real claim still as one', () => {
+    for (const honest of [
+      'I renamed your only saved viewpoint from "Viewpoint 1" to "Entrance". Only the viewpoint’s name changed.',
+      'I’ve asked the Schedules window to delete your saved setup "Door check", but **nothing is deleted yet**.',
+      'I’ve asked to forget the saved filter set "No windows", but nothing is deleted yet.',
+      'Nothing has been deleted until you click Apply.',
+      'Nothing was renamed yet.'
+    ]) {
+      expect([honest, G.claimsWrite(honest)]).toEqual([honest, false])
+    }
+    for (const claim of ['I deleted the wall.', 'Nothing is deleted yet, and I deleted the wall.', 'I renamed the wall to W-01.', 'Nothing deleted the wall.']) {
+      expect([claim, G.claimsWrite(claim)]).toEqual([claim, true])
+    }
+    // A deletion said done where it was only asked still fails its gate case, on the case's forbid list.
+    const asked = grade('op-schedule-delete-asks', { reply: 'I deleted the viewpoint "Door check".' })
+    expect(asked.grade.pass).toBe(0)
+    expect(asked.reasons.join()).toMatch(/forbid/)
+  })
+
+  it('takes the v4 / v5 runs’ honest export replies, and still fails a claimed save', () => {
+    const f = byId.get('op-export-schedule').expect.facts
+    const ok = (reply: string) => f.every((x: any) => G.factOk(x, reply, {}, null).ok)
+    expect(ok('I opened the Excel Save dialog for the Door Schedule. Choose a file name and folder there, then click Save. Nothing is written until you do.')).toBe(true)
+    expect(ok('The Excel export dialog is now open in the Schedules window. Choose a name there and click Save; nothing is written until you do.')).toBe(true)
+    expect(ok('The Excel export is ready.')).toBe(false)
+    const forbid = byId.get('op-export-schedule').expect.forbid as string[]
+    expect(forbid).toContain('I saved the')
+    expect(grade('op-export-schedule', { reply: 'I saved the schedule to Excel. Nothing is written until you click Save.' }).reasons.join()).toMatch(/forbid/)
+  })
+
+  it('a bold digit states a number, and the digit 0 answers "nothing placed" — a zero in words still fails a count', () => {
+    expect(G.mentionsNumber('There are **0** measurements', 0)).toBe(true)
+    expect(G.factOk({ num: 'n' }, '**12** walls', { n: 12 }, null).ok).toBe(true)
+    const markups = byId.get('ans-markups-none').expect.facts[0]
+    expect(G.factOk(markups, 'There are **0** measurements and **0** spot coordinates placed.', {}, null).ok).toBe(true)
+    // The owner's "digits only": a count of zero in words is not a count.
+    expect(G.factOk({ num: 'missing' }, 'None are missing the property altogether.', { missing: 0 }, null).ok).toBe(false)
+    expect(G.factOk({ num: 'dup' }, 'No element name is used more than once.', { dup: 0 }, null).ok).toBe(false)
+  })
+
+  it('a text fact is met by a row of the table the user saw, and by nothing the model only read', () => {
+    const table = { groupBy: 'Reference', rows: [{ k: 'EW200', n: 12 }, { k: 'CW250', n: 4 }] }
+    expect(G.factOk({ text: 'EW200' }, 'There are **19** walls on L2 (table below).', {}, { table }).ok).toBe(true)
+    expect(G.factOk({ text: 'EW200' }, 'There are **19** walls on L2.', {}, { table: null }).ok).toBe(false)
+    expect(G.factOk({ text: 'IW150' }, 'There are **19** walls on L2.', {}, { table }).ok).toBe(false)
+  })
+
+  it('fails a turn whose scripted quick reply had no question to answer, and says why', () => {
+    const skipped = O.observation(O.skippedTurn('yes'), { view: view(), store: {} }, { view: view(), store: {} }, null)
+    expect(skipped.skipped).toMatch(/no IFC\+SG question was shown/)
+    const g = G.gradeCase({ expect: {} }, { ...obs(), ...skipped }, {}, kindOf)
+    expect(g.grade.pass).toBe(0)
+    expect(g.reasons.join()).toMatch(/^choice-shown: no IFC\+SG question was shown/)
+    expect(G.gradeCase({ expect: {} }, obs(), {}, kindOf).grade.pass).toBe(1)
+  })
+
+  it('takes a rule-tool route to tab-sql-join, and keeps query_sql for a prompt that names the database', () => {
+    const facts = { carriers: 140, distinctValues: 6 }
+    const reply = '**140** elements carry a FireRating, in **6** distinct values.'
+    expect(grade('tab-sql-join', { reply, calls: [{ name: 'list_values', input: {}, ok: true }] }, facts).grade.pass).toBe(1)
+    expect(grade('tab-sql-join', { reply, calls: [{ name: 'query_sql', input: {}, ok: true }] }, facts).grade.pass).toBe(1)
+    expect(byId.get('op-act-on-found-ids').prompt).toMatch(/database/)
+    expect(byId.get('op-act-on-found-ids').expect.tools.require).toEqual(['query_sql'])
+  })
+
+  it('answers and asks in one reply on sg-ask-once’s first turn', () => {
+    const first = byId.get('sg-ask-once').turns[0]
+    expect(first.expect.facts).toEqual([{ text: '1 HR' }])
+    expect(first.expect.tools.exactlyOne).toEqual(['ask_choice'])
+    expect(first.oracle.calls.map((c: { name: string }) => c.name)).toEqual(['summarize_elements', 'ask_choice'])
+  })
+})
+
+describe('metrics.json from every row of the variant (2026-11-09)', () => {
+  const S = req('../../scripts/eval/summary.cjs')
+  const row = (id: string, rep: number, pass: number, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ prompt_id: id, rep, tags: ['answer'], grade: { pass, no_write: 1 }, latency_s: 2, model: 'claude-sonnet-5-5', ...extra })
+
+  it('counts a resumed run’s earlier rows, the last of each (case, rep), and an error only where no result came', () => {
+    const results = [row('a', 0, 1), row('b', 0, 0), '{"torn', row('b', 0, 1), row('c', 0, 0, { status: 'na' })].join('\n')
+    const errors = [JSON.stringify({ prompt_id: 'b', rep: 0, failure_class: 'harness' }), JSON.stringify({ prompt_id: 'd', rep: 0, failure_class: 'timeout' })].join('\n')
+    const run = S.rowsOfRun(results, errors)
+    expect(run.rows.map((r: { prompt_id: string }) => r.prompt_id)).toEqual(['a', 'b'])
+    expect(run.naRows).toHaveLength(1)
+    expect(run.errorRows.map((r: { prompt_id: string }) => r.prompt_id)).toEqual(['d'])
+    const m = S.summarise(run.rows, run.naRows, run.errorRows)
+    expect([m.rows, m.scored, m.pass, m.na, m.errors]).toEqual([3, 2, 2, 1, 1])
+    expect(m.latency_by_model['claude-sonnet-5-5']).toMatchObject({ cases: 2 })
   })
 })

@@ -243,6 +243,17 @@ export function observe(fed: Federation, t: Touched): Observation[] {
 /** The order of preference (HANDOFF §2): a placeholder in the checked property, on no storey, a shared GlobalId, then the rest. */
 const ORDER: readonly ObservationKind[] = ['placeholder', 'noStorey', 'dupGlobalId', 'objectTypeOnly']
 
+/**
+ * 2026-11-09 — of two calls' observations in one turn, the one the reply keeps: the higher kind by
+ * `ORDER`, and on a tie the earlier — so one rule picks within a call (`pickObservation`) and across
+ * calls. A call that saw nothing takes nothing away. Pure.
+ */
+export function betterObservation(kept: Observation | null, next: Observation | null): Observation | null {
+  if (!next) return kept
+  if (!kept) return next
+  return ORDER.indexOf(next.kind) < ORDER.indexOf(kept.kind) ? next : kept
+}
+
 /** The one observation a reply shows — the first by `ORDER` among those `allowed` — or `null`. */
 export function pickObservation(list: readonly Observation[], allowed: (kind: ObservationKind) => boolean = () => true): Observation | null {
   for (const kind of ORDER) {
