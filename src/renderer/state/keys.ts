@@ -55,14 +55,17 @@ export function keyAction(e: KeyEventLike, s: KeyState): KeyAction | null {
     return { kind: 'deselect' }
   }
   if ((k === 'z' || k === 'Z') && (e.metaKey || e.ctrlKey)) return { kind: 'step', back: !e.shiftKey }
-  // ⌘S / Ctrl+S and ⇧⌘S are File › Save Project and Save Project As… (2026-11-07): on Windows a
-  // menu accelerator's key still reaches the page first, and must not also flip the snap.
-  if ((k === 's' || k === 'S') && !e.metaKey && !e.ctrlKey) return { kind: 'toggleSnap' }
+  if (k === 'Home') return { kind: 'view', name: 'iso' }
+  // Every letter below is the letter alone. A key pressed with ⌘ or Ctrl is the menu's or the
+  // OS's — ⌘S / ⇧⌘S Save Project (2026-11-07), ⌘C / ⌘X / ⌘V the Edit menu, ⌘H Hide, ⌘M
+  // Minimise (2026-11-09) — and the key still reaches the page first, so it must do nothing here:
+  // ⌘C over the property card's selected text used to arm the spot tool.
+  if (e.metaKey || e.ctrlKey) return null
+  if (k === 's' || k === 'S') return { kind: 'toggleSnap' }
   if (k === 'm' || k === 'M') return { kind: 'tool', tool: 'measure' }
   if (k === 'c' || k === 'C') return { kind: 'tool', tool: 'spot' }
   if (k === 'g' || k === 'G') return { kind: 'toggleGrids' }
   if (k === 'l' || k === 'L') return { kind: 'toggleLevels' }
-  if (k === 'Home') return { kind: 'view', name: 'iso' }
   if (k === 'H') return { kind: 'showAll' }
   if (k === 'h' && s.selCount) return { kind: 'hide' }
   if ((k === 'i' || k === 'I') && s.selCount) return { kind: 'isolate' }

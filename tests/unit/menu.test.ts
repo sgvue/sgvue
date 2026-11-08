@@ -112,3 +112,38 @@ describe('Preferences…', () => {
     expect(() => clickPreferences()).not.toThrow()
   })
 })
+
+/**
+ * Edit (2026-11-09). On macOS a text field's ⌘X / ⌘V work only while the app menu carries the
+ * `cut` / `paste` role, so without them nothing could be pasted into the API key box or the
+ * Ask Vee composer. Electron's own default order on each platform.
+ */
+describe('Edit', () => {
+  async function editRoles(platform: NodeJS.Platform): Promise<(string | undefined)[]> {
+    const real = process.platform
+    Object.defineProperty(process, 'platform', { value: platform })
+    try {
+      vi.resetModules()
+      const menu = await import('../../src/main/menu')
+      menu.installMenu()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: real })
+    }
+    const edit = built.at(-1)!.find((m) => m.label === 'Edit')!
+    return (edit.submenu as MenuItemConstructorOptions[]).map((i) => i.role ?? i.type)
+  }
+
+  it.each(['darwin', 'win32'] as const)('has cut, copy, paste and selectAll on %s', async (platform) => {
+    const roles = await editRoles(platform)
+    for (const role of ['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll']) expect(roles).toContain(role)
+  })
+
+  it('is the platform order: macOS adds pasteAndMatchStyle, Windows a separator before selectAll', async () => {
+    expect(await editRoles('darwin')).toEqual([
+      'undo', 'redo', 'separator', 'cut', 'copy', 'paste', 'pasteAndMatchStyle', 'delete', 'selectAll'
+    ])
+    expect(await editRoles('win32')).toEqual([
+      'undo', 'redo', 'separator', 'cut', 'copy', 'paste', 'delete', 'separator', 'selectAll'
+    ])
+  })
+})

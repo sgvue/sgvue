@@ -50,6 +50,22 @@ describe('onKey', () => {
     expect(act('S', {}, { shiftKey: true })).toEqual({ kind: 'toggleSnap' })
   })
 
+  it('fires no letter shortcut with ⌘ or Ctrl held: those are the Edit menu’s and the OS’s', () => {
+    // ⌘C / Ctrl+C copies selected text (the property card's); it never arms the spot tool.
+    expect(act('c', {}, { metaKey: true })).toBeNull()
+    expect(act('c', {}, { ctrlKey: true })).toBeNull()
+    expect(act('c')).toEqual({ kind: 'tool', tool: 'spot' })
+    const full = { selCount: 3, hasSel: true }
+    for (const key of ['m', 'M', 'c', 'C', 'g', 'G', 'l', 'L', 'h', 'H', 'i', 'I', 'd', 'D', 'f', 'F', 'x', 'v']) {
+      for (const mods of [{ metaKey: true }, { ctrlKey: true }, { metaKey: true, shiftKey: true }] as Record<string, boolean>[]) {
+        expect(act(key, full, mods), `${key} ${JSON.stringify(mods)}`).toBeNull()
+      }
+    }
+    // The one shortcut documented with a modifier keeps it, and Home is not a letter.
+    expect(act('z', {}, { metaKey: true })).toEqual({ kind: 'step', back: true })
+    expect(act('Home', {}, { ctrlKey: true })).toEqual({ kind: 'view', name: 'iso' })
+  })
+
   it('distinguishes shift-H (show all) from h (hide the selection)', () => {
     expect(act('H')).toEqual({ kind: 'showAll' })
     expect(act('H', { selCount: 3 })).toEqual({ kind: 'showAll' })

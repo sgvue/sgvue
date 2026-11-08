@@ -67,6 +67,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 - When Vee makes a schedule for several classes and one of them is in no loaded model, it leaves
   that class out and says so. An interference check states the tolerance it used.
 
+### Fixed
+
+- Paste (⌘V / Ctrl+V) and cut now work in text fields, including the API key box and the Ask Vee
+  composer.
+- ⌘C / Ctrl+C no longer switches to the spot tool.
+
 ## [1.5.0] - 2026-11-08
 
 ### Added

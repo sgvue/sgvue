@@ -1502,6 +1502,9 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-08 — **the trace's names are the file's own, coloured as IFC terms**: `toolFacts` takes the main window's `isTerm` and marks which shown names are terms (`filter.terms` / `check.terms`); the diary's steps, the folded line and the storey-rows title read `FireRating`, not "Fire Rating"; a finished reply's terms are worked out per snapshot (`traceTermsOf`), so a name no longer loaded falls back to plain; an `.ifc-term` keeps its case inside a capitalised header (`text-transform: none`).
 - 2026-11-08 — **the matrix canvas is `willReadFrequently`, and the reduced-motion e2e compares the matrix by layout, not pixels** (the owner: "Compare layout, not pixels"): the e2e's per-frame readbacks made one reduced-motion frame rasterise twice with 160 corner pixels apart; `layoutKey` (`tests/e2e/layout-key.ts`) names a picture by its cells' boxes and centre colours, so sub-pixel corner coverage is the same picture and a moved, added or recoloured cell is not.
 
+- 2026-11-09 — **the Edit menu carries the platform's standard roles** (undo, redo, cut, copy, paste, pasteAndMatchStyle on macOS, delete, selectAll; Electron's default order, `main/menu.ts`): on macOS a text field's ⌘X / ⌘V work only while the menu has the `cut` / `paste` role, so since 1.2.0 nothing could be pasted, the API key box included; no page handler swallows them, and the model stays read-only.
+- 2026-11-09 — **no single-letter shortcut fires with ⌘ or Ctrl held** (`keyAction`, `state/keys.ts`): after Escape, ⌘Z / ⇧⌘Z and Home, a modified key is no action, so ⌘C / ⌘X / ⌘V, ⌘H and ⌘M stay the Edit menu's and the OS's — ⌘C over the property card used to arm the spot tool; ⌘S's own guard of 2026-11-07 is now this one rule.
+
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
 ---

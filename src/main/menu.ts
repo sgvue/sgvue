@@ -103,7 +103,24 @@ function buildMenu(): Menu {
         isMac ? { role: 'close' } : { role: 'quit' }
       ]
     },
-    { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'copy' }, { role: 'selectAll' }] },
+    {
+      // 2026-11-09 — the platform's standard Edit roles, in Electron's own default order. On
+      // macOS a text field's ⌘X / ⌘V work only while the app menu carries the `cut` / `paste`
+      // role; without them (1.2.0 to 1.5.0) no field could be pasted into — not Preferences' API
+      // key box, not the Ask Vee composer. They act on text fields only; the model stays read-only.
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        ...(isMac
+          ? ([{ role: 'pasteAndMatchStyle' }, { role: 'delete' }, { role: 'selectAll' }] as MenuItemConstructorOptions[])
+          : ([{ role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }] as MenuItemConstructorOptions[]))
+      ]
+    },
     {
       label: 'View',
       submenu: [
