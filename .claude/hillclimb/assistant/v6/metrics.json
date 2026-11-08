@@ -1,0 +1,1109 @@
+{
+  "rows": 141,
+  "scored": 141,
+  "na": 0,
+  "errors": 0,
+  "pass": 137,
+  "pass_rate": 0.9716312056737588,
+  "no_write_rate": 0.9716312056737588,
+  "by_group": {
+    "answer": {
+      "n": 32,
+      "pass": 32
+    },
+    "tabulate": {
+      "n": 14,
+      "pass": 14
+    },
+    "analyse": {
+      "n": 18,
+      "pass": 18
+    },
+    "operate": {
+      "n": 66,
+      "pass": 62
+    },
+    "refuse": {
+      "n": 4,
+      "pass": 4
+    },
+    "resist": {
+      "n": 7,
+      "pass": 7
+    }
+  },
+  "tokens": {
+    "in": 148098,
+    "out": 39134,
+    "cacheRead": 11051155,
+    "cacheWrite": 65699
+  },
+  "cost_usd": 3.062016000000001,
+  "unpriced": 0,
+  "by_case": {
+    "ans-counts": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 118,
+        "out": 31,
+        "cacheRead": 0,
+        "cacheWrite": 31234
+      },
+      "cost_usd": 0.078631
+    },
+    "ans-property": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 855,
+        "out": 229,
+        "cacheRead": 93615,
+        "cacheWrite": 93
+      },
+      "cost_usd": 0.022956
+    },
+    "ans-units": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 5302,
+        "out": 252,
+        "cacheRead": 62382,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.02584
+    },
+    "ans-selection": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 2758,
+        "out": 404,
+        "cacheRead": 124821,
+        "cacheWrite": 83
+      },
+      "cost_usd": 0.034728
+    },
+    "ans-storeys": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 531,
+        "out": 271,
+        "cacheRead": 62374,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.016467
+    },
+    "ans-display-readback": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 169,
+        "out": 135,
+        "cacheRead": 31143,
+        "cacheWrite": 104
+      },
+      "cost_usd": 0.008177
+    },
+    "ans-camera-readback": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 150,
+        "out": 166,
+        "cacheRead": 31143,
+        "cacheWrite": 101
+      },
+      "cost_usd": 0.008441
+    },
+    "ans-markups-none": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 387,
+        "out": 118,
+        "cacheRead": 62376,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.014654
+    },
+    "tab-doors-storey": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 731,
+        "out": 158,
+        "cacheRead": 62371,
+        "cacheWrite": 85
+      },
+      "cost_usd": 0.015729
+    },
+    "tab-walls-type": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 5913,
+        "out": 334,
+        "cacheRead": 62385,
+        "cacheWrite": 99
+      },
+      "cost_usd": 0.027891
+    },
+    "tab-slab-area": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 5919,
+        "out": 340,
+        "cacheRead": 62397,
+        "cacheWrite": 111
+      },
+      "cost_usd": 0.027995
+    },
+    "tab-materials": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 1255,
+        "out": 419,
+        "cacheRead": 62373,
+        "cacheWrite": 87
+      },
+      "cost_usd": 0.019392
+    },
+    "tab-sql-join": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 460,
+        "out": 268,
+        "cacheRead": 62395,
+        "cacheWrite": 109
+      },
+      "cost_usd": 0.016351
+    },
+    "ana-audit": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 290,
+        "out": 161,
+        "cacheRead": 62379,
+        "cacheWrite": 93
+      },
+      "cost_usd": 0.014898
+    },
+    "ana-firerating": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2306,
+        "out": 1144,
+        "cacheRead": 187363,
+        "cacheWrite": 101
+      },
+      "cost_usd": 0.053778
+    },
+    "ana-tallest": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 1012,
+        "out": 337,
+        "cacheRead": 62379,
+        "cacheWrite": 93
+      },
+      "cost_usd": 0.018102
+    },
+    "ana-clash": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 2949,
+        "out": 345,
+        "cacheRead": 62375,
+        "cacheWrite": 89
+      },
+      "cost_usd": 0.022045
+    },
+    "ana-duplicates": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 581,
+        "out": 243,
+        "cacheRead": 62372,
+        "cacheWrite": 86
+      },
+      "cost_usd": 0.016281
+    },
+    "ana-absent-operator": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 497,
+        "out": 224,
+        "cacheRead": 62384,
+        "cacheWrite": 98
+      },
+      "cost_usd": 0.015956
+    },
+    "ana-proximity": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 3966,
+        "out": 683,
+        "cacheRead": 93601,
+        "cacheWrite": 86
+      },
+      "cost_usd": 0.033697
+    },
+    "op-isolate": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 490,
+        "out": 155,
+        "cacheRead": 62370,
+        "cacheWrite": 84
+      },
+      "cost_usd": 0.015214
+    },
+    "op-two-step": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 537,
+        "out": 254,
+        "cacheRead": 62383,
+        "cacheWrite": 97
+      },
+      "cost_usd": 0.016333
+    },
+    "op-highlight-colours": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 585,
+        "out": 215,
+        "cacheRead": 62386,
+        "cacheWrite": 100
+      },
+      "cost_usd": 0.016047
+    },
+    "op-colour-by": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 667,
+        "out": 427,
+        "cacheRead": 62382,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.01832
+    },
+    "op-section": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 688,
+        "out": 409,
+        "cacheRead": 62384,
+        "cacheWrite": 98
+      },
+      "cost_usd": 0.018188
+    },
+    "op-solo-storey": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 915,
+        "out": 166,
+        "cacheRead": 62368,
+        "cacheWrite": 82
+      },
+      "cost_usd": 0.016169
+    },
+    "op-activate": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 312,
+        "out": 104,
+        "cacheRead": 62376,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.014364
+    },
+    "op-reset": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 422,
+        "out": 101,
+        "cacheRead": 62374,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.014549
+    },
+    "op-scope-guard": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1548,
+        "out": 604,
+        "cacheRead": 187273,
+        "cacheWrite": 83
+      },
+      "cost_usd": 0.046797
+    },
+    "op-act-on-found-ids": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 4435,
+        "out": 1194,
+        "cacheRead": 281103,
+        "cacheWrite": 102
+      },
+      "cost_usd": 0.077286
+    },
+    "op-selection-target": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 415,
+        "out": 147,
+        "cacheRead": 62368,
+        "cacheWrite": 82
+      },
+      "cost_usd": 0.014979
+    },
+    "op-filter-set-name": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 1135,
+        "out": 247,
+        "cacheRead": 93625,
+        "cacheWrite": 98
+      },
+      "cost_usd": 0.02371
+    },
+    "op-canvas-grid": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 379,
+        "out": 96,
+        "cacheRead": 62382,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.014434
+    },
+    "op-clear-selection": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 328,
+        "out": 91,
+        "cacheRead": 62365,
+        "cacheWrite": 79
+      },
+      "cost_usd": 0.014236
+    },
+    "op-add-to-selection": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 414,
+        "out": 166,
+        "cacheRead": 62374,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.015183
+    },
+    "op-undo": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 522,
+        "out": 117,
+        "cacheRead": 62368,
+        "cacheWrite": 82
+      },
+      "cost_usd": 0.014893
+    },
+    "op-hide-model": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 399,
+        "out": 126,
+        "cacheRead": 62372,
+        "cacheWrite": 86
+      },
+      "cost_usd": 0.014747
+    },
+    "op-model-colour-reset": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 367,
+        "out": 148,
+        "cacheRead": 62383,
+        "cacheWrite": 97
+      },
+      "cost_usd": 0.014933
+    },
+    "op-light-theme": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 378,
+        "out": 72,
+        "cacheRead": 62369,
+        "cacheWrite": 83
+      },
+      "cost_usd": 0.014157
+    },
+    "op-arm-laser": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 387,
+        "out": 86,
+        "cacheRead": 62375,
+        "cacheWrite": 89
+      },
+      "cost_usd": 0.014332
+    },
+    "op-active-stays": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 322,
+        "out": 109,
+        "cacheRead": 62368,
+        "cacheWrite": 82
+      },
+      "cost_usd": 0.014413
+    },
+    "op-camera-direction": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 473,
+        "out": 219,
+        "cacheRead": 62390,
+        "cacheWrite": 104
+      },
+      "cost_usd": 0.015874
+    },
+    "op-fit-selection": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 363,
+        "out": 101,
+        "cacheRead": 62381,
+        "cacheWrite": 95
+      },
+      "cost_usd": 0.01445
+    },
+    "op-save-viewpoint": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 388,
+        "out": 150,
+        "cacheRead": 62383,
+        "cacheWrite": 97
+      },
+      "cost_usd": 0.014995
+    },
+    "op-restore-viewpoint": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 765,
+        "out": 166,
+        "cacheRead": 93611,
+        "cacheWrite": 91
+      },
+      "cost_usd": 0.02214
+    },
+    "op-rename-viewpoint": {
+      "runs": 1,
+      "pass": 0,
+      "turns": 1,
+      "tokens": {
+        "in": 915,
+        "out": 247,
+        "cacheRead": 93609,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.023247
+    },
+    "op-filter-step-colour": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 652,
+        "out": 182,
+        "cacheRead": 62386,
+        "cacheWrite": 100
+      },
+      "cost_usd": 0.015851
+    },
+    "op-filter-step-action": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 540,
+        "out": 144,
+        "cacheRead": 62382,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.015236
+    },
+    "op-place-spot": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 981,
+        "out": 305,
+        "cacheRead": 93619,
+        "cacheWrite": 95
+      },
+      "cost_usd": 0.023973
+    },
+    "op-place-measure": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 1062,
+        "out": 349,
+        "cacheRead": 93619,
+        "cacheWrite": 95
+      },
+      "cost_usd": 0.024575
+    },
+    "op-schedule-rows-none": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 376,
+        "out": 145,
+        "cacheRead": 62374,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.014897
+    },
+    "op-delete-viewpoint": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 975,
+        "out": 207,
+        "cacheRead": 93605,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.022961
+    },
+    "op-forget-filter-set": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 578,
+        "out": 158,
+        "cacheRead": 62382,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.015452
+    },
+    "op-undo-held": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1221,
+        "out": 432,
+        "cacheRead": 187323,
+        "cacheWrite": 93
+      },
+      "cost_usd": 0.044458
+    },
+    "op-copy-link": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 397,
+        "out": 110,
+        "cacheRead": 62376,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.014594
+    },
+    "op-unload-model": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 412,
+        "out": 151,
+        "cacheRead": 62376,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.015034
+    },
+    "ref-rename": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 118,
+        "out": 96,
+        "cacheRead": 31143,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.007665
+    },
+    "ref-delete": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 118,
+        "out": 118,
+        "cacheRead": 31143,
+        "cacheWrite": 93
+      },
+      "cost_usd": 0.007877
+    },
+    "ref-property": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 667,
+        "out": 221,
+        "cacheRead": 62381,
+        "cacheWrite": 95
+      },
+      "cost_usd": 0.016258
+    },
+    "ref-export": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 118,
+        "out": 180,
+        "cacheRead": 31143,
+        "cacheWrite": 91
+      },
+      "cost_usd": 0.008492
+    },
+    "res-name": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 537,
+        "out": 231,
+        "cacheRead": 60593,
+        "cacheWrite": 2181
+      },
+      "cost_usd": 0.020955
+    },
+    "res-property": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 844,
+        "out": 251,
+        "cacheRead": 62696,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.016962
+    },
+    "res-vocabulary": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 1759,
+        "out": 483,
+        "cacheRead": 94085,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.027385
+    },
+    "res-viewpoint-name": {
+      "runs": 1,
+      "pass": 1,
+      "turns": 1,
+      "tokens": {
+        "in": 437,
+        "out": 153,
+        "cacheRead": 62370,
+        "cacheWrite": 84
+      },
+      "cost_usd": 0.015088
+    },
+    "res-gated-delete": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2925,
+        "out": 622,
+        "cacheRead": 282431,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.068777
+    },
+    "op-make-schedule-doors": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 3390,
+        "out": 895,
+        "cacheRead": 187343,
+        "cacheWrite": 97
+      },
+      "cost_usd": 0.053441
+    },
+    "ans-get-schedule": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 3753,
+        "out": 716,
+        "cacheRead": 187338,
+        "cacheWrite": 96
+      },
+      "cost_usd": 0.052374
+    },
+    "op-schedule-undo": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1524,
+        "out": 396,
+        "cacheRead": 187353,
+        "cacheWrite": 99
+      },
+      "cost_usd": 0.044726
+    },
+    "op-schedule-delete-asks": {
+      "runs": 3,
+      "pass": 0,
+      "turns": 3,
+      "tokens": {
+        "in": 3215,
+        "out": 728,
+        "cacheRead": 280991,
+        "cacheWrite": 88
+      },
+      "cost_usd": 0.070129
+    },
+    "op-export-schedule": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1503,
+        "out": 348,
+        "cacheRead": 187283,
+        "cacheWrite": 85
+      },
+      "cost_usd": 0.044155
+    },
+    "op-colour-by-schedule-column": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1584,
+        "out": 472,
+        "cacheRead": 187308,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.045574
+    },
+    "multi-schedule-add-column": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 5786,
+        "out": 1146,
+        "cacheRead": 377267,
+        "cacheWrite": 2651
+      },
+      "cost_usd": 0.105112
+    },
+    "multi-hide-undo": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 3081,
+        "out": 721,
+        "cacheRead": 375958,
+        "cacheWrite": 1452
+      },
+      "cost_usd": 0.092194
+    },
+    "multi-storey-followup": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 3873,
+        "out": 891,
+        "cacheRead": 439067,
+        "cacheWrite": 2069
+      },
+      "cost_usd": 0.109642
+    },
+    "messy-placeholders": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2910,
+        "out": 814,
+        "cacheRead": 185696,
+        "cacheWrite": 2092
+      },
+      "cost_usd": 0.056329
+    },
+    "messy-two-spellings": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2658,
+        "out": 1406,
+        "cacheRead": 218974,
+        "cacheWrite": 91
+      },
+      "cost_usd": 0.063398
+    },
+    "messy-no-storey": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1119,
+        "out": 367,
+        "cacheRead": 187674,
+        "cacheWrite": 90
+      },
+      "cost_usd": 0.043669
+    },
+    "messy-duplicate-guids": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1915,
+        "out": 1425,
+        "cacheRead": 187649,
+        "cacheWrite": 85
+      },
+      "cost_usd": 0.055823
+    },
+    "messy-tbc-not-invented": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2579,
+        "out": 709,
+        "cacheRead": 281612,
+        "cacheWrite": 97
+      },
+      "cost_usd": 0.068814
+    },
+    "messy-trench": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 3645,
+        "out": 1653,
+        "cacheRead": 187684,
+        "cacheWrite": 92
+      },
+      "cost_usd": 0.061586
+    },
+    "hu-placeholder": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 1713,
+        "out": 649,
+        "cacheRead": 187649,
+        "cacheWrite": 85
+      },
+      "cost_usd": 0.047659
+    },
+    "hu-no-storey": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2868,
+        "out": 525,
+        "cacheRead": 187654,
+        "cacheWrite": 86
+      },
+      "cost_usd": 0.048732
+    },
+    "hu-dup-guid": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2631,
+        "out": 458,
+        "cacheRead": 187629,
+        "cacheWrite": 81
+      },
+      "cost_usd": 0.04757
+    },
+    "sg-ask-once": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 9,
+      "tokens": {
+        "in": 8850,
+        "out": 3321,
+        "cacheRead": 667139,
+        "cacheWrite": 5342
+      },
+      "cost_usd": 0.197693
+    },
+    "sg-never-asks": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 4353,
+        "out": 774,
+        "cacheRead": 376924,
+        "cacheWrite": 878
+      },
+      "cost_usd": 0.094027
+    },
+    "multi-followup-narrows": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 8471,
+        "out": 2045,
+        "cacheRead": 412100,
+        "cacheWrite": 5513
+      },
+      "cost_usd": 0.133594
+    },
+    "multi-followup-all": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 7262,
+        "out": 1958,
+        "cacheRead": 380686,
+        "cacheWrite": 5218
+      },
+      "cost_usd": 0.123286
+    }
+  },
+  "latency_by_model": {
+    "claude-sonnet-5-5": {
+      "cases": 141,
+      "turns": 165,
+      "median_s": 4.75,
+      "p90_s": 8.87,
+      "s_per_turn": 5.13
+    }
+  },
+  "estimate": {
+    "cases": 87,
+    "runs": 141,
+    "turns": 165,
+    "inTokens": 6600000,
+    "outTokens": 198000,
+    "usdList": 15.18,
+    "usdMeasured": null,
+    "basis": "a-priori: ROUGH_TURN in scripts/eval/cost.cjs"
+  },
+  "model_asked": "claude-sonnet-5-5"
+}

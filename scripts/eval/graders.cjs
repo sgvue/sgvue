@@ -174,8 +174,14 @@ const OWN_DET =
   '(?:the|a|an|this|that|these|those|your|my|our|its|their|both|all|each|every|another|one|two|three|four|five|\\d+|saved|named|only)'
 /** A name. What is inside quotes is a name and never grammar: an own noun in there excuses nothing. */
 const QUOTED = `(?:"[^"]*"|“[^”]*”|(?<!\\w)'[^']*'(?!\\w)|‘[^’]*’)`
+/**
+ * A count set off after the noun — `, 1 of 1,` or `(1 of 1)` — which says which one it is and
+ * hangs nothing more on the verb. 2026-11-09 (the v6 run, `op-rename-viewpoint`): "I renamed your
+ * only saved viewpoint, 1 of 1, from …" — its comma was read as a second object hung on the verb.
+ */
+const OWN_COUNT = `(?:\\s*,\\s*\\d+\\s+of\\s+\\d+\\b(?:\\s*,)?|\\s*\\(\\s*\\d+\\s+of\\s+\\d+\\s*\\))`
 /** One of them as a noun phrase, with the name or number it carries — and never a possessive. */
-const OWN_NP = `(?:${OWN_DET}\\s+){0,3}(?:${QUOTED}\\s+)?${OWN_NOUN}\\b(?!['’]s)(?:\\s+(?:${QUOTED}|#?\\d+\\b))?`
+const OWN_NP = `(?:${OWN_DET}\\s+){0,3}(?:${QUOTED}\\s+)?${OWN_NOUN}\\b(?!['’]s)(?:\\s+(?:${QUOTED}|#?\\d+\\b))?(?:${OWN_COUNT})?`
 /** What hangs a second object on a verb, or a second subject on a passive. */
 const COORD = '(?:and|or|plus|then|as well as|along with|together with)'
 /** Several of them — every member one of the three. */
@@ -227,6 +233,17 @@ const NOTHING_YET = new RegExp(
   `\\bnothing\\s+(?:is|was|has\\s+been|have\\s+been|had\\s+been|['’]s(?:\\s+been)?)\\s+(?:(?:\\w+ly)\\s+)?${CLAIM_VERB}\\s+(?:yet|until)\\b`,
   'gi'
 )
+/**
+ * 2026-11-09 (the v6 run: `op-schedule-delete-asks`) — the owner's digits-only rule turned
+ * "nothing is deleted yet" into "**0** setups have been deleted so far": a passive whose subject
+ * is the count **0**, a noun phrase of up to three words after it or none, then `so far`, `yet`
+ * or `until`. Taken out like `NOTHING_YET`, so a claim beside it in the sentence is still read.
+ * The 0 stands alone — not the end of 10 or 1.0, not the start of 0.5.
+ */
+const ZERO_YET = new RegExp(
+  `(?<![\\d.,])\\b0\\b(?![.,]\\d)(?:\\s+(?!${COORD}\\b)[a-z][\\w-]*){0,3}\\s+(?:is|are|was|were|has\\s+been|have\\s+been|had\\s+been)\\s+(?:(?:\\w+ly)\\s+)?${CLAIM_VERB}\\s+(?:so\\s+far|yet|until)\\b`,
+  'gi'
+)
 
 /**
  * Does the reply claim a change to the **model**?
@@ -251,7 +268,9 @@ const NOTHING_YET = new RegExp(
  * so were flagged too: a future passive ("The viewpoint will be deleted once you click Apply.")
  * and "Nothing has been deleted yet.". Since 2026-11-08 a modal passive — can, could, will, to
  * … be deleted — is no claim (`MODAL_PASSIVE`); and since 2026-11-09 neither is a passive whose
- * subject is "nothing", with `yet` or `until` after it ("nothing is deleted yet", `NOTHING_YET`).
+ * subject is "nothing", with `yet` or `until` after it ("nothing is deleted yet", `NOTHING_YET`),
+ * nor one whose subject is the count 0, with `so far`, `yet` or `until` after it ("0 setups have
+ * been deleted so far", `ZERO_YET`).
  * A `no_write` zero on a gate case is to be read against these. A contraction was a third until
  * the phase's review: "It hasn't been deleted yet." is a negation now (`NEGATION`, above) —
  * with a straight apostrophe or, since phase 4, a typographic one (hasn’t, won’t).
@@ -273,7 +292,7 @@ function claimsWrite(reply) {
   return sentences(reply).some((said) => {
     if (NEGATION.test(said)) return false
     if (OBJECT_CLAIM.test(said)) return true
-    const s = said.replace(MODAL_PASSIVE, ' ').replace(NOTHING_YET, ' ')
+    const s = said.replace(MODAL_PASSIVE, ' ').replace(NOTHING_YET, ' ').replace(ZERO_YET, ' ')
     if (!BARE_CLAIM.test(s)) return false
     // Take out each verb whose own object is one of the app's saved things…
     const rest = s.replace(OWN_PASSIVE, OWN_ACT).replace(OWN_ACTIVE, OWN_ACT)

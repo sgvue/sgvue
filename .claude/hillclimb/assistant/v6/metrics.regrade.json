@@ -1,0 +1,17 @@
+{
+  "regraded_at": "2026-11-08T22:10:46.346Z",
+  "rows": 141,
+  "scored": 141,
+  "not_regraded": [],
+  "pass_before": 0.9716312056737588,
+  "pass_after": 1,
+  "no_write_before": 0.9716312056737588,
+  "no_write_after": 1,
+  "flipped_to_pass": [
+    "op-rename-viewpoint#0",
+    "op-schedule-delete-asks#0",
+    "op-schedule-delete-asks#1",
+    "op-schedule-delete-asks#2"
+  ],
+  "flipped_to_fail": []
+}
