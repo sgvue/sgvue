@@ -29,7 +29,9 @@
  *  · a length, area, volume or plane angle: × IfcOpenShell's `calculate_unit_scale`;
  *  · a mass: × `calculate_unit_scale` ÷ 1 000 — IfcOpenShell scales mass against the gram, which
  *    is IFC's SI unit for it, and the schedule holds kilograms (`adapter.ts`, `scalesOf`);
- *  · a measure in a derived unit the project assigns: × that unit's SI scale, with no unit kind;
+ *  · a measure in a derived unit the project assigns: × that unit's SI scale, with no unit kind
+ *    (IfcOpenShell's scale counts a mass element in grams, the app in kilograms; none of the
+ *    three models has a derived unit with mass in it — `container-units.test.ts` pins the app's);
  *  · a count: as written, kind `count`; anything else (a ratio, a label) as written;
  *  · a list, or an enumeration of more than one value: text — the values as written, ', '-joined,
  *    with no unit conversion (ifcTable's `toCell`); an enumeration of one: that value;
@@ -159,17 +161,10 @@ const SI_PER_UNIT: Record<string, Record<string, number>> = {
  * to be removed.
  */
 const KNOWN_DIFFERENCES: Record<string, string> = {
-  // `adapter.ts` (its header, "gap"): the index keeps no space containment, so `space` is blank
-  // for anything but an IfcSpace. IfcOpenShell: Table 1 is contained in S01, "Meeting room".
-  'edge 000000000000000000000J space': 'furniture in an IfcSpace has no Room / Space',
-  // The index records an IfcDerivedUnit but resolves no SI factor for it (`index-builder.ts`),
-  // so a U-value authored in W/(ft²·K) reaches the schedule as written: 0.5, where SI is 5.38.
-  'edge 000000000000000000000E SGVue_Edge.UValue': 'a non-SI derived unit is not converted',
-  'edge 000000000000000000000F SGVue_Edge.UValue': 'a non-SI derived unit is not converted',
-  // Building and Site come from the element's storey (`adapter.ts`, `walkSpatial`); a wall
-  // contained in the building itself has no storey, so both are blank. IfcOpenShell: Building, Site.
-  'edge 000000000000000000000I building': 'an element with no storey has no Building',
-  'edge 000000000000000000000I site': 'an element with no storey has no Site'
+  // None. The three found on edge.ifc (2026-11-08) were fixed for 1.5.0: a derived unit is
+  // converted to SI (`index-builder.ts` `derivedFactor`, `adapter.ts` `derivedOf`), and
+  // Building, Site and Room / Space come from the element's own spatial container
+  // (`IfcElement.container`), whatever level it is contained at.
 }
 
 /** A cell as the schedule should hold it: undefined = no value. */

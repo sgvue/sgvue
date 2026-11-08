@@ -75,6 +75,10 @@
        "UpperBoundValue": 50.0
       }
      },
+     "LinearMass": {
+      "m": "IfcMassPerLengthMeasure",
+      "v": 12.5
+     },
      "NotApplicable": {
       "m": "IfcLabel",
       "v": "n/a"
@@ -106,6 +110,10 @@
       "v": [
        "FIRE"
       ]
+     },
+     "RotationalMass": {
+      "m": "IfcRotationalMassMeasure",
+      "v": 3.25
      },
      "UValue": {
       "m": "IfcThermalTransmittanceMeasure",
@@ -183,6 +191,10 @@
        "UpperBoundValue": 50.0
       }
      },
+     "LinearMass": {
+      "m": "IfcMassPerLengthMeasure",
+      "v": 12.5
+     },
      "NotApplicable": {
       "m": "IfcLabel",
       "v": "n/a"
@@ -214,6 +226,10 @@
       "v": [
        "FIRE"
       ]
+     },
+     "RotationalMass": {
+      "m": "IfcRotationalMassMeasure",
+      "v": 3.25
      },
      "UValue": {
       "m": "IfcThermalTransmittanceMeasure",
@@ -313,10 +329,12 @@
   "IfcLabel": "LABELUNIT",
   "IfcLengthMeasure": "LENGTHUNIT",
   "IfcMassMeasure": "MASSUNIT",
+  "IfcMassPerLengthMeasure": "MASSPERLENGTHUNIT",
   "IfcPositiveLengthMeasure": "LENGTHUNIT",
+  "IfcRotationalMassMeasure": "ROTATIONALMASSUNIT",
   "IfcThermalTransmittanceMeasure": "THERMALTRANSMITTANCEUNIT"
  },
- "sha256": "a6f4143db3bbcdd251a2b44bb10413b598dcef44c7ba27834c6ac09817ff29a0",
+ "sha256": "e48cbb320091a05b55bf47b48ba1527db3781e7ee975d2b57f1283424d57c835",
  "spatial": {
   "0000000000000000000002": {
    "longName": "",

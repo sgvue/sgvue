@@ -14,6 +14,8 @@ else:
  · a **mass** quantity in pounds (a conversion-based `MASSUNIT` over the kilogram) and a **count**
    quantity;
  · a thermal transmittance in a **non-SI derived unit**, W / (ft² · K);
+ · a **mass per length** and a **rotational mass**, compound measures with no unit assigned, whose
+   names contain a length and a mass;
  · a piece of furniture **contained in an `IfcSpace`**, which the storey aggregates, and a wall
    contained in the building with no storey at all.
 
@@ -152,6 +154,10 @@ def build() -> None:
                 single("NotApplicable", "IfcLabel", "n/a"),
                 single("Flag", "IfcBoolean", False),
                 single("UValue", "IfcThermalTransmittanceMeasure", 0.5),
+                # Compound measures with no unit assigned: as written, never read as a length
+                # or a mass because their names contain one.
+                single("LinearMass", "IfcMassPerLengthMeasure", 12.5),
+                single("RotationalMass", "IfcRotationalMassMeasure", 3.25),
                 f.create_entity(
                     "IfcPropertyListValue", Name="Colours", ListValues=[v("IfcLabel", "Red"), v("IfcLabel", "Green")]
                 ),
