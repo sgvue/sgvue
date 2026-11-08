@@ -12,7 +12,7 @@ import { csvCell } from '../../../src/schedule/export/csv';
 // Phase 2 (2026-09-25): the coverage sweep and the window's state are ported now. v1.5.0,
 // phase 2: the inspector is gone; its Align control and its summaries are the column menu's and
 // the view bar's (ifcTable's own hardening test, 2026-11-05).
-import { renderColumnMenu, toggleColumnMenu } from '../../../src/renderer/schedule-ui/columnMenu';
+import { renderColumnMenu, toggleColumnMenu, toggleMore } from '../../../src/renderer/schedule-ui/columnMenu';
 import { buildCoverage } from '../../../src/renderer/schedule-ui/coverage';
 import { closePopover } from '../../../src/renderer/schedule-ui/popover';
 import { state as blankState, type AppState } from '../../../src/renderer/schedule-ui/state';
@@ -294,5 +294,36 @@ describe('the view bar and the column menu escape what they show', () => {
     // The text is still shown to the user — escaped, not dropped.
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('&quot;&gt;&lt;img');
+  });
+
+  // CodeQL js/xss-through-dom (PR #21): a def is the user's text after the window history's JSON
+  // round trip, and a saved setup or an opened .schedule.json carries whatever it was given —
+  // so a number the menu reads off it is not trusted to be a number. `format.decimals` reached
+  // the Decimals box's `value="…"` raw.
+  it('escapes a column\'s decimals and width, even when they are not numbers', () => {
+    const store = build(1, () => 1);
+    const hostile = '"><img src=x onerror=alert(1)>';
+    const col = { ...colW, width: hostile, format: { decimals: hostile } } as unknown as Column;
+    const def: ScheduleDef = { ...emptySchedule('S', ['IfcWall']), columns: [col] };
+    const state = { ...blankState, store, def } as AppState;
+    toggleColumnMenu(0);
+    toggleMore();
+    const html = renderColumnMenu(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    closePopover();
+
+    expect(html).toContain('data-act="fmt-decimals"');
+    expect(html).toContain('data-act="fmt-width"');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('value="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"');
+  });
+
+  it('draws an ordinary decimals value exactly as before', () => {
+    const store = build(1, () => 1);
+    const def: ScheduleDef = { ...emptySchedule('S', ['IfcWall']), columns: [{ ...colW, format: { decimals: 2 } }] };
+    const state = { ...blankState, store, def } as AppState;
+    toggleColumnMenu(0);
+    const html = renderColumnMenu(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    closePopover();
+    expect(html).toMatch(/data-act="fmt-decimals" data-defcol="0" value="2"/);
   });
 });

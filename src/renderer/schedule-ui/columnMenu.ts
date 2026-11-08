@@ -191,7 +191,7 @@ export function renderColumnMenu(
     ${units.length > 1 ? rowx('Unit', seg('cm-unit', units.map((u) => [u, u]), unit, at, 'Unit')) : ''}
     ${numeric ? rowx('Decimals', `<span class="row"><span class="stepper">
         <button data-act="cm-dec" data-v="-1"${at} aria-label="Fewer decimals"${dec <= DECIMALS_MIN ? ' disabled' : ''}>−</button>
-        <input class="pop-num" type="text" inputmode="numeric" data-act="fmt-decimals"${at} value="${dec}"
+        <input class="pop-num" type="text" inputmode="numeric" data-act="fmt-decimals"${at} value="${esc(String(dec))}"
           aria-label="Decimals, ${DECIMALS_MIN} to ${DECIMALS_MAX}" />
         <button data-act="cm-dec" data-v="1"${at} aria-label="More decimals"${dec >= DECIMALS_MAX ? ' disabled' : ''}>+</button>
       </span><span class="preview-box pop-preview grow-1${lit ? ' lit' : ''}"${lit}><span class="mono value">${esc(sample)}</span>${
