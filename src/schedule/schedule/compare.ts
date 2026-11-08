@@ -60,14 +60,22 @@ export function matchRule(cell: Cell | undefined, rule: FilterRule): boolean {
   const { op } = rule;
   if (op === 'hasValue') return cell !== undefined && cell.v !== '';
   if (op === 'noValue') return cell === undefined || cell.v === '';
-  if (cell === undefined) return false;
 
+  // An empty bound is open-ended: only "to" filled is <= hi, only "from" is >= lo, and
+  // neither filled leaves the rule switched off (it keeps everything, values or not).
+  // (ifcTable, 2026-11-05 — ported for SGVue v1.5.0.)
   if (op === 'between') {
+    const lo = boundOf(rule.values?.[0]);
+    const hi = boundOf(rule.values?.[1]);
+    if (lo === null && hi === null) return true;
     const n = numberOf(cell);
-    const [lo, hi] = (rule.values ?? []).map(Number);
-    if (n === null || !Number.isFinite(lo) || !Number.isFinite(hi)) return false;
+    if (n === null) return false;
+    if (lo === null) return n <= hi!;
+    if (hi === null) return n >= lo;
     return n >= Math.min(lo, hi) && n <= Math.max(lo, hi);
   }
+
+  if (cell === undefined) return false;
 
   if (op === 'in') {
     const t = textOf(cell).trim().toLowerCase();
@@ -93,6 +101,13 @@ export function matchRule(cell: Cell | undefined, rule: FilterRule): boolean {
   if (op === 'startsWith') return t.startsWith(q);
   if (op === 'endsWith') return t.endsWith(q);
   return true;
+}
+
+/** One end of a `between` range, or null when that box is empty (blank, null, a hole). */
+function boundOf(v: string | number | null | undefined): number | null {
+  if (v === undefined || v === null || String(v).trim() === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function equalValues(cell: Cell, want: FilterRule['value']): boolean {

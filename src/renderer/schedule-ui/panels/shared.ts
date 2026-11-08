@@ -5,7 +5,7 @@ import type { UnitKind } from '../../../schedule/ifc/types';
 import type { UnitSystem } from '../../../schedule/ifc/units';
 import { kindOf, kindsByHeading, statOf, typeOf } from '../../../schedule/schedule/columns';
 import { fieldKey, headingOf, CORE_KEYS, CORE_LABELS, type FieldRef, type ScheduleDef } from '../../../schedule/schedule/def';
-import { defaultUnit, fromDisplay, toDisplay } from '../../../schedule/schedule/format';
+import { defaultUnit, toDisplay } from '../../../schedule/schedule/format';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
 import { cross, grip } from '../icons';
@@ -151,8 +151,5 @@ export function displayNum(v: unknown, kind: UnitKind, system?: UnitSystem): str
   return String(Math.round(out * 1e6) / 1e6);
 }
 
-export function storeNum(raw: string, kind: UnitKind, system?: UnitSystem): number | undefined {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return undefined;
-  return fromDisplay(n, kind, defaultUnit(kind, system) || undefined);
-}
+/** The box's text, read back to SI — moved to the engine (v1.5.0, phase 1); one copy. */
+export { storeNum } from '../../../schedule/schedule/format';

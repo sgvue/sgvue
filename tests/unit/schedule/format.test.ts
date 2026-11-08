@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UnitKind } from '../../../src/schedule/ifc/types';
 import type { UnitFormat } from '../../../src/schedule/schedule/def';
 import {
-  defaultDecimals, defaultUnit, displayNumber, formatCell, formatNumber, fromDisplay, toDisplay,
+  defaultDecimals, defaultUnit, displayNumber, formatCell, formatNumber, fromDisplay, storeNum, toDisplay,
 } from '../../../src/schedule/schedule/format';
 
 describe('unit conversion', () => {
@@ -143,5 +143,31 @@ describe('defaults follow the system the model was authored in', () => {
     // imperial model exactly as it did on the metric one it was saved against.
     expect(formatNumber(0.9144, 'length')).toBe('914');
     expect(toDisplay(0.9144, 'length')).toBeCloseTo(914.4, 6);
+  });
+});
+
+describe('storeNum — a number filter stores a number or nothing', () => {
+  // ifcTable 2026-11-05 (4d66e5f), ported for SGVue v1.5.0. A box reads what people type —
+  // "1,200" and "900 mm" — in the model's own unit, and returns nothing for anything else.
+  it('mm: thousands separators and the box\'s unit are read; junk and empty store nothing', () => {
+    expect(storeNum('1,200', 'length', 'metric')).toBeCloseTo(1.2);
+    expect(storeNum('900 mm', 'length', 'metric')).toBeCloseTo(0.9);
+    expect(storeNum(' 900MM ', 'length', 'metric')).toBeCloseTo(0.9);
+    expect(storeNum('-2.5e3', 'length', 'metric')).toBeCloseTo(-2.5);
+    expect(storeNum('.5', 'none', 'metric')).toBe(0.5);
+    for (const junk of ['', '  ', 'abc', '12 m', '1.2.3', '1e', '--1', '1e400']) {
+      expect(storeNum(junk, 'length', 'metric'), junk).toBeUndefined();
+    }
+  });
+
+  it('a model in feet reads feet', () => {
+    expect(storeNum('1,200', 'length', 'imperial')).toBeCloseTo(365.76);
+  });
+
+  it('a number the old reader took is read the same', () => {
+    // What the Filter tab's number inputs hand over today: a valid number, or ''.
+    for (const raw of ['0', '12', '1.25', '-3', '4e2']) {
+      expect(storeNum(raw, 'length', 'metric')).toBe(fromDisplay(Number(raw), 'length', defaultUnit('length', 'metric')));
+    }
   });
 });

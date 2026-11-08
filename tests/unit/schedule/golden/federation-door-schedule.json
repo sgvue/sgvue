@@ -1,0 +1,3031 @@
+{
+ "def": {
+  "version": 1,
+  "name": "Door Schedule",
+  "entity": [
+   "IfcDoor"
+  ],
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "model"
+    },
+    "align": "left"
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "mark"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "typeName"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Width"
+    },
+    "align": "right",
+    "format": {
+     "display": "mm",
+     "decimals": 0,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Height"
+    },
+    "align": "right",
+    "format": {
+     "display": "mm",
+     "decimals": 0,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    },
+    "align": "left"
+   }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    },
+    "dir": "asc",
+    "header": true,
+    "footer": "count"
+   }
+  ],
+  "itemize": true,
+  "grandTotal": false,
+  "appearance": {
+   "showTitle": true,
+   "gridLines": true,
+   "zebra": true,
+   "fontSize": 13,
+   "headerBold": true
+  },
+  "meta": {
+   "notes": "SGVue template — Door Schedule"
+  }
+ },
+ "result": {
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "model"
+    },
+    "align": "left"
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "mark"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "typeName"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Width"
+    },
+    "align": "right",
+    "format": {
+     "display": "mm",
+     "decimals": 0,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Height"
+    },
+    "align": "right",
+    "format": {
+     "display": "mm",
+     "decimals": 0,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    },
+    "align": "left"
+   }
+  ],
+  "headings": [
+   "Model",
+   "Tag (Revit ID)",
+   "Type",
+   "Level",
+   "Width",
+   "Height",
+   "FireRating"
+  ],
+  "rows": [
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "L1",
+    "count": 5
+   },
+   {
+    "kind": "data",
+    "rows": [
+     5
+    ],
+    "cells": [
+     "ARC",
+     "200178",
+     "D2 Double 2400x2400",
+     "L1",
+     "2,400",
+     "2,400",
+     "-"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     2400,
+     2400,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     28
+    ],
+    "cells": [
+     "ARC",
+     "200204",
+     "D1 Single 900x2100",
+     "L1",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     30
+    ],
+    "cells": [
+     "ARC",
+     "200206",
+     "D1 Single 900x2100",
+     "L1",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     31
+    ],
+    "cells": [
+     "ARC",
+     "200207",
+     "D1 Single 900x2100",
+     "L1",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     33
+    ],
+    "cells": [
+     "ARC",
+     "200209",
+     "D1 Single 900x2100",
+     "L1",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "5",
+    "count": 5,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "L2",
+    "count": 4
+   },
+   {
+    "kind": "data",
+    "rows": [
+     62
+    ],
+    "cells": [
+     "ARC",
+     "200296",
+     "D1 Single 900x2100",
+     "L2",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     64
+    ],
+    "cells": [
+     "ARC",
+     "200298",
+     "D1 Single 900x2100",
+     "L2",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     65
+    ],
+    "cells": [
+     "ARC",
+     "200299",
+     "D1 Single 900x2100",
+     "L2",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     67
+    ],
+    "cells": [
+     "ARC",
+     "200301",
+     "D1 Single 900x2100",
+     "L2",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "4",
+    "count": 4,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "L3",
+    "count": 4
+   },
+   {
+    "kind": "data",
+    "rows": [
+     96
+    ],
+    "cells": [
+     "ARC",
+     "200388",
+     "D1 Single 900x2100",
+     "L3",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     98
+    ],
+    "cells": [
+     "ARC",
+     "200390",
+     "D1 Single 900x2100",
+     "L3",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     99
+    ],
+    "cells": [
+     "ARC",
+     "200391",
+     "D1 Single 900x2100",
+     "L3",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     101
+    ],
+    "cells": [
+     "ARC",
+     "200393",
+     "D1 Single 900x2100",
+     "L3",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "4",
+    "count": 4,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "L4",
+    "count": 4
+   },
+   {
+    "kind": "data",
+    "rows": [
+     130
+    ],
+    "cells": [
+     "ARC",
+     "200479",
+     "D1 Single 900x2100",
+     "L4",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     132
+    ],
+    "cells": [
+     "ARC",
+     "200481",
+     "D1 Single 900x2100",
+     "L4",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     133
+    ],
+    "cells": [
+     "ARC",
+     "200482",
+     "D1 Single 900x2100",
+     "L4",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     135
+    ],
+    "cells": [
+     "ARC",
+     "200484",
+     "D1 Single 900x2100",
+     "L4",
+     "900",
+     "2,100",
+     "1 HR"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     900,
+     2100,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "4",
+    "count": 4,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  ],
+  "totalDataRows": 17,
+  "matchedElements": 17,
+  "truncated": false,
+  "countColumn": false,
+  "numeric": {
+   "4": {
+    "decimals": 0,
+    "unit": ""
+   },
+   "5": {
+    "decimals": 0,
+    "unit": ""
+   }
+  }
+ },
+ "csv": [
+  "Model,Tag (Revit ID),Type,Level,Width,Height,FireRating",
+  "L1 (5),,,,,,",
+  "ARC,200178,D2 Double 2400x2400,L1,2400,2400,'-",
+  "ARC,200204,D1 Single 900x2100,L1,900,2100,1 HR",
+  "ARC,200206,D1 Single 900x2100,L1,900,2100,1 HR",
+  "ARC,200207,D1 Single 900x2100,L1,900,2100,1 HR",
+  "ARC,200209,D1 Single 900x2100,L1,900,2100,1 HR",
+  "5,,,,,,",
+  "L2 (4),,,,,,",
+  "ARC,200296,D1 Single 900x2100,L2,900,2100,1 HR",
+  "ARC,200298,D1 Single 900x2100,L2,900,2100,1 HR",
+  "ARC,200299,D1 Single 900x2100,L2,900,2100,1 HR",
+  "ARC,200301,D1 Single 900x2100,L2,900,2100,1 HR",
+  "4,,,,,,",
+  "L3 (4),,,,,,",
+  "ARC,200388,D1 Single 900x2100,L3,900,2100,1 HR",
+  "ARC,200390,D1 Single 900x2100,L3,900,2100,1 HR",
+  "ARC,200391,D1 Single 900x2100,L3,900,2100,1 HR",
+  "ARC,200393,D1 Single 900x2100,L3,900,2100,1 HR",
+  "4,,,,,,",
+  "L4 (4),,,,,,",
+  "ARC,200479,D1 Single 900x2100,L4,900,2100,1 HR",
+  "ARC,200481,D1 Single 900x2100,L4,900,2100,1 HR",
+  "ARC,200482,D1 Single 900x2100,L4,900,2100,1 HR",
+  "ARC,200484,D1 Single 900x2100,L4,900,2100,1 HR",
+  "4,,,,,,"
+ ],
+ "xlsx": [
+  {
+   "pageSetup": {
+    "fitToPage": true,
+    "margins": {
+     "left": 0.7,
+     "right": 0.7,
+     "top": 0.75,
+     "bottom": 0.75,
+     "header": 0.3,
+     "footer": 0.3
+    },
+    "orientation": "landscape",
+    "horizontalDpi": 4294967295,
+    "verticalDpi": 4294967295,
+    "pageOrder": "downThenOver",
+    "blackAndWhite": false,
+    "draft": false,
+    "cellComments": "None",
+    "errors": "displayed",
+    "scale": 100,
+    "fitToWidth": 1,
+    "fitToHeight": 0,
+    "firstPageNumber": 1,
+    "useFirstPageNumber": false,
+    "usePrinterDefaults": false,
+    "copies": 1
+   },
+   "name": "Door Schedule",
+   "autoFilter": "A1:G1",
+   "views": [
+    {
+     "workbookViewId": 0,
+     "rightToLeft": false,
+     "state": "frozen",
+     "xSplit": 0,
+     "ySplit": 1,
+     "topLeftCell": "A2",
+     "showRuler": true,
+     "showRowColHeaders": true,
+     "showGridLines": true,
+     "zoomScale": 100,
+     "zoomScaleNormal": 100
+    }
+   ],
+   "cols": [
+    {
+     "i": 0,
+     "width": 10
+    },
+    {
+     "i": 1,
+     "width": 16
+    },
+    {
+     "i": 2,
+     "width": 21
+    },
+    {
+     "i": 3,
+     "width": 10
+    },
+    {
+     "i": 4,
+     "width": 10,
+     "al": {
+      "horizontal": "right"
+     }
+    },
+    {
+     "i": 5,
+     "width": 10,
+     "al": {
+      "horizontal": "right"
+     }
+    },
+    {
+     "i": 6,
+     "width": 12
+    }
+   ],
+   "rows": [
+    {
+     "r": 1,
+     "cells": [
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 1,
+       "v": "Model",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 2,
+       "v": "Tag (Revit ID)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 3,
+       "v": "Type",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 4,
+       "v": "Level",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 5,
+       "v": "Width",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 6,
+       "v": "Height",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 7,
+       "v": "FireRating",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 2,
+     "cells": [
+      {
+       "c": 1,
+       "v": "L1 (5)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 3,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200178"
+      },
+      {
+       "c": 3,
+       "v": "D2 Double 2400x2400"
+      },
+      {
+       "c": 4,
+       "v": "L1"
+      },
+      {
+       "c": 5,
+       "v": 2400,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2400,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "-"
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200204"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L1"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200206"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L1"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 6,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200207"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L1"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 7,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200209"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L1"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "5",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 9,
+     "cells": [
+      {
+       "c": 1,
+       "v": "L2 (4)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 10,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200296"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L2"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 11,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200298"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L2"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 12,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200299"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L2"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 13,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200301"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L2"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 14,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "4",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 15,
+     "cells": [
+      {
+       "c": 1,
+       "v": "L3 (4)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 16,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200388"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L3"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 17,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200390"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L3"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 18,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200391"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L3"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 19,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200393"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L3"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 20,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "4",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 21,
+     "cells": [
+      {
+       "c": 1,
+       "v": "L4 (4)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 22,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200479"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L4"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 23,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200481"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L4"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 24,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200482"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L4"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 25,
+     "cells": [
+      {
+       "c": 1,
+       "v": "ARC"
+      },
+      {
+       "c": 2,
+       "v": "200484"
+      },
+      {
+       "c": 3,
+       "v": "D1 Single 900x2100"
+      },
+      {
+       "c": 4,
+       "v": "L4"
+      },
+      {
+       "c": 5,
+       "v": 900,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 6,
+       "v": 2100,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 7,
+       "v": "1 HR"
+      }
+     ]
+    },
+    {
+     "r": 26,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "4",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

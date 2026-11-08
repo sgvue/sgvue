@@ -1,0 +1,596 @@
+{
+ "def": {
+  "version": 1,
+  "name": "Pipe Schedule",
+  "entity": [
+   "IfcPipeSegment"
+  ],
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "typeName"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Length"
+    },
+    "align": "right",
+    "format": {
+     "display": "m",
+     "decimals": 2,
+     "thousands": true
+    }
+   }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    },
+    "dir": "asc",
+    "header": true,
+    "footer": "count"
+   }
+  ],
+  "itemize": true,
+  "grandTotal": false,
+  "appearance": {
+   "showTitle": true,
+   "gridLines": true,
+   "zebra": true,
+   "fontSize": 13,
+   "headerBold": true
+  },
+  "meta": {
+   "notes": "SGVue template — Pipe Schedule"
+  }
+ },
+ "result": {
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "typeName"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Length"
+    },
+    "align": "right",
+    "format": {
+     "display": "m",
+     "decimals": 2,
+     "thousands": true
+    }
+   }
+  ],
+  "headings": [
+   "Type",
+   "Level",
+   "Length"
+  ],
+  "rows": [
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 10",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     55
+    ],
+    "cells": [
+     "DN50",
+     "Level 10",
+     "5.14"
+    ],
+    "nums": [
+     null,
+     null,
+     5.14
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "1",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Roof",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     54
+    ],
+    "cells": [
+     "DN50",
+     "Roof",
+     "5.00"
+    ],
+    "nums": [
+     null,
+     null,
+     5
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "1",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null
+    ]
+   }
+  ],
+  "totalDataRows": 2,
+  "matchedElements": 2,
+  "truncated": false,
+  "countColumn": false,
+  "numeric": {
+   "2": {
+    "decimals": 2,
+    "unit": ""
+   }
+  }
+ },
+ "csv": [
+  "Type,Level,Length",
+  "Level 10 (1),,",
+  "DN50,Level 10,5.14",
+  "1,,",
+  "Roof (1),,",
+  "DN50,Roof,5.00",
+  "1,,"
+ ],
+ "xlsx": [
+  {
+   "pageSetup": {
+    "fitToPage": true,
+    "margins": {
+     "left": 0.7,
+     "right": 0.7,
+     "top": 0.75,
+     "bottom": 0.75,
+     "header": 0.3,
+     "footer": 0.3
+    },
+    "orientation": "landscape",
+    "horizontalDpi": 4294967295,
+    "verticalDpi": 4294967295,
+    "pageOrder": "downThenOver",
+    "blackAndWhite": false,
+    "draft": false,
+    "cellComments": "None",
+    "errors": "displayed",
+    "scale": 100,
+    "fitToWidth": 1,
+    "fitToHeight": 0,
+    "firstPageNumber": 1,
+    "useFirstPageNumber": false,
+    "usePrinterDefaults": false,
+    "copies": 1
+   },
+   "name": "Pipe Schedule",
+   "autoFilter": "A1:C1",
+   "views": [
+    {
+     "workbookViewId": 0,
+     "rightToLeft": false,
+     "state": "frozen",
+     "xSplit": 0,
+     "ySplit": 1,
+     "topLeftCell": "A2",
+     "showRuler": true,
+     "showRowColHeaders": true,
+     "showGridLines": true,
+     "zoomScale": 100,
+     "zoomScaleNormal": 100
+    }
+   ],
+   "cols": [
+    {
+     "i": 0,
+     "width": 14
+    },
+    {
+     "i": 1,
+     "width": 10
+    },
+    {
+     "i": 2,
+     "width": 10,
+     "al": {
+      "horizontal": "right"
+     }
+    }
+   ],
+   "rows": [
+    {
+     "r": 1,
+     "cells": [
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 1,
+       "v": "Type",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 2,
+       "v": "Level",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 3,
+       "v": "Length",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 2,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 10 (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 3,
+     "cells": [
+      {
+       "c": 1,
+       "v": "DN50"
+      },
+      {
+       "c": 2,
+       "v": "Level 10"
+      },
+      {
+       "c": 3,
+       "v": 5.14,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "1",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Roof (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 6,
+     "cells": [
+      {
+       "c": 1,
+       "v": "DN50"
+      },
+      {
+       "c": 2,
+       "v": "Roof"
+      },
+      {
+       "c": 3,
+       "v": 5,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 7,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "1",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

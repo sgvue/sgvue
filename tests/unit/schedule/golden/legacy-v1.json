@@ -1,0 +1,1045 @@
+{
+ "def": {
+  "version": 1,
+  "name": "Legacy Door Schedule",
+  "entity": [
+   "IfcDoor"
+  ],
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "objectType"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    },
+    "total": "count"
+   },
+   {
+    "field": {
+     "kind": "formula",
+     "id": "c1"
+    },
+    "format": {
+     "decimals": 2
+    }
+   }
+  ],
+  "filters": [
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    },
+    "op": "hasValue"
+   }
+  ],
+  "filterLogic": "and",
+  "sort": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    },
+    "dir": "asc",
+    "header": true
+   }
+  ],
+  "itemize": true,
+  "grandTotal": true,
+  "appearance": {
+   "showTitle": true,
+   "gridLines": true,
+   "outline": true,
+   "blankRowBeforeData": false,
+   "zebra": true,
+   "fontSize": 13,
+   "headerBold": true,
+   "bodyFont": "plex"
+  },
+  "calculated": [
+   {
+    "id": "c1",
+    "name": "Double",
+    "kind": "formula",
+    "formula": "FireRating * 2"
+   }
+  ]
+ },
+ "result": {
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "objectType"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    },
+    "total": "count"
+   },
+   {
+    "field": {
+     "kind": "formula",
+     "id": "c1"
+    },
+    "format": {
+     "decimals": 2
+    }
+   }
+  ],
+  "headings": [
+   "Level",
+   "Object Type",
+   "FireRating",
+   "Double"
+  ],
+  "rows": [
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 1",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     16
+    ],
+    "cells": [
+     "Level 1",
+     "Single-Flush:0915 x 2134mm",
+     "90 min",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 2",
+    "count": 2
+   },
+   {
+    "kind": "data",
+    "rows": [
+     11
+    ],
+    "cells": [
+     "Level 2",
+     "Single-Flush:0915 x 2134mm",
+     "90 min",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     15
+    ],
+    "cells": [
+     "Level 2",
+     "Single-Flush:0915 x 2134mm",
+     "60 min",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 10",
+    "count": 3
+   },
+   {
+    "kind": "data",
+    "rows": [
+     10
+    ],
+    "cells": [
+     "Level 10",
+     "Single-Flush:0915 x 2134mm",
+     "60 min",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     14
+    ],
+    "cells": [
+     "Level 10",
+     "Single-Flush:0915 x 2134mm",
+     "FR, \"120\"",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     18
+    ],
+    "cells": [
+     "Level 10",
+     "Single-Flush:0915 x 2134mm",
+     "=SUM(A1)",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Roof",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     13
+    ],
+    "cells": [
+     "Roof",
+     "Single-Flush:0915 x 2134mm",
+     "=SUM(A1)",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 7,
+    "cells": [
+     null,
+     null,
+     "7",
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     7,
+     null
+    ]
+   }
+  ],
+  "totalDataRows": 7,
+  "matchedElements": 7,
+  "truncated": false,
+  "countColumn": false
+ },
+ "csv": [
+  "Level,Object Type,FireRating,Double",
+  "Level 1 (1),,,",
+  "Level 1,Single-Flush:0915 x 2134mm,90 min,",
+  "Level 2 (2),,,",
+  "Level 2,Single-Flush:0915 x 2134mm,90 min,",
+  "Level 2,Single-Flush:0915 x 2134mm,60 min,",
+  "Level 10 (3),,,",
+  "Level 10,Single-Flush:0915 x 2134mm,60 min,",
+  "Level 10,Single-Flush:0915 x 2134mm,\"FR, \"\"120\"\"\",",
+  "Level 10,Single-Flush:0915 x 2134mm,'=SUM(A1),",
+  "Roof (1),,,",
+  "Roof,Single-Flush:0915 x 2134mm,'=SUM(A1),",
+  "Grand total,,7,"
+ ],
+ "xlsx": [
+  {
+   "pageSetup": {
+    "fitToPage": true,
+    "margins": {
+     "left": 0.7,
+     "right": 0.7,
+     "top": 0.75,
+     "bottom": 0.75,
+     "header": 0.3,
+     "footer": 0.3
+    },
+    "orientation": "landscape",
+    "horizontalDpi": 4294967295,
+    "verticalDpi": 4294967295,
+    "pageOrder": "downThenOver",
+    "blackAndWhite": false,
+    "draft": false,
+    "cellComments": "None",
+    "errors": "displayed",
+    "scale": 100,
+    "fitToWidth": 1,
+    "fitToHeight": 0,
+    "firstPageNumber": 1,
+    "useFirstPageNumber": false,
+    "usePrinterDefaults": false,
+    "copies": 1
+   },
+   "name": "Legacy Door Schedule",
+   "autoFilter": "A1:D1",
+   "views": [
+    {
+     "workbookViewId": 0,
+     "rightToLeft": false,
+     "state": "frozen",
+     "xSplit": 0,
+     "ySplit": 1,
+     "topLeftCell": "A2",
+     "showRuler": true,
+     "showRowColHeaders": true,
+     "showGridLines": true,
+     "zoomScale": 100,
+     "zoomScaleNormal": 100
+    }
+   ],
+   "cols": [
+    {
+     "i": 0,
+     "width": 14
+    },
+    {
+     "i": 1,
+     "width": 28
+    },
+    {
+     "i": 2,
+     "width": 12,
+     "al": {
+      "horizontal": "right"
+     }
+    },
+    {
+     "i": 3,
+     "width": 10
+    }
+   ],
+   "rows": [
+    {
+     "r": 1,
+     "cells": [
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 1,
+       "v": "Level",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 2,
+       "v": "Object Type",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 3,
+       "v": "FireRating",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 4,
+       "v": "Double",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 2,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 1 (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 3,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 1"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "90 min",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 2 (2)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 2"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "90 min",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 6,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 2"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "60 min",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 7,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 10 (3)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 10"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "60 min",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 9,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 10"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "FR, \"120\"",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 10,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 10"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "=SUM(A1)",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 11,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Roof (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 12,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Roof"
+      },
+      {
+       "c": 2,
+       "v": "Single-Flush:0915 x 2134mm"
+      },
+      {
+       "c": 3,
+       "v": "=SUM(A1)",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 13,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": 7,
+       "f": "0",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

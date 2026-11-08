@@ -11,7 +11,7 @@ import { StoreBuilder, type ModelStore } from '../../../src/schedule/ifc/store';
 import type { Cell, ElemCore, ModelMeta } from '../../../src/schedule/ifc/types';
 import { headingOf, parseScheduleDef } from '../../../src/schedule/schedule/def';
 import { runSchedule, type DataRow } from '../../../src/schedule/schedule/engine';
-import { PRESETS, presetById, presetCount, presetsFor, scheduleFromPreset } from '../../../src/schedule/schedule/presets';
+import { PRESETS, presetById, presetCount, presetsFor, scheduleFromPreset, suggestedFor } from '../../../src/schedule/schedule/presets';
 
 const general = PRESETS.filter((p) => !p.section);
 const ifcsg = PRESETS.filter((p) => p.section === 'ifcsg');
@@ -198,5 +198,32 @@ describe('the Planting template against a model', () => {
     // is pinned here at its source: matchedElements under the template's own filters.
     const res = runSchedule(store, scheduleFromPreset(presetById('sg-planting')!), { cap: 0 });
     expect(res.matchedElements).toBe(2);
+  });
+});
+
+describe('suggestedFor — what a category\'s templates ask for', () => {
+  // ifcTable 2026-11-05 (faa2b27), ported for SGVue v1.5.0; the field picker that shows it is
+  // phase 2's. The case is ifcTable's own.
+  const names = (entities: string[]) =>
+    suggestedFor(entities).map((f) => (f.kind === 'core' ? f.key : f.kind === 'prop' ? f.prop : ''));
+
+  it('is the fields the templates name, in template order, each once, matched by name', () => {
+    expect(names(['IfcDoor'])).toEqual(['mark', 'typeName', 'storey', 'Width', 'Height', 'FireRating']);
+  });
+
+  it('is empty for a category no template covers', () => {
+    expect(suggestedFor(['IfcBuildingElementProxy'])).toEqual([]);
+  });
+
+  it('every suggested field is one a template asks for', () => {
+    const all = new Set(PRESETS.flatMap((p) => p.columns.map((c) => JSON.stringify(c.field))));
+    for (const p of PRESETS) for (const f of suggestedFor(p.entities)) expect(all.has(JSON.stringify(f))).toBe(true);
+  });
+
+  it('hands back copies, so editing a suggestion cannot rewrite a template (SGVue)', () => {
+    const f = suggestedFor(['IfcDoor'])[0];
+    const before = JSON.stringify(PRESETS);
+    (f as { key?: string }).key = 'name';
+    expect(JSON.stringify(PRESETS)).toBe(before);
   });
 });

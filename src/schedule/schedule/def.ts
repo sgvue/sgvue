@@ -300,16 +300,23 @@ function cleanFormat(v: unknown): UnitFormat | undefined {
   });
 }
 
+/**
+ * A field reference this build can resolve, or null. References to removed field kinds (the
+ * old 'combined') or removed core keys (typeMark, expressId) drop quietly, so a v1 file from
+ * an earlier build still loads what it can.
+ */
+function cleanField(v: unknown): FieldRef | null {
+  if (!v || typeof v !== 'object') return null;
+  const kind = (v as { kind?: unknown }).kind;
+  if (kind !== 'core' && kind !== 'prop' && kind !== 'formula') return null;
+  if (kind === 'core' && !(((v as { key?: string }).key ?? '') in CORE_LABELS)) return null;
+  return v as FieldRef;
+}
+
 function cleanColumn(v: unknown): Column | null {
   if (!v || typeof v !== 'object') return null;
   const c = v as Record<string, unknown>;
-  if (!c.field || typeof c.field !== 'object') return null;
-  // Columns referencing removed field kinds (the old 'combined') or removed core keys
-  // (typeMark, expressId) drop quietly, so a v1 file from an earlier build still loads
-  // what it can.
-  const kind = (c.field as { kind?: unknown }).kind;
-  if (kind !== 'core' && kind !== 'prop' && kind !== 'formula') return null;
-  if (kind === 'core' && !(((c.field as { key?: string }).key ?? '') in CORE_LABELS)) return null;
+  if (!cleanField(c.field)) return null;
   const aligns = ['left', 'center', 'right'];
   const totals = ['sum', 'count', 'countDistinct', 'min', 'max', 'avg'];
   const col: Column = compact({
@@ -338,6 +345,45 @@ function cleanColumn(v: unknown): Column | null {
   return col;
 }
 
+/** Every UnitKind, keyed so the compiler flags a kind added to the type and not here. */
+const UNIT_KINDS: Record<UnitKind, true> = {
+  length: true, area: true, volume: true, angle: true, mass: true, count: true, none: true,
+};
+const CALC_RESULTS: readonly CalcResult[] = ['number', 'yesNo', 'text'];
+
+/**
+ * A calculated entry, rebuilt from the keys `Calculated` names. Its name becomes a column
+ * heading that reaches the table and the workbook, so a name that is not text drops the
+ * entry — the same goes for an id, kind, formula or ofField this build cannot use.
+ *
+ * ifcTable's security fix of 2026-11-07, ported for SGVue v1.5.0: every route a definition
+ * takes into SGVue — a `.schedule.json`, a saved setup, a project file, the assistant's
+ * `make_schedule` and the Schedules port — is read through `parseScheduleDef`, so this is
+ * the one gate for all of them.
+ */
+function cleanCalculated(v: unknown): Calculated | null {
+  if (!v || typeof v !== 'object') return null;
+  const c = v as Record<string, unknown>;
+  const name = text(c.name, 120);
+  if (typeof c.id !== 'string' || !c.id || name === undefined) return null;
+  const kind = c.kind === 'formula' || c.kind === 'percentage' ? (c.kind as Calculated['kind']) : null;
+  if (!kind) return null;
+  if (c.formula !== undefined && typeof c.formula !== 'string') return null;
+  const ofField = c.ofField === undefined ? undefined : cleanField(c.ofField);
+  if (ofField === null) return null;
+  return compact({
+    id: c.id,
+    name,
+    kind,
+    unitKind: typeof c.unitKind === 'string' && Object.hasOwn(UNIT_KINDS, c.unitKind)
+      ? (c.unitKind as UnitKind) : undefined,
+    result: CALC_RESULTS.find((r) => r === c.result),
+    yesNo: c.yesNo === true ? true : undefined,
+    formula: text(c.formula, 1000),
+    ofField,
+  });
+}
+
 function cleanAppearance(v: unknown): Appearance {
   const a = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   return {
@@ -353,6 +399,12 @@ function cleanAppearance(v: unknown): Appearance {
     // rather than throwing — the same forward-lenient rule the rest of this parser follows.
     bodyFont: isBodyFont(a.bodyFont) ? a.bodyFont : 'plex',
   };
+}
+
+/** A `between` end saved empty (null from JSON, or a hole) loads as '', the empty box. */
+function cleanRange(f: FilterRule): FilterRule {
+  if (f.op !== 'between' || !Array.isArray(f.values)) return f;
+  return { ...f, values: Array.from(f.values as (string | number | null)[], (v) => v ?? '') };
 }
 
 /**
@@ -388,9 +440,10 @@ export function parseScheduleDef(input: unknown): ScheduleDef {
     entity,
     columns,
     calculated: Array.isArray(o.calculated)
-      ? (o.calculated as Calculated[]).filter((c) => c?.id && c.kind) : undefined,
+      ? (o.calculated as unknown[]).map(cleanCalculated).filter((c): c is Calculated => c !== null)
+      : undefined,
     filters: Array.isArray(o.filters)
-      ? (o.filters as FilterRule[]).filter((f) => f?.field && f.op).slice(0, MAX_FILTERS) : [],
+      ? (o.filters as FilterRule[]).filter((f) => f?.field && f.op).slice(0, MAX_FILTERS).map(cleanRange) : [],
     filterLogic: o.filterLogic === 'or' ? 'or' : 'and',
     sort: Array.isArray(o.sort)
       ? (o.sort as SortLevel[]).filter((s) => s?.field).slice(0, MAX_SORT_LEVELS) : [],

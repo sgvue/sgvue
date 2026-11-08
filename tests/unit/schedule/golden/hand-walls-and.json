@@ -1,0 +1,1799 @@
+{
+ "def": {
+  "version": 1,
+  "name": "Walls AND",
+  "entity": [
+   "IfcWall",
+   "IfcWallStandardCase"
+  ],
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "entity"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "mark"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "storeyElevation"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "Qto_WallBaseQuantities",
+     "prop": "Length"
+    },
+    "total": "sum",
+    "format": {
+     "display": "m",
+     "decimals": 2
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "Other_Pset",
+     "prop": "FireRating"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "NetVolume"
+    },
+    "total": "min",
+    "format": {
+     "display": "m³",
+     "decimals": 3,
+     "thousands": false
+    }
+   }
+  ],
+  "filters": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    },
+    "op": "in",
+    "values": [
+     "Level 1",
+     "Level 10",
+     "Roof"
+    ]
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Length"
+    },
+    "op": "between",
+    "values": [
+     2,
+     12
+    ]
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "name"
+    },
+    "op": "!=",
+    "value": "Wall 3"
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "description"
+    },
+    "op": "noValue"
+   }
+  ],
+  "filterLogic": "and",
+  "sort": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    },
+    "dir": "asc",
+    "header": true,
+    "footer": "totals"
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Length"
+    },
+    "dir": "desc"
+   }
+  ],
+  "itemize": true,
+  "grandTotal": true,
+  "appearance": {
+   "showTitle": true,
+   "gridLines": true,
+   "zebra": true,
+   "fontSize": 13,
+   "headerBold": true
+  }
+ },
+ "result": {
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "entity"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "mark"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "storeyElevation"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "Qto_WallBaseQuantities",
+     "prop": "Length"
+    },
+    "total": "sum",
+    "format": {
+     "display": "m",
+     "decimals": 2
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "FireRating"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "Other_Pset",
+     "prop": "FireRating"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "NetVolume"
+    },
+    "total": "min",
+    "format": {
+     "display": "m³",
+     "decimals": 3,
+     "thousands": false
+    }
+   }
+  ],
+  "headings": [
+   "IFC Class",
+   "Tag (Revit ID)",
+   "Level Elevation",
+   "Length",
+   "FireRating",
+   "FireRating (Other_Pset)",
+   "NetVolume"
+  ],
+  "rows": [
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 1",
+    "count": 2
+   },
+   {
+    "kind": "data",
+    "rows": [
+     4
+    ],
+    "cells": [
+     "IfcWall",
+     "1004",
+     "0",
+     "2.95",
+     "FR, \"120\"",
+     "Other",
+     "1.367"
+    ],
+    "nums": [
+     null,
+     null,
+     0,
+     2.95,
+     null,
+     null,
+     1.367
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     0
+    ],
+    "cells": [
+     "IfcWall",
+     "1000",
+     "0",
+     "2.40",
+     "60 min",
+     "Other",
+     "1.200"
+    ],
+    "nums": [
+     null,
+     null,
+     0,
+     2.4,
+     null,
+     null,
+     1.2
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "Total",
+    "count": 2,
+    "cells": [
+     null,
+     null,
+     null,
+     "5.35",
+     null,
+     null,
+     "1.200"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     5.35,
+     null,
+     null,
+     1.2
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 10",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     6
+    ],
+    "cells": [
+     "IfcWall",
+     "1006",
+     "31,500",
+     "3.22",
+     "90 min",
+     "Other",
+     "1.450"
+    ],
+    "nums": [
+     null,
+     null,
+     31500,
+     3.22,
+     null,
+     null,
+     1.45
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "Total",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null,
+     "3.22",
+     null,
+     null,
+     "1.450"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     3.22,
+     null,
+     null,
+     1.45
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Roof",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     9
+    ],
+    "cells": [
+     "IfcWallStandardCase",
+     "1009",
+     "",
+     "10.77",
+     "",
+     "",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     10.77,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "Total",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null,
+     "10.77",
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     10.77,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 4,
+    "cells": [
+     null,
+     null,
+     null,
+     "19.34",
+     null,
+     null,
+     "1.200"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     19.34,
+     null,
+     null,
+     1.2
+    ]
+   }
+  ],
+  "totalDataRows": 4,
+  "matchedElements": 4,
+  "truncated": false,
+  "countColumn": false,
+  "numeric": {
+   "2": {
+    "decimals": 0,
+    "unit": ""
+   },
+   "3": {
+    "decimals": 2,
+    "unit": ""
+   },
+   "6": {
+    "decimals": 3,
+    "unit": ""
+   }
+  }
+ },
+ "csv": [
+  "IFC Class,Tag (Revit ID),Level Elevation,Length,FireRating,FireRating (Other_Pset),NetVolume",
+  "Level 1 (2),,,,,,",
+  "IfcWall,1004,0,2.95,\"FR, \"\"120\"\"\",Other,1.367",
+  "IfcWall,1000,0,2.40,60 min,Other,1.200",
+  "Total,,,5.35,,,1.200",
+  "Level 10 (1),,,,,,",
+  "IfcWall,1006,31500,3.22,90 min,Other,1.450",
+  "Total,,,3.22,,,1.450",
+  "Roof (1),,,,,,",
+  "IfcWallStandardCase,1009,,10.77,,,",
+  "Total,,,10.77,,,",
+  "Grand total,,,19.34,,,1.200"
+ ],
+ "xlsx": [
+  {
+   "pageSetup": {
+    "fitToPage": true,
+    "margins": {
+     "left": 0.7,
+     "right": 0.7,
+     "top": 0.75,
+     "bottom": 0.75,
+     "header": 0.3,
+     "footer": 0.3
+    },
+    "orientation": "landscape",
+    "horizontalDpi": 4294967295,
+    "verticalDpi": 4294967295,
+    "pageOrder": "downThenOver",
+    "blackAndWhite": false,
+    "draft": false,
+    "cellComments": "None",
+    "errors": "displayed",
+    "scale": 100,
+    "fitToWidth": 1,
+    "fitToHeight": 0,
+    "firstPageNumber": 1,
+    "useFirstPageNumber": false,
+    "usePrinterDefaults": false,
+    "copies": 1
+   },
+   "name": "Walls AND",
+   "autoFilter": "A1:G1",
+   "views": [
+    {
+     "workbookViewId": 0,
+     "rightToLeft": false,
+     "state": "frozen",
+     "xSplit": 0,
+     "ySplit": 1,
+     "topLeftCell": "A2",
+     "showRuler": true,
+     "showRowColHeaders": true,
+     "showGridLines": true,
+     "zoomScale": 100,
+     "zoomScaleNormal": 100
+    }
+   ],
+   "cols": [
+    {
+     "i": 0,
+     "width": 21
+    },
+    {
+     "i": 1,
+     "width": 16
+    },
+    {
+     "i": 2,
+     "width": 17
+    },
+    {
+     "i": 3,
+     "width": 10,
+     "al": {
+      "horizontal": "right"
+     }
+    },
+    {
+     "i": 4,
+     "width": 12
+    },
+    {
+     "i": 5,
+     "width": 25
+    },
+    {
+     "i": 6,
+     "width": 11,
+     "al": {
+      "horizontal": "right"
+     }
+    }
+   ],
+   "rows": [
+    {
+     "r": 1,
+     "cells": [
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 1,
+       "v": "IFC Class",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 2,
+       "v": "Tag (Revit ID)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 3,
+       "v": "Level Elevation",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 4,
+       "v": "Length",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 5,
+       "v": "FireRating",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 6,
+       "v": "FireRating (Other_Pset)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 7,
+       "v": "NetVolume",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 2,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 1 (2)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 3,
+     "cells": [
+      {
+       "c": 1,
+       "v": "IfcWall"
+      },
+      {
+       "c": 2,
+       "v": "1004"
+      },
+      {
+       "c": 3,
+       "v": 0,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": 2.95,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "FR, \"120\""
+      },
+      {
+       "c": 6,
+       "v": "Other"
+      },
+      {
+       "c": 7,
+       "v": 1.367,
+       "f": "0.000",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "cells": [
+      {
+       "c": 1,
+       "v": "IfcWall"
+      },
+      {
+       "c": 2,
+       "v": "1000"
+      },
+      {
+       "c": 3,
+       "v": 0,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": 2.4,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "60 min"
+      },
+      {
+       "c": 6,
+       "v": "Other"
+      },
+      {
+       "c": 7,
+       "v": 1.2,
+       "f": "0.000",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "Total",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": 5.35,
+       "f": "#,##0.00",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": 1.2,
+       "f": "0.000",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 6,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 10 (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 7,
+     "cells": [
+      {
+       "c": 1,
+       "v": "IfcWall"
+      },
+      {
+       "c": 2,
+       "v": "1006"
+      },
+      {
+       "c": 3,
+       "v": 31500,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": 3.22,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "90 min"
+      },
+      {
+       "c": 6,
+       "v": "Other"
+      },
+      {
+       "c": 7,
+       "v": 1.45,
+       "f": "0.000",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "Total",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": 3.22,
+       "f": "#,##0.00",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": 1.45,
+       "f": "0.000",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 9,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Roof (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 10,
+     "cells": [
+      {
+       "c": 1,
+       "v": "IfcWallStandardCase"
+      },
+      {
+       "c": 2,
+       "v": "1009"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": 10.77,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": ""
+      },
+      {
+       "c": 6,
+       "v": ""
+      },
+      {
+       "c": 7,
+       "v": "",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 11,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "Total",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": 10.77,
+       "f": "#,##0.00",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 7,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 12,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": 19.34,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 7,
+       "v": 1.2,
+       "f": "0.000",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
