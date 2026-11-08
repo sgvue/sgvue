@@ -4,6 +4,16 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — SGVue 1.4.0 published
+
+**Did.** Pushed `main` and the tag `v1.4.0` (`5a58765`); `release.yml` built the three installers,
+each verified by its build-provenance attestation; the owner tested the Mac build; all three were
+published together on `sgvue/releases` with their SHA-256, and it is the latest release. The notes
+(`docs/releases/1.4.0.md`) now give the published download sizes and no longer say the Mac images
+come later. The download site's 1.4.0 branch was merged and is live: `?v=1.4.0` reads "You're up to
+date", and its sidebar row names the path hover and the library's removal. `docs/SYSTEM_SPEC.md`
+§3 and §11 record the release.
+
 ## 2026-11-08 — the sidebar's library popover removed; the path title on the whole model row
 
 **Did.** The owner, testing 1.4.0: *"Add hover description on the model list and show the file

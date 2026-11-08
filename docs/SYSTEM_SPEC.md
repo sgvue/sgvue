@@ -173,6 +173,13 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > installed), on which `npm run test:packaged` passes; so the disk sizes published, 1.2.0's
 > figures, still hold. The Windows installer is published first, and the macOS disk images once
 > they have been tested on a Mac.
+> **2026-11-08, version 1.4.0:** its published requirements (`docs/releases/1.4.0.md`) are 1.3.0's,
+> measured then, with the download sizes of the files published: built by `release.yml` from the
+> tag `v1.4.0` (commit `5a58765`), each file's build-provenance attestation verified with
+> `gh attestation verify` — `SGVue-1.4.0-setup.exe` 124 872 911 bytes (about 120 MB, unsigned),
+> `SGVue-1.4.0-arm64.dmg` 135 651 172 and `SGVue-1.4.0-x64.dmg` 142 221 161 (ad-hoc signed);
+> installed, the Mac app is 336 MB (Apple silicon) and 342 MB (Intel). All three were published
+> together on `sgvue/releases`, after the owner's test of the Mac build.
 
 ---
 
@@ -2151,3 +2158,7 @@ Icons come from the design's brand mark (`scripts/make-icons.py`).
 > `dist/SGVue-1.3.0-setup.exe` from this tree (§3). No macOS build was made here. The Electron
 > checks ran after the owner's own test of a packaged copy had ended, because SGVue's
 > single-instance lock would have met it.
+> **2026-11-08, version 1.4.0 (macOS):** `typecheck`, `test`, `build` and the guarded smoke
+> `test:e2e` (32 of 32, one test passing on its own rerun after its window closed mid-run, the
+> guard not tripping) pass on the tagged tree; the installers were built on GitHub's runners
+> (`release.yml`), and the owner tested the Mac build. No Windows run was made here.
