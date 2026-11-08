@@ -1,0 +1,47 @@
+{
+  "rows": 3,
+  "scored": 3,
+  "na": 0,
+  "errors": 0,
+  "pass": 3,
+  "pass_rate": 1,
+  "no_write_rate": 1,
+  "by_group": {
+    "answer": {
+      "n": 3,
+      "pass": 3
+    }
+  },
+  "tokens": {
+    "in": 7709,
+    "out": 3500,
+    "cacheRead": 626317,
+    "cacheWrite": 35395
+  },
+  "cost_usd": 0.6604220000000001,
+  "unpriced": 0,
+  "by_case": {
+    "sg-ask-once": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 9,
+      "tokens": {
+        "in": 7709,
+        "out": 3500,
+        "cacheRead": 626317,
+        "cacheWrite": 35395
+      },
+      "cost_usd": 0.660422
+    }
+  },
+  "estimate": {
+    "cases": 1,
+    "runs": 3,
+    "turns": 9,
+    "inTokens": 360000,
+    "outTokens": 10800,
+    "usdList": 2.07,
+    "usdMeasured": null,
+    "basis": "a-priori: ROUGH_TURN in scripts/eval/cost.cjs"
+  }
+}
