@@ -348,6 +348,8 @@ export function buildModelIndex(
   const storeySet = new Set(storeyNodes.map((n) => n.expressId))
   const storeyNameById = new Map(storeyNodes.map((n) => [n.expressId, n.name || n.longName]))
   const storeyOf = new Map<number, number>()
+  // The spatial element each element is contained in, whatever its level — see below.
+  const containerOf = new Map<number, number>()
   // Elements are often contained in an IfcSpace rather than a storey, so spaces are
   // resolved to their own storey first and their contents inherit it.
   const inSpace: { space: number; elements: number[] }[] = []
@@ -356,6 +358,7 @@ export function buildModelIndex(
     if (!rel) continue
     const structure = ref(rel.RelatingStructure)
     const contents = refs(rel.RelatedElements)
+    if (structure) for (const el of contents) if (!containerOf.has(el)) containerOf.set(el, structure)
     if (storeySet.has(structure)) for (const el of contents) storeyOf.set(el, structure)
     else inSpace.push({ space: structure, elements: contents })
   }
@@ -376,6 +379,36 @@ export function buildModelIndex(
       for (const kid of aggregates.get(parent) ?? []) {
         if (storeyOf.has(kid)) continue
         storeyOf.set(kid, storey)
+        next.push(kid)
+      }
+    }
+    frontier = next
+  }
+
+  /*
+   * ── containment: element → the spatial element holding it (2026-11-08) ──
+   * The site, building, storey or space an element sits in, whatever level that is: its own
+   * `IfcRelContainedInSpatialStructure`, else — for a part — what holds the element that
+   * aggregates it; a spatial element (a space) is held by the one aggregating it. It is what
+   * the Schedules window reads Building, Site and Room / Space from, as IfcOpenShell's
+   * `get_container` / `get_aggregate` walk does. Seeded by the containment pass above.
+   */
+  const spatialIds = new Set<number>()
+  const collectSpatial = (node: SpatialNode | null): void => {
+    if (!node) return
+    spatialIds.add(node.expressId)
+    node.children.forEach(collectSpatial)
+  }
+  collectSpatial(spatial)
+  frontier = [...containerOf.keys(), ...spatialIds]
+  while (frontier.length) {
+    const next: number[] = []
+    for (const parent of frontier) {
+      const holder = spatialIds.has(parent) ? parent : containerOf.get(parent)
+      if (holder === undefined) continue
+      for (const kid of aggregates.get(parent) ?? []) {
+        if (containerOf.has(kid)) continue
+        containerOf.set(kid, holder)
         next.push(kid)
       }
     }
@@ -643,6 +676,8 @@ export function buildModelIndex(
       psetMeta: metaOf.get(id) ?? {},
       ...(spaceSet.has(id) ? { isSpace: true as const } : {})
     })
+    const container = containerOf.get(id)
+    if (container !== undefined) elements[elements.length - 1].container = container
   }
   stage('building elements', `${elements.length.toLocaleString('en-US')} elements`, 1)
 
@@ -805,11 +840,8 @@ function unitFactor(
   entity: string
 ): number | undefined {
   if (entity === 'IfcSIUnit') return siFactor(text(unit.Name), text(unit.Prefix))
-  if (entity !== 'IfcConversionBasedUnit') {
-    // IfcDerivedUnit (thermal transmittance, …) is recorded but not resolved to an SI
-    // factor: its values are reported exactly as authored.
-    return undefined
-  }
+  if (entity === 'IfcDerivedUnit') return derivedFactor(src, modelID, unit)
+  if (entity !== 'IfcConversionBasedUnit') return undefined
   // e.g. DEGREE = 0.01745… RADIAN, INCH = 0.0254 METRE, expressed against an SI unit.
   const conversion = src.line(modelID, ref(unit.ConversionFactor))
   const value = numberOf(conversion?.ValueComponent)
@@ -817,6 +849,35 @@ function unitFactor(
   const baseName = base ? text(base.Name) : ''
   const basePrefix = base ? text(base.Prefix) : ''
   return value !== null ? value * siFactor(baseName, basePrefix) : undefined
+}
+
+/**
+ * SI base units per one of an `IfcDerivedUnit` (2026-11-08) — W/(ft²·K) is 10.7639… W/(m²·K):
+ * the product of its elements' factors, each raised to its exponent, as IfcOpenShell composes
+ * one. A mass element counts in **kilograms**, so the factor is in SI base units, where the
+ * `MASSUNIT` entry itself is in grams (the file's own reading, `scalesOf` in the Schedules
+ * adapter). `undefined` when any element does not resolve. Only the Schedules window converts
+ * with it; the main window shows every value as authored.
+ */
+function derivedFactor(src: ReadOnlyIfcSource, modelID: number, unit: IfcLine): number | undefined {
+  const elements = refs(unit.Elements)
+  if (!elements.length) return undefined
+  let factor = 1
+  for (const id of elements) {
+    const element = src.line(modelID, id)
+    const exponent = numberOf(element?.Exponent)
+    const namedId = ref(element?.Unit)
+    const named = namedId ? src.line(modelID, namedId) : null
+    if (exponent === null || !named) return undefined
+    const entity = src.typeName(src.lineType(modelID, namedId))
+    // A derived unit's elements are named units; never recurse into another derived one.
+    if (entity === 'IfcDerivedUnit') return undefined
+    let f = unitFactor(src, modelID, named, entity)
+    if (f === undefined) return undefined
+    if (text(named.UnitType) === 'MASSUNIT') f /= 1000
+    factor *= f ** exponent
+  }
+  return factor
 }
 
 /* ────────────── property / quantity set resolution ────────────── */

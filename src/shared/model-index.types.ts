@@ -67,8 +67,10 @@ export interface UnitEntry {
   /** SI prefix, e.g. `MILLI`. `''` when there is none. */
   prefix: string
   /**
-   * SI units per file unit: 0.001 for millimetres, 0.0174532925… for degrees. `undefined`
-   * for a derived unit we do not resolve — the value is still reported as authored.
+   * SI units per file unit: 0.001 for millimetres, 0.0174532925… for degrees — grams for a
+   * `MASSUNIT`. For an `IfcDerivedUnit` (2026-11-08), SI base units per one, a mass element
+   * counted in kilograms: 10.7639… for W/(ft²·K). `undefined` when it does not resolve. Only
+   * the Schedules window converts with a derived unit's; the main window shows values as authored.
    */
   factor?: number
 }
@@ -393,6 +395,14 @@ export interface IfcElement {
   /** `IfcTypeObject.GlobalId`, when the element has a type object. */
   typeGuid: string
   storey: string
+  /**
+   * expressId of the spatial element holding this one (2026-11-08) — the site, building,
+   * storey or space of its own `IfcRelContainedInSpatialStructure`; for a part, what holds the
+   * element aggregating it; for a space, the spatial element aggregating it. Local to its file,
+   * an id in `spatial`. The Schedules window's Building, Site and Room / Space come from it.
+   * Absent when nothing holds the element.
+   */
+  container?: number
   /** The single display string the design shows. `''` when the file names no material. */
   material: string
   materials: readonly MaterialRef[]

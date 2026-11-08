@@ -105,12 +105,40 @@ export function unitSystemOf(units: any[]): UnitSystem {
 /** IFC measure type name (e.g. "IFCLENGTHMEASURE") → the dimension it carries. */
 export function measureKind(typeName: string | undefined): UnitKind {
   if (!typeName) return 'none';
+  return MEASURE_KIND[typeName.toUpperCase()] ?? 'none';
+}
+
+/**
+ * The measures `measureKind` converts, by exact name — never a substring (2026-11-08):
+ * `IfcMassPerLengthMeasure` is not a length, `IfcRotationalMassMeasure` not a mass and
+ * `IfcCompoundPlaneAngleMeasure` not a plane angle. These are exactly the measures, across
+ * IFC2X3, IFC4 and IFC4X3, whose unit type (`measureUnitType`, IfcOpenShell's
+ * `get_measure_unit_type`) is one of the six named kinds. Every other measure is `none`:
+ * converted only through a derived unit the file assigns (`adapter.ts`), else kept as written.
+ */
+const MEASURE_KIND: Readonly<Record<string, UnitKind>> = {
+  IFCLENGTHMEASURE: 'length',
+  IFCPOSITIVELENGTHMEASURE: 'length',
+  IFCNONNEGATIVELENGTHMEASURE: 'length',
+  IFCAREAMEASURE: 'area',
+  IFCVOLUMEMEASURE: 'volume',
+  IFCPLANEANGLEMEASURE: 'angle',
+  IFCPOSITIVEPLANEANGLEMEASURE: 'angle',
+  IFCMASSMEASURE: 'mass',
+  IFCCOUNTMEASURE: 'count',
+};
+
+/**
+ * IFC measure type → the `IfcUnitEnum` its unit is assigned under — IfcOpenShell's
+ * `get_measure_unit_type`: `IfcThermalTransmittanceMeasure` → `THERMALTRANSMITTANCEUNIT`,
+ * `IfcPositiveLengthMeasure` → `LENGTHUNIT`; `IfcNumericMeasure` → `USERDEFINED`. Any case in.
+ */
+export function measureUnitType(typeName: string): string {
   const n = typeName.toUpperCase();
-  if (n.includes('LENGTHMEASURE')) return 'length';
-  if (n.includes('AREAMEASURE')) return 'area';
-  if (n.includes('VOLUMEMEASURE')) return 'volume';
-  if (n.includes('PLANEANGLEMEASURE')) return 'angle';
-  if (n.includes('MASSMEASURE')) return 'mass';
-  if (n.includes('COUNTMEASURE')) return 'count';
-  return 'none';
+  if (n === 'IFCNUMERICMEASURE') return 'USERDEFINED';
+  return n
+    .replace(/^IFC/, '')
+    .replace(/MEASURE$/, '')
+    .replace(/^NON/, '')
+    .replace(/^(POSITIVE|NEGATIVE)/, '') + 'UNIT';
 }
