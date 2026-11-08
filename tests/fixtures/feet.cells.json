@@ -1,0 +1,145 @@
+{
+ "derivedScales": {},
+ "elements": {
+  "0000000000000000000008": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcSlab",
+   "longName": "",
+   "materials": [],
+   "name": "Slab L1",
+   "objectType": "",
+   "predefinedType": "FLOOR",
+   "psets": {},
+   "qtos": {
+    "Qto_SlabBaseQuantities": {
+     "GrossArea": {
+      "m": "IfcAreaMeasure",
+      "v": 1200.0
+     },
+     "GrossVolume": {
+      "m": "IfcVolumeMeasure",
+      "v": 1200.0
+     }
+    }
+   },
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "0000000000000000000009": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall S",
+   "objectType": "",
+   "predefinedType": "SOLIDWALL",
+   "psets": {},
+   "qtos": {
+    "Qto_WallBaseQuantities": {
+     "Length": {
+      "m": "IfcLengthMeasure",
+      "v": 40.0
+     }
+    }
+   },
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000A": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall W",
+   "objectType": "",
+   "predefinedType": "SOLIDWALL",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000B": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcColumn",
+   "longName": "",
+   "materials": [],
+   "name": "Column C2",
+   "objectType": "",
+   "predefinedType": "COLUMN",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000D": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcSlab",
+   "longName": "",
+   "materials": [],
+   "name": "Slab L2",
+   "objectType": "",
+   "predefinedType": "FLOOR",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000007",
+   "tag": "",
+   "typeName": ""
+  }
+ },
+ "file": "feet.ifc",
+ "generatedBy": "IfcOpenShell 0.8.4.post1",
+ "measureUnitTypes": {
+  "IfcAreaMeasure": "AREAUNIT",
+  "IfcLengthMeasure": "LENGTHUNIT",
+  "IfcVolumeMeasure": "VOLUMEUNIT"
+ },
+ "sha256": "568174f89a0f52acb7f1066711b8d54aacd7d30397896c4d178fd534a13b334f",
+ "spatial": {
+  "0000000000000000000002": {
+   "longName": "",
+   "name": "Site"
+  },
+  "0000000000000000000003": {
+   "longName": "",
+   "name": "Building"
+  }
+ },
+ "storeys": {
+  "0000000000000000000006": {
+   "elevation": 0.0,
+   "longName": "",
+   "name": "Level 1"
+  },
+  "0000000000000000000007": {
+   "elevation": 3.2004,
+   "longName": "",
+   "name": "Level 2"
+  }
+ },
+ "unitScales": {
+  "AREAUNIT": 0.09290304,
+  "LENGTHUNIT": 0.3048,
+  "MASSUNIT": 1,
+  "PLANEANGLEUNIT": 1,
+  "VOLUMEUNIT": 0.028316846592
+ }
+}
