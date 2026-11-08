@@ -85,6 +85,48 @@ function oracleTurn(kase, truth) {
   }
 }
 
+/**
+ * 2026-11-08 — a case may be a conversation. `turns` lists the user turns **before** the case's
+ * own `prompt`, in order, in one conversation — each `{ prompt, oracle, expect?, choice? }` —
+ * and the case's `prompt`, `oracle` and `expect` are its last turn, as in every one-turn case,
+ * which is unchanged. This is every turn in order, the last one the case itself; `choice` is a
+ * quick reply the user clicks before that turn's text is sent (stage 2's IFC+SG Yes / No).
+ */
+function turnsOf(kase) {
+  return [...(kase.turns || []), { prompt: kase.prompt, oracle: kase.oracle, expect: kase.expect, choice: kase.choice }]
+}
+
+/** Two turns' `usage` summed, counter by counter; null only when neither was billed. */
+function addUsage(a, b) {
+  if (!a) return b || null
+  if (!b) return a
+  const out = { ...a }
+  for (const k of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheCreateTokens']) out[k] = (a[k] || 0) + (b[k] || 0)
+  return out
+}
+
+/**
+ * A conversation's last-turn observation with the turns before it: each earlier turn's own
+ * observation (its reply, calls and the view after it), the view before the first turn, and
+ * the usage of every turn summed — what the conversation cost. The graders read `calls`,
+ * `view` and `viewBefore` as the last turn's, as they always have.
+ */
+function withEarlier(obs, earlier, start) {
+  if (!earlier.length) return obs
+  // A turn that did not finish — a rate limit, a timeout — is the conversation's outcome, so the
+  // runner files it as plumbing rather than scoring the turns after it as a model failure.
+  const unfinished = earlier.map((e) => e.outcome).find((o) => o && o.type !== 'done')
+  return {
+    ...obs,
+    outcome: unfinished || obs.outcome,
+    earlier,
+    viewStart: start.view,
+    storeStart: start.store,
+    usageLast: obs.usage,
+    usage: [...earlier.map((e) => e.usage), obs.usage].reduce(addUsage, null)
+  }
+}
+
 /** The null agent's turn: nothing called, nothing said. */
 function nullTurn() {
   return { reply: '', calls: [], outcome: { type: 'done', rounds: 0 }, usage: null, model: null, index: -1 }
@@ -122,7 +164,13 @@ function observation(turn, before, after, message) {
     ...after.store,
     table: message ? message.table || null : null,
     pending: message ? message.pending || null : null,
-    chips: message && message.chips ? message.chips.map((c) => ({ label: c.label, n: c.ids.length })) : []
+    chips: message && message.chips ? message.chips.map((c) => ({ label: c.label, n: c.ids.length })) : [],
+    /**
+     * 2026-11-08 — stage 2's heads-up line, as the committed reply carries it: the one
+     * app-computed observation the reply shows (`{ kind, n, … }`), or null for none
+     * (`prototypes/vee-messages/full/HANDOFF.md` §2). A build before stage 2 has none.
+     */
+    headsUp: message && message.headsUp ? message.headsUp : null
   }
   return {
     reply: turn.reply,
@@ -136,4 +184,4 @@ function observation(turn, before, after, message) {
   }
 }
 
-module.exports = { collectTruth, fillTemplate, nullTurn, observation, oracleTurn, pickFrom, scriptedCalls }
+module.exports = { addUsage, collectTruth, fillTemplate, nullTurn, observation, oracleTurn, pickFrom, scriptedCalls, turnsOf, withEarlier }

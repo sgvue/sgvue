@@ -442,6 +442,19 @@ async function installDevTools(viewer: Viewer): Promise<void> {
     sql: (statement: string) => fed.query(statement),
     tool: (name: string, input: unknown) => runToolOnce(name, input),
     /**
+     * 2026-11-08. A stand-in Schedules window for `scripts/ai-eval.cjs` (`dev/schedules-standin.ts`):
+     * `attach()` joins the schedule link from the other end, as the real window's port does, and
+     * `state()` is what it shows and was asked for — `null` while none is joined. An eval window is
+     * not the app's main window, so the toolbar's own call opens no real Schedules window there.
+     */
+    schedules: {
+      attach: async () => {
+        ;(await import('./dev/schedules-standin')).attachScheduleStandIn()
+        return true
+      },
+      state: async () => (await import('./dev/schedules-standin')).scheduleStandInState()
+    },
+    /**
      * 2026-09-20. The same executor as `tool` above, returning the **panel's** half of the
      * outcome as well — the chips, the table and the patch the 5 % scope guard held back.
      * `scripts/ai-audit.cjs` cannot see any of it through `tool`, because only `forModel`
@@ -563,7 +576,12 @@ async function installDevTools(viewer: Viewer): Promise<void> {
    */
   const hostile = /(^|[#&?])hostile\b/.test(where)
     ? (await import('./dev/hostile')).HOSTILE_OPTIONS
-    : undefined
+    : /(^|[#&?])messy\b/.test(where)
+      ? // `#mock&messy` (2026-11-08) — the same federation with placeholder values, elements on no
+        // storey, a shared GlobalId, ObjectType-only sub-types and a second spelling of FireRating
+        // (`dev/messy.ts`): the eval suite's messy-model cases, and nothing else.
+        (await import('./dev/messy')).MESSY_OPTIONS
+      : undefined
   shell().setLibrary(
     SAMPLE_FILES.map((f) => ({ key: f.key, name: f.name, file: f.file, swatch: f.swatch }))
   )

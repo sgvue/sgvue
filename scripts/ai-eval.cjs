@@ -35,7 +35,7 @@
  *   --null      an agent that does nothing. Must score 0 on every case.
  *   (neither)   LIVE. Needs ANTHROPIC_API_KEY already in the environment. Spends real money.
  *
- * Flags: --pilot, --only=<ids|groups|tags>, --fixture=<mock|mock-hostile>, --variant=v1,
+ * Flags: --pilot[=<ids>], --only=<ids|groups|tags>, --fixture=<mock|mock-hostile|mock-messy>, --variant=v1,
  *        --flow=DIR, --reps=N, --timeout-s=N, --retries=N, --approve-harness;
  *        --no-report is accepted and does nothing (there has been no report since 2026-10-05).
  * Env:   SGVUE_APP_OUT=<dir> runs the suite against a saved build directory instead of `out/`.
@@ -70,6 +70,20 @@
  *
  * Phase 4: the store also carries the Markups card's two lists — each record's id and where it
  * stands — read off the app's own store, because the assistant can place one now.
+ *
+ * 2026-11-08, the Ask Vee eval cases:
+ *   · **a conversation** — a case's `turns` are user turns sent before its own `prompt`, in the
+ *     same window and so the same conversation; each is graded on its own `expect` where it has
+ *     one, the last on the case's, and the row's usage is every turn's, summed;
+ *   · **a Schedules window** — a case with `harness.schedules` gets the dev stand-in for it
+ *     (`src/renderer/dev/schedules-standin.ts`), joined before its setup runs, and the view
+ *     carries what it shows and was asked for (`store.schedules`);
+ *   · **the messy fixture** — `#mock&messy` (`src/renderer/dev/messy.ts`);
+ *   · **run counts** — each case runs `runsOf(case)` times (`cases.cjs`: three for the tagged
+ *     new and tricky cases, one for the rest) unless `--reps=N` sets one count for all;
+ *     `--pilot` is five named cases, once each; and before a run starts the runner prints what
+ *     it should roughly cost, and writes it, beside what it measured per case, to `metrics.json`;
+ *   · **stage 2** — a case that needs what is not built yet is n/a, with the reason printed.
  */
 const { app, BrowserWindow } = require('electron')
 const { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs')
@@ -77,11 +91,11 @@ const { createHash } = require('node:crypto')
 const { basename, join, resolve } = require('node:path')
 
 const ROOT = join(__dirname, '..')
-const { CASES, PILOT_IDS, selectCases } = require('./eval/cases.cjs')
-const { capabilityTags, missingCapabilities } = require('./eval/capabilities.cjs')
+const { CASES, PILOT_IDS, PILOT_MAX, runsOf, selectCases } = require('./eval/cases.cjs')
+const { capabilityTags, missingCapabilities, whyMissing } = require('./eval/capabilities.cjs')
 const { TRANSIENT_KINDS, failureClass, gradeCase } = require('./eval/graders.cjs')
-const { money, runCost, turnCost } = require('./eval/cost.cjs')
-const { collectTruth, nullTurn, observation, oracleTurn, scriptedCalls } = require('./eval/observe.cjs')
+const { estimateRun, measuredTurn, money, runCost, turnCost } = require('./eval/cost.cjs')
+const { collectTruth, nullTurn, observation, oracleTurn, scriptedCalls, turnsOf, withEarlier } = require('./eval/observe.cjs')
 
 /* ────────────────────────────── arguments ────────────────────────────── */
 
@@ -90,7 +104,9 @@ function parseArgs(argv) {
     mode: 'live',
     flow: null,
     variant: 'baseline',
-    reps: 1,
+    // null: each case runs `runsOf(case)` times; a number from --reps sets one count for all.
+    reps: null,
+    pilot: false,
     timeoutS: 240,
     retries: 3,
     only: [],
@@ -102,7 +118,21 @@ function parseArgs(argv) {
     if (k === '--dry-run') a.mode = 'oracle'
     else if (k === '--null') a.mode = 'null'
     else if (k === '--live') a.mode = 'live'
-    else if (k === '--pilot') a.only = a.only.concat(PILOT_IDS)
+    else if (k === '--pilot') {
+      // `--pilot` is the five in PILOT_IDS; `--pilot=a,b,c` names its own (at most PILOT_MAX).
+      const named = v ? String(v).split(',').map((x) => x.trim()).filter(Boolean) : PILOT_IDS
+      if (!named.length || named.length > PILOT_MAX) {
+        console.error(`ai-eval: --pilot takes 1 to ${PILOT_MAX} case ids, got ${named.length}`)
+        process.exit(64)
+      }
+      const unknown = named.filter((id) => !CASES.some((c) => c.id === id))
+      if (unknown.length) {
+        console.error(`ai-eval: --pilot names no such case: ${unknown.join(', ')}`)
+        process.exit(64)
+      }
+      a.pilot = true
+      a.only = a.only.concat(named)
+    }
     else if (k === '--only') a.only = a.only.concat(String(v || '').split(','))
     else if (k === '--fixture') a.fixture = v
     else if (k === '--flow') a.flow = v
@@ -118,6 +148,10 @@ function parseArgs(argv) {
       console.error(`ai-eval: unknown argument ${k}`)
       process.exit(64)
     }
+  }
+  if (a.reps !== null && !(Number.isInteger(a.reps) && a.reps >= 1)) {
+    console.error(`ai-eval: --reps must be a whole number of at least 1, got ${a.reps}`)
+    process.exit(64)
   }
   if (!/^(baseline|v[1-9]\d*)$/.test(a.variant)) {
     console.error(`ai-eval: --variant must be 'baseline' or 'v<N>', got '${a.variant}'`)
@@ -233,7 +267,9 @@ const HARNESS_PATHS = [
   'scripts/eval/cases.cjs',
   'scripts/eval/graders.cjs',
   'scripts/eval/capabilities.cjs',
-  'scripts/eval/cost.cjs'
+  'scripts/eval/cost.cjs',
+  // 2026-11-08: the conversation and the heads-up are read there.
+  'scripts/eval/observe.cjs'
 ]
 
 function readState() {
@@ -315,6 +351,21 @@ function doneKeys() {
   return done
 }
 
+/** Every row already in this variant's `results.jsonl` — the measured basis for the estimate. */
+function readRows() {
+  if (!existsSync(RESULTS)) return []
+  const rows = []
+  for (const line of readFileSync(RESULTS, 'utf8').split('\n')) {
+    if (!line.trim()) continue
+    try {
+      rows.push(JSON.parse(line))
+    } catch {
+      /* a torn line is not a row */
+    }
+  }
+  return rows
+}
+
 /* ────────────────────────────── driving one window ────────────────────────────── */
 
 const WIN_OPTS = {
@@ -346,7 +397,8 @@ async function openFixture(fixture) {
   if (MODEL_PATH) {
     await win.loadFile(join(APP_OUT, 'renderer/index.html'), BACKEND_HASH ? { hash: BACKEND_HASH } : undefined)
   } else {
-    const hash = ['mock', fixture === 'mock-hostile' ? 'hostile' : '', BACKEND_HASH].filter(Boolean).join('&')
+    const variant = fixture === 'mock-hostile' ? 'hostile' : fixture === 'mock-messy' ? 'messy' : ''
+    const hash = ['mock', variant, BACKEND_HASH].filter(Boolean).join('&')
     await win.loadFile(join(APP_OUT, 'renderer/index.html'), { hash })
   }
   const js = (code) => win.webContents.executeJavaScript(code)
@@ -427,7 +479,8 @@ const VIEW_EXPR = `(async () => {
       camera: view.camera,
       viewpoints: view.viewpoints,
       loadedModels: view.loadedModels,
-      basePoint: view.basePoint
+      basePoint: view.basePoint,
+      ifcsg: view.ifcsg
     },
     store: {
       stack: dev.evalStack(),
@@ -451,7 +504,8 @@ const VIEW_EXPR = `(async () => {
         const mm = (n) => Math.round(n * 1000) / 1000
         const cam = dev.viewer.getCamera()
         return { target: cam.target.map(mm), dist: mm(cam.dist), half: mm(cam.half), proj: cam.proj }
-      })()
+      })(),
+      schedules: dev.schedules ? await dev.schedules.state() : null
     }
   }
 })()`
@@ -478,13 +532,27 @@ const lastAssistant = `(() => {
   return null
 })()`
 
-async function runTurn(js, kase, truth) {
+/**
+ * One user turn of a case — the case itself, or one of its earlier `turns` (`turnsOf`), each
+ * `{ prompt, oracle, choice? }`. In one window, so every turn of a case is one conversation.
+ *
+ * `choice` (stage 2) is a quick reply the user clicks before the turn's text is sent — the
+ * IFC+SG question's Yes or No — through `window.__sgvueDev.chat.choose`, which a stage-2 build
+ * provides; a case that has one is n/a on any earlier build, so it is never reached there.
+ */
+async function runTurn(js, turn, truth) {
   if (ARGS.mode === 'null') return nullTurn()
+  if (turn.choice !== undefined) {
+    if (!(await js('typeof window.__sgvueDev.chat.choose === "function"'))) {
+      throw new Error('this build has no window.__sgvueDev.chat.choose, which a case with a quick reply needs')
+    }
+    await js(`window.__sgvueDev.chat.choose(${JSON.stringify(turn.choice)})`)
+  }
   if (ARGS.mode === 'oracle') {
-    const { calls, reply } = oracleTurn(kase, truth)
+    const { calls, reply } = oracleTurn(turn, truth)
     const out = await jsonOf(
       js,
-      `window.__sgvueDev.chat.turn(${JSON.stringify(kase.prompt)}, ${JSON.stringify(calls)}, ${JSON.stringify(reply)})`
+      `window.__sgvueDev.chat.turn(${JSON.stringify(turn.prompt)}, ${JSON.stringify(calls)}, ${JSON.stringify(reply)})`
     )
     return {
       reply,
@@ -497,7 +565,7 @@ async function runTurn(js, kase, truth) {
   }
   // Live: the panel's own path, recorded.
   await js('window.__sgvueDev.chat.record(true)')
-  await js(`window.__sgvueDev.chat.send(${JSON.stringify(kase.prompt)})`)
+  await js(`window.__sgvueDev.chat.send(${JSON.stringify(turn.prompt)})`)
   const record = await jsonOf(js, 'window.__sgvueDev.chat.recorded()')
   const log = await jsonOf(js, 'window.__sgvueDev.chat.log()')
   const msg = await jsonOf(js, lastAssistant)
@@ -535,6 +603,8 @@ async function runCase(kase, rep, caps, settings) {
   const started = Date.now()
   const { win, js } = await openFixture(kase.fixture)
   try {
+    // A Schedules window for the cases that need one: the stand-in joins before the setup runs.
+    if (kase.harness && kase.harness.schedules) await js('window.__sgvueDev.schedules.attach()')
     for (const step of kase.setup || []) {
       await jsonOf(
         js,
@@ -542,13 +612,24 @@ async function runCase(kase, rep, caps, settings) {
       )
     }
     const truth = await collectTruth(kase, probesIn(js))
-    const before = await readView(js)
-    const turn = await runTurn(js, kase, truth)
-    const after = await readView(js)
-
-    const message =
-      turn.index >= 0 ? await jsonOf(js, `window.__sgvueDev.chat.messages()[${turn.index}]`) : null
-    const obs = observation(turn, before, after, message)
+    const start = await readView(js)
+    // Every user turn in order, one conversation; the last is the case's own.
+    const all = turnsOf(kase)
+    const earlier = []
+    let before = start
+    let turn = null
+    let after = start
+    let message = null
+    for (let i = 0; i < all.length; i++) {
+      turn = await runTurn(js, all[i], truth)
+      after = await readView(js)
+      message = turn.index >= 0 ? await jsonOf(js, `window.__sgvueDev.chat.messages()[${turn.index}]`) : null
+      if (i < all.length - 1) {
+        earlier.push(observation(turn, before, after, message))
+        before = after
+      }
+    }
+    const obs = withEarlier(observation(turn, before, after, message), earlier, start)
 
     // The scope guard's Apply button, clicked only where the case says the user would.
     if (kase.applyPending && obs.store.pending && turn.index >= 0) {
@@ -562,7 +643,7 @@ async function runCase(kase, rep, caps, settings) {
       return t ? t.kind : 'unknown'
     }
     const graded = gradeCase(kase, obs, truth, kindOf)
-    const cost = turnCost(turn.usage, turn.model || settings.model, settings.cacheOneHour)
+    const cost = turnCost(obs.usage, turn.model || settings.model, settings.cacheOneHour)
     return {
       obs,
       truth,
@@ -602,10 +683,20 @@ function traceOf(kase, obs, truth) {
         `group: ${kase.group}\n` +
         (kase.setup ? `setup: ${kase.setup.map((s) => s.tool).join(', ')}\n` : '') +
         `ground truth (computed at grade time):\n${pretty(truth)}\n` +
-        `view before the turn:\n${pretty(obs.viewBefore)}`
+        `view before the ${obs.earlier ? 'first ' : ''}turn:\n${pretty(obs.viewStart || obs.viewBefore)}`
     },
-    { role: 'user', content: kase.prompt }
   ]
+  // A conversation's earlier turns first, each with its own calls and reply.
+  turnsOf(kase).slice(0, -1).forEach((t, i) => {
+    const e = (obs.earlier || [])[i] || { calls: [], reply: '' }
+    turns.push({ role: 'user', content: t.prompt + (t.choice ? `  (quick reply: ${t.choice})` : '') })
+    for (const c of e.calls) {
+      turns.push({ role: 'tool_call', name: c.name, content: pretty(c.input) })
+      turns.push({ role: 'tool_result', content: c.ok ? pretty(c.result) : `ERROR: ${c.error}` })
+    }
+    turns.push({ role: 'assistant', content: e.reply || '(no reply)' })
+  })
+  turns.push({ role: 'user', content: kase.prompt })
   for (const c of obs.calls) {
     turns.push({ role: 'tool_call', name: c.name, content: pretty(c.input) })
     turns.push({ role: 'tool_result', content: c.ok ? pretty(c.result) : `ERROR: ${c.error}` })
@@ -636,6 +727,22 @@ function summarise(rows, naRows, errorRows) {
     byGroup.set(g, acc)
   }
   const cost = runCost(scored)
+  /*
+   * 2026-11-08 — what each case actually cost, over its runs: the owner's measured cost per
+   * case, beside the estimate the run printed before it started (`metrics.json` `estimate`).
+   */
+  const byCase = {}
+  for (const r of scored) {
+    const c = (byCase[r.prompt_id] = byCase[r.prompt_id] || { runs: 0, pass: 0, turns: 0, rows: [] })
+    c.runs++
+    c.pass += r.grade.pass === 1 ? 1 : 0
+    c.turns += r.turns || 1
+    c.rows.push(r)
+  }
+  for (const [id, c] of Object.entries(byCase)) {
+    const k = runCost(c.rows)
+    byCase[id] = { runs: c.runs, pass: c.pass, turns: c.turns, tokens: k.tokens, cost_usd: k.usd == null ? null : Number(k.usd.toFixed(6)) }
+  }
   return {
     rows: rows.length + naRows.length,
     scored: scored.length,
@@ -647,7 +754,8 @@ function summarise(rows, naRows, errorRows) {
     by_group: Object.fromEntries([...byGroup].map(([g, v]) => [g, { n: v.n, pass: v.pass }])),
     tokens: cost.tokens,
     cost_usd: cost.usd,
-    unpriced: cost.unpriced
+    unpriced: cost.unpriced,
+    by_case: byCase
   }
 }
 
@@ -697,7 +805,25 @@ app.whenReady().then(async () => {
 
   const fixtures = [...new Set(cases.map((c) => c.fixture))]
   console.log(`\nai-eval — ${ARGS.mode} run`)
-  console.log(`  cases        ${cases.length} × ${ARGS.reps} rep(s)`)
+  // How many times each case runs: --reps for all of them, else its own count (`runsOf`), and a
+  // pilot once each — its point is the first measured cost, not an error bar.
+  const repsOf = (kase) => (ARGS.reps !== null ? ARGS.reps : ARGS.pilot ? 1 : runsOf(kase))
+  const plan = cases
+    .filter((c) => !missingCapabilities(c.requires, have))
+    .map((c) => ({ id: c.id, runs: repsOf(c), turns: turnsOf(c).length }))
+  const estimate = estimateRun(plan, settings.model, measuredTurn(readRows()))
+  const tripled = plan.filter((p) => p.runs > 1).length
+  console.log(
+    `  cases        ${cases.length} (${plan.length} scorable) · ${estimate.runs} run(s)` +
+      (ARGS.reps !== null ? ` — ${ARGS.reps} each (--reps)` : ARGS.pilot ? ' — once each (pilot)' : ` — ${tripled} case(s) run ${Math.max(1, ...plan.map((p) => p.runs))}×, the rest once`) +
+      ` · ${estimate.turns} user turn(s)`
+  )
+  console.log(
+    `  estimate     ~${(estimate.inTokens / 1e6).toFixed(2)} M in / ~${(estimate.outTokens / 1e6).toFixed(3)} M out tokens · ` +
+      `${money(estimate.usdList)} at list prices with no cache discount` +
+      (estimate.usdMeasured == null ? '' : ` · ${money(estimate.usdMeasured)} at the measured cost per turn`) +
+      `\n               (${estimate.basis}${LIVE ? '' : '; this mode makes no request'})`
+  )
   console.log(`  fixture      ${MODEL_PATH ? `REAL MODEL ${basename(MODEL_PATH)}` : fixtures.join(', ')}`)
   console.log(`  build        ${APP_OUT}`)
   console.log(`  capabilities ${have.join(', ')}`)
@@ -711,7 +837,7 @@ app.whenReady().then(async () => {
   }
   if (LIVE) {
     console.log(
-      `\n  LIVE: ${cases.length * ARGS.reps} turns against ${settings.model} will be billed to the key in your\n` +
+      `\n  LIVE: ${estimate.turns} turns against ${settings.model} will be billed to the key in your\n` +
         '  environment. The first honest cost figure comes from the pilot — see docs/AI_EVAL.md.'
     )
   }
@@ -723,7 +849,7 @@ app.whenReady().then(async () => {
   const errorRows = []
 
   for (const kase of cases) {
-    for (let rep = 0; rep < ARGS.reps; rep++) {
+    for (let rep = 0; rep < repsOf(kase); rep++) {
       const missing = missingCapabilities(kase.requires, have)
       const prior = already.get(`${kase.id}\u0000${rep}`)
       if (prior !== undefined) {
@@ -753,7 +879,7 @@ app.whenReady().then(async () => {
         }
         appendFileSync(RESULTS, JSON.stringify(row) + '\n')
         naRows.push(row)
-        console.log(`  n/a ${kase.id} — needs ${missing.join(', ')}`)
+        console.log(`  n/a ${kase.id} — ${whyMissing(missing)}`)
         continue
       }
 
@@ -857,7 +983,10 @@ app.whenReady().then(async () => {
         failure_class: cls,
         latency_s: Number(out.latency_s.toFixed(2)),
         rounds: (out.obs.outcome && out.obs.outcome.rounds) || 0,
-        tool_calls: out.obs.calls.length,
+        tool_calls: out.obs.calls.length + (out.obs.earlier || []).reduce((n, e) => n + e.calls.length, 0),
+        // 2026-11-08: a conversation's user turns, and each one's own usage beside the summed one.
+        turns: turnsOf(kase).length,
+        ...(out.obs.earlier && usage ? { usage_turns: [...out.obs.earlier.map((e) => e.usage), out.obs.usageLast] } : {}),
         meta: {
           mode: ARGS.mode,
           fixture: kase.fixture,
@@ -884,7 +1013,7 @@ app.whenReady().then(async () => {
     }
   }
 
-  const summary = summarise(rows, naRows, errorRows)
+  const summary = { ...summarise(rows, naRows, errorRows), estimate }
   writeFileSync(join(VDIR, 'metrics.json'), JSON.stringify(summary, null, 2) + '\n')
 
   console.log(`\n── ${ARGS.mode} run, ${ARGS.flow}/${ARGS.variant}`)
@@ -903,6 +1032,10 @@ app.whenReady().then(async () => {
         `${summary.tokens.cacheRead} cache-read / ${summary.tokens.cacheWrite} cache-write tokens` +
         (summary.unpriced ? `  (${summary.unpriced} row(s) had no rate card)` : '')
     )
+    console.log(`   estimated  ${money(estimate.usdList)} before the run (${estimate.basis})`)
+    for (const [id, c] of Object.entries(summary.by_case)) {
+      console.log(`     ${id.padEnd(30)} ${c.runs} run(s)  ${money(c.cost_usd)}`)
+    }
   }
 
   guard.sample('done')

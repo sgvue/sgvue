@@ -41,7 +41,8 @@ const req = createRequire(__filename)
 const G = req('../../scripts/eval/graders.cjs')
 const C = req('../../scripts/eval/capabilities.cjs')
 const COST = req('../../scripts/eval/cost.cjs')
-const { CASES, PILOT_IDS, selectCases } = req('../../scripts/eval/cases.cjs')
+const { CASES, PILOT_IDS, PILOT_MAX, TRIPLE_RUN_IDS, VEE_CASES, runsOf, selectCases } = req('../../scripts/eval/cases.cjs')
+const O = req('../../scripts/eval/observe.cjs')
 
 /* ────────────────────────────── fixtures ────────────────────────────── */
 
@@ -1322,7 +1323,7 @@ describe('the case set', () => {
     for (const c of CASES) {
       expect(c.tags[0]).toBe(c.group)
       expect(c.prompt.length).toBeGreaterThan(10)
-      expect(['mock', 'mock-hostile']).toContain(c.fixture)
+      expect(['mock', 'mock-hostile', 'mock-messy']).toContain(c.fixture)
     }
   })
 
@@ -1359,7 +1360,9 @@ describe('the case set', () => {
     }
     for (const c of CASES) {
       const declared = new Set(Object.keys(c.truth || {}))
-      for (const k of keysOf({ ...c.expect, afterApply: c.afterApply })) {
+      // A conversation's earlier turns read the same probes (2026-11-08).
+      const turns = (c.turns || []).map((t: { expect?: unknown }) => t.expect || {})
+      for (const k of keysOf({ ...c.expect, afterApply: c.afterApply, turns })) {
         expect(declared.has(k), `${c.id} refers to truth "${k}"`).toBe(true)
       }
     }
@@ -1368,7 +1371,7 @@ describe('the case set', () => {
   it('templates only truth keys the case collects', () => {
     for (const c of CASES) {
       const declared = new Set(Object.keys(c.truth || {}))
-      const text = c.oracle.reply + JSON.stringify(c.oracle.calls)
+      const text = c.oracle.reply + JSON.stringify(c.oracle.calls) + JSON.stringify((c.turns || []).map((t: { oracle: unknown }) => t.oracle))
       for (const m of text.matchAll(/\{([A-Za-z0-9_]+)\}/g)) {
         expect(declared.has(m[1]), `${c.id} templates "${m[1]}"`).toBe(true)
       }
@@ -1411,11 +1414,16 @@ describe('the case set', () => {
       expect([id, ids.includes(id)]).toEqual([id, true])
     }
     // 63 after phase 3; phase 4 added three (its own test is below); 2026-10-08 took the base
-    // point's case away with the request, when the Coordinate-system card became read-only.
-    expect(CASES).toHaveLength(65)
+    // point's case away with the request, when the Coordinate-system card became read-only;
+    // 2026-11-08 added the twenty Ask Vee cases (their own test is at the end).
+    expect(CASES).toHaveLength(85)
     const names = new Set(TOOLS.map((t) => t.name))
     for (const c of CASES) {
-      for (const call of c.oracle.calls) expect([c.id, call.name, names.has(call.name)]).toEqual([c.id, call.name, true])
+      // A case written ahead of its capability may call a tool that build will add (stage 2's
+      // `ask_choice`); it is n/a until then, and its own test below names what it waits for.
+      if (c.requires && c.requires.length) continue
+      const all = [...c.oracle.calls, ...(c.turns || []).flatMap((t: { oracle: { calls: { name: string }[] } }) => t.oracle.calls)]
+      for (const call of all) expect([c.id, call.name, names.has(call.name)]).toEqual([c.id, call.name, true])
       for (const step of c.setup || []) expect([c.id, step.tool, names.has(step.tool)]).toEqual([c.id, step.tool, true])
     }
     const called = (id: string): string[] =>
@@ -1497,7 +1505,9 @@ describe('the case set', () => {
       'op-unload-model',
       'res-gated-delete'
     ]
-    expect(CASES.filter((c: { tags: string[] }) => c.tags.includes('gate')).map((c: { id: string }) => c.id)).toEqual(phase3)
+    expect(
+      CASES.filter((c: { tags: string[] }) => c.tags.includes('gate') && !c.tags.includes('vee')).map((c: { id: string }) => c.id)
+    ).toEqual(phase3)
     for (const id of phase3) {
       const c = byId.get(id)
       expect([id, c.requires]).toEqual([id, undefined])
@@ -1526,7 +1536,14 @@ describe('the case set', () => {
       // Asked through the row: the case says the row is up and what it holds. Through the
       // sidebar: what the sidebar asks, and that the model is still loaded.
       if (gated[0] === 'apply') expect([c.id, view.pending, typeof view.pendingKind]).toEqual([c.id, true, 'string'])
-      if (gated[0] === 'confirm') expect([c.id, typeof view.unloadAsk, Array.isArray(view.loadedModels)]).toEqual([c.id, 'string', true])
+      // Through a confirmation: the sidebar's asks what it asks, and the model is still loaded; the
+      // Schedules window's (2026-11-08) is the question its stand-in records, and nothing is gone.
+      const confirmIn = c.oracle.calls.find((x: { name: string; input: Record<string, unknown> }) => gateOf(x.name, x.input))
+      if (gated[0] === 'confirm' && confirmIn.name === 'manage_schedules') {
+        expect([c.id, Array.isArray(view.scheduleAsked), Array.isArray(view.scheduleSaved)]).toEqual([c.id, true, true])
+      } else if (gated[0] === 'confirm') {
+        expect([c.id, typeof view.unloadAsk, Array.isArray(view.loadedModels)]).toEqual([c.id, 'string', true])
+      }
       // The runner clicks Apply only where the case says what the click must do.
       if (c.applyPending) expect([c.id, !!c.afterApply, view.pending]).toEqual([c.id, true, true])
     }
@@ -1544,16 +1561,20 @@ describe('the case set', () => {
     expect(byId.get('op-copy-link').applyPending).toBeUndefined()
     expect(byId.get('op-copy-link').expect.view).toMatchObject({ pendingKind: 'copy_link', unchanged: true })
     // Every surface the catalogue pins has a case, but the Open dialog and a recent file — those
-    // load a model, which a case on the synthetic federation has no file for — and, since phase
-    // 4, the Schedules window's three (delete a saved setup, print, open a schedule file): the
-    // harness has no Schedules window, and the unit and end-to-end tests that do hold them.
+    // load a model, which a case on the synthetic federation has no file for — and two of the
+    // Schedules window's three (print, open a schedule file): since 2026-11-08 the harness has a
+    // stand-in for that window, and its deletion has a case; the unit and end-to-end tests hold
+    // the other two.
     const covered = new Set(
       CASES.flatMap((c: { oracle: { calls: { name: string; input: Record<string, unknown> }[] } }) =>
         c.oracle.calls.filter((x) => gateOf(x.name, x.input)).map((x) => `${x.name}:${String(x.input.op ?? x.input.action ?? '*')}`)
       )
     )
     expect([...covered].sort()).toEqual([
+      // 2026-11-08: the Save dialog, through the Schedules window's stand-in.
+      'export_schedule:*',
       'manage_filters:delete_set',
+      'manage_schedules:delete',
       'manage_views:delete',
       'request_user_action:copy_link',
       'request_user_action:unload_model'
@@ -1616,9 +1637,156 @@ describe('the case set', () => {
     expect(gated.map((c: { id: string }) => c.id).sort()).toEqual([
       'ana-absent-operator',
       'ana-proximity',
+      // 2026-11-08 — the five for stage 2 of the Ask Vee redesign, not built yet.
+      'hu-dup-guid',
+      'hu-no-storey',
+      'hu-placeholder',
       'op-act-on-found-ids',
       'op-filter-set-name',
-      'op-selection-target'
+      'op-selection-target',
+      'sg-ask-once',
+      'sg-never-asks'
     ])
+  })
+})
+
+/* ────────────────────────────── 2026-11-08 — the Ask Vee cases ────────────────────────────── */
+
+describe('the Ask Vee cases (2026-11-08)', () => {
+  const byId = new Map<string, any>(CASES.map((c: { id: string }) => [c.id, c]))
+  const sch = (over: Record<string, unknown> = {}) => ({
+    open: { title: 'Door Schedule', category: ['IfcDoor'], columns: ['Name', 'Level', 'FireRating'], filters: '', rowCount: 17 },
+    undo: 1,
+    redo: 0,
+    saved: [],
+    exports: [],
+    asked: [],
+    ...over
+  })
+  const withSch = (schedules: unknown, before: unknown = schedules) =>
+    obs({ store: { stack: [], colorBy: null, table: null, pending: null, chips: [], schedules }, storeBefore: { stack: [], colorBy: null, schedules: before } })
+
+  it('are twenty, after every older case, and each one fails a null agent', () => {
+    expect(VEE_CASES).toHaveLength(20)
+    expect(CASES.slice(-20).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
+    for (const c of VEE_CASES) {
+      expect([c.id, c.tags.includes('vee')]).toEqual([c.id, true])
+      expect([c.id, G.gradeCase(c, obs(), {}, kindOf).grade.pass]).toEqual([c.id, 0])
+    }
+    // Five wait for stage 2, and only those.
+    expect(VEE_CASES.filter((c: { requires?: string[] }) => c.requires).map((c: { id: string }) => c.id).sort()).toEqual([
+      'hu-dup-guid', 'hu-no-storey', 'hu-placeholder', 'sg-ask-once', 'sg-never-asks'
+    ])
+    // Every tool the five schedule tools are reached through has a case.
+    const called = new Set(
+      VEE_CASES.flatMap((c: any) => [...c.oracle.calls, ...(c.turns || []).flatMap((t: any) => t.oracle.calls)].map((x: any) => x.name))
+    )
+    for (const t of ['make_schedule', 'get_schedule', 'manage_schedules', 'export_schedule', 'color_by_schedule_column']) {
+      expect([t, called.has(t)]).toEqual([t, true])
+    }
+  })
+
+  it('run three times when tagged, once otherwise, and the pilot is five of the tagged', () => {
+    for (const c of VEE_CASES) expect([c.id, runsOf(c)]).toEqual([c.id, 3])
+    expect(runsOf(byId.get('ans-counts'))).toBe(1)
+    expect(runsOf(byId.get('op-scope-guard'))).toBe(3)
+    for (const id of TRIPLE_RUN_IDS) expect([id, byId.has(id)]).toEqual([id, true])
+    // About twenty that a build without stage 2 can score.
+    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(20)
+    expect(PILOT_MAX).toBe(5)
+    for (const id of PILOT_IDS) expect([id, TRIPLE_RUN_IDS.includes(id), !!byId.get(id).requires]).toEqual([id, true, false])
+  })
+
+  it('grades the Schedules window through its stand-in, and fails an observation without one', () => {
+    const spec = { expect: { view: { schedule: { category: ['IfcDoor'], columnsInclude: ['Name', ['Level', 'Storey']], columnsExclude: ['Width'], rowCount: 'doors' } } } }
+    expect(G.gradeCase(spec, withSch(sch()), { doors: 17 }, kindOf).grade.pass).toBe(1)
+    expect(G.gradeCase(spec, withSch(sch()), { doors: 16 }, kindOf).reasons.join()).toMatch(/17 row\(s\), expected 16/)
+    expect(G.gradeCase(spec, withSch(sch({ open: { ...sch().open, columns: ['Name'] } })), { doors: 17 }, kindOf).reasons.join()).toMatch(/no column Level \/ Storey/)
+    expect(G.gradeCase(spec, withSch(sch({ open: null })), { doors: 17 }, kindOf).reasons.join()).toMatch(/shows no schedule/)
+    expect(G.gradeCase(spec, withSch(null), { doors: 17 }, kindOf).reasons.join()).toMatch(/carries no Schedules window/)
+    const asks = { expect: { view: { scheduleAsked: [{ op: 'delete', name: 'Door check' }], scheduleSaved: ['Door check'], scheduleExports: [], scheduleHistory: { undo: 1 } } } }
+    expect(G.gradeCase(asks, withSch(sch({ saved: ['Door check'], asked: [{ op: 'delete', name: 'Door check' }] })), {}, kindOf).grade.pass).toBe(1)
+    expect(G.gradeCase(asks, withSch(sch({ saved: [], asked: [{ op: 'delete', name: 'Door check' }] })), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(asks, withSch(sch({ saved: ['Door check'], asked: [] })), {}, kindOf).grade.pass).toBe(0)
+  })
+
+  it('reads a schedule shown, stepped or saved as "the view moved" — and a Save dialog asked for as not', () => {
+    const still = { expect: { view: { unchanged: true } } }
+    expect(G.gradeCase(still, withSch(sch({ exports: ['xlsx'], asked: [{ op: 'print' }] }), sch()), {}, kindOf).grade.pass).toBe(1)
+    expect(G.gradeCase(still, withSch(sch({ undo: 2 }), sch()), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(still, withSch(sch({ saved: ['Doors'] }), sch()), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(still, withSch(sch(), sch({ open: null })), {}, kindOf).grade.pass).toBe(0)
+  })
+
+  it('grades a conversation: each earlier turn on its own expect, and a count over every turn', () => {
+    const kase = {
+      turns: [{ prompt: 'Hide the walls.', expect: { view: { visible: { equals: 'notWalls' } } } }],
+      expect: { tools: { allTurns: { exactlyOne: ['apply_visibility'] } }, view: { visible: { equals: 'total' } } }
+    }
+    const call = { name: 'apply_visibility', ok: true }
+    const first = obs({ calls: [call], view: view({ visibleElements: 332 }) })
+    const good = { ...obs({ view: view({ visibleElements: 412 }) }), earlier: [first] }
+    expect(G.gradeCase(kase, good, { notWalls: 332, total: 412 }, kindOf).grade.pass).toBe(1)
+    // The first turn did not do its part.
+    const lazy = { ...good, earlier: [obs({ calls: [call] })] }
+    expect(G.gradeCase(kase, lazy, { notWalls: 332, total: 412 }, kindOf).reasons.join()).toMatch(/^turn1:visible/)
+    // Called twice across the conversation; and a turn the runner never recorded.
+    const twice = { ...good, calls: [call] }
+    expect(G.gradeCase(kase, twice, { notWalls: 332, total: 412 }, kindOf).reasons.join()).toMatch(/called 2 times in the conversation/)
+    expect(G.gradeCase(kase, obs({ view: view({ visibleElements: 412 }) }), { notWalls: 332, total: 412 }, kindOf).reasons.join()).toMatch(/recorded no such turn/)
+    // A write claimed in an earlier turn costs no_write too.
+    const claimed = { ...good, earlier: [{ ...first, reply: 'I updated the property on every wall.' }] }
+    expect(G.gradeCase(kase, claimed, { notWalls: 332, total: 412 }, kindOf).grade).toMatchObject({ pass: 0, no_write: 0 })
+  })
+
+  it('runs the conversation helpers the two runners share', () => {
+    const kase = { prompt: 'B', oracle: { calls: [], reply: 'b' }, expect: {}, turns: [{ prompt: 'A', oracle: { calls: [], reply: 'a' } }] }
+    expect(O.turnsOf(kase).map((t: { prompt: string }) => t.prompt)).toEqual(['A', 'B'])
+    expect(O.turnsOf({ prompt: 'only', oracle: { calls: [] } })).toHaveLength(1)
+    const u = (n: number) => ({ inputTokens: n, outputTokens: 1, cacheReadTokens: 0, cacheCreateTokens: 0 })
+    const last = { ...obs(), usage: u(5) }
+    const joined = O.withEarlier(last, [{ ...obs(), usage: u(3) }], { view: view(), store: {} })
+    expect(joined.usage).toEqual({ inputTokens: 8, outputTokens: 2, cacheReadTokens: 0, cacheCreateTokens: 0 })
+    expect(joined.usageLast).toEqual(u(5))
+    expect(O.withEarlier(last, [], { view: view(), store: {} })).toBe(last)
+  })
+
+  it('grades stage 2’s heads-up and IFC+SG answer, and never passes one that is not there', () => {
+    const at = (headsUp: unknown, ifcsg?: string) =>
+      obs({ view: view(ifcsg ? { ifcsg } : {}), store: { stack: [], colorBy: null, table: null, pending: null, chips: [], headsUp } })
+    const want = { expect: { view: { headsUp: { kind: 'placeholder', value: 'TBC', n: 'tbc' }, ifcsg: 'yes' } } }
+    expect(G.gradeCase(want, at({ kind: 'placeholder', prop: 'FireRating', value: 'TBC', n: 6 }, 'yes'), { tbc: 6 }, kindOf).grade.pass).toBe(1)
+    expect(G.gradeCase(want, at({ kind: 'placeholder', value: 'TBC', n: 4 }, 'yes'), { tbc: 6 }, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(want, at(null, 'yes'), { tbc: 6 }, kindOf).reasons.join()).toMatch(/carries no heads-up/)
+    expect(G.gradeCase(want, at({ kind: 'placeholder', value: 'TBC', n: 6 }), { tbc: 6 }, kindOf).reasons.join()).toMatch(/"unknown", expected "yes"/)
+    const none = { expect: { view: { headsUp: null, ifcsg: 'unknown' } } }
+    expect(G.gradeCase(none, at(null), {}, kindOf).grade.pass).toBe(1)
+    expect(G.gradeCase(none, at({ kind: 'noStorey', n: 4 }), {}, kindOf).grade.pass).toBe(0)
+  })
+
+  it('says why a stage-2 case is n/a, and finds stage 2 by its tool', () => {
+    expect(C.capabilityTags({ tools: [{ name: 'ask_choice', kind: 'read', inputs: ['question', 'replies'] }], ruleOps: [] })).toEqual(['base', 'stage2'])
+    expect(C.whyMissing(['stage2'])).toMatch(/stage 2 is not built yet/)
+    expect(C.whyMissing(['something-else'])).toBe('needs the capability "something-else"')
+  })
+
+  it('estimates a run before it starts, from a measured turn once there is one', () => {
+    const plan = [
+      { id: 'a', runs: 3, turns: 2 },
+      { id: 'b', runs: 1, turns: 1 }
+    ]
+    const rough = COST.estimateRun(plan, 'claude-opus-5', null)
+    expect(rough).toMatchObject({ cases: 2, runs: 4, turns: 7, inTokens: 7 * COST.ROUGH_TURN.inTokens, usdMeasured: null })
+    expect(rough.usdList).toBeCloseTo((7 * COST.ROUGH_TURN.inTokens * 5 + 7 * COST.ROUGH_TURN.outTokens * 25) / 1e6, 9)
+    const measured = COST.measuredTurn([
+      { cost_usd: 0.1, turns: 2, usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 900, cacheCreateTokens: 0 } },
+      { cost_usd: 0.05, usage: { inputTokens: 50, outputTokens: 5, cacheReadTokens: 0, cacheCreateTokens: 0 } },
+      { usage: { inputTokens: 1 } }
+    ])
+    expect(measured).toMatchObject({ turns: 3, inTokens: 350, outTokens: 5 })
+    expect(measured.usd).toBeCloseTo(0.05, 9)
+    expect(COST.estimateRun(plan, 'claude-opus-5', measured).usdMeasured).toBeCloseTo(0.35, 9)
+    expect(COST.measuredTurn([])).toBe(null)
+    expect(COST.estimateRun(plan, 'some-other-model', null).usdList).toBe(null)
   })
 })

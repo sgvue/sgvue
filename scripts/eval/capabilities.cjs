@@ -22,8 +22,31 @@ const CAPABILITY_TAGS = {
   'selection-target': 'A tool can act on, or rule against, the current selection.',
   'op-absent': 'The rule grammar can say "this property has no value".',
   'filter-sets': 'A tool can save the current stack under a name and recall it.',
-  proximity: 'A tool answers "what is within N metres of this" without hand-written SQL.'
+  proximity: 'A tool answers "what is within N metres of this" without hand-written SQL.',
+  /**
+   * 2026-11-08 — stage 2 of the Ask Vee redesign (`prototypes/vee-messages/full/HANDOFF.md`
+   * §2, §8, §9): the app-computed heads-up line under a reply, and asking "Is this model for an
+   * IFC+SG submission?" once, only when relevant. Detected by the one catalogue fact stage 2
+   * adds, its read tool `ask_choice` (§8.3); the heads-up ships with it. If the two ever land
+   * apart, this tag is split in two.
+   */
+  stage2: 'Stage 2 of the Ask Vee redesign: the heads-up line and the IFC+SG question (detected by an ask_choice tool).'
 }
+
+/**
+ * Why a case is n/a, in words a reader of the run can act on — printed beside each skipped case
+ * by the runner and the offline test (2026-11-08). A tag with no entry is said by its name.
+ */
+const REQUIRES_WHY = {
+  stage2:
+    'Ask Vee stage 2 is not built yet — the heads-up line from app-computed observations and the ' +
+    'ask-once IFC+SG question (prototypes/vee-messages/full/HANDOFF.md §2, §8, §9). The case turns ' +
+    'on by itself the day the catalogue has ask_choice.'
+}
+
+/** One sentence for a case's missing capabilities. */
+const whyMissing = (missing) =>
+  (missing || []).map((tag) => REQUIRES_WHY[tag] || `needs the capability "${tag}"`).join(' ')
 
 /** The view tools an id list would have to reach to be worth anything. */
 const ID_TARGETS = ['select_elements', 'apply_visibility', 'color_by_property', 'set_filter_stack']
@@ -75,6 +98,7 @@ function capabilityTags(snapshot) {
     tags.add('filter-sets')
   }
   if (names.some((n) => /near|nearby|proximity|within/i.test(n))) tags.add('proximity')
+  if (names.includes('ask_choice')) tags.add('stage2')
 
   return [...tags].sort()
 }
@@ -86,4 +110,4 @@ function missingCapabilities(requires, have) {
   return missing.length ? missing : null
 }
 
-module.exports = { CAPABILITY_TAGS, ID_TARGETS, capabilityTags, missingCapabilities }
+module.exports = { CAPABILITY_TAGS, ID_TARGETS, REQUIRES_WHY, capabilityTags, missingCapabilities, whyMissing }

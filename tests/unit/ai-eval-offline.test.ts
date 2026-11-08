@@ -2,7 +2,7 @@
  * The assistant's eval suite, offline: the oracle scores 100 % and the null agent 0 %, on every
  * push (2026-11-07, core protection #11).
  *
- * `scripts/ai-eval.cjs` grades the assistant on 65 cases with pure graders (`eval/graders.cjs`)
+ * `scripts/ai-eval.cjs` grades the assistant on 85 cases (80 scorable today) with pure graders (`eval/graders.cjs`)
  * and has two offline modes that make no request: `--dry-run`, the **oracle**, replays each case's
  * ideal tool sequence and reply and must score 100 % — the proof that the tools, the graders and
  * the ground truth agree about what "right" means — and `--null`, an agent that does nothing,
@@ -35,7 +35,13 @@
  *  - Nothing is billed and nothing is written: no results directory, no trace.
  *
  * A case the build cannot run yet (`requires`) is n/a here as there, by the same
- * `missingCapabilities` over the same catalogue facts.
+ * `missingCapabilities` over the same catalogue facts — and since 2026-11-08 each one shows as
+ * a skipped test with its reason (`whyMissing`), so it cannot go quietly missing either.
+ *
+ * 2026-11-08, the Ask Vee eval cases: a case may be a conversation (`turns`, every turn through
+ * `runTurnOnce` in order, as the window's `chat.turn` takes them), may run on the messy fixture
+ * (`dev/messy.ts`), and may need a Schedules window — the same dev stand-in the window's
+ * `__sgvueDev.schedules` joins (`dev/schedules-standin.ts`), joined here before the setup runs.
  */
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -48,6 +54,8 @@ import { readoutCoords, toMap } from '../../src/shared/georef'
 import { RULES, TOOLS } from '../../src/shared/tool-schemas'
 import { runToolOnce, runTurnOnce } from '../../src/renderer/ai/bridge'
 import { HOSTILE_OPTIONS } from '../../src/renderer/dev/hostile'
+import { MESSY_OPTIONS } from '../../src/renderer/dev/messy'
+import { attachScheduleStandIn, detachScheduleStandIn, scheduleStandInState } from '../../src/renderer/dev/schedules-standin'
 import { SAMPLE_FILES, mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { federation as fed } from '../../src/renderer/model/federation-store'
 import { modelRows } from '../../src/renderer/state/selectors/models'
@@ -63,11 +71,13 @@ type Json = Record<string, unknown>
 interface Kase extends Json {
   id: string
   group: string
-  fixture: 'mock' | 'mock-hostile'
+  fixture: 'mock' | 'mock-hostile' | 'mock-messy'
   prompt: string
   requires?: string[]
   setup?: { tool: string; input?: Json }[]
   applyPending?: boolean
+  harness?: { schedules?: boolean }
+  turns?: Json[]
 }
 interface Graded {
   grade: { pass: number }
@@ -77,9 +87,10 @@ const { CASES } = req('../../scripts/eval/cases.cjs') as { CASES: Kase[] }
 const { gradeCase } = req('../../scripts/eval/graders.cjs') as {
   gradeCase: (kase: Kase, obs: Json, truth: Json, kindOf: (name: string) => string) => Graded
 }
-const { capabilityTags, missingCapabilities } = req('../../scripts/eval/capabilities.cjs') as {
+const { capabilityTags, missingCapabilities, whyMissing } = req('../../scripts/eval/capabilities.cjs') as {
   capabilityTags: (snapshot: Json) => string[]
   missingCapabilities: (requires: string[] | undefined, have: string[]) => string[] | null
+  whyMissing: (missing: string[]) => string
 }
 type Turn = { reply: string; calls: Json[]; outcome: Json; usage: unknown; index: number }
 const O = req('../../scripts/eval/observe.cjs') as {
@@ -88,6 +99,8 @@ const O = req('../../scripts/eval/observe.cjs') as {
   nullTurn: () => Turn
   scriptedCalls: (calls: { name: string; input: Json }[], results: unknown[]) => Json[]
   observation: (turn: Turn, before: Snapshot, after: Snapshot, message: unknown) => Json & { store: Json }
+  turnsOf: (kase: Kase) => (Json & { prompt: string; choice?: string })[]
+  withEarlier: (obs: Json & { store: Json }, earlier: Json[], start: Snapshot) => Json & { store: Json }
 }
 
 const st = useShell.getState
@@ -97,7 +110,8 @@ const st = useShell.getState
 const KEYS = SAMPLE_FILES.map((f) => f.key)
 const FIXTURES: Record<Kase['fixture'], Federation> = {
   mock: federate(KEYS.map((k) => mockModelIndex(k))),
-  'mock-hostile': federate(KEYS.map((k) => mockModelIndex(k, HOSTILE_OPTIONS)))
+  'mock-hostile': federate(KEYS.map((k) => mockModelIndex(k, HOSTILE_OPTIONS))),
+  'mock-messy': federate(KEYS.map((k) => mockModelIndex(k, MESSY_OPTIONS)))
 }
 const databases = new Map<Kase['fixture'], Database>()
 
@@ -150,8 +164,12 @@ function viewer(): ReturnType<typeof rigViewer>['viewer'] {
   }).viewer
 }
 
-/** One case's fresh window: an empty `localStorage`, the store at its first state, the fixture loaded. */
-function open(fixture: Kase['fixture']): void {
+/**
+ * One case's fresh window: an empty `localStorage`, the store at its first state, the fixture
+ * loaded — and, for a case that needs one, a Schedules window (the stand-in), joined after it.
+ */
+function open(fixture: Kase['fixture'], schedules = false): void {
+  detachScheduleStandIn()
   vi.stubGlobal('localStorage', memoryStorage())
   resetShell()
   setViewer(viewer())
@@ -162,6 +180,7 @@ function open(fixture: Kase['fixture']): void {
   if (!db) throw new Error(`no database for ${fixture}`)
   // The app's SQL worker, answered in-process: the same `buildDatabase`, the same `runQuery`.
   fed.query = (statement: string) => Promise.resolve(runQuery(db, statement))
+  if (schedules) attachScheduleStandIn()
 }
 
 /* ────────────────────────────── reading the view (`VIEW_EXPR`) ────────────────────────────── */
@@ -170,10 +189,10 @@ function open(fixture: Kase['fixture']): void {
 const VIEW_FIELDS = [
   'filterStack', 'visibleElements', 'totalElements', 'hiddenManually', 'storeysShown', 'activeModel', 'view',
   'projection', 'section', 'selectedCount', 'display', 'modelsHidden', 'models', 'sectionPlanes', 'history',
-  'interface', 'camera', 'viewpoints', 'loadedModels', 'basePoint'
+  'interface', 'camera', 'viewpoints', 'loadedModels', 'basePoint', 'ifcsg'
 ] as const
 /** The store fields `VIEW_EXPR` reads, in its order. */
-const STORE_FIELDS = ['stack', 'filterSets', 'unloadAsk', 'colorBy', 'markups', 'pose'] as const
+const STORE_FIELDS = ['stack', 'filterSets', 'unloadAsk', 'colorBy', 'markups', 'pose', 'schedules'] as const
 
 interface Snapshot {
   view: Json
@@ -212,7 +231,8 @@ async function readView(): Promise<Snapshot> {
       measures: s.measures.map((m) => ({ id: m.id, x: mm(m.x), y: mm(m.y), z: mm(m.z), p: at(m.p) })),
       spots: s.spots.map((p) => ({ id: p.id, x: mm(p.x), y: mm(p.y), z: mm(p.z) }))
     },
-    pose: cam ? { target: cam.target.map((n) => mm(n)), dist: mm(cam.dist), half: mm(cam.half), proj: cam.proj } : null
+    pose: cam ? { target: cam.target.map((n) => mm(n)), dist: mm(cam.dist), half: mm(cam.half), proj: cam.proj } : null,
+    schedules: scheduleStandInState()
   }
   // JSON, as the window hands it over: `undefined` is not a value there.
   return JSON.parse(JSON.stringify({ view: Object.fromEntries(VIEW_FIELDS.map((k) => [k, view[k]])), store })) as Snapshot
@@ -220,30 +240,54 @@ async function readView(): Promise<Snapshot> {
 
 /* ────────────────────────────── running one case (`runCase`) ────────────────────────────── */
 
+/**
+ * A quick reply the user clicks before a turn's text is sent — stage 2's IFC+SG Yes / No. The
+ * window's runner calls `__sgvueDev.chat.choose`; here it is the store action a stage-2 build
+ * gives that hook, `chooseReply`. Only a stage-2 case has one, and those are n/a until then.
+ */
+function choose(value: string): void {
+  const act = (st() as unknown as { chooseReply?: (v: string) => void }).chooseReply
+  if (typeof act !== 'function') throw new Error('this build has no chooseReply, which a case with a quick reply needs')
+  act(value)
+}
+
 async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
-  open(kase.fixture)
+  open(kase.fixture, !!kase.harness?.schedules)
   for (const step of kase.setup || []) await runToolOnce(step.tool, step.input || {})
   const truth = await O.collectTruth(kase, {
     sql: (statement) => fed.query(statement),
     tool: (name, input) => runToolOnce(name, input)
   })
-  const before = await readView()
-  let turn: Turn
-  if (mode === 'null') turn = O.nullTurn()
-  else {
-    const { calls, reply } = O.oracleTurn(kase, truth)
-    const out = await runTurnOnce(kase.prompt, calls, reply)
-    turn = {
-      reply,
-      calls: O.scriptedCalls(calls, out.results),
-      outcome: { type: 'done', rounds: out.results.length ? 1 : 0 },
-      usage: null,
-      index: out.index
+  const start = await readView()
+  // Every user turn in order, one conversation; the last is the case's own.
+  const all = O.turnsOf(kase)
+  const earlier: Json[] = []
+  let before = start
+  let after = start
+  let turn: Turn = O.nullTurn()
+  let message: unknown = null
+  for (let i = 0; i < all.length; i++) {
+    if (mode === 'null') turn = O.nullTurn()
+    else {
+      if (all[i].choice !== undefined) choose(String(all[i].choice))
+      const { calls, reply } = O.oracleTurn(all[i] as Kase, truth)
+      const out = await runTurnOnce(all[i].prompt, calls, reply)
+      turn = {
+        reply,
+        calls: O.scriptedCalls(calls, out.results),
+        outcome: { type: 'done', rounds: out.results.length ? 1 : 0 },
+        usage: null,
+        index: out.index
+      }
+    }
+    after = await readView()
+    message = turn.index >= 0 ? JSON.parse(JSON.stringify(st().chatMsgs[turn.index])) : null
+    if (i < all.length - 1) {
+      earlier.push(O.observation(turn, before, after, message))
+      before = after
     }
   }
-  const after = await readView()
-  const message = turn.index >= 0 ? JSON.parse(JSON.stringify(st().chatMsgs[turn.index])) : null
-  const obs = O.observation(turn, before, after, message)
+  const obs = O.withEarlier(O.observation(turn, before, after, message), earlier, start)
   // The scope guard's Apply button, clicked only where the case says the user would.
   if (kase.applyPending && obs.store.pending && turn.index >= 0) {
     st().applyPending(turn.index)
@@ -258,6 +302,8 @@ async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
 
 const have = capabilityTags(capabilities)
 const scored = CASES.filter((k) => !missingCapabilities(k.requires, have))
+/** The cases that wait for stage 2 of the Ask Vee redesign (`capabilities.cjs`, `stage2`). */
+const STAGE2 = ['hu-placeholder', 'hu-no-storey', 'hu-dup-guid', 'sg-ask-once', 'sg-never-asks']
 
 beforeAll(async () => {
   const dist = dirname(req.resolve('sql.js'))
@@ -267,6 +313,7 @@ beforeAll(async () => {
   }
 })
 afterAll(() => {
+  detachScheduleStandIn()
   for (const db of databases.values()) db.close()
   setViewer(null)
   vi.unstubAllGlobals()
@@ -284,12 +331,22 @@ describe('the eval suite, offline', () => {
   })
 
   it('runs every case it can: none silently missing', () => {
-    // Exactly 65 (`docs/AI_EVAL.md`, "The other modes": 66 until `op-base-point` went on
-    // 2026-10-08), so a case dropped from `cases.cjs` fails here rather than shrinking the run.
-    expect(CASES.length).toBe(65)
-    // n/a only for a capability this build lacks — today, none.
-    expect(CASES.filter((k) => !scored.includes(k)).map((k) => k.id)).toEqual([])
+    // Exactly 85 (`docs/AI_EVAL.md`, "The cases": 65, then twenty Ask Vee cases on 2026-11-08 —
+    // 66 until `op-base-point` went on 2026-10-08), so a case dropped from `cases.cjs` fails here
+    // rather than shrinking the run.
+    expect(CASES.length).toBe(85)
+    // n/a only for stage 2 of the Ask Vee redesign — today, its five cases — and the day the
+    // catalogue has `ask_choice` they are scored with the rest, with no edit here.
+    for (const kase of CASES.filter((k) => !scored.includes(k))) {
+      expect([kase.id, STAGE2.includes(kase.id), missingCapabilities(kase.requires, have)]).toEqual([kase.id, true, ['stage2']])
+    }
+    expect(scored.length).toBeGreaterThanOrEqual(CASES.length - STAGE2.length)
   })
+
+  // Each case this build cannot score yet, skipped where it can be seen, with its reason.
+  for (const kase of CASES.filter((k) => !scored.includes(k))) {
+    it.skip(`n/a: ${kase.id} — ${whyMissing(missingCapabilities(kase.requires, have) ?? [])}`, () => undefined)
+  }
 
   it('the oracle scores 100 %', async () => {
     const failed: string[] = []

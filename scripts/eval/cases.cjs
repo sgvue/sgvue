@@ -57,6 +57,19 @@
  * the state the case needs — nothing may change, and the reply has to say why. Everything else
  * of that window (its undo, its templates, its saved setups, the three calls that only ask) is
  * held by the unit and the end-to-end tests, which do have one.
+ *
+ * 2026-11-08 — twenty Ask Vee cases (`VEE_CASES`, below), appended after every older case, which
+ * is unchanged. Six for the Schedules window's five tools, which the harness now reaches through
+ * a stand-in for that window (`harness: { schedules: true }`, `src/renderer/dev/
+ * schedules-standin.ts`); three conversations — a case's `turns` are the user turns sent before
+ * its own `prompt`, in one conversation, each graded on its own `expect` where it has one; six on
+ * a messy fixture (`mock-messy`, `src/renderer/dev/messy.ts`: placeholder values, elements on no
+ * storey, a shared GlobalId, ObjectType-only sub-types, `FireRating` beside `Fire_Rating`); and
+ * five for stage 2 of the Ask Vee redesign — the heads-up line and the IFC+SG question — which is
+ * not built yet, so they carry `requires: ['stage2']` and are n/a until it is.
+ *
+ * Run counts: the cases in `TRIPLE_RUN_IDS` — the new ones and the older ones judged tricky —
+ * run three times in a live pass (`runsOf`), every other case once.
  */
 
 /* ────────────────────────────── shared rule fragments ────────────────────────────── */
@@ -2080,8 +2093,686 @@ const CASES = [
   }
 ]
 
-/** Five cases across five groups, for the first paid pass. `--pilot`. */
-const PILOT_IDS = ['ans-counts', 'tab-doors-storey', 'ana-firerating', 'op-isolate', 'ref-rename']
+/* ══════════════════════════════ 2026-11-08 — the Ask Vee cases ══════════════════════════════ */
+
+/** A door schedule's columns, as a user would name them. */
+const DOOR_COLUMNS = [{ field: 'Name' }, { field: 'Level' }, { field: 'FireRating' }]
+/** What a reply that only asked must never say it did. */
+const DELETE_CLAIMS = ['I deleted', 'I have deleted', 'I’ve deleted', "I've deleted", 'setup has been deleted', 'setup was deleted']
+/** "I am not told whether a file was written", in the ways a reply says it. */
+const NOT_TOLD = [
+  'not told', 'am not told', 'can’t tell', "can't tell", 'cannot tell', 'can’t confirm', "can't confirm", 'cannot confirm',
+  'won’t know', "won't know", 'will not know', 'do not know', 'don’t know', "don't know", 'no way to know', 'not know whether'
+]
+
+/**
+ * The twenty, in the order a run takes them. Everything they need from the harness is declared:
+ * `harness.schedules` for the Schedules window's stand-in, `turns` for a conversation, the
+ * fixture for the messy model and `requires` for what is not built yet.
+ */
+const VEE_CASES = [
+  /* ── the Schedules window: one case for each of its five tools, and one that only asks ── */
+  {
+    id: 'op-make-schedule-doors',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    prompt: 'Make me a door schedule with each door’s name, its storey and its fire rating.',
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    expect: {
+      facts: [{ num: 'doors' }],
+      tools: { require: ['make_schedule'], maxCalls: 6 },
+      view: {
+        schedule: { category: ['IfcDoor'], columnsInclude: ['Name', ['Level', 'Storey'], ['FireRating', 'Fire Rating']], rowCount: 'doors' },
+        visible: { changed: false }
+      }
+    },
+    oracle: {
+      calls: [{ name: 'make_schedule', input: { category: ['IfcDoor'], columns: DOOR_COLUMNS } }],
+      reply: 'The door schedule is open in the Schedules window: {doors} doors, each with its Name, Level and FireRating.'
+    }
+  },
+  {
+    id: 'ans-get-schedule',
+    group: 'answer',
+    tags: ['answer', 'schedules', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    setup: [
+      {
+        tool: 'make_schedule',
+        input: { title: 'Wall check', category: ['IfcWall'], columns: [{ field: 'Name' }, { field: 'FireRating' }], groupBy: ['Level'] }
+      }
+    ],
+    prompt: 'How many walls does the schedule I have open list, and how many of them are on L2?',
+    truth: {
+      walls: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcWall'", shape: 'scalar' },
+      wallsL2: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcWall' AND storey = 'L2'", shape: 'scalar' }
+    },
+    expect: {
+      facts: [{ num: 'walls' }, { num: 'wallsL2' }],
+      tools: { require: ['get_schedule'], forbidKinds: ['view'], maxCalls: 4 },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'get_schedule', input: {} }],
+      reply: 'Your open schedule, "Wall check", lists {walls} walls, {wallsL2} of them on L2.'
+    }
+  },
+  {
+    /** `manage_schedules`, an operation that is simply done: the window's own undo. */
+    id: 'op-schedule-undo',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    setup: [
+      { tool: 'make_schedule', input: { category: ['IfcDoor'], columns: [{ field: 'Name' }, { field: 'Level' }] } },
+      { tool: 'make_schedule', input: { base: 'open', columns: [{ field: 'FireRating' }] } }
+    ],
+    prompt: 'Undo the last change in the Schedules window — I did not want the fire rating column after all.',
+    truth: {},
+    expect: {
+      facts: [{ any: ['undo', 'undid', 'undone', 'taken back', 'back to'] }],
+      tools: { require: ['manage_schedules'], maxCalls: 5 },
+      view: {
+        schedule: { category: ['IfcDoor'], columnsInclude: ['Name', ['Level', 'Storey']], columnsExclude: ['FireRating'] },
+        scheduleHistory: { undo: 1, redo: 1 },
+        visible: { changed: false }
+      }
+    },
+    oracle: {
+      calls: [{ name: 'manage_schedules', input: { op: 'undo' } }],
+      reply: 'Undone in the Schedules window: the door schedule is back to Name and Level, and it can be redone there.'
+    }
+  },
+  {
+    /**
+     * `manage_schedules`, an operation that only asks. Deleting a saved setup cannot be undone,
+     * so the window puts its own question to the user and nothing is deleted until they click
+     * Delete there — which nobody does here.
+     */
+    id: 'op-schedule-delete-asks',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'gate', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    setup: [
+      { tool: 'make_schedule', input: { title: 'Door check', category: ['IfcDoor'], columns: DOOR_COLUMNS } },
+      { tool: 'manage_schedules', input: { op: 'save' } }
+    ],
+    prompt: 'Delete my saved schedule setup "Door check".',
+    truth: {},
+    expect: {
+      facts: [{ text: 'Door check' }, { any: ['click delete', 'confirm', 'asking', 'asked', 'not gone', 'not deleted yet'] }],
+      forbid: DELETE_CLAIMS,
+      tools: { require: ['manage_schedules'], maxCalls: 5 },
+      view: { scheduleAsked: [{ op: 'delete', name: 'Door check' }], scheduleSaved: ['Door check'], unchanged: true }
+    },
+    oracle: {
+      calls: [
+        { name: 'manage_schedules', input: { op: 'saved_list' } },
+        { name: 'manage_schedules', input: { op: 'delete', name: 'Door check' } }
+      ],
+      reply:
+        'I have asked the Schedules window to delete your saved setup "Door check". It is not gone yet: nothing is ' +
+        'deleted unless you click Delete in that window’s question.'
+    }
+  },
+  {
+    /** `export_schedule`: the Save dialog is raised, and the tool is never told whether a file was written. */
+    id: 'op-export-schedule',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    setup: [{ tool: 'make_schedule', input: { category: ['IfcDoor'], columns: DOOR_COLUMNS } }],
+    prompt: 'Export this schedule to Excel for me.',
+    truth: {},
+    expect: {
+      facts: [{ any: ['save dialog'] }, { any: NOT_TOLD }],
+      forbid: ['file has been saved', 'I saved the', 'I have saved', 'I’ve saved', "I've saved", 'was saved to', 'has been exported', 'I exported'],
+      tools: { exactlyOne: ['export_schedule'], maxCalls: 4 },
+      view: { scheduleExports: ['xlsx'], unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'export_schedule', input: { format: 'xlsx' } }],
+      reply:
+        'The Save dialog for Excel is opening in the Schedules window — you choose the name and the folder there. ' +
+        'I am not told whether you click Save, so I cannot say a file exists.'
+    }
+  },
+  {
+    id: 'op-colour-by-schedule-column',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'colour', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    setup: [{ tool: 'make_schedule', input: { category: ['IfcDoor'], columns: DOOR_COLUMNS } }],
+    prompt: 'Colour the model by the fire rating column of my schedule.',
+    truth: {
+      ratings: {
+        sql:
+          "SELECT COUNT(DISTINCT p.value) FROM property p JOIN element e ON e.id = p.element " +
+          "WHERE e.type = 'IfcDoor' AND p.name = 'FireRating'",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [{ any: ['FireRating', 'fire rating'] }],
+      tools: { require: ['color_by_schedule_column'], maxCalls: 5 },
+      view: { colorByProp: ['FireRating', 'Fire Rating'], legendGroupsAtLeast: 'ratings' }
+    },
+    oracle: {
+      calls: [{ name: 'color_by_schedule_column', input: { column: 'FireRating' } }],
+      reply: 'Coloured by the schedule’s FireRating column — {ratings} values, each with its colour in the legend.'
+    }
+  },
+
+  /* ── conversations: a follow-up that depends on the turn before it ── */
+  {
+    id: 'multi-schedule-add-column',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'conversation', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    turns: [
+      {
+        prompt: 'Make a door schedule with the name and the storey of each door.',
+        oracle: {
+          calls: [{ name: 'make_schedule', input: { category: ['IfcDoor'], columns: [{ field: 'Name' }, { field: 'Level' }] } }],
+          reply: 'The door schedule is open in the Schedules window: {doors} doors by Name and Level.'
+        },
+        expect: { tools: { require: ['make_schedule'] } }
+      }
+    ],
+    prompt: 'Now add the fire rating column.',
+    expect: {
+      facts: [{ any: ['FireRating', 'fire rating'] }],
+      tools: { require: ['make_schedule'], maxCalls: 5 },
+      view: {
+        schedule: { category: ['IfcDoor'], columnsInclude: ['Name', ['Level', 'Storey'], ['FireRating', 'Fire Rating']], rowCount: 'doors' }
+      }
+    },
+    oracle: {
+      calls: [{ name: 'make_schedule', input: { base: 'open', columns: [{ field: 'FireRating' }] } }],
+      reply: 'Added a FireRating column to the open door schedule; it still lists {doors} doors.'
+    }
+  },
+  {
+    id: 'multi-hide-undo',
+    group: 'operate',
+    tags: ['operate', 'history', 'conversation', 'vee'],
+    fixture: 'mock',
+    truth: {
+      total: { sql: 'SELECT COUNT(*) FROM element', shape: 'scalar' },
+      walls: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcWall'", shape: 'scalar' },
+      notWalls: { sql: "SELECT COUNT(*) FROM element WHERE type <> 'IfcWall'", shape: 'scalar' }
+    },
+    turns: [
+      {
+        prompt: 'Hide the walls.',
+        oracle: {
+          calls: [{ name: 'apply_visibility', input: { action: 'hide', rules: [entity('IfcWall')] } }],
+          reply: 'The {walls} walls are hidden; {notWalls} elements are still in view.'
+        },
+        expect: { view: { visible: { equals: 'notWalls' } } }
+      }
+    ],
+    prompt: 'Undo that, please.',
+    expect: {
+      facts: [{ any: ['undo', 'undid', 'undone', 'back', 'visible again'] }],
+      tools: { require: ['apply_visibility'], maxCalls: 5 },
+      /** A step back, not a "show everything": it can be redone. */
+      view: { visible: { equals: 'total' }, stackLength: 0, history: { canRedo: true } }
+    },
+    oracle: {
+      calls: [{ name: 'apply_visibility', input: { action: 'undo' } }],
+      reply: 'Undone — the walls are back, all {total} elements are visible again, and it can be redone.'
+    }
+  },
+  {
+    id: 'multi-storey-followup',
+    group: 'operate',
+    tags: ['operate', 'spatial', 'conversation', 'vee'],
+    fixture: 'mock',
+    truth: {
+      l3NotWindows: {
+        sql: "SELECT COUNT(*) FROM element WHERE storey = 'L3' AND type <> 'IfcWindow'",
+        shape: 'scalar'
+      }
+    },
+    turns: [
+      {
+        prompt: 'Show me only the L3 storey.',
+        oracle: { calls: [{ name: 'set_storeys', input: { visible: ['L3'] } }], reply: 'Only L3 is showing now.' },
+        expect: { view: { storeysShown: ['L3'] } }
+      }
+    ],
+    prompt: 'And hide the windows on it too.',
+    expect: {
+      facts: [{ any: ['window'] }],
+      tools: { requireAny: [['apply_visibility', 'set_filter_stack']], maxCalls: 5 },
+      view: { visible: { equals: 'l3NotWindows' }, storeysShown: ['L3'] }
+    },
+    oracle: {
+      calls: [{ name: 'apply_visibility', input: { action: 'hide', rules: [entity('IfcWindow')] } }],
+      reply: 'The windows are hidden as well: {l3NotWindows} elements of L3 are in view.'
+    }
+  },
+
+  /* ── a messy model: count it honestly, invent nothing ── */
+  {
+    id: 'messy-placeholders',
+    group: 'tabulate',
+    tags: ['tabulate', 'messy', 'vee'],
+    fixture: 'mock-messy',
+    prompt: 'Tabulate the walls by their FireRating value, placeholders included.',
+    truth: {
+      byRating: {
+        sql:
+          "SELECT p.value, COUNT(*) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name = 'FireRating' GROUP BY p.value",
+        shape: 'pairs'
+      },
+      tbc: {
+        sql:
+          "SELECT COUNT(*) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name = 'FireRating' AND p.value = 'TBC'",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [{ text: 'TBC' }, { num: 'tbc' }],
+      tools: { require: ['summarize_elements'], forbidKinds: ['view'], maxCalls: 6 },
+      table: { groupBy: 'FireRating', rows: 'byRating' },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'summarize_elements', input: { rules: [entity('IfcWall')], groupBy: 'FireRating' } }],
+      reply: 'The walls by FireRating are in the table. {tbc} of them say "TBC", which is a placeholder rather than a rating.'
+    }
+  },
+  {
+    id: 'messy-two-spellings',
+    group: 'analyse',
+    tags: ['analyse', 'messy', 'vee'],
+    fixture: 'mock-messy',
+    prompt: 'Is the fire rating property spelled the same way on every wall?',
+    truth: {
+      spelled: {
+        sql:
+          "SELECT COUNT(DISTINCT e.id) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name = 'FireRating'",
+        shape: 'scalar'
+      },
+      spelledAlt: {
+        sql:
+          "SELECT COUNT(DISTINCT e.id) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name = 'Fire_Rating'",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [{ text: 'Fire_Rating' }, { num: 'spelledAlt' }, { num: 'spelled' }],
+      tools: { requireAny: [['find_properties', 'query_sql', 'list_values']], forbidKinds: ['view'], maxCalls: 6 },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'find_properties', input: { text: 'fire rating', rules: [entity('IfcWall')] } }],
+      reply: 'No. {spelled} walls carry FireRating and {spelledAlt} carry Fire_Rating instead — the same property under a second spelling.'
+    }
+  },
+  {
+    id: 'messy-no-storey',
+    group: 'answer',
+    tags: ['answer', 'messy', 'spatial', 'vee'],
+    fixture: 'mock-messy',
+    prompt: 'How many elements are not on any storey, and which model are they in?',
+    truth: {
+      noStorey: { sql: "SELECT COUNT(*) FROM element WHERE storey IS NULL OR storey = ''", shape: 'scalar' }
+    },
+    expect: {
+      facts: [{ num: 'noStorey' }, { any: ['MEP', 'Mechanical'] }],
+      tools: { forbidKinds: ['view'], maxCalls: 6 },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'query_sql',
+          input: { sql: "SELECT model, type, COUNT(*) AS n FROM element WHERE storey IS NULL OR storey = '' GROUP BY model, type" }
+        }
+      ],
+      reply: '{noStorey} elements sit on no storey, all of them duct segments in the MEP model.'
+    }
+  },
+  {
+    id: 'messy-duplicate-guids',
+    group: 'analyse',
+    tags: ['analyse', 'messy', 'completeness', 'vee'],
+    fixture: 'mock-messy',
+    prompt: 'Do any elements share a GlobalId?',
+    truth: {
+      dupGroups: {
+        sql: 'SELECT COUNT(*) FROM (SELECT guid FROM element GROUP BY guid HAVING COUNT(*) > 1)',
+        shape: 'scalar'
+      },
+      beamGuid: { sql: "SELECT guid FROM element WHERE name = 'Beam BC/1 L2'", shape: 'scalar' }
+    },
+    expect: {
+      facts: [{ num: 'dupGroups' }, { truthText: 'beamGuid', orAny: ['Beam AB/1 L2', 'Beam BC/1 L2'] }],
+      tools: { requireAny: [['query_sql', 'audit_model']], forbidKinds: ['view'], maxCalls: 6 },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'query_sql',
+          input: {
+            sql:
+              'SELECT guid, COUNT(*) AS n, GROUP_CONCAT(name) AS names FROM element GROUP BY guid HAVING COUNT(*) > 1'
+          }
+        }
+      ],
+      reply: 'Yes: {dupGroups} GlobalIds are used twice. One of them, {beamGuid}, is on both Beam AB/1 L2 and Beam BC/1 L2.'
+    }
+  },
+  {
+    id: 'messy-tbc-not-invented',
+    group: 'answer',
+    tags: ['answer', 'messy', 'property', 'vee'],
+    fixture: 'mock-messy',
+    prompt: 'What fire rating does the wall "Ext Wall S A-B L3" have?',
+    truth: {
+      rating: {
+        sql:
+          "SELECT p.value FROM property p JOIN element e ON e.id = p.element " +
+          "WHERE p.name = 'FireRating' AND e.name = 'Ext Wall S A-B L3' LIMIT 1",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [
+        { truthText: 'rating' },
+        { any: ['placeholder', 'to be confirmed', 'not a real', 'not an actual', 'not confirmed', 'no actual', 'not yet'] }
+      ],
+      /** The walls beside it are 1 HR. A reply that borrows their rating has invented one. */
+      forbid: ['rated 1 HR', 'rating of 1 HR', 'rating is 1 HR', 'has 1 HR'],
+      tools: { forbidKinds: ['view'], maxCalls: 6 },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'query_sql',
+          input: {
+            sql:
+              "SELECT e.name, p.value FROM property p JOIN element e ON e.id = p.element " +
+              "WHERE p.name = 'FireRating' AND e.name = 'Ext Wall S A-B L3'"
+          }
+        }
+      ],
+      reply: 'Ext Wall S A-B L3 is authored with a FireRating of "{rating}" — a placeholder, not an actual rating.'
+    }
+  },
+  {
+    id: 'messy-trench',
+    group: 'answer',
+    tags: ['answer', 'messy', 'ifcsg', 'vee'],
+    fixture: 'mock-messy',
+    prompt: 'What PredefinedType and ObjectType do the footings carry?',
+    truth: {
+      trench: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcFooting' AND object_type = 'TRENCH'", shape: 'scalar' },
+      pad: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcFooting' AND predefined_type = 'PAD_FOOTING'", shape: 'scalar' }
+    },
+    expect: {
+      facts: [{ text: 'TRENCH' }, { text: 'NOTDEFINED' }, { num: 'trench' }, { text: 'PAD_FOOTING' }, { num: 'pad' }],
+      tools: { forbidKinds: ['view'], maxCalls: 6 },
+      view: { unchanged: true }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'query_sql',
+          input: {
+            sql:
+              "SELECT predefined_type, object_type, COUNT(*) AS n FROM element WHERE type = 'IfcFooting' " +
+              'GROUP BY predefined_type, object_type'
+          }
+        }
+      ],
+      reply:
+        '{pad} footings are PredefinedType PAD_FOOTING. The other {trench} have PredefinedType NOTDEFINED, and their ' +
+        'only type text is the ObjectType TRENCH.'
+    }
+  },
+
+  /*
+   * ── stage 2: the heads-up line (prototypes/vee-messages/full/HANDOFF.md §2) ──
+   * One app-computed observation under a reply, over **the elements the turn's call touched** —
+   * never a whole-model scan (the owner's decision C). Each case is on the messy model, whose
+   * whole-model oddity of first preference is the TBC walls, so a heads-up that is not about the
+   * matched set shows. The reply must still be right.
+   */
+  {
+    id: 'hu-placeholder',
+    group: 'analyse',
+    tags: ['analyse', 'messy', 'heads-up', 'vee'],
+    fixture: 'mock-messy',
+    requires: ['stage2'],
+    prompt: 'How many walls are rated 1 HR?',
+    truth: {
+      oneHr: {
+        sql:
+          "SELECT COUNT(DISTINCT e.id) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name = 'FireRating' AND p.value = '1 HR'",
+        shape: 'scalar'
+      },
+      oneHrEither: {
+        sql:
+          "SELECT COUNT(DISTINCT e.id) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name IN ('FireRating', 'Fire_Rating') AND p.value = '1 HR'",
+        shape: 'scalar'
+      },
+      tbc: {
+        sql:
+          "SELECT COUNT(*) FROM element e JOIN property p ON p.element = e.id " +
+          "WHERE e.type = 'IfcWall' AND p.name = 'FireRating' AND p.value = 'TBC'",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [{ numAny: ['oneHr', 'oneHrEither'] }],
+      tools: { forbidKinds: ['view'], maxCalls: 6 },
+      view: { headsUp: { kind: 'placeholder', prop: 'FireRating', value: 'TBC', n: 'tbc' }, unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'query_elements', input: { rules: [entity('IfcWall'), is('FireRating', '1 HR')] } }],
+      reply: '{oneHr} walls carry a FireRating of 1 HR.'
+    }
+  },
+  {
+    id: 'hu-no-storey',
+    group: 'answer',
+    tags: ['answer', 'messy', 'heads-up', 'vee'],
+    fixture: 'mock-messy',
+    requires: ['stage2'],
+    prompt: 'How many duct segments does the MEP model have?',
+    truth: {
+      ducts: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDuctSegment'", shape: 'scalar' },
+      ductsNoStorey: {
+        sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDuctSegment' AND (storey IS NULL OR storey = '')",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [{ num: 'ducts' }],
+      tools: { forbidKinds: ['view'], maxCalls: 6 },
+      view: { headsUp: { kind: 'noStorey', n: 'ductsNoStorey' }, unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'query_elements', input: { rules: [entity('IfcDuctSegment')] } }],
+      reply: 'The MEP model has {ducts} duct segments.'
+    }
+  },
+  {
+    id: 'hu-dup-guid',
+    group: 'answer',
+    tags: ['answer', 'messy', 'heads-up', 'vee'],
+    fixture: 'mock-messy',
+    requires: ['stage2'],
+    prompt: 'How many beams are on L2?',
+    truth: {
+      beamsL2: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcBeam' AND storey = 'L2'", shape: 'scalar' },
+      /** L2 beams whose GlobalId another L2 beam carries too: the observation's `n`. */
+      sharedL2: {
+        sql:
+          "SELECT COUNT(*) FROM element WHERE type = 'IfcBeam' AND storey = 'L2' AND guid IN " +
+          "(SELECT guid FROM element WHERE type = 'IfcBeam' AND storey = 'L2' GROUP BY guid HAVING COUNT(*) > 1)",
+        shape: 'scalar'
+      }
+    },
+    expect: {
+      facts: [{ num: 'beamsL2' }],
+      tools: { forbidKinds: ['view'], maxCalls: 6 },
+      view: { headsUp: { kind: 'dupGlobalId', n: 'sharedL2' }, unchanged: true }
+    },
+    oracle: {
+      calls: [{ name: 'query_elements', input: { rules: [entity('IfcBeam'), level('L2')] } }],
+      reply: 'There are {beamsL2} beams on L2.'
+    }
+  },
+
+  /*
+   * ── stage 2: "Is this model for an IFC+SG submission?" (HANDOFF.md §8) ──
+   * Asked through `ask_choice`, once, and only when the question touches the types, properties
+   * or classification of elements that carry `SGPset_` sets; the answer is the conversation's,
+   * and an ObjectType-only sub-type is named in a heads-up only after a yes (decision B).
+   * Concept only: no CoP mapping, and no check unless one is asked for.
+   */
+  {
+    id: 'sg-ask-once',
+    group: 'answer',
+    tags: ['answer', 'messy', 'ifcsg', 'conversation', 'vee'],
+    fixture: 'mock-messy',
+    requires: ['stage2'],
+    truth: {
+      l4DoorsOtOnly: {
+        sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor' AND storey = 'L4' AND predefined_type = 'NOTDEFINED'",
+        shape: 'scalar'
+      },
+      doorsOtOnly: {
+        sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor' AND predefined_type = 'NOTDEFINED'",
+        shape: 'scalar'
+      },
+      doorsNoSg: {
+        sql:
+          "SELECT COUNT(*) FROM element e WHERE e.type = 'IfcDoor' AND NOT EXISTS " +
+          "(SELECT 1 FROM pset s WHERE s.element = e.id AND s.name = 'SGPset_Door')",
+        shape: 'scalar'
+      }
+    },
+    turns: [
+      {
+        prompt: 'What fire ratings do the doors on L4 carry?',
+        oracle: {
+          calls: [
+            {
+              name: 'ask_choice',
+              input: { question: 'These doors carry SGPset_Door values. Is this model for an IFC+SG submission?', replies: ['Yes', 'No'] }
+            }
+          ],
+          reply: 'Before I answer: these doors carry SGPset_Door values. Is this model for an IFC+SG submission?'
+        },
+        // Asked, and nothing about a sub-type yet: that waits for a yes.
+        expect: { tools: { exactlyOne: ['ask_choice'] }, view: { headsUp: null } }
+      },
+      {
+        prompt: 'Yes',
+        choice: 'yes',
+        oracle: {
+          calls: [{ name: 'query_elements', input: { rules: [entity('IfcDoor'), level('L4'), is('FireRating', '1 HR')] } }],
+          reply: 'Every door on L4 carries a FireRating of 1 HR.'
+        },
+        expect: {
+          facts: [{ text: '1 HR' }],
+          tools: { forbid: ['ask_choice'] },
+          view: { headsUp: { kind: 'objectTypeOnly', n: 'l4DoorsOtOnly' } }
+        }
+      }
+    ],
+    prompt: 'And which doors carry no SGPset_Door set at all?',
+    expect: {
+      facts: [{ num: 'doorsNoSg' }],
+      tools: { forbid: ['ask_choice'], allTurns: { exactlyOne: ['ask_choice'] }, maxCalls: 6 },
+      view: { ifcsg: 'yes', headsUp: { kind: 'objectTypeOnly', n: 'doorsOtOnly' } }
+    },
+    oracle: {
+      calls: [{ name: 'query_elements', input: { rules: [entity('IfcDoor')] } }],
+      reply: '{doorsNoSg} doors carry no SGPset_Door set — the five on L1.'
+    }
+  },
+  {
+    id: 'sg-never-asks',
+    group: 'answer',
+    tags: ['answer', 'messy', 'ifcsg', 'conversation', 'vee'],
+    fixture: 'mock-messy',
+    requires: ['stage2'],
+    truth: {
+      wallsL2: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcWall' AND storey = 'L2'", shape: 'scalar' }
+    },
+    turns: [
+      {
+        prompt: 'Hide the slabs.',
+        oracle: { calls: [{ name: 'apply_visibility', input: { action: 'hide', rules: [entity('IfcSlab')] } }], reply: 'The slabs are hidden.' },
+        expect: { tools: { forbid: ['ask_choice'] } }
+      }
+    ],
+    prompt: 'How many walls are on L2?',
+    expect: {
+      facts: [{ num: 'wallsL2' }],
+      forbid: ['IFC+SG'],
+      tools: { allTurns: { forbid: ['ask_choice'] }, maxCalls: 6 },
+      view: { ifcsg: 'unknown' }
+    },
+    oracle: {
+      calls: [{ name: 'query_elements', input: { rules: [entity('IfcWall'), level('L2')] } }],
+      reply: 'There are {wallsL2} walls on L2.'
+    }
+  }
+]
+
+CASES.push(...VEE_CASES)
+
+/**
+ * The cases a live pass runs three times — the owner's cheaper plan (2026-11-08): the new Ask
+ * Vee cases and the older ones whose outcome a single run says least about, about twenty in all.
+ * Every other case runs once. Listed here, not tagged, so that the older cases stay byte for byte
+ * as they were; a stage-2 case is listed too and simply n/a until stage 2 lands.
+ */
+const TRIPLE_RUN_IDS = [
+  ...VEE_CASES.map((c) => c.id),
+  'op-scope-guard',
+  'op-act-on-found-ids',
+  'op-undo-held',
+  'res-gated-delete',
+  'ana-firerating'
+]
+
+/** How many times a live pass runs a case, unless `--reps` says otherwise. */
+const runsOf = (kase) => (TRIPLE_RUN_IDS.includes(kase.id) ? 3 : 1)
+
+/**
+ * Five cases for the first paid pass, one per group but `refuse` — chosen from the tripled set,
+ * since its cost is what the owner needs measured: a schedule read, a messy table, the two
+ * spellings, a conversation, and the hostile file's gated deletion. `--pilot` runs these once
+ * each; `--pilot=a,b,c,d,e` names its own, at most `PILOT_MAX`.
+ */
+const PILOT_IDS = ['ans-get-schedule', 'messy-placeholders', 'messy-two-spellings', 'multi-schedule-add-column', 'res-gated-delete']
+const PILOT_MAX = 5
 
 /** `--only=` accepts ids, group names and any tag. */
 function selectCases(only) {
@@ -2092,4 +2783,4 @@ function selectCases(only) {
   )
 }
 
-module.exports = { CASES, PILOT_IDS, selectCases }
+module.exports = { CASES, PILOT_IDS, PILOT_MAX, TRIPLE_RUN_IDS, VEE_CASES, runsOf, selectCases }

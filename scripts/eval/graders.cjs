@@ -391,6 +391,24 @@ function gradeTools(spec, obs, kindOf) {
   if (typeof t.minCalls === 'number') {
     out.push(check('min-calls', names.length >= t.minCalls, `${names.length} tool calls, at least ${t.minCalls} expected`))
   }
+  /*
+   * 2026-11-08 — a conversation: `allTurns` holds the same `require` / `forbid` / `exactlyOne`
+   * over every turn's calls, where the rest of `tools` reads the last turn's — "asked once, and
+   * never again" is a count over the whole conversation.
+   */
+  if (t.allTurns) {
+    const every = [...(obs.earlier || []).flatMap((e) => e.calls || []), ...obs.calls].map((c) => c.name)
+    for (const n of t.allTurns.require || []) {
+      out.push(check(`all:tool:${n}`, every.includes(n), `${n} was never called in the conversation`))
+    }
+    for (const n of t.allTurns.forbid || []) {
+      out.push(check(`all:no-tool:${n}`, !every.includes(n), `${n} was called in the conversation, and must not be`))
+    }
+    for (const n of t.allTurns.exactlyOne || []) {
+      const c = every.filter((x) => x === n).length
+      out.push(check(`all:one:${n}`, c === 1, `${n} was called ${c} times in the conversation, expected exactly 1`))
+    }
+  }
   const failed = obs.calls.filter((c) => !c.ok)
   if (t.allowFailures !== true) {
     out.push(
@@ -447,7 +465,13 @@ const VIEW_FINGERPRINT = (v, store) =>
     basePoint: v.basePoint,
     filterSets: store ? store.filterSets : undefined,
     unloadAsk: store ? store.unloadAsk : undefined,
-    markups: store ? store.markups : undefined
+    markups: store ? store.markups : undefined,
+    // 2026-11-08 — what the Schedules window shows, and its history and saved setups: a turn that
+    // was to change nothing must not have shown, stepped or saved a schedule. A Save dialog or a
+    // question it was asked for is a request, not a change — as a row waiting behind Apply is not.
+    schedules: store && store.schedules
+      ? [store.schedules.open, store.schedules.undo, store.schedules.redo, store.schedules.saved]
+      : undefined
   })
 
 function gradeView(spec, obs, truth) {
@@ -513,7 +537,9 @@ function gradeView(spec, obs, truth) {
   }
   if (v.legendGroupsAtLeast !== undefined) {
     const n = store.colorBy ? store.colorBy.groups.length : 0
-    out.push(check('legend', n >= v.legendGroupsAtLeast, `${n} legend group(s), expected at least ${v.legendGroupsAtLeast}`))
+    // A number, or (2026-11-08) a truth key — a count of distinct values the database holds.
+    const want = resolve(v.legendGroupsAtLeast, truth)
+    out.push(check('legend', typeof want === 'number' && n >= want, `${n} legend group(s), expected at least ${want} (${v.legendGroupsAtLeast})`))
   }
   if (v.section !== undefined) {
     if (v.section === null) {
@@ -754,6 +780,107 @@ function gradeView(spec, obs, truth) {
       )
     }
   }
+  out.push(...gradeSchedules(v, store, truth))
+  out.push(...gradeStage2(v, after, store, truth))
+  return out
+}
+
+/*
+ * 2026-11-08 — the Schedules window, through the eval's stand-in for it (`src/renderer/dev/
+ * schedules-standin.ts`): what it shows, its history, its saved setups, the Save dialogs and the
+ * questions it was asked for. The same rule as every check here: an observation that does not
+ * carry the stand-in's state fails, it is never assumed.
+ */
+function gradeSchedules(v, store, truth) {
+  const out = []
+  const keys = ['schedule', 'scheduleHistory', 'scheduleSaved', 'scheduleExports', 'scheduleAsked']
+  if (!keys.some((k) => v[k] !== undefined)) return out
+  const sch = store.schedules
+  if (!sch) {
+    for (const k of keys) if (v[k] !== undefined) out.push(check(k, false, 'the observation carries no Schedules window at all'))
+    return out
+  }
+  if (v.schedule !== undefined) {
+    const open = sch.open
+    if (v.schedule === null) {
+      out.push(check('schedule', open === null, `the Schedules window shows "${open && open.title}", expected none`))
+    } else if (!open) {
+      out.push(check('schedule', false, 'the Schedules window shows no schedule'))
+    } else {
+      const wrong = []
+      const cols = (open.columns || []).map(String)
+      const has = (want) => cols.some((c) => c.toLowerCase() === String(want).toLowerCase())
+      if (v.schedule.category && JSON.stringify([...open.category].sort()) !== JSON.stringify([...v.schedule.category].sort())) {
+        wrong.push(`category [${open.category.join(', ')}], expected [${v.schedule.category.join(', ')}]`)
+      }
+      for (const c of v.schedule.columnsInclude || []) {
+        const any = Array.isArray(c) ? c : [c]
+        if (!any.some(has)) wrong.push(`no column ${any.join(' / ')} (columns: ${cols.join(', ')})`)
+      }
+      for (const c of v.schedule.columnsExclude || []) if (has(c)) wrong.push(`a column ${c} is still there`)
+      if (v.schedule.rowCount !== undefined) {
+        const want = resolve(v.schedule.rowCount, truth)
+        if (open.rowCount !== want) wrong.push(`${open.rowCount} row(s), expected ${want} (${v.schedule.rowCount})`)
+      }
+      if (v.schedule.title !== undefined && open.title !== v.schedule.title) wrong.push(`titled "${open.title}", expected "${v.schedule.title}"`)
+      out.push(check('schedule', !wrong.length, `the open schedule: ${wrong.join('; ')}`))
+    }
+  }
+  if (v.scheduleHistory) {
+    const wrong = Object.entries(v.scheduleHistory)
+      .filter(([k, want]) => sch[k] !== want)
+      .map(([k, want]) => `${k} ${sch[k]}, expected ${want}`)
+    out.push(check('schedule-history', !wrong.length, `the Schedules window's history: ${wrong.join('; ')}`))
+  }
+  for (const [field, id, what] of [
+    ['scheduleSaved', 'schedule-saved', 'saved setups', 'saved'],
+    ['scheduleExports', 'schedule-exports', 'Save dialogs asked for', 'exports']
+  ]) {
+    if (!Array.isArray(v[field])) continue
+    const got = field === 'scheduleSaved' ? sch.saved : sch.exports
+    out.push(check(id, JSON.stringify(got) === JSON.stringify(v[field]), `${what} [${(got || []).join(', ')}], expected [${v[field].join(', ')}]`))
+  }
+  if (Array.isArray(v.scheduleAsked)) {
+    const got = (sch.asked || []).map((a) => (a.name === undefined ? { op: a.op } : { op: a.op, name: a.name }))
+    out.push(
+      check(
+        'schedule-asked',
+        JSON.stringify(got) === JSON.stringify(v.scheduleAsked),
+        `the Schedules window asked the user ${JSON.stringify(got)}, expected ${JSON.stringify(v.scheduleAsked)}`
+      )
+    )
+  }
+  return out
+}
+
+/*
+ * 2026-11-08 — stage 2 of the Ask Vee redesign (`prototypes/vee-messages/full/HANDOFF.md` §2,
+ * §8). `headsUp` is the reply's one app-computed observation — `null` for none, or the fields of
+ * it the case names (`kind`, `prop`, `value`, and `n`, a truth key or a number). `ifcsg` is the
+ * conversation's IFC+SG answer as `get_view_state` reads it back, `unknown` while it carries none.
+ */
+function gradeStage2(v, after, store, truth) {
+  const out = []
+  if (v.headsUp !== undefined) {
+    const got = store.headsUp === undefined ? null : store.headsUp
+    if (v.headsUp === null) {
+      out.push(check('heads-up', got === null, `the reply carries a heads-up ${JSON.stringify(got)}, expected none`))
+    } else {
+      const wrong = []
+      if (!got) wrong.push('the reply carries no heads-up')
+      else {
+        for (const [k, want] of Object.entries(v.headsUp)) {
+          const w = k === 'n' ? resolve(want, truth) : want
+          if (got[k] !== w) wrong.push(`${k} is ${JSON.stringify(got[k])}, expected ${JSON.stringify(w)}`)
+        }
+      }
+      out.push(check('heads-up', !wrong.length, `heads-up: ${wrong.join('; ')}`))
+    }
+  }
+  if (v.ifcsg !== undefined) {
+    const got = after.ifcsg == null ? 'unknown' : after.ifcsg
+    out.push(check('ifcsg', got === v.ifcsg, `the conversation's IFC+SG answer is ${JSON.stringify(got)}, expected ${JSON.stringify(v.ifcsg)}`))
+  }
   return out
 }
 
@@ -822,7 +949,21 @@ function gradeCase(kase, obs, truth, kindOf) {
     check('no-write-claim', !claimsWrite(obs.reply), 'the reply claims the model was changed')
   ]
 
+  /**
+   * 2026-11-08 — a conversation (`turns`, `eval/observe.cjs` `turnsOf`): each earlier turn is
+   * graded on its own `expect`, against its own reply, calls and the view it left, with the same
+   * functions, and every one of them is held to the read-only guarantee. A turn the runner never
+   * recorded fails.
+   */
+  const earlierChecks = (kase.turns || []).flatMap((t, i) => {
+    const o = (obs.earlier || [])[i]
+    if (!o) return [check(`turn${i + 1}`, false, 'the runner recorded no such turn')]
+    return gradeCase({ expect: t.expect || {} }, o, truth, kindOf).checks.map((c) => ({ ...c, id: `turn${i + 1}:${c.id}` }))
+  })
+  const earlierWrites = earlierChecks.filter((c) => /:no-(mutating-tool|unknown-tool|write-claim)$/.test(c.id))
+
   const all = [
+    ...earlierChecks,
     ...facts.results,
     ...replyChecks,
     ...toolChecks,
@@ -832,7 +973,7 @@ function gradeCase(kase, obs, truth, kindOf) {
     ...writeChecks
   ]
   const reasons = all.filter((c) => !c.ok).map((c) => `${c.id}: ${c.why}`)
-  const noWrite = writeChecks.every((c) => c.ok)
+  const noWrite = writeChecks.every((c) => c.ok) && earlierWrites.every((c) => c.ok)
   const toolsOk = toolChecks.every((c) => c.ok)
 
   return {

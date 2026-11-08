@@ -87,6 +87,77 @@ function runCost(rows) {
   return { usd: priced ? usd : null, priced, unpriced, tokens }
 }
 
+/**
+ * 2026-11-08 — the estimate a live run prints **before** it starts, so the owner sees what a pass
+ * will roughly cost before paying for it, and can set it beside what the run then measured.
+ *
+ * A-priori, one turn is taken as `ROUGH_TURN`: about 2.5 rounds of a ~16 000-token prefix (the
+ * tool catalogue, ~55 kB, is ~13 700 tokens; the prompt and the cached schema block ~2 000 more)
+ * plus the turn's own messages, and about 1 200 tokens written. That is a guess — `docs/AI_EVAL.md`
+ * says a token guess is routinely out by 3–10× — so it is priced at the **list input rate with
+ * no cache discount**, a deliberately high figure, and replaced by a measured one as soon as one
+ * exists: `measuredTurn` reads the mean per turn off every priced row a live run has written.
+ */
+const ROUGH_TURN = { inTokens: 40_000, outTokens: 1_200 }
+
+/**
+ * The mean billed turn of earlier live rows, or null when none was priced. A row of a
+ * multi-turn case counts as its `turns` (default 1).
+ *
+ * @param {{usage?: object, cost_usd?: number, turns?: number}[]} rows
+ */
+function measuredTurn(rows) {
+  let turns = 0
+  let usd = 0
+  const tokens = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 }
+  for (const r of rows || []) {
+    if (!r || typeof r.cost_usd !== 'number' || !r.usage) continue
+    const n = Number.isInteger(r.turns) && r.turns > 0 ? r.turns : 1
+    turns += n
+    usd += r.cost_usd
+    tokens.in += r.usage.inputTokens || 0
+    tokens.out += r.usage.outputTokens || 0
+    tokens.cacheRead += r.usage.cacheReadTokens || 0
+    tokens.cacheWrite += r.usage.cacheCreateTokens || 0
+  }
+  if (!turns) return null
+  return {
+    turns,
+    usd: usd / turns,
+    inTokens: (tokens.in + tokens.cacheRead + tokens.cacheWrite) / turns,
+    outTokens: tokens.out / turns
+  }
+}
+
+/**
+ * What a run of `plan` should roughly cost.
+ *
+ * @param {{id: string, runs: number, turns: number}[]} plan  each case, its runs and its user turns
+ * @param {string} model
+ * @param {{usd: number, inTokens: number, outTokens: number, turns: number} | null} measured  `measuredTurn`'s
+ * @returns {{cases: number, runs: number, turns: number, inTokens: number, outTokens: number,
+ *            usdList: number|null, usdMeasured: number|null, basis: string}}
+ */
+function estimateRun(plan, model, measured) {
+  const runs = plan.reduce((n, p) => n + p.runs, 0)
+  const turns = plan.reduce((n, p) => n + p.runs * p.turns, 0)
+  const per = measured || ROUGH_TURN
+  const base = PRICES[String(model)]
+  const inTokens = Math.round(turns * per.inTokens)
+  const outTokens = Math.round(turns * per.outTokens)
+  return {
+    cases: plan.length,
+    runs,
+    turns,
+    inTokens,
+    outTokens,
+    // Every input token at the list input rate: no cache read, no cache write.
+    usdList: base ? (inTokens * base.in + outTokens * base.out) / 1e6 : null,
+    usdMeasured: measured ? turns * measured.usd : null,
+    basis: measured ? `measured: the mean of ${measured.turns} billed turn(s) already in this flow` : 'a-priori: ROUGH_TURN in scripts/eval/cost.cjs'
+  }
+}
+
 /** `$0.0123`, or `—` when nothing could be priced. */
 const money = (usd) => (typeof usd === 'number' ? `$${usd.toFixed(4)}` : '—')
 
@@ -97,5 +168,8 @@ module.exports = {
   ratesFor,
   turnCost,
   runCost,
-  money
+  money,
+  ROUGH_TURN,
+  measuredTurn,
+  estimateRun
 }
