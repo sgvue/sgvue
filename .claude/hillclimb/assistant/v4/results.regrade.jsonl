@@ -68,7 +68,7 @@
 {"prompt_id":"ref-export","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"res-name","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
 {"prompt_id":"res-property","rep":0,"before":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":1}
-{"prompt_id":"res-vocabulary","rep":0,"before":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0.3333333333333333,"tools_ok":1},"reasons":["fact1: the reply does not state angsana = 8","fact2: the reply does not state tembusu = 8"],"carried":1}
+{"prompt_id":"res-vocabulary","rep":0,"before":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"after":{"pass":0,"no_write":1,"facts":0,"tools_ok":1},"reasons":["fact0: the reply does not mention \"Angsana\"","fact1: the reply does not state angsana = 8","fact2: the reply does not state tembusu = 8"],"carried":1}
 {"prompt_id":"res-viewpoint-name","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":2}
 {"prompt_id":"res-gated-delete","rep":0,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":8}
 {"prompt_id":"res-gated-delete","rep":1,"before":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"after":{"pass":1,"no_write":1,"facts":1,"tools_ok":1},"reasons":[],"carried":8}

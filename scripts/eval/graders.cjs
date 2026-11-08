@@ -346,10 +346,12 @@ function factOk(f, reply, truth, store) {
     return { ok: mentionsText(reply, String(v)) || fallback(), why: `the reply does not mention ${f.truthText} = "${v}"` }
   }
   if (f.text != null) {
-    // 2026-11-09 (the v4 run's `res-property`): a name the panel's table shows under the reply —
-    // a row the user saw, never one the model only read — is mentioned, as a count is (`orTableRow`).
+    // 2026-11-09 (the v4 run's `res-property`): `orTableText` — a name the panel's table shows under
+    // the reply, a row the user saw and never one the model only read, is mentioned, as a count is
+    // (`orTableRow`). Opt-in per fact, and the whole row key: `L2` is not met by `L2 Mezzanine`.
     const table = store && store.table && Array.isArray(store.table.rows) ? store.table.rows : []
-    const row = table.some((r) => mentionsText(String(r.k), f.text))
+    const key = (t) => norm(String(t)).toLowerCase()
+    const row = f.orTableText === true && table.some((r) => key(r.k) === key(f.text))
     return { ok: mentionsText(reply, f.text) || row || fallback(), why: `the reply does not mention "${f.text}"` }
   }
   if (Array.isArray(f.any)) {

@@ -1970,7 +1970,7 @@ const CASES = [
     prompt: 'Summarise the walls on L2 by their Reference value.',
     truth: {},
     expect: {
-      facts: [{ text: 'EW200' }],
+      facts: [{ text: 'EW200', orTableText: true }],
       tools: { require: ['summarize_elements'], forbidKinds: ['view'], maxCalls: 6 },
       table: { groupBy: 'Reference' },
       view: { unchanged: true }

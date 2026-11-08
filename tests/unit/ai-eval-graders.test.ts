@@ -2111,11 +2111,26 @@ describe('the graders after the v4 / v5 diagnosis (2026-11-09)', () => {
     expect(G.factOk({ num: 'dup' }, 'No element name is used more than once.', { dup: 0 }, null).ok).toBe(false)
   })
 
-  it('a text fact is met by a row of the table the user saw, and by nothing the model only read', () => {
+  it('a text fact with `orTableText` is met by a whole row key of the table the user saw, and by nothing else', () => {
     const table = { groupBy: 'Reference', rows: [{ k: 'EW200', n: 12 }, { k: 'CW250', n: 4 }] }
-    expect(G.factOk({ text: 'EW200' }, 'There are **19** walls on L2 (table below).', {}, { table }).ok).toBe(true)
-    expect(G.factOk({ text: 'EW200' }, 'There are **19** walls on L2.', {}, { table: null }).ok).toBe(false)
-    expect(G.factOk({ text: 'IW150' }, 'There are **19** walls on L2.', {}, { table }).ok).toBe(false)
+    const opted = { text: 'EW200', orTableText: true }
+    expect(G.factOk(opted, 'There are **19** walls on L2 (table below).', {}, { table }).ok).toBe(true)
+    expect(G.factOk(opted, 'There are **19** walls on L2.', {}, { table: null }).ok).toBe(false)
+    expect(G.factOk({ text: 'IW150', orTableText: true }, 'There are **19** walls on L2.', {}, { table }).ok).toBe(false)
+    // Whitespace and case only: ` ew200 ` is the row, `EW2` is not.
+    expect(G.factOk(opted, 'x', {}, { table: { rows: [{ k: ' ew200 ', n: 1 }] } }).ok).toBe(true)
+    expect(G.factOk({ text: 'EW2', orTableText: true }, 'x', {}, { table }).ok).toBe(false)
+    // The whole key, never a substring of it.
+    const levels = { table: { groupBy: 'Level', rows: [{ k: 'L2 Mezzanine', n: 3 }, { k: 'C1-01', n: 2 }] } }
+    expect(G.factOk({ text: 'L2', orTableText: true }, 'x', {}, levels).ok).toBe(false)
+    expect(G.factOk({ text: 'C1', orTableText: true }, 'x', {}, levels).ok).toBe(false)
+    // No opt-in, no table fallback — not even for an exact row.
+    expect(G.factOk({ text: 'EW200' }, 'There are **19** walls on L2 (table below).', {}, { table }).ok).toBe(false)
+    expect(G.factOk({ text: 'L2' }, 'x', {}, { table: { rows: [{ k: 'L2', n: 3 }, { k: 'L2 Mezzanine', n: 3 }] } }).ok).toBe(false)
+    // Only res-property opts in today.
+    const opting = CASES.filter((c: { expect?: { facts?: { orTableText?: boolean }[] } }) =>
+      (c.expect?.facts || []).some((f) => f.orTableText !== undefined)).map((c: { id: string }) => c.id)
+    expect(opting).toEqual(['res-property'])
   })
 
   it('fails a turn whose scripted quick reply had no question to answer, and says why', () => {
