@@ -1141,14 +1141,17 @@ Anything not on this list is a defect.
   `CLEARED`, `CANCELLED` — also for a request the user's own work had overtaken — `REVERTED`)
   carrying the reply's one `Revert`, else `Revert` at the group's foot; stopped and failed turns
   are neutral system lines that never say "nothing changed" when a tool had acted, with
-  `Try again` on a failed one while a model is open; a `New message` pill; not-ready lines — no
+  `Try again` on a failed one while a model is open; a `New message` pill; a day line (`Today`,
+  `Yesterday` or the date) over each day's first message; activity bars in the header while a
+  turn runs; the board's view chip (`3D`, `Plan`, `N` …) and its isolated look (the eye struck
+  through, the selection colours); a faint 4 % grid behind the thread; not-ready lines — no
   key wins (`Add your API key in Preferences to start.`, composer disabled at `.45`, no
   placeholder), no model (`Open a model and I'll take a look.`; no board, no suggestions; a
   question gets the line back and runs no turn). **The trace's answer is the app's own** — the
   handoff (`design-reference/ask-vee/`) is the specification up to its Answer cue: while a turn
   runs Vee's bubble is typing dots, then a diary of every step shown with its live count over
   the element matrix; at the answer it folds into one dashed line (`✓ 412 read · 80 walls ·
-  12 missing · 7s ›`) that reopens to its steps, and the reply's parts land ≤ 110 ms apart, all
+  12 missing · 7s ›`, a dashed card) that reopens to its steps, and the reply's parts land ≤ 110 ms apart, all
   within 0.5 s, on the row they settle in — no re-layout. The status beside the name, the ticker
   bubble and the word-by-word reveal are gone. The selected storey row is pressed and ringed by
   a revision cloud; the storey-rows card is titled by the checked property; a fresh bubble pops
