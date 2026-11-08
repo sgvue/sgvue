@@ -7,10 +7,10 @@
 
 /** Panes that scroll independently and must not jump. */
 const SCROLLERS = [
-  // The rail has two: the categories list, and the capped saved-schedules list pinned
-  // below it. Both are rebuilt by the same innerHTML write, so both have to be listed.
-  '.rail-body', '.rail-sched .rail-group', '.table-wrap',
-  '.tpl-grid-wrap', '.saved-list', '.calc-scroll', '.pick-list',
+  '.rail-body', '.table-wrap', '.calc-scroll', '.pick-list',
+  // The Templates library (v1.5.0, phase 3): its list and its preview pane scroll apart, and
+  // both are rebuilt on every move of the selection.
+  '.lib-rows', '.lib-pane .pane-scroll',
   // The popover node is never rebuilt, but its body is — and a long menu scrolls.
   '#popover',
 ];

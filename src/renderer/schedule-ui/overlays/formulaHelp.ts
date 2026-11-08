@@ -8,7 +8,7 @@
 // ifcTable's own, section for section; only the pointers to where things live are SGVue's.
 // Static text — no model data reaches this string.
 
-import { cross } from '../icons';
+import { ICON } from '../icons';
 
 const SECTIONS: [string, string][] = [
   ['basics', 'Basics'], ['units', 'Units'], ['text', 'Text'],
@@ -25,9 +25,8 @@ export function formulaHelp(): string {
         <div class="row top head-row">
           <div class="grow-1">
             <h3>Formula syntax</h3>
-            <p>For calculated columns — the field picker’s + Calculated value, or a calculated column’s Edit formula</p>
           </div>
-          <button class="overlay-close hv-step-ink" data-act="close-overlay" aria-label="Close">${cross(14, 1.8)}</button>
+          <button class="icon-btn hv-step-ink" data-act="close-overlay" title="Close" aria-label="Close">${ICON.close}</button>
         </div>
         <div class="chips filter-row">${toc}</div>
       </div>

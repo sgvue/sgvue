@@ -399,7 +399,7 @@ function sendProjectSchedules(withOpen: boolean): void {
 
 /**
  * The open project's saved setups and open schedule — or `null`, the project closed. The
- * Schedules window, when one is joined, shows them at once: the list as My templates, and with
+ * Schedules window, when one is joined, shows them at once: the list as the Templates library's Mine, and with
  * `show`, the open schedule as its current one (a project being opened). A project that was
  * already open and is closing, or a first save's import (`show` false), leaves the schedule on
  * screen alone.

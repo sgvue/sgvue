@@ -16,7 +16,7 @@ import { dimensionOf } from '../../../schedule/schedule/formula';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
 import { fieldKey, kindsByHeading, selectableFields } from '../panels/shared';
-import { cross } from '../icons';
+import { ICON } from '../icons';
 
 /**
  * What the result IS. The measurements let the column convert units like any other number;
@@ -96,7 +96,8 @@ function calcRow(state: AppState, c: Calculated, problems: Map<string, string>, 
     <div class="row">
       <input type="text" data-act="calc-name" data-id="${esc(c.id)}" value="${esc(c.name)}"
         placeholder="Name" class="grow-1" aria-label="Calculated value name" />
-      <button class="x-btn hv-warn-both" data-act="calc-remove" data-id="${esc(c.id)}" title="Remove">${cross()}</button>
+      <button class="icon-btn sm hv-warn-both" data-act="calc-remove" data-id="${esc(c.id)}"
+        title="Remove" aria-label="Remove ${esc(c.name || 'calculated value')}">${ICON.remove}</button>
     </div>
     <div class="calc-body">${body}</div>
   </div>`;

@@ -13,8 +13,7 @@ import type { Column, Op } from '../../../schedule/schedule/def';
 import type { ScheduleResult } from '../../../schedule/schedule/engine';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
-import { toggle } from './shared';
-import { cross } from '../icons';
+import { ICON } from '../icons';
 
 /**
  * Six ready-made pairs: a soft fill with text deep enough to stay readable on it. Picking
@@ -92,17 +91,19 @@ export function conditionalRules(
         <select class="cond-op${presence ? ' solo' : ''}" data-act="cond-op" data-i="${n}"${at} aria-label="Condition">${ops}</select>
         ${presence ? '' : `<input class="grow-1" type="text" data-act="cond-value" data-i="${n}"${at} value="${esc(r.value ?? '')}"
           placeholder="value" aria-label="Value" />`}
-        <button class="x-btn hv-warn-both" data-act="cond-remove" data-i="${n}"${at} title="Remove">${cross()}</button>
+        <button class="icon-btn sm hv-warn-both" data-act="cond-remove" data-i="${n}"${at}
+          title="Remove rule" aria-label="Remove rule">${ICON.remove}</button>
       </div>
       <div class="row block snug">
         <span class="cond-presets">${presets}</span>
       </div>
       <div class="row block snug">
-        <label class="cond-swatch"><span class="lbl">Fill</span>
+        <label class="cond-swatch" title="Fill colour">${ICON.fill}
           <input type="color" data-act="cond-bg" data-i="${n}"${at} value="${esc(bg)}" aria-label="Fill colour" /></label>
-        <label class="cond-swatch"><span class="lbl">Text</span>
+        <label class="cond-swatch" title="Text colour">${ICON.textColour}
           <input type="color" data-act="cond-fg" data-i="${n}"${at} value="${esc(fg)}" aria-label="Text colour" /></label>
-        ${toggle('cond-bold', 'Bold', !!r.bold, ` data-i="${n}"${at}`)}
+        <label class="icon-btn sm cond-bold hv-step" title="Bold"><input type="checkbox" data-act="cond-bold" data-i="${n}"${at}
+          aria-label="Bold"${r.bold ? ' checked' : ''} />${ICON.bold}</label>
       </div>
       ${effect}
     </div>`;

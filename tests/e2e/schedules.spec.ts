@@ -234,6 +234,13 @@ const act = (win: Page, name: string, more = '') => win.locator(`[data-act="${na
 const chip = (win: Page, kind: string, more = '') => act(win, 'vb-open', `[data-v="${kind}"]${more}`).first()
 /** The one popover, and a control inside it. */
 const pop = (win: Page) => win.locator('#popover')
+/** The Templates library (v1.5.0, phase 3): its card, and Use on one of its rows. */
+const library = (win: Page) => win.locator('.overlay-card[aria-label="Templates"]')
+async function useTemplate(win: Page, key: string): Promise<void> {
+  if (!(await library(win).count())) await act(win, 'open-library').first().click()
+  await library(win).locator(`[data-act="library-row"][data-id="${key}"]`).click()
+  await library(win).locator('[data-act="library-use"]').click()
+}
 const inPop = (win: Page, name: string, more = '') => pop(win).locator(`[data-act="${name}"]${more}`)
 
 /**
@@ -264,14 +271,16 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     const sched = await openSchedules(app, page)
     await expect(sched.locator('tr.data')).toHaveCount(4)
 
-    // 1 — the header's template gallery; the Wall Schedule card applies its columns.
-    await act(sched, 'open-templates').click()
-    const gallery = sched.locator('.overlay-card[aria-label="Start from a template"]')
-    await expect(gallery).toBeVisible()
+    // 1 — the header's Templates library; Use on the Wall Schedule row applies its columns.
+    await act(sched, 'open-library').first().click()
+    const lib = library(sched)
+    await expect(lib).toBeVisible()
     // Focus went into the card (its search box), as it does in the Preferences dialog.
-    await expect(gallery.locator('[data-act="template-search"]')).toBeFocused()
-    await gallery.locator('[data-act="apply-template"][data-id="wall-schedule"]').click()
-    await expect(gallery).toHaveCount(0)
+    await expect(lib.locator('[data-act="library-search"]')).toBeFocused()
+    await lib.locator('[data-act="library-row"][data-id="b:wall-schedule"]').click()
+    await expect(lib.locator('.lib-pane .ph h4')).toHaveText('Wall Schedule')
+    await lib.locator('[data-act="library-use"]').click()
+    await expect(lib).toHaveCount(0)
     await expect(sched.locator('.schedule-title')).toHaveText('Wall Schedule')
     await expect(sched.locator('.tpl-chip')).toContainText('Wall Schedule')
     await expect(sched.locator('table.schedule thead th', { hasText: 'IsExternal' })).toHaveCount(1)
@@ -309,10 +318,16 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     // The marked element follows its row through the re-render.
     await expect(sched.locator('tr.data.on')).toHaveText(/Level 2/)
 
-    // 6 — save; the rail lists it as the setup in use.
+    // 6 — save: the header's Save opens the library's Save row on a schedule that is not a
+    // saved one; Enter saves it, and the rail says it is the setup in use.
     await act(sched, 'save-schedule').first().click()
+    await expect(library(sched).locator('[data-act="library-save-name"]')).toBeFocused()
+    await sched.keyboard.press('Enter')
     await expect(sched.locator('.toast')).toHaveText('Saved “Wall Schedule”.')
-    await expect(sched.locator('.rail-saved.on')).toContainText('Wall Schedule')
+    await sched.keyboard.press('Escape')
+    await expect(library(sched)).toHaveCount(0)
+    await expect(sched.locator('.cur-row')).toContainText('Wall Schedule')
+    await expect(sched.locator('.cur-row .state')).toHaveText('in use')
 
     // 7 — edit, then switch category: the window's own dialog asks first.
     await chip(sched, 'style').click()
@@ -325,25 +340,27 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(sched.locator('.schedule-title')).toHaveText('Slab Schedule')
 
     // 8 — the saved setup survives the window: close Schedules, open it again, load it from
-    // My templates, and the whole setup comes back — filter, grouping, itemise off.
+    // the Templates library's Mine, and the whole setup comes back — filter, grouping, itemise off.
     const gone = sched.waitForEvent('close')
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('schedule.html'))!.close()
     })
     await gone
     const again = await openSchedules(app, page)
-    await expect(again.locator('.rail-saved')).toHaveCount(1)
-    await act(again, 'open-saved').click()
-    const mine = again.locator('.overlay-card[aria-label="My templates"]')
-    await expect(mine.locator('.saved-row')).toHaveCount(1)
-    // Rename through the window's own prompt.
-    await mine.locator('[data-act="rename-saved"]').click()
-    const prompt = again.locator('.dlg[role="dialog"]')
-    await expect(prompt.locator('.dlg-field')).toBeFocused()
-    await prompt.locator('.dlg-field').fill('Walls by level')
-    await prompt.locator('.dlg-field').press('Enter')
-    await expect(mine.locator('.saved-row')).toContainText('Walls by level')
-    await mine.locator('[data-act="load-saved"]').click()
+    await act(again, 'open-library').first().click()
+    const mine = library(again)
+    await expect(mine.locator('[data-act="library-row"][data-id^="m:"]')).toHaveCount(1)
+    // Rename in place: F2 on the selected row, type, Enter.
+    await mine.locator('[data-act="library-row"][data-id="m:Wall Schedule"]').click()
+    await again.keyboard.press('F2')
+    await expect(mine.locator('[data-act="library-rename"]')).toBeFocused()
+    await mine.locator('[data-act="library-rename"]').fill('Walls by level')
+    await mine.locator('[data-act="library-rename"]').press('Enter')
+    await expect(mine.locator('[data-act="library-row"][data-id="m:Walls by level"]')).toHaveCount(1)
+    // The renamed row stays selected; Use loads it (the slab schedule on screen is unedited,
+    // so nothing is asked).
+    await expect(mine.locator('.lib-row.sel')).toHaveAttribute('data-id', 'm:Walls by level')
+    await mine.locator('[data-act="library-use"]').click()
     await expect(mine).toHaveCount(0)
     await expect(again.locator('.schedule-title')).toHaveText('Walls by level')
     await expect(again.locator('tr.group')).toHaveCount(2)
@@ -353,10 +370,15 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await again.locator('tr.data', { hasText: 'Level 1' }).click()
     await expect(page.locator('[data-role="propcard"]')).toContainText('2 selected')
     // Escape closes an overlay, and focus goes back to the button that opened it.
-    await act(again, 'open-templates').click()
+    await act(again, 'open-library').first().click()
     await again.keyboard.press('Escape')
     await expect(again.locator('.overlay')).toHaveCount(0)
-    await expect(act(again, 'open-templates')).toBeFocused()
+    await expect(act(again, 'open-library').first()).toBeFocused()
+    // T opens it too, when nothing is being typed.
+    await again.locator('.status').click()
+    await again.keyboard.press('t')
+    await expect(library(again)).toBeVisible()
+    await again.keyboard.press('Escape')
   } finally {
     await app.close()
   }
@@ -368,8 +390,7 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
     await page.getByText(DROP_COPY).click()
     await expect(page.locator('[data-role="landing"]')).toHaveCount(0, { timeout: 60_000 })
     const sched = await openSchedules(app, page)
-    await act(sched, 'open-templates').click()
-    await sched.locator('[data-act="apply-template"][data-id="wall-schedule"]').click()
+    await useTemplate(sched, 'b:wall-schedule')
     const heads = sched.locator('table.schedule thead th[data-defcol]')
     const widthVar = (i: number) =>
       sched.locator('table.schedule').evaluate((t, n) => (t as HTMLElement).style.getPropertyValue(`--colw-${n}`), i)
@@ -463,8 +484,7 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
     await expect.poll(() => railItems(sched).count()).toBeGreaterThan(3)
 
     // A grouped door schedule with a filter, footers, a grand total and conditional colours.
-    await act(sched, 'open-templates').click()
-    await sched.locator('[data-act="apply-template"][data-id="door-schedule"]').click()
+    await useTemplate(sched, 'b:door-schedule')
     await addOn(sched, 'filter', 'core|storey', 'level')
     await addOn(sched, 'sort', 'core|storey', 'level')
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
@@ -521,12 +541,12 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
       await snap('formula-help', theme)
       await sched.keyboard.press('Escape')
       await sched.keyboard.press('Escape')
-      await act(sched, 'open-templates').click()
-      await snap('template-gallery', theme)
-      await sched.keyboard.press('Escape')
-      await act(sched, 'save-schedule').first().click()
-      await act(sched, 'open-saved').click()
-      await snap('my-templates', theme)
+      await act(sched, 'open-library').first().click()
+      await snap('library', theme)
+      await act(sched, 'library-save-new').click()
+      await snap('library-save-row', theme)
+      await sched.keyboard.press('Enter')
+      await snap('library-mine', theme)
       await sched.keyboard.press('Escape')
       await sched.locator('table.schedule thead th[data-defcol="0"]').click()
       await snap('column-menu', theme)
@@ -1158,11 +1178,12 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const setup = JSON.parse(await readFile(setupPath, 'utf8')) as { name: string; itemize: boolean; entity: string[] }
     expect(setup).toMatchObject({ name: 'Walls round trip', itemize: false, entity: ['IfcWall'] })
 
-    // …and My templates' own row action exports a saved setup the same way.
-    await act(sched, 'open-saved').click()
-    const mine = sched.locator('.overlay-card[aria-label="My templates"]')
+    // …and the library's own Export exports a saved setup the same way.
+    await act(sched, 'open-library').first().click()
+    const mine = library(sched)
+    await mine.locator('[data-act="library-row"][data-id="m:Wall Schedule"]').click()
     await answerSave(app, join(out, 'saved-one'))
-    await mine.locator('[data-act="export-saved"]').click()
+    await mine.locator('[data-act="library-export"]').click()
     await expect(toast).toHaveText('Exported “Wall Schedule” as a schedule file.')
     expect(JSON.parse(await readFile(join(out, 'saved-one.schedule.json'), 'utf8')).name).toBe('Wall Schedule')
     await sched.keyboard.press('Escape')
@@ -1172,11 +1193,15 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     await sched.locator('.dlg[role="dialog"]').getByRole('button', { name: 'Replace' }).click()
     await expect(sched.locator('.schedule-title')).toHaveText('Slab Schedule')
 
-    // …and Open schedule file… in My templates brings the whole setup back.
+    // …and the library's Import adds the file to Mine, selected (v1.5.0, phase 3); Use brings
+    // the whole setup back.
     await answerOpen(app, setupPath)
-    await act(sched, 'open-saved').click()
+    await act(sched, 'open-library').first().click()
     await mine.locator('[data-act="import-schedule"]').click()
-    await expect(toast).toHaveText('Loaded “Walls round trip”.')
+    await expect(toast).toHaveText('Imported “Walls round trip” into Mine.')
+    await expect(mine.locator('.lib-row.sel')).toHaveAttribute('data-id', 'm:Walls round trip')
+    await expect(sched.locator('.schedule-title')).toHaveText('Slab Schedule')
+    await mine.locator('[data-act="library-use"]').click()
     await expect(mine).toHaveCount(0)
     await expect(sched.locator('.schedule-title')).toHaveText('Walls round trip')
     await expect(sched.locator('tr.group')).toHaveCount(2)
@@ -1195,7 +1220,7 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const bad = join(out, 'bad.schedule.json')
     await writeFile(bad, '{"hello":"world"}')
     await answerOpen(app, bad)
-    await act(sched, 'open-saved').click()
+    await act(sched, 'open-library').first().click()
     await mine.locator('[data-act="import-schedule"]').click()
     await expect(sched.locator('.toast.bad')).toHaveText('Missing "version" — is this a schedule file?')
     await writeFile(bad, 'not json at all')
@@ -1408,10 +1433,10 @@ test('the assistant makes a schedule, sees it, and changes it keeping the user�
 
     // 3 — the user makes it theirs in the window: the Wall Schedule template, columns and all.
     // The schedule from chat is unsaved work, so the window's own dialog asks first.
-    await act(sched, 'open-templates').click()
-    await sched.locator('[data-act="apply-template"][data-id="wall-schedule"]').click()
+    await useTemplate(sched, 'b:wall-schedule')
     const dialog = sched.locator('.dlg[role="dialog"]')
-    await expect(dialog).toContainText('Replace the current schedule setup?')
+    // The Templates library's own question (v1.5.0, phase 3), not the category's.
+    await expect(dialog).toContainText(/Replace the edited “Walls from chat”\? Changes not saved to it are lost\./)
     await dialog.getByRole('button', { name: 'Replace' }).click()
     await expect(sched.locator('.tpl-chip')).toContainText('Wall Schedule')
     const theirs = await heads.count()
@@ -1695,12 +1720,12 @@ test('the assistant works the Schedules window’s own controls: undo and redo, 
     await manage('undo')
     await expect(title).toHaveText('Walls from chat')
 
-    // 4 — My templates: saved, listed, and loaded back after the schedule has become another.
+    // 4 — the library's Mine: saved, listed, and loaded back after the schedule has become another.
     expect((await manage('saved_list')).result).toMatchObject({ saved: [], total: 0 })
     const saved = await manage('save')
     expect(saved.result).toMatchObject({ done: true, name: 'Walls from chat' })
     await expect(toast).toHaveText('Saved “Walls from chat”.')
-    await expect(sched.locator('.rail-saved.on')).toContainText('Walls from chat')
+    await expect(sched.locator('.cur-row')).toContainText('Walls from chat')
     expect((await manage('saved_list')).result.saved).toEqual([
       { name: 'Walls from chat', classes: ['IfcWall'], columns: 2, saved: new Date().toISOString().slice(0, 10), inUse: true, lacks: false }
     ])
@@ -1829,7 +1854,9 @@ test('the assistant works the Schedules window’s own controls: undo and redo, 
 
     // …and the user's own Delete is what it always was: their click asked for it, so its confirm
     // button has the focus — and the Enter that answered nothing above answers this one.
-    await sched.locator('.rail-saved [data-act="delete-saved"][data-name="Walls L1"]').click()
+    await act(sched, 'open-library').first().click()
+    await library(sched).locator('[data-act="library-row"][data-id="m:Walls L1"]').click()
+    await library(sched).locator('[data-act="library-delete"]').click()
     await expect(dialog.locator('.dlg-label')).toHaveText('Schedules')
     await expect(dialog.getByRole('button', { name: 'Delete' })).toBeFocused()
     expect(await sched.evaluate(() => document.querySelector('.dlg')!.hasAttribute('tabindex'))).toBe(false)
@@ -1838,7 +1865,8 @@ test('the assistant works the Schedules window’s own controls: undo and redo, 
     await expect.poll(names).toEqual([])
 
     // 8 — open_file only asks: the native Open dialog, attached to the Schedules window. The
-    // file the user picks there becomes the schedule; the tool is told nothing of it.
+    // file the user picks there is added to the library's Mine (v1.5.0, phase 3) — the
+    // schedule on screen stays; the tool is told nothing of it.
     await stubDialogs(app)
     const file = join(dir, 'picked.schedule.json')
     await writeFile(
@@ -1852,8 +1880,10 @@ test('the assistant works the Schedules window’s own controls: undo and redo, 
     const picked = await manage('open_file')
     expect(picked.result).toMatchObject({ done: false, asked: true, dialog: true })
     expect(JSON.stringify(picked.result)).not.toMatch(/picked|From a file|[A-Za-z]:[\\/]/)
-    await expect(title).toHaveText('From a file')
-    await expect(toast).toHaveText('Loaded “From a file”.')
+    await expect(toast).toHaveText('Imported “From a file” into Mine.')
+    await expect(library(sched).locator('.lib-row.sel')).toHaveAttribute('data-id', 'm:From a file')
+    await expect(title).not.toHaveText('From a file')
+    await sched.keyboard.press('Escape')
     expect((await dialogs(app)).opens.at(-1)).toMatchObject({ attached: true, properties: ['openFile'] })
 
     // 9 — the schedule's rows as a set, in the main window: select what it lists.
@@ -1908,7 +1938,14 @@ test('a real model: what the snapshot costs (SGVUE_IFC)', async () => {
     const largestName = ((await largest.locator('.grow').textContent()) ?? '').trim()
     if (!/\bon\b/.test((await largest.getAttribute('class')) ?? '')) await largest.click()
     await expect(largest).toHaveClass(/\bon\b/)
-    const engineMs = ((await sched.locator('.status').textContent()) ?? '').match(/Rendered in (\d+) ms/)?.[1]
+    // v1.5.0, phase 3: the status line no longer says "Rendered in N ms" (ifcTable 2026-11-07);
+    // the engine run is timed here instead.
+    const engineMs = (await sched.evaluate(() => {
+      const t = performance.now()
+      document.querySelector<HTMLElement>('[data-act="rail-sort"]')!.click()
+      document.querySelector<HTMLElement>('[data-act="rail-sort"]')!.click()
+      return performance.now() - t
+    })).toFixed(0)
     const timed = (selector: string, ctrlKey = false) => sched.evaluate(([sel, ctrl]) => {
       const t = performance.now()
       document.querySelector<HTMLElement>(sel)!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: ctrl }))

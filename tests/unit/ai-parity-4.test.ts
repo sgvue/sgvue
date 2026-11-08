@@ -584,7 +584,7 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     )
     const save = await run('manage_schedules', { op: 'save' })
     expect(save).toMatchObject({ done: true, name: 'Door Schedule (2)' })
-    expect(save.message).toContain('Saved the open schedule to My templates as "Door Schedule (2)".')
+    expect(save.message).toContain('Saved the open schedule to the Templates library (Mine) as "Door Schedule (2)".')
     expect((await run('manage_schedules', { op: 'rename', name: 'Doors', to: 'Doors L2' })).message).toBe(
       'Renamed the saved setup "Doors" to "Doors L2".'
     )
@@ -604,7 +604,7 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     connect(managingPort((m) => (m.op === 'saved_list' ? { result: 'done', saved, unlisted: 1 } : { result: 'done', templates })).port)
     expect(await run('manage_schedules', { op: 'saved_list' })).toEqual({
       message:
-        '2 saved setups in My templates, newest first. 1 more cannot be listed here: their names are too long, or hold characters that cannot be shown — the user reaches them in the Schedules window.',
+        '2 saved setups in the Templates library (Mine), newest first. 1 more cannot be listed here: their names are too long, or hold characters that cannot be shown — the user reaches them in the Schedules window.',
       done: true,
       saved,
       total: 3,
@@ -618,7 +618,7 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     })
     connect(managingPort(() => ({ result: 'done', saved: [], unlisted: 0 })).port)
     expect(await run('manage_schedules', { op: 'saved_list' })).toMatchObject({
-      message: 'There are no saved setups in My templates.',
+      message: 'There are no saved setups in the Templates library (Mine).',
       saved: [],
       total: 0,
       truncated: false
@@ -694,18 +694,15 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     const open = await run('manage_schedules', { op: 'open_file' })
     expect(open).toMatchObject({ done: false, asked: true, dialog: true })
     expect(open.message).toContain(
-      'is opening its Open dialog for a schedule file (.schedule.json). The file the user picks there becomes the open schedule, and nothing changes if they cancel'
+      'is opening its Open dialog for a schedule file (.schedule.json). The file the user picks there is added to their saved setups (the Templates library’s Mine) — it does not replace the open schedule — and nothing changes if they cancel'
     )
     // No file name, no path and no definition is in any of it — there is none to carry.
     expect(JSON.stringify([del, print, open])).not.toMatch(/[A-Za-z]:[\\/]|\.json"|"def"/)
   })
 
-  it('a save or a duplicate that would forget a saved setup is asked there too — or held, when the turn has already asked', async () => {
-    const forgets: Record<string, Answer> = {
-      save: { result: 'asked', forgets: 'replace', name: 'Doors', gone: 'Doors' },
-      duplicate: { result: 'asked', forgets: 'evict', name: 'S100', gone: 'S1' }
-    }
-    const { port, asked } = managingPort((m) => (m.ask ? forgets[m.op] : { ...forgets[m.op], result: 'held' }))
+  it('a save that would forget a saved setup is asked there too — or held, when the turn has already asked', async () => {
+    const forgets: Answer = { result: 'asked', forgets: 'replace', name: 'Doors', gone: 'Doors' }
+    const { port, asked } = managingPort((m) => (m.ask ? forgets : { ...forgets, result: 'held' }))
     connect(port)
     const save = await run('manage_schedules', { op: 'save' })
     expect(save).toMatchObject({ done: false, asked: true, name: 'Doors', wouldForget: 'Doors' })
@@ -715,24 +712,33 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     expect(turn.asked).toContain('save over the saved setup "Doors"')
 
     // The turn has asked: the next is sent with ask:false, the window holds it, and it is refused in words.
-    const dup = await run('manage_schedules', { op: 'duplicate', name: 'S100' })
+    const again = await run('manage_schedules', { op: 'save' })
     expect(asked.map((m) => [m.op, m.ask])).toEqual([
       ['save', true],
-      ['duplicate', false]
+      ['save', false]
     ])
-    expect(dup).toMatchObject({ applied: false, pending: false, alreadyWaiting: turn.asked })
+    expect(again).toMatchObject({ applied: false, pending: false, alreadyWaiting: turn.asked })
     expect(openSchedules).toHaveBeenCalledTimes(1)
 
-    fresh()
-    const copy = await run('manage_schedules', { op: 'duplicate', name: 'S100' })
-    expect(copy.message).toContain(
-      'is asking whether to duplicate "S100", because only a hundred are kept and the oldest, "S1", would be forgotten. Nothing is saved unless the user clicks Duplicate there'
-    )
     // A held change behind the chat's own Apply counts as the turn's request as well.
     fresh()
     turn.pending = { label: 'isolate 3 elements', patch: {} }
     await run('manage_schedules', { op: 'save' })
     expect(asked.at(-1)).toMatchObject({ op: 'save', ask: false })
+  })
+
+  it('at a hundred saved setups a save or a copy is refused, and said so — nothing asked, nothing claimed (v1.5.0)', async () => {
+    connect(managingPort(() => ({ result: 'full' })).port)
+    for (const input of [{ op: 'save' }, { op: 'duplicate', name: 'S100' }]) {
+      const out = await run('manage_schedules', input)
+      expect(out.message).toBe(
+        'A hundred setups are saved, which is all the Schedules window keeps, so nothing was saved. The user deletes one in its Templates library to make room.'
+      )
+      expect(out.done).not.toBe(true)
+      expect(out.asked).toBeUndefined()
+    }
+    // Nothing was asked of the user, so the turn's one request is still free.
+    expect(turn.asked).toBeFalsy()
   })
 
   it('waits three seconds for an answer and no longer, never stacks a second request, and drops a late or a foreign answer', async () => {
@@ -788,14 +794,14 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     connect(managingPort(() => answer).port)
     expect(await run('manage_schedules', { op: 'save' })).toEqual({
       message:
-        'Saved the open schedule to My templates as one whose name cannot be shown here. A setup of another name is never replaced: when the title was taken, the copy was numbered.',
+        'Saved the open schedule to the Templates library (Mine) as one whose name cannot be shown here. A setup of another name is never replaced: when the title was taken, the copy was numbered.',
       done: true,
       name: ''
     })
-    answer = { result: 'asked', forgets: 'evict' }
+    answer = { result: 'asked', forgets: 'replace' }
     const asked = await run('manage_schedules', { op: 'save' })
     expect(asked.message).toContain(
-      'is asking whether to save one whose name cannot be shown here, because only a hundred are kept and the oldest, one whose name cannot be shown here, would be forgotten'
+      'is asking whether to save over the saved setup one whose name cannot be shown here, whose present contents cannot be brought back'
     )
     // An operation that only asks is never answered `done`; one that somehow was is not given
     // another operation's sentence.

@@ -5,11 +5,11 @@
 // column from the picker, where it is listed with the other fields.
 //
 // Ported from ifcTable's `ui/overlays/calcOverlay.ts` (Yong Yen, 2026-11-05) for SGVue v1.5.0,
-// phase 2, in the window's own modal card (`overlay-card`, `hv-step-ink` close, `cross`).
+// phase 2, in the window's own modal card (`overlay-card`, `hv-step-ink` close, `ICON.close`).
 
 import type { ModelStore } from '../../../schedule/ifc/store';
 import type { AppState } from '../state';
-import { cross } from '../icons';
+import { ICON } from '../icons';
 import { calcEditor } from './calcEditor';
 
 export function calcOverlay(state: AppState, store: ModelStore): string {
@@ -19,9 +19,8 @@ export function calcOverlay(state: AppState, store: ModelStore): string {
         <div class="row top head-row">
           <div class="grow-1">
             <h3>Calculated values</h3>
-            <p>Worked out from this schedule's columns — add one as a column from the fields chip</p>
           </div>
-          <button class="overlay-close hv-step-ink" data-act="close-overlay" aria-label="Close">${cross(14, 1.8)}</button>
+          <button class="icon-btn hv-step-ink" data-act="close-overlay" title="Close" aria-label="Close">${ICON.close}</button>
         </div>
       </div>
       <div class="calc-scroll">${calcEditor(state, store)}</div>

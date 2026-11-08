@@ -72,18 +72,29 @@ const bump = <K>(m: Map<K, number>, k: K) => m.set(k, (m.get(k) ?? 0) + 1);
 
 /**
  * Coverage depends on the model and the category alone — never on the schedule — so it is
- * built once per category and reused by every repaint until either changes.
+ * built once per category and reused by every repaint until the model changes. One entry PER
+ * class set, held for the model's lifetime (v1.5.0, phase 3 — ifcTable 2026-11-07): the
+ * Templates library reads coverage for every template it lists, and a single-entry memo
+ * thrashed on every one of them (and then once more for the table's own category).
  */
-let memo: { store: ModelStore; key: string; cov: Coverage } | null = null;
+let memoStore: ModelStore | null = null;
+const memo = new Map<string, Coverage>();
 
 /** Let go of the closed model: the cache would otherwise keep it, and its tallies, alive. */
-export function clearCoverageCache() { memo = null; }
+export function clearCoverageCache() { memo.clear(); memoStore = null; }
+
+const keyOf = (entities: string[]) => entities.join('|');
+
+/** The coverage already built for these classes on this model, without building it. */
+export function peekCoverage(store: ModelStore, entities: string[]): Coverage | undefined {
+  return memoStore === store ? memo.get(keyOf(entities)) : undefined;
+}
 
 export function buildCoverage(store: ModelStore, entities: string[]): Coverage {
-  const key = entities.join('|');
-  if (memo?.store === store && memo.key === key) return memo.cov;
-  const cov = sweep(store, entities);
-  memo = { store, key, cov };
+  if (memoStore !== store) { memo.clear(); memoStore = store; }
+  const key = keyOf(entities);
+  let cov = memo.get(key);
+  if (!cov) { cov = sweep(store, entities); memo.set(key, cov); }
   return cov;
 }
 

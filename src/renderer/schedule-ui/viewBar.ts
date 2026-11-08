@@ -23,7 +23,7 @@ import { defaultUnit } from '../../schedule/schedule/format';
 import type { AppState } from './state';
 import { buildCoverage, populated } from './coverage';
 import { esc } from './dom';
-import { cross } from './icons';
+import { ICON } from './icons';
 import { calcProblems } from './overlays/calcEditor';
 import { ruleEffects } from './panels/filterSection';
 import { displayNum, kindOf, typeOf } from './panels/shared';
@@ -117,7 +117,7 @@ export function renderViewBar(state: AppState, store: ModelStore): string {
         <span class="k">Only where</span><span class="v">${esc(fieldLabel(def, r.field))}</span><span class="k">${esc(op)}</span>${
   value ? `<span class="v">${esc(value)}</span>` : ''}</button><button class="hv-step" data-act="vb-open" data-v="filter" data-i="${i}" data-id="removed"
         title="Elements this rule removes"><span class="removed">−${removes.toLocaleString()} removed</span></button><button
-        class="x hv-warn-both" data-act="filter-remove" data-i="${i}" aria-label="Remove this filter">${cross(10)}</button></span>`);
+        class="x icon-btn hv-warn-both" data-act="filter-remove" data-i="${i}" title="Remove this filter" aria-label="Remove this filter">${ICON.remove}</button></span>`);
   });
   const filtersFull = def.filters.length >= MAX_FILTERS;
   // At the cap the add gives way to a plain hint, as in the prototype.
@@ -129,7 +129,7 @@ export function renderViewBar(state: AppState, store: ModelStore): string {
     parts.push(`<span class="vchip"><button class="hv-step" data-act="vb-open" data-v="sort" data-i="${i}" aria-haspopup="dialog">${
       def.sort.length > 1 ? `<span class="lvl-n">${i + 1}</span>` : ''}<span class="k">${isGroup(l) ? 'Grouped by' : 'Sorted by'}</span><span
         class="v">${esc(fieldLabel(def, l.field))}</span><span class="k">${l.dir === 'desc' ? 'Z→A' : 'A→Z'}</span></button><button
-        class="x hv-warn-both" data-act="sort-remove" data-i="${i}" aria-label="Remove this level">${cross(10)}</button></span>`);
+        class="x icon-btn hv-warn-both" data-act="sort-remove" data-i="${i}" title="Remove this level" aria-label="Remove this level">${ICON.remove}</button></span>`);
   });
   const sortFull = def.sort.length >= MAX_SORT_LEVELS;
   parts.push(sortFull ? `<span class="vhint">${MAX_SORT_LEVELS} levels max</span>`

@@ -13,6 +13,7 @@ import type { AppState } from './state';
 import type { Coverage } from './coverage';
 import { option } from './dom';
 import { renderPicker } from './fieldPicker';
+import { ICON } from './icons';
 import { appearanceBody } from './panels/appearanceSection';
 import { matchToggle, ruleBody, ruleEffects } from './panels/filterSection';
 import { fieldSelect, toggle } from './panels/shared';
@@ -27,7 +28,8 @@ function filterPop(state: AppState, store: ModelStore, i: number): string {
     <div class="pop-row"><span class="pop-lbl">Field</span><div class="grow-1">${fieldSelect(state, def.filters[i].field, 'filter-field', i)}</div></div>
     ${ruleBody(state, store, i, e)}
     <hr class="pop-rule" />
-    <button class="mi danger hv-warn-both" data-act="filter-remove" data-i="${i}">Remove filter</button>`;
+    <div class="icon-row end"><button class="icon-btn sm hv-warn-both" data-act="filter-remove" data-i="${i}"
+      title="Remove filter" aria-label="Remove filter">${ICON.remove}</button></div>`;
 }
 
 function sortPop(state: AppState, i: number): string {
@@ -49,11 +51,15 @@ function sortPop(state: AppState, i: number): string {
       ${toggle('sort-blank', 'Blank line after each group', !!l.blankLine, at, 'row')}
     </div>
     <hr class="pop-rule" />
-    <div class="mrow">
-      <button class="mi hv-step" data-act="sort-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}>↑ Earlier</button>
-      <button class="mi hv-step" data-act="sort-move" data-v="1"${at}${i === def.sort.length - 1 ? ' disabled' : ''}>↓ Later</button>
-    </div>
-    <button class="mi danger hv-warn-both" data-act="sort-remove"${at}>Remove level</button>`;
+    <div class="icon-row">
+      <button class="icon-btn sm hv-step" data-act="sort-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}
+        title="Move earlier" aria-label="Move level earlier">${ICON.arrowUp}</button>
+      <button class="icon-btn sm hv-step" data-act="sort-move" data-v="1"${at}${i === def.sort.length - 1 ? ' disabled' : ''}
+        title="Move later" aria-label="Move level later">${ICON.arrowDown}</button>
+      <span class="spacer"></span>
+      <button class="icon-btn sm hv-warn-both" data-act="sort-remove"${at}
+        title="Remove level" aria-label="Remove level">${ICON.remove}</button>
+    </div>`;
 }
 
 export function renderViewPopover(state: AppState, store: ModelStore, cov: Coverage): string {

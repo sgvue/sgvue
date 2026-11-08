@@ -163,6 +163,14 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
          no walls, doors, spaces or other building elements.</div>`
       : '<div class="empty-note">Pick a category in the left rail to start a schedule.</div>';
   }
+  // A template can be used on a model without its class (the library says so first); the
+  // table then says it plainly and offers the way back, rather than drawing empty headings
+  // (ifcTable, 2026-11-07).
+  const store = state.store;
+  if (store && !def.entity.some((e) => (store.byEntity.get(e)?.length ?? 0) > 0)) {
+    return `<div class="empty-note">This model has no ${esc(def.entity.join(' or '))}.
+      <button class="link" data-act="open-library">Pick another template</button></div>`;
+  }
   if (!res.columns.length) return '<div class="empty-note">No columns yet. Add some from the fields chip above, or press /.</div>';
 
   // Map visible column index back to its index in def.columns, so a header click opens

@@ -41,7 +41,7 @@
 //
 // 2026-11-07 — the `.sgvue` project file, phase 3 (plan D9):
 //   port → `projectSchedules` → while a project is open in the main window, its saved setups
-//                       are My templates (schedules.ts), and every change to them goes back as
+//                       are the Templates library's Mine (schedules.ts), and every change to them goes back as
 //                       `projectSaved`; `null` — the project closed — is this window's own
 //                       `localStorage` list again. With `open`, the project's open schedule is
 //                       shown as the current one, as `define` shows one, without its toast.
@@ -79,6 +79,8 @@ import { runSchedule, type ScheduleResult } from '../../schedule/schedule/engine
 import { wireColumnResize } from './colResize';
 import { renderColumnMenu } from './columnMenu';
 import { buildCoverage, clearCoverageCache, type Coverage } from './coverage';
+import { cancelPreview, clearLibraryCache } from './libraryCache';
+import { afterPaintLibrary, setLibraryPainter } from './libraryPaint';
 import { dialogOpen } from './dialog';
 import { byId, flash } from './dom';
 import { EXPORT_ACTIONS, exportRefusal } from './exporting';
@@ -196,6 +198,7 @@ function paint(scope: RenderScope) {
     // Nothing for a menu to point at, and no model for the caches to hold on to.
     closePopover();
     clearCoverageCache();
+    clearLibraryCache();
     clearPickerMemo();
     queueCurrent();
     return;
@@ -252,7 +255,7 @@ function paint(scope: RenderScope) {
     outputPane.innerHTML = renderSchedule(state, res, coverage);
     drawn = null;
     // eslint-disable-next-line no-unsanitized/property -- renderStatus: numbers, and the selection note through esc()
-    statusBar.innerHTML = renderStatus(state, res, coverage, ms);
+    statusBar.innerHTML = renderStatus(state, res, coverage);
   }
 
   restoreUi(ui);
@@ -261,6 +264,10 @@ function paint(scope: RenderScope) {
   afterPaintPopover();
   afterPaintViewBar(state);
   settleOverlayFocus(ui);
+  // After the overlay's own first focus: the library may ask for its name row instead.
+  afterPaintLibrary();
+  // A closed library wants no preview: drop one still waiting to run.
+  if (state.overlay !== 'library') cancelPreview();
   if (ms > 120) console.warn(`[schedules] schedule took ${ms.toFixed(0)}ms`);
   queueCurrent();
 }
@@ -281,6 +288,23 @@ function paintPopoverOnly() {
   afterPaintViewBar(state);
 }
 setPopoverPainter(paintPopoverOnly);
+
+/**
+ * The Templates library alone: a move of its selection, its search, sort or folds — and a
+ * background count arriving (libraryCache.ts). The table and every other pane are left as they
+ * are: a full paint re-runs the schedule (v1.5.0, phase 3; ifcTable's `paintLibraryOnly`).
+ */
+function paintLibraryOnly() {
+  const { store } = state;
+  if (!store || !shown || state.overlay !== 'library') return;
+  const ui = snapshotUi();
+  // eslint-disable-next-line no-unsanitized/property -- renderOverlay and the library: every file- or user-derived value in it goes through esc()
+  overlayRoot.innerHTML = renderOverlay(state, store, coverage);
+  restoreUi(ui);
+  afterPaintLibrary();
+}
+const gatedLibraryPaint = deferWhilePressed(() => paintLibraryOnly());
+setLibraryPainter(() => gatedLibraryPaint('all'));
 
 // ---------- the schedule on screen, for the assistant (2026-09-28) ----------
 
@@ -368,7 +392,7 @@ function projectSchedules(saved: PortSavedEntry[] | null, open: unknown): void {
     const sent = SavedListShape.safeParse(entries);
     if (sent.success) port?.postMessage({ type: 'projectSaved', saved: entries });
   });
-  // A repaint either way, so My templates shows the list it now has.
+  // A repaint either way, so the library's Mine shows the list it now has.
   if (!(open && showProjectSchedule(open)) && (was || saved)) render();
 }
 
@@ -449,7 +473,7 @@ function load(snapshot: ScheduleSnapshot): void {
     sel3d: 0,
     ...(fits ? {} : {
       selectedColumn: null, selectedCols: [], removedBy: null, litBy: null,
-      templateId: null, savedName: null, dirty: false, overlay: null,
+      templateId: null, savedName: null, dirty: false, overlay: null, libraryDraft: null,
     }),
   });
 }
@@ -643,7 +667,7 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (event.source !== window || event.data !== CH_SCHEDULE_PORT) return;
   port?.close();
   port = event.ports[0] ?? null;
-  // A new main page has opened no project yet: My templates is this window's own list until
+  // A new main page has opened no project yet: Mine is this window's own list until
   // that page says otherwise (`projectSchedules`).
   if (projectListOn()) projectSchedules(null, null);
   if (port) port.onmessage = (m: MessageEvent) => receive(m.data);

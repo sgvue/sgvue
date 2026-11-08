@@ -19,10 +19,20 @@ import { record } from '../../schedule/history';
 import type { ModelStore } from '../../schedule/ifc/store';
 import { emptySchedule, type ScheduleDef } from '../../schedule/schedule/def';
 
-/** The modals: the calculated-value editor, the template gallery, the saved setups — and
- *  `formula`, the in-window syntax guide ifcTable served as `/formula.html`. */
-type Overlay = 'calc' | 'templates' | 'saved' | 'formula';
+/** The modals: the calculated-value editor, the Templates library (v1.5.0, phase 3 — it
+ *  replaces the template gallery and My templates) — and `formula`, the in-window syntax guide
+ *  ifcTable served as `/formula.html`. */
+type Overlay = 'calc' | 'library' | 'formula';
 export type RenderScope = 'all' | 'table' | 'panes';
+
+/** What the library's list is ordered by. */
+export type LibrarySortKey = 'name' | 'cls' | 'count' | 'fit' | 'dt';
+
+/**
+ * The library's inline name row: saving the schedule on screen (`target` null) or renaming a
+ * saved template (`target` its `m:` key). `error` is what the row says under the box.
+ */
+export interface LibraryDraft { kind: 'save' | 'rename'; target: string | null; text: string; error: string }
 
 export interface AppState {
   store: ModelStore | null;
@@ -45,7 +55,7 @@ export interface AppState {
   /** True once the user has edited the definition — guards destructive switches. */
   dirty: boolean;
   /**
-   * Which template this schedule was started from, for the gallery's IN USE badge.
+   * Which template this schedule was started from, for the library's IN USE badge.
    * Deliberately NOT part of ScheduleDef — a saved schedule records its provenance in
    * meta.notes, and the save format stays frozen.
    */
@@ -75,9 +85,17 @@ export interface AppState {
 
   // transient search / filter boxes
   railQuery: string;
-  templateQuery: string;
-  /** Search text in the My templates panel — transient, like templateQuery. */
-  savedQuery: string;
+
+  // The Templates library (overlays/library.ts) — transient UI, none of it saved and none of it
+  // in ScheduleDef. `librarySel` is a template's key: `b:<presetId>` or `m:<saved name>`.
+  // `libraryFolds` holds `sec:<section>` for a folded section and `abs:<section>` for an OPENED
+  // "Not in this model" group. (ifcTable's `librarySheet` is not ported: this window asks with
+  // its own dialog, dialog.ts.)
+  libraryQuery: string;
+  librarySel: string | null;
+  librarySort: { by: LibrarySortKey; dir: 1 | -1 };
+  libraryFolds: string[];
+  libraryDraft: LibraryDraft | null;
 
   /**
    * Index of the filter rule whose removals are being previewed. When set, the table
@@ -133,8 +151,11 @@ export const state: AppState = {
   railSort: 'count',
 
   railQuery: '',
-  templateQuery: '',
-  savedQuery: '',
+  libraryQuery: '',
+  librarySel: null,
+  librarySort: { by: 'count', dir: -1 },
+  libraryFolds: [],
+  libraryDraft: null,
 
   removedBy: null,
   litBy: null,

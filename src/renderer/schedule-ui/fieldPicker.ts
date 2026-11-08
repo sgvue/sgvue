@@ -15,7 +15,8 @@
 //
 // Ported from ifcTable's `ui/fieldPicker.ts` (Yong Yen, 2026-11-05) for SGVue v1.5.0, phase 2.
 // SGVue draws the drag handle and the × with this window's own glyphs (`icons.ts`: `grip`,
-// `cross`) and its hover classes; every row and button keeps ifcTable's markup and acts.
+// `ICON.remove` — phase 3, ifcTable's icon buttons) and its hover classes; every row and
+// button keeps ifcTable's markup and acts.
 
 import type { ModelStore } from '../../schedule/ifc/store';
 import { fieldKey } from '../../schedule/schedule/actions';
@@ -25,7 +26,7 @@ import { state } from './state';
 import { buildCoverage, type Coverage } from './coverage';
 import { esc } from './dom';
 import { allRows, CALC_GROUP, CORE_GROUP, pctOf, pickerModel, type PickRow, type PickerModel } from './pickerModel';
-import { cross, grip } from './icons';
+import { grip, ICON } from './icons';
 import { mark, stripHtml, type Peek } from './pickerStrip';
 
 export type PickMode = 'picker' | 'add-filter' | 'add-sort';
@@ -100,7 +101,8 @@ function tableRows(cov: Coverage, rows: PickRow[]): string {
       <button class="nm" data-act="pick-jump" data-i="${i}" title="${c.hidden ? 'Hidden — open its settings' : 'Go to this column'}">${esc(name)}${c.hidden ? ' <span class="sub">hidden</span>' : ''}</button>
       ${twinTag(byId.get(fieldKey(c.field))?.twin ?? '', source)}${covBadge(pct)}
       <button class="eye btn" data-act="${c.hidden ? 'cm-show' : 'cm-hide'}" data-defcol="${i}"${c.hidden ? '' : ' title="Keeps it for sorting, grouping and filtering"'}>${c.hidden ? 'Show' : 'Hide'}</button>
-      <button class="x-btn hv-warn-both" data-act="col-remove" data-i="${i}" aria-label="Remove ${esc(name)}">${cross()}</button>
+      <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" title="Remove column"
+        aria-label="Remove ${esc(name)}">${ICON.remove}</button>
     </div>`;
   }).join('');
 }
@@ -135,7 +137,8 @@ function footHtml(): string {
       <button class="quiet hv-step-ink" data-act="pick-calc">+ Calculated value</button>`;
   }
   const rows = new Map(allTicked());
-  return `<span class="basket">${picks.map((id) => `<span class="bchip">${esc(rows.get(id) ?? id)}<button data-act="pick-toggle" data-id="${esc(id)}" aria-label="Untick ${esc(rows.get(id) ?? id)}">${cross(10)}</button></span>`).join('')}</span>
+  return `<span class="basket">${picks.map((id) => `<span class="bchip">${esc(rows.get(id) ?? id)}<button class="icon-btn sm hv-warn-both" data-act="pick-toggle" data-id="${esc(id)}" title="Untick"
+    aria-label="Untick ${esc(rows.get(id) ?? id)}">${ICON.remove}</button></span>`).join('')}</span>
     <button class="btn primary" data-act="pick-commit">Add ${picks.length} column${picks.length === 1 ? '' : 's'} <kbd>Ctrl</kbd><kbd>Enter</kbd></button>`;
 }
 

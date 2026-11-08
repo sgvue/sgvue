@@ -78,6 +78,8 @@ export class FakeEl extends FakeTarget {
     if (parent instanceof FakeEl) parent.children.push(this);
     Object.assign(this.dataset, data);
   }
+  /** What the app's "is this a text box" tests read (ifcTable, 2026-11-07). */
+  get tagName() { return this.tag.toUpperCase(); }
   attr(name: string): string | undefined {
     if (name.startsWith('data-')) {
       const key = name.slice(5).replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -121,6 +123,8 @@ export interface FakeEvent {
   type: string;
   target: FakeEl;
   key?: string;
+  /** A click's count: the library's second click on a selected row uses it. */
+  detail?: number;
   shiftKey?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;

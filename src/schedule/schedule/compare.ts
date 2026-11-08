@@ -45,7 +45,7 @@ export const OP_LABELS: Record<Op, string> = {
   between: 'is between',
 };
 
-/** How a rule reads wherever the app says one — the Filter tab's summary, a template card. */
+/** How a rule reads wherever the app says one — a filter chip, a template in the Templates library. */
 export function ruleText(f: FilterRule, def?: ScheduleDef): string {
   const value = f.value === undefined || f.value === '' ? '' : ` ${f.value}`;
   return `${defaultHeading(f.field, def)} ${OP_LABELS[f.op] ?? f.op}${value}`;

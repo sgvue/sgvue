@@ -161,14 +161,14 @@ describe('a 3D selection this table does not show', () => {
   it('the status line says so, and the rail marks the category that holds it', () => {
     const res = runSchedule(store, doors);
     const away = stateOf({ def: doors, sel3d: 2, selAway: true, selEntities: ['IfcWall'] });
-    const text = renderStatus(away, res, buildCoverage(store, ['IfcDoor']), 1).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const text = renderStatus(away, res, buildCoverage(store, ['IfcDoor'])).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     expect(text).toContain('2 selected in 3D · not in this schedule');
     const rail = renderRail(away, store);
     expect(rail).toMatch(/class="rail-item hv-step sel-here" data-act="category" data-entity="IfcWall"/);
     expect(rail).not.toMatch(/sel-here" data-act="category" data-entity="IfcDoor"/);
     // In the table: no note, no mark.
     const here = stateOf({ def: doors, sel3d: 2, selAway: false, selEntities: [] });
-    expect(renderStatus(here, res, buildCoverage(store, ['IfcDoor']), 1)).toContain('<span class="sel-note"></span>');
+    expect(renderStatus(here, res, buildCoverage(store, ['IfcDoor']))).toContain('<span class="sel-note"></span>');
     expect(renderRail(here, store)).not.toContain('sel-here');
   });
 });

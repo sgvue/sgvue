@@ -25,6 +25,7 @@ import type { AppState } from './state';
 import { COL_WIDTH_MAX, COL_WIDTH_MIN } from './colResize';
 import { coverBar, fraction, populated, type Coverage } from './coverage';
 import { esc, option } from './dom';
+import { ICON } from './icons';
 import { calcProblems } from './overlays/calcEditor';
 import { conditionalRules } from './panels/conditionalRules';
 import { remapBlock } from './remap';
@@ -175,8 +176,11 @@ export function renderColumnMenu(
     + toggle('fmt-suppress', 'Blank instead of zero', !!f.suppressZero, at, 'row') : ''}
       ${type === 'bool' ? rowx('Yes / No', `<select class="full" data-act="fmt-bool"${at} aria-label="Yes or No style">
         ${BOOL_STYLES.map((s) => option(s, s, (f.boolStyle ?? 'Yes/No') === s)).join('')}</select>`) : ''}
-      <div class="mrow"><button class="mi hv-step" data-act="cm-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}>← Move left</button>
-        <button class="mi hv-step" data-act="cm-move" data-v="1"${at}${i === def.columns.length - 1 ? ' disabled' : ''}>Move right →</button></div>
+      ${rowx('Move', `<div class="icon-row">
+        <button class="icon-btn sm hv-step" data-act="cm-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}
+          title="Move left" aria-label="Move column left">${ICON.arrowLeft}</button>
+        <button class="icon-btn sm hv-step" data-act="cm-move" data-v="1"${at}${i === def.columns.length - 1 ? ' disabled' : ''}
+          title="Move right" aria-label="Move column right">${ICON.arrowRight}</button></div>`)}
     </div>` : '';
 
   const hiddenNote = col.hidden
@@ -195,19 +199,22 @@ export function renderColumnMenu(
     ${rowx('Total', seg('cm-total', totalsFor(type, numeric), col.total ?? '', at, 'Total at footers'))}
     ${rowx('Align', seg('fmt-align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], alignOf(col), at, 'Alignment'))}
     <hr class="pop-rule" />
-    <div class="mrow">
-      <button class="mi hv-step${level?.dir === 'asc' ? ' on' : ''}" data-act="cm-sort" data-v="asc"${at}>Sort A→Z</button>
-      <button class="mi hv-step${level?.dir === 'desc' ? ' on' : ''}" data-act="cm-sort" data-v="desc"${at}>Sort Z→A</button>
-    </div>
+    ${rowx('Sort', `<div class="icon-row">
+      <button class="icon-btn sm hv-step${level?.dir === 'asc' ? ' on' : ''}" data-act="cm-sort" data-v="asc"${at}
+        aria-pressed="${level?.dir === 'asc'}" title="Sort A to Z" aria-label="Sort A to Z">${ICON.sortAsc}</button>
+      <button class="icon-btn sm hv-step${level?.dir === 'desc' ? ' on' : ''}" data-act="cm-sort" data-v="desc"${at}
+        aria-pressed="${level?.dir === 'desc'}" title="Sort Z to A" aria-label="Sort Z to A">${ICON.sortDesc}</button></div>`)}
     <button class="mi hv-step${grouped ? ' on' : ''}" data-act="cm-group"${at}>${grouped ? 'Grouped by this — ungroup' : 'Group by this'}</button>
     <button class="mi hv-step" data-act="cm-filter"${at}>Filter by this…</button>
     <button class="mi hv-step" data-act="cm-view" data-v="colour"${at}>Colour rules<span class="tail">${col.conditional?.length || ''}</span></button>
     <button class="fold hv-step${more ? '' : ' shut'}" data-act="cm-more"${at} aria-expanded="${more}"><span class="tw">▾</span>More…</button>
     ${moreBody}
     <hr class="pop-rule" />
-    <div class="mrow">
-      ${col.hidden ? `<button class="mi hv-step" data-act="cm-show"${at}>Show column</button>`
-    : `<button class="mi hv-step" data-act="cm-hide"${at} title="Keeps it for sorting, grouping and filtering">Hide column</button>`}
-      <button class="mi danger hv-warn-both" data-act="col-remove" data-i="${i}">Remove column</button>
+    <div class="icon-row end">
+      ${col.hidden ? `<button class="icon-btn sm hv-step" data-act="cm-show"${at} title="Show column" aria-label="Show column">${ICON.eye}</button>`
+    : `<button class="icon-btn sm hv-step" data-act="cm-hide"${at} title="Hide column — keeps it for sorting, grouping and filtering"
+        aria-label="Hide column">${ICON.eyeOff}</button>`}
+      <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" title="Remove column"
+        aria-label="Remove column">${ICON.remove}</button>
     </div>`;
 }

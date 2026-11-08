@@ -37,20 +37,17 @@ import {
   type Column, type CondRule, type FieldRef, type FilterRule, type ScheduleDef, type SortLevel, type TotalKind,
 } from '../../schedule/schedule/def';
 import { clampDecimals, defaultDecimals } from '../../schedule/schedule/format';
-import { presetById } from '../../schedule/schedule/presets';
 import { dimensionOf } from '../../schedule/schedule/formula';
-import {
-  applyTemplate, askDeleteSaved, duplicateSaved, loadSaved, printSchedule, renameSaved, saveCurrent,
-  stepHistory,
-} from './actions';
+import { printSchedule, stepHistory } from './actions';
 import { later } from './pending';
 import { editDef, state, update, updateDef, type RenderScope } from './state';
 import { clampWidth, fitAll, naturalWidths } from './colResize';
 import { followColumn, menuColumn, openHiddenColumnMenu, setMenuView, toggleColumnMenu, toggleMore } from './columnMenu';
 import { wireReorder } from './dnd';
-import { confirmDialog, dialogOpen, promptDialog } from './dialog';
+import { confirmDialog, dialogOpen } from './dialog';
 import { menuOpen, openMenu } from './menu';
-import { EXPORT_ACTIONS, exportScheduleFile, openScheduleFile } from './exporting';
+import { EXPORT_ACTIONS, openScheduleFile } from './exporting';
+import { wireLibrary } from './libraryEvents';
 import { clamp, flash, onChange, onClick, onInput } from './dom';
 import { fieldFromKey, kindOf, kindsByHeading, selectedIndex, statOf, storeNum, typeOf } from './panels/shared';
 import { closePopover, paintPopover, popoverId } from './popover';
@@ -72,9 +69,9 @@ const checked = (el: HTMLElement) => (el as HTMLInputElement).checked;
  */
 const idx = (el: HTMLElement) => Number(el.dataset.i ?? -1);
 /**
- * Category, saved setup and template all replace the whole definition. If the user has
- * customized anything there is no way back, so ask first. One predicate and one string for
- * all three: written out twice, the template's copy could be — and was — the odd one out.
+ * A category replaces the whole definition. If the user has customized anything there is no
+ * way back, so ask first. (A saved setup or a template is the Templates library's, which asks
+ * in its own words — libraryActions.ts `requestUse`.)
  */
 //
 // SGVue: the question is the window's own dialog, so the answer arrives later. With nothing
@@ -143,7 +140,7 @@ function liveText(
  */
 function liveState(
   root: HTMLElement, selector: string,
-  key: 'railQuery' | 'templateQuery' | 'savedQuery',
+  key: 'railQuery',
 ) {
   onInput(root, selector, (el) => {
     const value = text(el);
@@ -174,6 +171,7 @@ export function wireApp(root: HTMLElement, hooks: Hooks) {
     return next;
   }));
   wireOverlays(root);
+  wireLibrary(root);
   wireColumns(root);
   wireFilter(root);
   wireSort(root);
@@ -203,10 +201,8 @@ function wireExports(root: HTMLElement) {
       { label: 'Schedule file (.schedule.json)', sep: true, run: () => void EXPORT_ACTIONS.schedule_file() },
     ], 'Export');
   });
-  onClick(root, '[data-act="export-saved"]', (el) => {
-    const entry = listSaved().find((s) => s.name === el.dataset.name);
-    if (entry) void exportScheduleFile(entry.def);
-  });
+  // The Templates library's Import: the native Open dialog, and the file goes into Mine
+  // (exporting.ts). Its Export is the pane's own (libraryActions.ts).
   onClick(root, '[data-act="import-schedule"]', () => void openScheduleFile());
 }
 
@@ -340,34 +336,8 @@ function wireShell(root: HTMLElement) {
     const w = clampWidth(Math.ceil(source));
     updateDef((def) => act.setWidths(def, picked.map((i) => [i, w])));
   });
-
-  // ---- saved schedules ----
-  // The bodies of these handlers are in actions.ts since 2026-10-02: a request from the
-  // assistant (manage.ts) runs the same function a click does.
-  onClick(root, '[data-act="save-schedule"]', () => { saveCurrent(); });
-  onClick(root, '[data-act="load-saved"]', (el) => {
-    const entry = listSaved().find((s) => s.name === el.dataset.name);
-    if (!entry) return;
-    // Clicking the one already loaded reloads it over your edits, a genuinely useful act.
-    // ifcTable's start-screen branch, where the row arms a setup for the next model, has no
-    // counterpart here: the model is always open.
-    ifReplaceOk(() => { if (popoverId()) closePopover(); loadSaved(entry); });
-  });
-  onClick(root, '[data-act="delete-saved"]', (el) => askDeleteSaved(el.dataset.name ?? ''));
-
-  // ---- my templates panel ----
-  liveState(root, '[data-act="saved-search"]', 'savedQuery');
-
-  onClick(root, '[data-act="rename-saved"]', (el) => {
-    const name = el.dataset.name ?? '';
-    void promptDialog('Rename this template', name, 'Rename').then((answer) => {
-      const next = answer?.trim();
-      if (!next || next === name) return;
-      renameSaved(name, next);
-    });
-  });
-
-  onClick(root, '[data-act="duplicate-saved"]', (el) => { duplicateSaved(el.dataset.name ?? ''); });
+  // Save, and every saved setup, are the Templates library's since v1.5.0, phase 3
+  // (libraryEvents.ts).
 }
 
 // ---------------------------------------------------------------- rows (phase 3)
@@ -461,7 +431,9 @@ function wireHistory(root: HTMLElement) {
     if (key !== 'z' && key !== 'y') return;
     // A dialog owns the keyboard while it is open; its text box keeps its own undo. So does
     // any text box of the window's: the caret in a box means "undo my typing", not the schedule.
-    if (dialogOpen() || editable(e.target)) return;
+    // The Templates library takes these first and drops them outside a text box (libraryEvents.ts);
+    // inside one they are the box's own — never the schedule hidden behind the library.
+    if (dialogOpen() || editable(e.target) || state.overlay === 'library') return;
     e.preventDefault();
     stepHistory(wantRedo);
   });
@@ -478,14 +450,12 @@ function wireOverlays(root: HTMLElement) {
   // "N formulas to fix" chip, the picker's "+ Calculated value" and the syntax guide's way
   // back. The modal replaces the popover.
   onClick(root, '[data-act="open-calc"]', () => { closePopover(); update({ overlay: 'calc' }); });
-  onClick(root, '[data-act="open-templates"]', () => { closePopover(); update({ overlay: 'templates' }); });
-  onClick(root, '[data-act="open-saved"]', () => { closePopover(); update({ overlay: 'saved' }); });
   // The formula syntax guide, which ifcTable served as a page of its own (`/formula.html`).
   onClick(root, '[data-act="open-formula"]', () => update({ overlay: 'formula' }));
   // Its section links scroll the guide; an in-page anchor would be a navigation.
   onClick(root, '[data-act="formula-jump"]', (el) =>
     root.querySelector(`#help-${CSS.escape(el.dataset.v ?? '')}`)?.scrollIntoView({ block: 'start' }));
-  onClick(root, '[data-act="close-overlay"]', () => update({ overlay: null }));
+  onClick(root, '[data-act="close-overlay"]', () => update({ overlay: null, libraryDraft: null }));
   // Clicking the dimmed surround closes; clicking anywhere inside the card must not.
   // Both ends of the gesture have to land there, not just the release. When a press and a
   // release happen on different elements the browser fires `click` on their nearest common
@@ -498,28 +468,21 @@ function wireOverlays(root: HTMLElement) {
     pressOnBackdrop = t?.closest('[data-act="overlay-backdrop"]') === t;
   });
   onClick(root, '[data-act="overlay-backdrop"]', (el, ev) => {
-    if (pressOnBackdrop && ev.target === el) update({ overlay: null });
+    if (pressOnBackdrop && ev.target === el) update({ overlay: null, libraryDraft: null });
   });
   // One Escape handler, in the order things sit on top of each other: an overlay first,
   // then a column selection — the other thing that outstays its welcome. The window's own
   // dialog (dialog.ts) owns Escape while it is open, and the popover takes its Escape at
-  // window capture before this one sees it (popover.ts).
+  // window capture before this one sees it (popover.ts), and the Templates library orders its
+  // own Escape (name row → search → close) at window capture too (libraryEvents.ts).
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || dialogOpen()) return;
+    if (e.key !== 'Escape' || dialogOpen() || state.overlay === 'library') return;
     // The syntax guide is opened from the calculated-value editor, so Escape goes back there.
     if (state.overlay === 'formula') { update({ overlay: 'calc' }); return; }
     if (state.overlay) { update({ overlay: null }); return; }
     // 'all', for the same reason as the two selection branches in wireShell: clearing the
     // marks also disables the header's Equal width button.
     if (state.selectedCols.length) update({ selectedCols: [] });
-  });
-
-  // ---- template gallery ----
-  liveState(root, '[data-act="template-search"]', 'templateQuery');
-  onClick(root, '[data-act="apply-template"]', (el) => {
-    const preset = presetById(el.dataset.id ?? '');
-    if (!preset) return;
-    ifReplaceOk(() => { if (popoverId()) closePopover(); applyTemplate(preset); });
   });
 }
 

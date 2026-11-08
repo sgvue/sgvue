@@ -39,7 +39,7 @@ beforeEach(() => {
   setRenderer((scope) => { paints.push(scope); });
   const d = def();
   resetHistory(d);
-  Object.assign(state, { def: d, selectedColumn: 0, dirty: false, templateQuery: '' });
+  Object.assign(state, { def: d, selectedColumn: 0, dirty: false, railQuery: '' });
   const cell = new Map<string, string>();
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -196,7 +196,7 @@ describe('when a pending edit lands, and what repaints', () => {
   it('a panes-only paint that lands a schedule edit still owes the table its paint', () => {
     setRenderer((scope) => { flushPending(); paints.push(scope); });
     typeInto(root, (d, v) => act.setName(d, v), 'R');
-    update({ templateQuery: 'x' }, 'panes');
+    update({ railQuery: 'x' }, 'panes');
     vi.advanceTimersByTime(0);
     expect(paints).toEqual(['panes', 'table']);
   });
@@ -211,9 +211,9 @@ describe('when a pending edit lands, and what repaints', () => {
 
   it('a search lands as a panes-only repaint', () => {
     const box = new EventTarget();
-    later(box, () => { state.templateQuery = 'fire'; }, 'panes', 150);
+    later(box, () => { state.railQuery = 'fire'; }, 'panes', 150);
     vi.advanceTimersByTime(200);
-    expect(state.templateQuery).toBe('fire');
+    expect(state.railQuery).toBe('fire');
     expect(paints).toEqual(['panes']);
   });
 });

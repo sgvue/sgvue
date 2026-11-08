@@ -5,8 +5,10 @@
 // the main window — but its Export menu is, since phase 4, as one more header button whose menu
 // is the row menu's own (`menu.ts`). Its centre head (the schedule's name, the template it came
 // from, Auto-fit and Equal width) is, whole. To those the header adds what a desktop window
-// reaches for without a rail: the category being scheduled, the template gallery, My
-// templates, Save, Export, Print, and undo / redo beside their shortcuts.
+// reaches for without a rail: the category being scheduled, the Templates library (v1.5.0,
+// phase 3 — ifcTable's one library in place of the gallery and My templates), Save, Export,
+// Print, and undo / redo beside their shortcuts. Auto-fit and Equal width are icon buttons
+// since ifcTable's icon set (2026-11-07), keeping the accent they had as words.
 //
 // Drawn in SGVue's toolbar idiom: 30 px icon buttons at 6 px radius with `hv-step` and a
 // `data-tip`, the category as the sidebar's accent pill, the status line in the status bar's
@@ -16,7 +18,7 @@ import { redoDepth, undoDepth } from '../../schedule/history';
 import type { ScheduleResult } from '../../schedule/schedule/engine';
 import type { Coverage } from './coverage';
 import { esc } from './dom';
-import * as icon from './icons';
+import { ICON } from './icons';
 import { selectionNote } from './selection';
 import type { AppState } from './state';
 
@@ -48,22 +50,21 @@ export function renderHeader(state: AppState): string {
       aria-label="Schedule name" title="Rename this schedule" spellcheck="false" />
     ${categories}${template}
     <span class="spacer"></span>
-    <button class="btn" data-act="fit-all"
-      title="Fit every column to its contents, and give columns of nearly equal width one shared width">Auto-fit columns</button>
-    <button class="btn" data-act="fit-equal"${equal ? '' : ' disabled'}
+    <button class="icon-btn accent hv-step" data-act="fit-all" aria-label="Auto-fit columns"
+      title="Fit every column to its contents, and give columns of nearly equal width one shared width">${ICON.autofit}</button>
+    <button class="icon-btn accent hv-step" data-act="fit-equal"${equal ? '' : ' disabled'} aria-label="Equal width"
       title="${equal
         ? 'Give the selected columns the width of the column you last clicked'
-        : 'Shift+click two or more column headings first'}">Equal width</button>
+        : 'Shift+click two or more column headings first'}">${ICON.equalWidth}</button>
     <span class="hdr-group" role="group" aria-label="Schedule actions">
-      ${tool('open-templates', 'Start from a template', icon.templates)}
-      ${tool('open-saved', 'My templates', icon.saved)}
-      ${tool('save-schedule', 'Save this setup', icon.save)}
+      ${tool('open-library', 'Templates library (T)', ICON.templates)}
+      ${tool('save-schedule', 'Save this schedule as a template', ICON.save)}
     </span>
     <span class="hdr-group" role="group" aria-label="Export, print and history">
-      ${tool('export-menu', 'Export — Excel, CSV or a schedule file', icon.exportFile, false, ' aria-haspopup="menu"')}
-      ${tool('print', `Print the whole schedule (${MOD}P)`, icon.print)}
-      ${tool('undo', `Undo (${MOD}Z)`, icon.undo, !undoDepth())}
-      ${tool('redo', `Redo (${MOD === '⌘' ? '⇧⌘Z' : 'Ctrl+Y'})`, icon.redo, !redoDepth())}
+      ${tool('export-menu', 'Export — Excel, CSV or a schedule file', ICON.exportFile, false, ' aria-haspopup="menu"')}
+      ${tool('print', `Print the whole schedule (${MOD}P)`, ICON.print)}
+      ${tool('undo', `Undo (${MOD}Z)`, ICON.undo, !undoDepth())}
+      ${tool('redo', `Redo (${MOD === '⌘' ? '⇧⌘Z' : 'Ctrl+Y'})`, ICON.redo, !redoDepth())}
     </span>`;
 }
 
@@ -78,8 +79,12 @@ export function selNoteHtml(state: AppState, res: ScheduleResult): string {
   return note ? `<span>${esc(note)}</span><span class="dot">·</span>` : '';
 }
 
-/** ifcTable's `renderStatus`, word for word, in the status bar's mono line — after the note. */
-export function renderStatus(state: AppState, res: ScheduleResult, cov: Coverage, ms: number): string {
+/**
+ * ifcTable's `renderStatus`, word for word, in the status bar's mono line — after the note.
+ * v1.5.0, phase 3: "Rendered in N ms" is gone, as in ifcTable (2026-11-07); main.ts still warns
+ * in the console when a run is slow.
+ */
+export function renderStatus(state: AppState, res: ScheduleResult, cov: Coverage): string {
   const rows = res.totalDataRows;
   const matched = res.matchedElements;
   // Elements in the scheduled category — counted once, by the coverage sweep, which is
@@ -95,7 +100,5 @@ export function renderStatus(state: AppState, res: ScheduleResult, cov: Coverage
     <span class="dot">·</span>
     <span>${matched.toLocaleString()} of ${total.toLocaleString()} elements matched</span>
     <span class="dot">·</span>
-    <span>${esc(collapse)}</span>
-    <span class="spacer"></span>
-    <span>Rendered in ${ms.toFixed(0)} ms</span>`;
+    <span>${esc(collapse)}</span>`;
 }

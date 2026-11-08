@@ -305,7 +305,7 @@ export const VeeCloseRequest = z.undefined()
  * largest category of the 134 MB reference model, `IfcMember` at 4 082 rows in its default
  * columns, is a 0.13 MB workbook and a 0.33 MB CSV — about 32 and 82 bytes a row — so all
  * 15 889 of its elements in one schedule would be ~0.5 MB and ~1.3 MB, and a workbook of the
- * 100 saved setups My templates can hold, each that largest category, ~13 MB. 50 MB is about
+ * 100 saved setups the Templates library can hold, each that largest category, ~13 MB. 50 MB is about
  * four times that worst case, and still a small copy across the process boundary. It
  * exists so a renderer that has gone wrong cannot fill the user's disk, or main's memory,
  * through this channel; the page refuses sooner, with a message, before it asks.

@@ -166,7 +166,7 @@ export interface ScheduleBrief {
   category: string[]
   /** Its visible column headings, as the table shows them. */
   columns: string[]
-  /** Its filter rules as the Filter tab words them, or "". */
+  /** Its filter rules as the view bar's filter chips word them, or "". */
   filters: string
   /** Rows the table shows. */
   rowCount: number

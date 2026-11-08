@@ -20,7 +20,11 @@ function walk(dir: string): string[] {
 
 const files = walk(UI);
 const read = (f: string) => readFileSync(f, 'utf8');
-const events = read(resolve(UI, 'events.ts'));
+/** The wiring files: their selectors are what is HANDLED, never what is emitted. v1.5.0,
+ *  phase 3: the Templates library's wiring is its own file, as in ifcTable. */
+const WIRING = ['events.ts', 'libraryEvents.ts'];
+const isWiring = (f: string) => WIRING.some((w) => f.endsWith(`/${w}`) || f.endsWith(`\\${w}`));
+const events = WIRING.map((w) => read(resolve(UI, w))).join('\n');
 
 /** Act names written into markup, from every ui module except the wiring itself. */
 const emitted = new Set<string>();
@@ -28,7 +32,7 @@ const emitted = new Set<string>();
 const interpolated: string[] = [];
 
 for (const f of files) {
-  if (f.endsWith('events.ts')) continue;
+  if (isWiring(f)) continue;
   const src = read(f);
   for (const m of src.matchAll(/data-act="([a-z][a-z0-9-]*)"/g)) emitted.add(m[1]);
   // Three places build the name instead of writing it. Each is resolved by reading the
@@ -119,7 +123,7 @@ describe('a backdrop closes only for a click that also began on it', () => {
   const close = events.match(/onClick\(root, '\[data-act="overlay-backdrop"\]'[\s\S]*?\n  \}\);/)?.[0] ?? '';
 
   it('found both halves, so the test is not vacuously passing', () => {
-    expect(close).toMatch(/update\(\{ overlay: null \}\)/);
+    expect(close).toMatch(/update\(\{ overlay: null[ ,]/);
     expect(press, 'wireOverlays must record the press origin on pointerdown')
       .toMatch(/overlay-backdrop/);
   });
