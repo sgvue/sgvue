@@ -61,10 +61,17 @@ included); `npx vitest run` **208 files passed / 1 skipped, 4 144 tests passed /
 (`scripts-parse.test.ts` parses the harness); `npm run build` exit 0; `npm run privacy` PASS.
 **Not run, by the rules of this session:** the e2e specs and the captures.
 
-**Owed.** The windowed runs on the owner's yes: `npm run test:e2e -- tests/e2e/vee-trace.spec.ts
-tests/e2e/vee-stage2.spec.ts` (and `smoke`, `consent-gate`, which stage 1 edited), then the `vm-*`
-captures in both themes beside the shots; VoiceOver over the window; the owner's Windows check of
-the child window (above SGVue, moving and minimising with it); and the owner's ten ratings.
+**The first window runs (2026-11-09, on the owner's yes).** Seven runs, fixed between them
+(`15d218c`): the screenshot harness's Vee window crashed main (SIGSEGV — device emulation before
+load; fixed); the diary's IFC names now use the file's spelling and the term colour; "1 element";
+the not-ready line carries its day line and time; the reduced-motion e2e compares the matrix by
+layout (the owner: "Compare layout, not pixels" — one frame rasterised twice, 160 corner pixels
+apart, after the advisor's analysis); the rest were test assumptions. **Final run: the seven
+chat-window specs, 64 passed, 3 skipped (opt-in), 0 failed**; all 12 `vm-*` captures in both themes,
+side by side with the prototype in `tests/parity/2026-11-08-vee-messages/compare/` (git-ignored).
+
+**Owed.** VoiceOver over the window; the owner's Windows check of the child window (above SGVue,
+moving and minimising with it); the owner's look on the Mac; the owner's ten ratings; the release.
 
 ## 2026-11-08 — 1.5.0 prepared: ifcTable's table-first Schedules window and the storey rule, recorded
 
