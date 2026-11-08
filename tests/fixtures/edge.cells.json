@@ -318,6 +318,23 @@
    "storey": "0000000000000000000006",
    "tag": "",
    "typeName": ""
+  },
+  "000000000000000000000Z": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcDiscreteAccessory",
+   "longName": "",
+   "materials": [],
+   "name": "Bracket on the loose wall",
+   "objectType": "",
+   "predefinedType": "",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": null,
+   "tag": "",
+   "typeName": ""
   }
  },
  "file": "edge.ifc",
@@ -334,7 +351,7 @@
   "IfcRotationalMassMeasure": "ROTATIONALMASSUNIT",
   "IfcThermalTransmittanceMeasure": "THERMALTRANSMITTANCEUNIT"
  },
- "sha256": "e48cbb320091a05b55bf47b48ba1527db3781e7ee975d2b57f1283424d57c835",
+ "sha256": "29220fa48fabf2b36f6e2702999b0a9360d1f44edd58ce331a8421f2efc3b405",
  "spatial": {
   "0000000000000000000002": {
    "longName": "",

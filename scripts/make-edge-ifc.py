@@ -17,7 +17,10 @@ else:
  · a **mass per length** and a **rotational mass**, compound measures with no unit assigned, whose
    names contain a length and a mass;
  · a piece of furniture **contained in an `IfcSpace`**, which the storey aggregates, and a wall
-   contained in the building with no storey at all.
+   contained in the building with no storey at all;
+ · a component **nested** (`IfcRelNests`) on that wall and contained nowhere itself, whose
+   Building and Site are its host's — IfcOpenShell's `get_parent` climbs nesting. It is written
+   last, so every GlobalId and entity number before it is unchanged.
 
 Millimetres, at the repository's synthetic site (`CLAUDE.md`, Rules: 12345.457 / 23456.766 /
 5.05 m, −43.4103°) — nothing here is a real place, project, person or organisation. Deterministic:
@@ -209,6 +212,12 @@ def build() -> None:
     )
     define([table], qto("Qto_FurnitureBaseQuantities", [("GrossWeight", "IfcQuantityWeight", "WeightValue", 88.5)]))
     define([space], qto("Qto_SpaceBaseQuantities", [("NetFloorArea", "IfcQuantityArea", "AreaValue", 20.0)]))
+
+    # ── a nested component, contained nowhere: its host's container is its own ──
+    bracket = fx.element(
+        "IfcDiscreteAccessory", "Bracket on the loose wall", fx.bldg_place, (10500.0, 300.0, 1000.0), (200.0, 100.0, 200.0)
+    )
+    f.create_entity("IfcRelNests", GlobalId=gid(), RelatingObject=loose, RelatedObjects=[bracket])
 
     fx.write(2)
 

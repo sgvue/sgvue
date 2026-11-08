@@ -217,8 +217,9 @@ describe('filters and totals against the independent oracle', () => {
     for (const seed of seeds) figures += runSeed(seed);
     process.stderr.write(`[totals oracle] ${seeds.length} seeds × ${STEPS} steps, ${footersSeen} footers, `
       + `${figures} totals compared; operators: ${[...seenOps].sort().join(' ')}\n`);
-    expect(figures).toBeGreaterThan(0);
+    // A replayed seed (`SIM_SEED`) may compare none: what the sweep must reach is checked on the sweep.
     if (ONLY === undefined) {
+      expect(figures).toBeGreaterThan(0);
       expect([...seenOps].sort()).toEqual(['!=', '<', '<=', '=', '>', '>=', 'between()', 'between(..hi)',
         'between(lo..)', 'between(lo..hi)', 'contains', 'endsWith', 'hasValue', 'in', 'noValue', 'startsWith'].sort());
       expect([...seenTotals].sort()).toEqual(['avg', 'count', 'countDistinct', 'max', 'min', 'sum']);

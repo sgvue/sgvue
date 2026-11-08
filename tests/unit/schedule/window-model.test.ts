@@ -143,14 +143,8 @@ afterAll(() => {
 /* ────────────────────────────── the model ────────────────────────────── */
 
 interface Model {
-  /** The definition on screen, as JSON. */
+  /** The definition on screen, as JSON — and the one the history holds as current. */
   screen: string;
-  /**
-   * The definition the history last recorded. It is the one on screen except after a change the
-   * window makes without recording it: a save under a numbered name, or a rename of the setup
-   * on screen (actions.ts writes `state.def.name` directly). See the KNOWN DIFFERENCE below.
-   */
-  cur: string;
   undo: string[];
   redo: string[];
   projectOn: boolean;
@@ -159,22 +153,20 @@ interface Model {
   store: 'doors' | 'site';
 }
 
-/**
- * A change the window records: what the history last recorded goes on the undo stack — which is
- * what was on screen, unless an unrecorded rename came in between (then that entry is the
- * pre-rename definition, and `drift` counts it: the KNOWN DIFFERENCE below).
- */
+/** A change the window records: what was on screen goes on the undo stack, unless nothing changed. */
 function recorded(m: Model, after: string) {
-  if (after !== m.cur) {
-    if (m.cur !== m.screen) reached.drift++;
-    m.undo.push(m.cur);
+  if (after !== m.screen) {
+    m.undo.push(m.screen);
     if (m.undo.length > HISTORY_LIMIT) m.undo.shift();
     m.redo = [];
   }
-  m.cur = m.screen = after;
+  m.screen = after;
 }
 
-/** A change the window makes to the definition on screen without recording it. */
+/**
+ * A change the window makes to the definition on screen that is not an undo step — a save under
+ * a numbered name, a rename of the setup on screen. The history holds it as current from here.
+ */
 function unrecorded(m: Model) {
   m.screen = defJson();
 }
@@ -182,12 +174,12 @@ function unrecorded(m: Model) {
 /** An undo or a redo: the step the model holds, exactly. */
 function step(m: Model, from: string[], to: string[]) {
   if (!from.length) return;
-  to.push(m.cur);
-  m.cur = m.screen = from.pop()!;
+  to.push(m.screen);
+  m.screen = from.pop()!;
 }
 
 const reached = { undoTop: 0, redoTop: 0, atCap: 0, capRefused: 0, deletesYes: 0, deletesNo: 0, saveOverYes: 0,
-  saveOverNo: 0, imports: 0, projectWrites: 0, reloadsReset: 0, menusOpen: 0, defines: 0, renamesOfOpen: 0, drift: 0 };
+  saveOverNo: 0, imports: 0, projectWrites: 0, reloadsReset: 0, menusOpen: 0, defines: 0, renamesOfOpen: 0 };
 
 /* ────────────────────────────── the commands ────────────────────────────── */
 
@@ -448,9 +440,13 @@ const libraryCmds = [
   })),
   // Fill the window's own list to near the cap, as a long-used window's storage would be.
   fc.constant(command('storage near the cap', () => {
-    const list = JSON.parse(W.storage.get(SAVED_KEY) ?? '[]') as unknown[];
+    const list = JSON.parse(W.storage.get(SAVED_KEY) ?? '[]') as { name: string; def: unknown; savedAt: string }[];
     const def = CASES[0].def;
-    for (let i = list.length; i < SAVED_CAP - 1; i++) list.push({ name: `Old ${i}`, def: { ...def, name: `Old ${i}` }, savedAt: '2026-01-01' });
+    // Names the window could have written: never one already in the list (a name is the identity).
+    const taken = new Set(list.map((e) => e.name));
+    for (let i = 0; list.length < SAVED_CAP - 1; i++) {
+      if (!taken.has(`Old ${i}`)) list.push({ name: `Old ${i}`, def: { ...def, name: `Old ${i}` }, savedAt: '2026-01-01' });
+    }
     W.storage.set(SAVED_KEY, JSON.stringify(list));
   }, (m) => !m.projectOn && names().length < SAVED_CAP - 1)),
 ];
@@ -484,7 +480,7 @@ const environment = [
       reached.reloadsReset++;
       m.undo = [];
       m.redo = [];
-      m.cur = m.screen = defJson();
+      m.screen = defJson();
       expect(M.columnMenu.menuColumn(), 'a reload that replaces the schedule leaves no menu').toBeNull();
     } else recorded(m, defJson());
   })),
@@ -503,7 +499,7 @@ function freshModel(): Model {
   M.popover.closePopover();
   M.state.state.store = null;
   deliver({ type: 'store', snapshot: SNAPS.doors });
-  return { screen: defJson(), cur: defJson(), undo: [], redo: [], projectOn: false, localRaw: null, store: 'doors' };
+  return { screen: defJson(), undo: [], redo: [], projectOn: false, localRaw: null, store: 'doors' };
 }
 
 describe('the Schedules window as a state machine (fc.commands)', () => {
@@ -534,18 +530,15 @@ describe('the Schedules window as a state machine (fc.commands)', () => {
     expect(reached.redoTop).toBeGreaterThan(20);
     expect(reached.saveOverYes).toBeGreaterThan(0);
     expect(reached.saveOverNo).toBeGreaterThan(0);
+    expect(reached.renamesOfOpen).toBeGreaterThan(0);
   }, 240_000);
 
-  // KNOWN DIFFERENCE (found by this check, 2026-11-08; not fixed here — a test-only change).
-  // A Save that has to number its name ("Door Schedule" is taken → "Door Schedule (2)") writes
-  // the new name onto the definition on screen without recording it (actions.ts `saveCurrent`:
-  // "a save records what is already on screen, so it is not an edit"); so does renaming the
-  // saved setup that is on screen (`renameSaved`). The history still holds the old name, so
-  // the next change — even one that changes nothing — records the PRE-save definition, and
-  // Undo then brings back the old name: a state that was not on screen before that change.
-  // The simulation models this (`Model.cur`, counted as `drift`); this pins it. When the save
-  // is made to keep the history in step, this test fails and comes out, and so does `cur`.
-  it('known difference: a numbered save renames outside the history, so the next undo restores the old name', () => {
+  // Found by this check (2026-11-08): a Save that has to number its name ("Door Schedule" is
+  // taken → "Door Schedule (2)"), and renaming the saved setup that is on screen, wrote the new
+  // name onto the definition outside the history, so the next change recorded the PRE-save
+  // definition and Undo brought the old name back. Neither is an undo step (`restate`), and the
+  // history holds the new name from then on.
+  it('a numbered save is no undo step, and the next undo keeps the saved name', () => {
     /** A fresh window whose schedule's name is already taken, saved: it is numbered. */
     const savedNumbered = () => {
       freshModel();
@@ -555,21 +548,36 @@ describe('the Schedules window as a state machine (fc.commands)', () => {
       expect(M.actions.saveCurrent()).toEqual({ result: 'done', name: `${name} (2)` });
       expect(M.state.state.def.name).toBe(`${name} (2)`);
       expect(undoDepth(), 'the save is not an undo step').toBe(0);
-      return name;
+      return `${name} (2)`;
     };
-    // An edit after the save is undone to the name the schedule had BEFORE the save.
-    let name = savedNumbered();
+    // An edit after the save is undone to the definition on screen right after the save.
+    let saved = savedNumbered();
     clock += 1000;
     M.state.updateDef((d) => act.setHidden(d, 0, true));
     click('button', { act: 'undo' });
     expect(M.state.state.def.columns[0].hidden).toBeUndefined();
-    expect(M.state.state.def.name, 'not what was on screen before the edit').toBe(name);
-    // A change that changes nothing makes an undo step of its own — one that only renames back.
-    name = savedNumbered();
+    expect(M.state.state.def.name, 'what was on screen before the edit').toBe(saved);
+    // A change that changes nothing makes no undo step.
+    saved = savedNumbered();
     clock += 1000;
     M.state.updateDef((d) => d);
-    expect(undoDepth()).toBe(1);
+    expect(undoDepth()).toBe(0);
+    expect(M.state.state.def.name).toBe(saved);
+  });
+
+  it('renaming the saved setup on screen is no undo step, and the next undo keeps the new name', () => {
+    freshModel();
+    const name = M.state.state.def.name;
+    clock += 1000;
+    expect(M.actions.saveCurrent()).toEqual({ result: 'done', name });
+    expect(M.actions.renameSaved(name, 'Renamed setup')).toBe('ok');
+    expect(M.state.state.def.name).toBe('Renamed setup');
+    expect(undoDepth()).toBe(0);
+    clock += 1000;
+    M.state.updateDef((d) => d);
+    expect(undoDepth(), 'a change that changes nothing').toBe(0);
+    M.state.updateDef((d) => act.setHidden(d, 0, true));
     click('button', { act: 'undo' });
-    expect(M.state.state.def.name).toBe(name);
+    expect(M.state.state.def.name).toBe('Renamed setup');
   });
 });

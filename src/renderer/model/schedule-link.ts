@@ -509,7 +509,8 @@ export function requestExport(format: ExportFormat, ms: number): Promise<ExportA
 /**
  * What became of a `manage_schedules` request (2026-10-02): the Schedules window's own answer
  * (`schedule/messages.ts`, `ManageAckMessage` — already validated, field by field), or `closed`
- * (no window, or it went) or `timeout` (no answer in time). `busy` is the window's — one of its
+ * (no window, or it went) or `timeout` (no answer in time — whether the window acted is not
+ * known: it may have, and answered too late to be heard). `busy` is the window's — one of its
  * dialogs is up — or this side's: another request is still waiting for its answer.
  */
 export interface ManageAnswer extends Omit<ManageAck, 'type' | 'n' | 'result'> {

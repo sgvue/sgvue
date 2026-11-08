@@ -388,10 +388,11 @@ export function buildModelIndex(
   /*
    * ── containment: element → the spatial element holding it (2026-11-08) ──
    * The site, building, storey or space an element sits in, whatever level that is: its own
-   * `IfcRelContainedInSpatialStructure`, else — for a part — what holds the element that
-   * aggregates it; a spatial element (a space) is held by the one aggregating it. It is what
-   * the Schedules window reads Building, Site and Room / Space from, as IfcOpenShell's
-   * `get_container` / `get_aggregate` walk does. Seeded by the containment pass above.
+   * `IfcRelContainedInSpatialStructure`, else — for a part or a nested component — what holds
+   * the element that aggregates or nests it; a spatial element (a space) is held by the one
+   * aggregating it. It is what the Schedules window reads Building, Site and Room / Space from,
+   * as IfcOpenShell's `get_parent` walk does (containment, aggregation, then nesting). Seeded by
+   * the containment pass above.
    */
   const spatialIds = new Set<number>()
   const collectSpatial = (node: SpatialNode | null): void => {
@@ -406,7 +407,7 @@ export function buildModelIndex(
     for (const parent of frontier) {
       const holder = spatialIds.has(parent) ? parent : containerOf.get(parent)
       if (holder === undefined) continue
-      for (const kid of aggregates.get(parent) ?? []) {
+      for (const kid of [...(aggregates.get(parent) ?? []), ...(nests.get(parent) ?? [])]) {
         if (containerOf.has(kid)) continue
         containerOf.set(kid, holder)
         next.push(kid)

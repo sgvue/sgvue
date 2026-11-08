@@ -190,13 +190,16 @@ function paint(scope: RenderScope) {
   if (scope === 'all') stale.clear(); else stale.delete(scope);
 }
 
-/** Merge a patch into state and repaint. */
-export function update(patch: Partial<AppState>, scope: RenderScope = 'all') {
+/**
+ * Merge a patch into state and repaint. `alone`: a new definition in the patch is always an
+ * undo step of its own (the assistant's `define`), never joined to the user's typing.
+ */
+export function update(patch: Partial<AppState>, scope: RenderScope = 'all', alone = false) {
   Object.assign(state, patch);
   // Replacing the definition wholesale — a template, a saved schedule, a category switch
   // — is as undoable as editing one. A restored state records as unchanged, so undo
   // itself never lands back on the stack.
-  if (patch.def) record(state.def);
+  if (patch.def) record(state.def, alone);
   paint(scope);
 }
 

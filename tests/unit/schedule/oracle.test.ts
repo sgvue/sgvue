@@ -12,7 +12,8 @@
  *
  * Three models: `reference.ifc` (2 097 elements, millimetres), `feet.ifc` (feet) and `edge.ifc`
  * (`scripts/make-edge-ifc.py`: Family:Type names, list / enumerated / bounded values, blanks and
- * placeholders, pounds, a count, a non-SI derived unit, furniture in a space, a wall in no storey).
+ * placeholders, pounds, a count, a non-SI derived unit, furniture in a space, a wall in no storey
+ * and a component nested on it).
  *
  * Per IFC class, two schedules, itemised, unfiltered and unsorted: the class's default schedule
  * (what picking the category opens) and one with every field — every core field and every
@@ -137,6 +138,7 @@ const SCALED: Record<string, UnitKind> = {
 const DISCIPLINE: Record<string, string> = {
   IfcBeam: 'STR',
   IfcColumn: 'STR',
+  IfcDiscreteAccessory: 'OTHER',
   IfcFooting: 'STR',
   IfcSlab: 'STR',
   IfcDoor: 'ARC',

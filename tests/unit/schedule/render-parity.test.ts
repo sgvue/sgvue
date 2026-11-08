@@ -52,9 +52,9 @@ const stores = buildStores();
 const stateOf = (store: ModelStore, def: ScheduleDef): AppState =>
   ({ ...blankState, store, def, selected: new Set<number>(), removedBy: null, litBy: null, selectedCols: [] } as AppState);
 
-/** Totals rows as the user reads them: the label in the first cell when that column has none. */
+/** Totals rows as the user reads them: the label in the first cell when that column shows no total. */
 const totalsText = (r: { label: string; cells: (string | null)[] }) =>
-  r.cells.map((c, i) => (i === 0 && c === null ? r.label : (c ?? '')));
+  r.cells.map((c, i) => (i === 0 && (c === null || c === '') ? r.label : (c ?? '')));
 
 /** The style a claimed cell is painted with, from the rule itself: `background`, `color`, bold. */
 function paintOf(rule: { bg?: string; fg?: string; bold?: boolean } | undefined): string | undefined {
@@ -64,7 +64,7 @@ function paintOf(rule: { bg?: string; fg?: string; bold?: boolean } | undefined)
   return bits.length ? bits.join(';') : undefined;
 }
 
-export interface Tally { tables: number; rows: number; cells: number; truncated: number; known: number }
+export interface Tally { tables: number; rows: number; cells: number; truncated: number }
 
 /**
  * Render `def` against `store` with the real renderer and hold every drawn row against the
@@ -151,14 +151,6 @@ function check(store: ModelStore, def: ScheduleDef, tally: Tally, what: string, 
     if (r.kind !== 'data' && r.kind !== 'footer' && r.kind !== 'grand') return;
     const screen = body[i].cells.slice(0, res.columns.length).map((c) => c.text);
     const file = csv[i].cells.slice(0, res.columns.length);
-    // KNOWN DIFFERENCE (found by this check, 2026-11-08, not fixed here): a totals row whose
-    // first column has a total that renders blank — a zero under `suppressZero` — shows its
-    // label in the file (`toRows`: `!cells[0]`) and nothing on screen (`tableView.ts`:
-    // `v === null`). Pinned below; counted here, everything else must agree.
-    if (r.kind !== 'data' && r.cells[0] === '' && screen[0] === '' && file[0] === r.label) {
-      tally.known++;
-      screen[0] = file[0];
-    }
     expect(screen, fail(`row ${i} (${r.kind}): the screen and the export disagree`)).toEqual(file);
   });
 
@@ -194,7 +186,7 @@ function check(store: ModelStore, def: ScheduleDef, tally: Tally, what: string, 
   return res;
 }
 
-const newTally = (): Tally => ({ tables: 0, rows: 0, cells: 0, truncated: 0, known: 0 });
+const newTally = (): Tally => ({ tables: 0, rows: 0, cells: 0, truncated: 0 });
 
 describe('the drawn table is the engine result — golden cases', () => {
   const tally = newTally();
@@ -294,14 +286,11 @@ describe('the cap: past RENDER_CAP rows the table stops and says so', () => {
   });
 });
 
-describe('known difference: a blank first-column total hides the totals row\'s label on screen only', () => {
-  // Found by the screen-vs-export comparison above. The engine's footer and grand rows carry a
-  // label and per-column totals; the label borrows the first cell when that column totals
-  // nothing. A first column whose total RENDERS blank (here `min` of a storey elevation that
-  // is 0, under `suppressZero`) is "nothing" to the export and "something" to the screen. This
-  // test pins the difference as it stands: when the renderer or the export is changed to agree,
-  // it fails, and this block comes out.
-  it('Level 1\'s footer and the grand total: labelled in the CSV, blank on screen', () => {
+describe('a blank first-column total gives its cell to the totals row\'s label, on screen as in the file', () => {
+  // Found by the screen-vs-export comparison above (2026-11-08): a first column whose total
+  // RENDERS blank (here `min` of a storey elevation that is 0, under `suppressZero`) left the
+  // label off the screen while the export wrote it. Both now read `labelTakesFirstCell`.
+  it('Level 1\'s footer and the grand total are labelled on screen and in the CSV', () => {
     const store = stores.metric;
     const def: ScheduleDef = {
       ...emptySchedule('Walls', ['IfcWall']),
@@ -317,10 +306,8 @@ describe('known difference: a blank first-column total hides the totals row\'s l
     const screen = t.body.filter((r) => r.cls.startsWith('footer') || r.cls === 'grand').map((r) => r.cells[0].text);
     const file = toRows(res).filter((r) => r.kind === 'footer' || r.kind === 'grand').map((r) => r.cells[0]);
     expect(file).toEqual(['Level 1: 2', '3,500', '31,500', 'Roof: 2', 'Grand total']);
-    expect(screen).toEqual(['', '3,500', '31,500', 'Roof: 2', '']);
-    const tally = newTally();
-    check(store, def, tally, 'known difference');
-    expect(tally.known).toBe(2);
+    expect(screen).toEqual(file);
+    check(store, def, newTally(), 'blank first total');
   });
 });
 

@@ -14,7 +14,7 @@
 // Every toast, every marker (`savedName`, `templateId`, `dirty`) and every undo entry is
 // therefore the same whoever asked. Nothing here knows about the port.
 
-import { redo, redoDepth, undo, undoDepth } from '../../schedule/history';
+import { redo, redoDepth, restate, undo, undoDepth } from '../../schedule/history';
 import { withModelColumn } from '../../schedule/schedule/columns';
 import { scheduleFromPreset, type Preset } from '../../schedule/schedule/presets';
 import { confirmDialog, type ConfirmHow } from './dialog';
@@ -120,10 +120,11 @@ export function saveCurrent(typed: string = state.def.name, also: Partial<AppSta
     flash(refusal(asked === state.savedName ? asked : null), true);
     return { result: full ? 'full' : 'failed' };
   }
-  // A save records what is already on screen, so it is not an edit: the name goes
-  // straight onto the definition rather than through updateDef, which would push a
-  // history entry for a change the user did not make.
+  // A save records what is already on screen, so it is not an edit: the name goes onto the
+  // definition without an undo step (`restate`) rather than through updateDef, which would push
+  // one for a change the user did not make — and the history holds it from here on.
   state.def.name = name;
+  restate(state.def);
   // You are now on that saved setup, unedited — so the rail and the library say so.
   update({ savedName: name, templateId: null, dirty: false, ...also });
   flash(name === asked
@@ -144,11 +145,12 @@ export function renameSaved(
   }
   // 'missing' says the row is already gone; the next repaint is the whole answer.
   if (result !== 'ok') return result;
-  // The name is the identity, so the marker follows it. Direct assignment for the same
-  // reason as a save: renaming what a setup is called in storage is not an edit to the
-  // schedule on screen, and does not belong on the undo stack.
+  // The name is the identity, so the marker follows it. No undo step, for the same reason as
+  // a save: renaming what a setup is called in storage is not an edit to the schedule on
+  // screen — but the history holds the new name from here on (`restate`).
   if (state.savedName === name) {
     state.def.name = next;
+    restate(state.def);
     update({ savedName: next, ...also });
   } else if (Object.keys(also).length) update(also);
   else render();

@@ -17,8 +17,9 @@
 //      is unanswered, and a request made meanwhile is answered `busy` without being sent;
 //   2. an answer reaches only the request it answers: a request resolves with the window's
 //      fields only from a `manageAck` carrying its own number, delivered while it waited; one
-//      that timed out resolves `timeout`, and its late ack is dropped — never applied to the
-//      next request;
+//      that timed out resolves `timeout` — which claims nothing either way, because the window
+//      may have acted and answered late (the assistant is told the outcome is not known) — and
+//      its late ack is dropped, never applied to the next request;
 //   3. a request delivered more than 2 s after it was asked is dropped by the window: no answer,
 //      no change to the schedule, its history or the saved list, no dialog, nothing printed;
 //   4. a gated request (delete, print) does nothing until the dialog's answer, and then only on
@@ -37,6 +38,7 @@ import { parseScheduleDef, type ScheduleDef } from '../../../src/schedule/schedu
 import { federate } from '../../../src/shared/federate';
 import { mockModelIndex } from '../../../src/renderer/dev/mock-adapter';
 import { connect, defineSchedule, openSchedule, requestManage, type ManageAnswer } from '../../../src/renderer/model/schedule-link';
+import { MANAGE_TIMEOUT_MESSAGE } from '../../../src/renderer/ai/executors/schedule';
 import { setViewer, useShell } from '../../../src/renderer/state/shell';
 import { resetShell, stubViewer } from '../stub-viewer';
 import { FakeEl } from './support/fakeDom';
@@ -149,7 +151,7 @@ interface Plan {
 }
 
 const tally = { runs: 0, dropped: 0, timeouts: 0, lateAcks: 0, busy: 0, gatedYes: 0, gatedNo: 0, races: 0,
-  performedButTimedOut: 0, deliveries: 0, textRaces: 0, defineMerged: 0 };
+  actedThenTimedOut: 0, deliveries: 0, textRaces: 0, closeTextRaces: 0 };
 
 /**
  * A fresh pair of windows joined by a fresh port, set up with everything delivered at once: the
@@ -260,6 +262,14 @@ async function runOne(s: fc.Scheduler, plan: Plan) {
       arrivals.push({ kind: 'define', json: JSON.stringify(Win.state.state.def), at: Date.now(), before: defBefore, text: plan.textOnly });
     }
     if (m.type === 'manage' && !stale && (m.op === 'undo' || m.op === 'redo')) arrivals.length = 0; // a step moves the history
+    // A save that had to number its name renames the schedule on screen, and is no undo step
+    // (`history.ts` `restate`): the last arrival now stands under that name, one step as before.
+    if (m.type === 'manage' && !stale && m.op === 'save' && JSON.stringify(Win.state.state.def) !== defBefore) {
+      const renamed = { ...(JSON.parse(defBefore) as ScheduleDef), name: Win.state.state.def.name };
+      expect(JSON.stringify(Win.state.state.def), 'a save changed more than the name').toBe(JSON.stringify(renamed));
+      const last = arrivals.at(-1);
+      if (last) last.json = JSON.stringify(Win.state.state.def);
+    }
   };
 
   const defineDef = (): ScheduleDef => {
@@ -309,14 +319,14 @@ async function runOne(s: fc.Scheduler, plan: Plan) {
     const mine = acksToMain.filter((x) => x.msg.n === r.n);
     if (a.result === 'timeout') {
       tally.timeouts++;
+      expect(a, 'a timeout carries nothing of the window\'s').toEqual({ result: 'timeout' });
       expect(r.answeredAt! - r.asked, 'timed out early').toBeGreaterThanOrEqual(MANAGE_ACK_MS);
       for (const late of mine) {
         expect(late.at, 'an ack in time was ignored').toBeGreaterThanOrEqual(r.answeredAt!);
         tally.lateAcks++;
       }
-      // Done by the window, but the asker heard "timeout": the window acted on a request that
-      // was fresh when it arrived, and its answer was then delivered after the 3 s wait.
-      if (mine.some((x) => x.msg.result === 'done' || x.msg.result === 'asked')) tally.performedButTimedOut++;
+      // Acted on by the window and answered after the wait: the case a timeout must not deny.
+      if (mine.some((x) => x.msg.result === 'done' || x.msg.result === 'asked')) tally.actedThenTimedOut++;
     } else {
       expect(mine.length, `request ${r.n} resolved "${a.result}" without its own ack`).toBeGreaterThan(0);
       const { type: _t, n: _n, ...fields } = mine[0].msg;
@@ -358,15 +368,10 @@ async function runOne(s: fc.Scheduler, plan: Plan) {
     const undoBtn = new FakeEl('button', { act: 'undo' }, W.pane('output-pane'));
     W.dispatch(undoBtn, 'click', {});
     const back = JSON.stringify(Win.state.state.def);
-    // KNOWN DIFFERENCE (found by this check, 2026-11-08; pinned below): the history joins two
-    // text-only changes less than 700 ms apart into one step — meant for typing — and an
-    // assistant's `define` is not exempt. A text-only define and the user's text edit within
-    // 700 ms of each other, in either order, become one step: one undo takes both back.
-    if (back === first.before && first.kind !== second.kind && plan.textOnly && second.at - first.at < 700) {
-      tally.defineMerged++;
-    } else {
-      expect(back, 'the later arrival is not its own undo step').toBe(first.json);
-    }
+    // Text-only and within 700 ms of each other, in either order, too: a `define` is never
+    // joined to the user's typing (found by this check, 2026-11-08; `history.ts` `alone`).
+    if (plan.textOnly && second.at - first.at < 700) tally.closeTextRaces++;
+    expect(back, 'the later arrival is not its own undo step').toBe(first.json);
   }
   // …and the main window ends holding what the window shows.
   await vi.advanceTimersByTimeAsync(1000);
@@ -406,8 +411,9 @@ describe('the Schedules port under every message order (fc.scheduler)', () => {
     expect(tally.gatedYes).toBeGreaterThan(0);
     expect(tally.gatedNo).toBeGreaterThan(0);
     expect(tally.races).toBeGreaterThan(0);
-    expect(tally.defineMerged).toBeGreaterThan(0);
-    expect(tally.performedButTimedOut).toBeGreaterThan(0);
+    // `closeTextRaces` (text-only, under 700 ms apart) is logged, not required: some seeds draw
+    // none, and the two tests below hold that race in both orders on every run.
+    expect(tally.actedThenTimedOut).toBeGreaterThan(0);
   }, 240_000);
 
   /** Deliveries held until a test releases them, in order, one direction at a time. */
@@ -416,13 +422,11 @@ describe('the Schedules port under every message order (fc.scheduler)', () => {
     return { q, deliver: (dir: 'toWin' | 'toMain', go: () => void) => { q[dir].push(go); }, next: (dir: 'toWin' | 'toMain') => q[dir].shift()!() };
   };
 
-  // KNOWN DIFFERENCE (found by the property above, 2026-11-08; not fixed here). `history.ts`
-  // joins two text-only changes under 700 ms apart into one undo step — the rule for typing —
-  // and `main.ts`'s `define` records through the same `update`, so an assistant's change that
-  // only re-heads a column, landing within 700 ms of the user typing a heading, is folded into
-  // the user's step: one undo takes both back, and the state between them cannot be reached.
-  // When a define is made its own step, this fails and comes out (and so does `defineMerged`).
-  it('known difference: a text-only define within 700 ms of the user\'s typing joins the user\'s undo step', async () => {
+  // Found by the property above (2026-11-08): `history.ts` joins two text-only changes under
+  // 700 ms apart into one undo step — the rule for typing — and `define` recorded through the
+  // same `update`, so an assistant's change that only re-heads a column, landing within 700 ms
+  // of the user typing a heading, was folded into the user's step. A define is its own step.
+  it('a text-only define within 700 ms of the user\'s typing is its own undo step', async () => {
     const h = held();
     const pair = await setUp(h.deliver);
     pair.scheduled();
@@ -434,19 +438,33 @@ describe('the Schedules port under every message order (fc.scheduler)', () => {
     defineSchedule(act.setHeading(base, 1, 'From Vee'), 'edited', 1);
     h.next('toWin');
     expect(Win.state.state.def.columns[1].heading).toBe('From Vee');
-    expect(undoDepth(), 'the define is not a step of its own').toBe(4);
+    expect(undoDepth(), 'the define is a step of its own').toBe(5);
     W.dispatch(new FakeEl('button', { act: 'undo' }, W.pane('output-pane')), 'click', {});
-    expect(JSON.stringify(Win.state.state.def), 'undo skips the state the user typed').not.toBe(typed);
-    expect(Win.state.state.def.columns[0].heading).toBe('First');
+    expect(JSON.stringify(Win.state.state.def), 'undo lands on the state the user typed').toBe(typed);
   });
 
-  // FOUND (design-level, 2026-11-08; not fixed here). `messages.ts` sets the window's freshness
-  // (2 s) under the asker's wait (3 s) so that "whatever it does, it answers within the asker's
-  // wait" — which holds only if the answer takes under 1 s to come back. A request the window
-  // receives at 2 s, acts on and answers, whose answer then waits more than 1 s (the main
-  // renderer busy), is reported `timeout` to the assistant although the window DID act — here,
-  // an undo. A retry would undo twice. The property above counts these (`performedButTimedOut`).
-  it('found: a request acted on at 2 s whose answer comes back after 1 s more is reported as a timeout', async () => {
+  it('the user\'s typing within 700 ms after a text-only define is its own undo step', async () => {
+    const h = held();
+    const pair = await setUp(h.deliver);
+    pair.scheduled();
+    defineSchedule(act.setHeading(structuredClone(openSchedule()!.def), 1, 'From Vee'), 'edited', 1);
+    h.next('toWin');
+    const defined = JSON.stringify(Win.state.state.def);
+    expect(undoDepth()).toBe(4);
+    vi.advanceTimersByTime(100);
+    Win.state.updateDef((d) => act.setHeading(d, 0, 'Typed'));
+    expect(undoDepth(), 'the typing is a step of its own').toBe(5);
+    W.dispatch(new FakeEl('button', { act: 'undo' }, W.pane('output-pane')), 'click', {});
+    expect(JSON.stringify(Win.state.state.def), 'undo lands on the assistant\'s schedule').toBe(defined);
+  });
+
+  // Found by the property above (2026-11-08): `messages.ts` sets the window's freshness (2 s)
+  // under the asker's wait (3 s), but nothing bounds how long the answer takes to come back. A
+  // request the window receives at 2 s, acts on and answers, whose answer then waits more than
+  // 1 s (the main renderer busy), times out although the window DID act — here, an undo. The
+  // assistant was told "most likely nothing was done", and a retry would undo twice. It is now
+  // told the outcome is not known, to read the state first, and that asking again could repeat it.
+  it('a request acted on at 2 s whose answer comes back after 1 s more is reported as not known, never as not done', async () => {
     const h = held();
     const pair = await setUp(h.deliver);
     pair.scheduled();
@@ -454,14 +472,17 @@ describe('the Schedules port under every message order (fc.scheduler)', () => {
     void requestManage('undo', { ask: true }, MANAGE_ACK_MS).then((a) => { answer = a; });
     vi.advanceTimersByTime(MANAGE_FRESH_MS);
     h.next('toWin');
-    const acted = undoDepth();
-    expect(acted, 'the window undid one step').toBe(2);
+    expect(undoDepth(), 'the window undid one step').toBe(2);
     vi.advanceTimersByTime(MANAGE_ACK_MS - MANAGE_FRESH_MS);
     await Promise.resolve();
     expect(answer).toEqual({ result: 'timeout' });
     while (h.q.toMain.length) h.next('toMain');
     await Promise.resolve();
     expect(answer, 'the late answer is dropped').toEqual({ result: 'timeout' });
-    expect(undoDepth(), 'yet the undo happened').toBe(2);
+    expect(undoDepth(), 'the undo happened').toBe(2);
+    // …and what the assistant is told for a timeout says exactly that it may have been done.
+    expect(MANAGE_TIMEOUT_MESSAGE).toMatch(/whether this was done is not known — it may have been\./);
+    expect(MANAGE_TIMEOUT_MESSAGE).toMatch(/before asking again: asking again could do it twice\.$/);
+    expect(MANAGE_TIMEOUT_MESSAGE).not.toMatch(/nothing was done|not done/i);
   });
 });

@@ -24,7 +24,7 @@ import { headingOf, type Column } from '../../schedule/schedule/def';
 import { firingRule, litTarget } from '../../schedule/schedule/conditional';
 import { fontStack } from '../../schedule/schedule/fonts';
 import type { RenderRow, ScheduleResult } from '../../schedule/schedule/engine';
-import { RENDER_CAP } from '../../schedule/schedule/engine';
+import { RENDER_CAP, labelTakesFirstCell } from '../../schedule/schedule/engine';
 import type { AppState } from './state';
 import { populated, type Coverage } from './coverage';
 import { esc } from './dom';
@@ -98,8 +98,8 @@ function renderRow(
       const cls = row.kind === 'grand' ? 'grand' : `footer level-${row.level}`;
       const cells = cols.map((c, i) => {
         const v = row.cells[i];
-        // The label sits in the first column that has no total of its own.
-        if (i === 0 && v === null) return `<td>${esc(row.label)}</td>`;
+        // The label sits in the first column when it shows no total of its own.
+        if (i === 0 && labelTakesFirstCell(row.cells)) return `<td>${esc(row.label)}</td>`;
         return `<td${alignClass(c)}>${esc(v ?? '')}</td>`;
       });
       return `<tr class="${cls}">${cells.join('')}${tail(row.count)}</tr>`;

@@ -375,7 +375,8 @@ function define(raw: unknown, kind: 'made' | 'edited'): void {
     selectedColumn: null, selectedCols: [], removedBy: null, litBy: null,
     // A new schedule is nobody's template or saved setup; a changed one still is, edited.
     ...(kind === 'made' ? { templateId: null, savedName: null } : {}),
-  });
+  // Always an undo step of its own: never folded into the user's typing, before or after it.
+  }, 'all', true);
   // The assistant by its own name, as the main window's panel and pill call it (2026-10-01).
   flash(kind === 'made' ? 'Schedule from Ask Vee' : 'Schedule changed by Ask Vee');
 }

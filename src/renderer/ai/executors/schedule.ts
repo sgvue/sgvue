@@ -339,6 +339,15 @@ function askedThere(what: string, clicks: string, more: Record<string, unknown> 
   }
 }
 
+/**
+ * What `manage_schedules` says when the Schedules window's answer did not come back within
+ * `MANAGE_ACK_MS`: whether it was done is not known, and the state says — never that it was
+ * not done, because a request the window acted on can be answered too late to be heard.
+ */
+export const MANAGE_TIMEOUT_MESSAGE =
+  `The Schedules window did not answer within ${MANAGE_ACK_MS / 1000} s, so whether this was done is not known — it may have been. ` +
+  'Read get_schedule (its undo and redo steps), or op:"saved_list", before saying either way and before asking again: asking again could do it twice.'
+
 const nothing = (message: string, more: Record<string, unknown> = {}): ToolOutcome => ({
   forModel: { message, done: false, ...more }
 })
@@ -356,9 +365,9 @@ function refusedThere(answer: ManageAnswer, op: ManageOp, asked: string, to: str
     case 'closed':
       return nothing('The Schedules window closed, so nothing was done.')
     case 'timeout':
-      return nothing(
-        `The Schedules window did not answer within ${MANAGE_ACK_MS / 1000} s. It drops a request it gets to that late, so most likely nothing was done — read get_schedule, or saved_list, before saying either way.`
-      )
+      // Not "nothing was done": the window may have acted and its answer come back late (a
+      // busy renderer here). `done: null` — not known — and a retry could do it twice.
+      return { forModel: { message: MANAGE_TIMEOUT_MESSAGE, done: null } }
     case 'busy':
       return nothing(
         'The Schedules window has a dialog of its own up, or is still answering another request. Nothing was done — the user finishes that first.'

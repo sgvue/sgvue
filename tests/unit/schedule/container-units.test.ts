@@ -246,6 +246,15 @@ describe('Building and Site come from the element’s own container', () => {
     expect(core.space).toBe('')
   })
 
+  it('a component nested on that wall, contained nowhere itself, has its host\'s Building and Site', async () => {
+    // IfcOpenShell's `get_parent` climbs `IfcRelNests` as well as aggregation.
+    const el = await byGuid('000000000000000000000Z')
+    const building = (await edge).building!
+    expect(el.container).toBe(building.expressId)
+    const { core } = await coreOf('000000000000000000000Z')
+    expect([core.storey, core.building, core.site, core.space]).toEqual(['', 'Building', 'Site', ''])
+  })
+
   it('a wall in a storey keeps its Building and Site, and no space', async () => {
     const { core } = await coreOf('000000000000000000000E')
     expect([core.storey, core.building, core.site, core.space]).toEqual(['Level 00', 'Building', 'Site', ''])

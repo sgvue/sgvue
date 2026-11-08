@@ -766,9 +766,12 @@ describe('manage_schedules — asked of the Schedules window, over the port', ()
     await vi.advanceTimersByTimeAsync(0)
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(1)
-    expect((await first).message).toBe(
-      'The Schedules window did not answer within 3 s. It drops a request it gets to that late, so most likely nothing was done — read get_schedule, or saved_list, before saying either way.'
-    )
+    // Not "nothing was done": the window may have acted and answered too late to be heard.
+    expect(await first).toEqual({
+      message:
+        'The Schedules window did not answer within 3 s, so whether this was done is not known — it may have been. Read get_schedule (its undo and redo steps), or op:"saved_list", before saying either way and before asking again: asking again could do it twice.',
+      done: null
+    })
     // Its answer arriving now is nobody's; the next request is answered by its own.
     receive({ type: 'manageAck', n, result: 'done', undo: 9, redo: 9 })
     const next = run('manage_schedules', { op: 'undo' })

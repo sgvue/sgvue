@@ -287,10 +287,13 @@ export type ManageOp = (typeof MANAGE_OPS)[number]
 
 /**
  * How long the asker waits for `manageAck`, and how old a request the window will still act on.
- * The window's limit is the shorter one: whatever it does, it answers within the asker's wait.
- * A Schedules renderer held up by a modal dialog — the print dialog blocks its scripts — works
- * through what queued up when the dialog closes, and must not then save, load or print for a
- * request the assistant gave up on minutes ago. Both pages read the same clock.
+ * The window's limit is the shorter one, so a request it acts on is normally answered within
+ * the asker's wait. A Schedules renderer held up by a modal dialog — the print dialog blocks its
+ * scripts — works through what queued up when the dialog closes, and must not then save, load
+ * or print for a request the assistant gave up on minutes ago. Both pages read the same clock.
+ * Nothing bounds how long the answer takes to come back, though (the main renderer may be
+ * busy), so a request can be acted on and still time out: a `timeout` means the outcome is NOT
+ * KNOWN, and the assistant is told so (`executors/schedule.ts` `MANAGE_TIMEOUT_MESSAGE`).
  */
 export const MANAGE_ACK_MS = 3000
 export const MANAGE_FRESH_MS = 2000
