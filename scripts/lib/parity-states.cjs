@@ -228,8 +228,9 @@ const UI = `
 
 /**
  * One entry per Phase 3 parity state. They run **in order** and each one undoes the previous
- * state's change first, so the sequence ends where it started — except `library-open`, which
- * is last because it unloads a model.
+ * state's change first, so the sequence ends where it started. (`library-open`, last because it
+ * unloaded a model, was retired on 2026-11-08 with the sidebar's `library` control, by the
+ * owner's request.)
  */
 const CHROME_STATES = {
   default: '',
@@ -242,11 +243,7 @@ const CHROME_STATES = {
   'project-card': `click($$('button').filter((b) => b.title.startsWith('Override this model'))[0]); click($('button[data-tip="Project, site and building information"]'))`,
   'tool-measure-active': `click($('button[data-tip="Project, site and building information"]')); click($('button[data-tip^="Laser meter"]'))`,
   'view-plan': `click($('button[data-tip^="Select (Esc)"]')); click($('button[data-tip="Plan"]'))`,
-  rail: `click($('button[title="Collapse panel"]'))`,
-  'library-open':
-    `click($('button[title="Open panel"]')); click($('button[data-tip="3D perspective (Home)"]'));` +
-    ` await sleep(1400); click(byTitle('Unload model')[3]); await sleep(200);` +
-    ` click(byText('button', 'delete')); await sleep(3000); click(byText('button', 'library'))`
+  rail: `click($('button[title="Collapse panel"]'))`
 }
 
 /**
@@ -454,11 +451,12 @@ const COLOR_STATES = {
 
 /**
  * Phase 8 — the landing page, the upload rows, the Resume card, the warning banner, the share
- * link's flash, the sidebar's own upload rows and the library popover. Identical text in both
- * scripts.
+ * link's flash and the sidebar's own upload rows. Identical text in both scripts.
+ * (`library-popover` was retired on 2026-11-08 with the sidebar's `library` control, by the
+ * owner's request.)
  *
  * They run **in order**: eight states on the landing page, then the federation is opened
- * through the design's own "open all four as a federation →" button and the last three are
+ * through the design's own "open all four as a federation →" button and the last two are
  * captured on the shell. Every state calls `freeze()` first, so the 26 s survey-grid drift, the
  * spinner, the progress shimmer and the pointer parallax are at the same phase on both sides.
  *
@@ -497,11 +495,8 @@ const LANDING_STATES = {
     ` { id: 'u2', name: 'sit-context.ifc', kb: 3072, pct: 100, stage: 'ready', done: true },` +
     ` { id: 'e1', name: 'mep-draft.rvt', stage: 'not an IFC file', pct: 0, error: true, dismiss: true }` +
     `])`,
-  'library-popover':
-    `setUploads([]); await sleep(300); click(byTitle('Unload model')[3]); await sleep(200);` +
-    ` click(byText('button', 'delete')); await sleep(3000); click(byText('button', 'library'))`,
   'link-copied':
-    `click(byText('button', 'library')); await sleep(300);` +
+    `setUploads([]); await sleep(300);` +
     ` click(tbBtn('Saved viewpoints')); await sleep(400); click(linkBtn());` +
     ` await sleep(2000); setLinkCopied(true)`
 }

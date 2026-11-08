@@ -1,6 +1,6 @@
 /**
  * The recents list — `src/main/sessions.ts`'s `mergeRecent`, which is what backs the landing
- * page's sample pills and the sidebar's library popover on the desktop.
+ * page's sample pills on the desktop (and the sidebar's library popover until 2026-11-08).
  *
  * `mergeRecent` is the pure half on purpose: the disk half is two `writeFile`s.
  */

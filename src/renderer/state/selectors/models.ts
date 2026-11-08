@@ -1,5 +1,6 @@
 /**
- * The MODELS list and the `library` popover — `SGVue.dc.html:1796–1815`, as pure functions.
+ * The MODELS list — `SGVue.dc.html:1796–1815`, as pure functions. (The design's `library`
+ * popover, `:1815`, is not in the port since 2026-11-08.)
  *
  * One thing the design gets for free and the port does not: its rows come from a fixed
  * `SAMPLE_FILES` table, so every model already has a `swatch`. A real IFC file declares no
@@ -236,14 +237,6 @@ export function modelRows(input: ModelInput): ModelRow[] {
       }))
     }
   })
-}
-
-/** What the `library` popover offers: every library file that is not already loaded. `:1815`. */
-export function addableRows(
-  library: readonly LibraryFile[],
-  loaded: readonly string[]
-): LibraryFile[] {
-  return library.filter((f) => !loaded.includes(f.key))
 }
 
 /**

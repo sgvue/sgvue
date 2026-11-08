@@ -132,11 +132,10 @@ describe('the MODELS section (2026-11-07)', () => {
   })
 
   it('collapses and expands, and collapsing puts away what lives in it', () => {
-    useShell.setState({ addOpen: true, palette: 'ARC', confirmRemove: null })
+    useShell.setState({ palette: 'ARC', confirmRemove: null })
     useShell.getState().toggleModels()
     expect(useShell.getState()).toMatchObject({
       modelsOpen: false,
-      addOpen: false,
       palette: null,
       confirmRemove: null
     })
@@ -153,12 +152,10 @@ describe('the MODELS section (2026-11-07)', () => {
     expect(useShell.getState()).toMatchObject({ modelsOpen: true, confirmRemove: null })
   })
 
-  it('expands for the library popover and for a new upload row', () => {
+  // 2026-11-08: the `library` popover, which also expanded the section, is not in the port.
+  it('expands for a new upload row', () => {
     useShell.getState().toggleModels()
-    useShell.getState().toggleAdd()
-    expect(useShell.getState()).toMatchObject({ modelsOpen: true, addOpen: true })
-    useShell.getState().toggleModels()
-    expect(useShell.getState().addOpen).toBe(false)
+    expect(useShell.getState().modelsOpen).toBe(false)
     useShell.getState().addUpload({ id: 'u1', name: 'a.ifc', stage: 'reading file', pct: 5 })
     expect(useShell.getState().modelsOpen).toBe(true)
   })

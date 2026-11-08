@@ -208,7 +208,8 @@ export interface CtxState {
 }
 
 /**
- * One entry of the sample library behind the `library` popover and the landing pills.
+ * One entry of the sample library behind the landing page's Recent pills (and, until
+ * 2026-11-08, the sidebar's `library` popover).
  *
  * `path` is the desktop's: the fidelity contract's allowed deviations back the library with
  * real files the user provides, and here that is the recents list (`main/sessions.ts`). The
@@ -347,7 +348,6 @@ export interface ShellState {
   expanded: Record<string, boolean>
   storeyVis: Record<string, boolean>
   modelVis: Record<string, boolean>
-  addOpen: boolean
   hidden: Record<number | string, boolean>
   sel: number | null
   selIds: readonly number[]
@@ -486,7 +486,6 @@ export interface ShellState {
   askRemove: (key: string) => void
   cancelRemove: () => void
   toggleNative: () => void
-  toggleAdd: () => void
   activate: (key: string | null) => void
   setTool: (tool: Tool) => void
   toggleSnap: () => void
@@ -585,7 +584,7 @@ export interface ShellState {
   setSideStoreys: (size: SideSize | null) => void
   /**
    * 2026-11-07 — the MODELS header's toggle. Collapsing also puts away what lives in the
-   * section — the library popover, a model's colour palette, the unload confirmation — so
+   * section — a model's colour palette, the unload confirmation — so
    * nothing stays open where it cannot be seen.
    */
   toggleModels: () => void
@@ -1011,7 +1010,6 @@ export const useShell = create<ShellState>((set, get) => ({
   expanded: {},
   storeyVis: {},
   modelVis: {},
-  addOpen: false,
   hidden: {},
   sel: null,
   selIds: [],
@@ -1445,9 +1443,6 @@ export const useShell = create<ShellState>((set, get) => ({
     viewer?.setModelColors(get().modelColors, native)
   },
 
-  // 2026-11-07: the library popover is in the MODELS rows, so opening it expands MODELS.
-  toggleAdd: () => set(get().addOpen ? { addOpen: false } : { addOpen: true, modelsOpen: true }),
-
   /** `SGVue.dc.html:1049`. One model owns the lists and the picker; the rest stay inert. */
   activate: (key) => {
     const s = get()
@@ -1679,7 +1674,7 @@ export const useShell = create<ShellState>((set, get) => ({
   toggleModels: () =>
     set(
       get().modelsOpen
-        ? { modelsOpen: false, addOpen: false, palette: null, confirmRemove: null }
+        ? { modelsOpen: false, palette: null, confirmRemove: null }
         : { modelsOpen: true }
     ),
 

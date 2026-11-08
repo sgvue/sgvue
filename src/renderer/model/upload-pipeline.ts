@@ -826,7 +826,7 @@ export async function openRecent(path: string): Promise<'opening' | 'gone' | 'mo
 const chosenOf = (p: PickedFile): ChosenFile => ({ path: p.path, name: p.name, size: p.size })
 
 /**
- * A landing pill, "open all N as a federation →", or a row of the sidebar's library popover.
+ * A landing pill, or "open all N as a federation →".
  *
  * An entry with a `path` is a real file and goes through the whole pipeline; one without is
  * the design's own mock federation, which `#mock` registers as a loader (dev only).

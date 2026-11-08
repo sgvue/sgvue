@@ -2694,7 +2694,7 @@ test('the element tree is eye-first like the storeys, and clipped card texts car
   }
 })
 
-test('a file’s full path is the hover title of its model row, its library row and its Recent pill', async () => {
+test('a file’s full path is the hover title of its whole model row and of its Recent pill', async () => {
   // The path is the one main admitted and the session recorded — read back from the session, so
   // no path of this machine is spelled here.
   let path = ''
@@ -2707,12 +2707,14 @@ test('a file’s full path is the hover title of its model row, its library row 
       path = ((await readSession(dir)).payload.files as { path: string }[])[0].path
       expect(path).toMatch(/[\\/]tiny\.ifc$/)
 
-      // The loaded model's name block — and only that: the row's buttons keep their own titles.
+      // 2026-11-08 — the loaded model's whole row carries it (it was the name block alone), so
+      // the name block, the file line and the count inherit it and carry none of their own …
       const side = page.locator('aside')
       const block = side.getByText('tiny.ifc', { exact: true }).locator('xpath=..')
-      await expect(block).toHaveAttribute('title', path)
       const row = block.locator('xpath=..')
-      expect(await row.getAttribute('title')).toBeNull()
+      await expect(row).toHaveAttribute('title', path)
+      expect(await block.getAttribute('title')).toBeNull()
+      // … while the row's buttons keep their own titles, which win over the row's.
       expect(
         await row.locator('button').evaluateAll((bs) => bs.map((b) => (b as HTMLElement).title))
       ).toEqual([
@@ -2720,12 +2722,14 @@ test('a file’s full path is the hover title of its model row, its library row 
         "Override this model's colour",
         "Activate — lists show only this model; the others stay visible in 3D but can't be selected"
       ])
+      // The palette under the row is the row's sibling, so nothing in it inherits the path.
+      await row.locator('button[title="Override this model\'s colour"]').click()
+      const reset = row.locator('xpath=following-sibling::div[1]').getByText('reset', { exact: true })
+      await expect(reset).toBeVisible()
+      expect(await reset.evaluate((e) => e.closest('[title]')?.getAttribute('title') ?? null)).toBeNull()
 
-      // The library popover lists the same file as a recent, with the same path.
-      await side.getByText('library', { exact: true }).click()
-      await expect(
-        side.locator('button.hv-step').filter({ hasText: 'tiny.ifc' }).last()
-      ).toHaveAttribute('title', path)
+      // 2026-11-08 — the sidebar has no `library` control any more.
+      await expect(side.getByText('library', { exact: true })).toHaveCount(0)
     } finally {
       await app.close()
     }

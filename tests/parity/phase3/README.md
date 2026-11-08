@@ -16,12 +16,16 @@ Electron and kills any survivor afterwards; the guard inside each run polls the 
 ## Capturing
 
 One theme per invocation on each side: the states run **in order**, each undoing the previous
-one's change, and the last one (`library-open`) unloads a model, so a fresh process is the only
+one's change, and the last one (`library-open`) unloaded a model, so a fresh process is the only
 honest way to start the second theme.
+
+**2026-11-08 — `library-open` is retired**, by the owner's request (*"remove library, i dont
+think its useful"*): the sidebar's `library` control is not in the port, so the state is gone
+from `scripts/lib/parity-states.cjs`. Its measurements below are the record.
 
 ```sh
 VITE_SGVUE_DEVTOOLS=1 npm run build
-STATES=default,tree-predef,search-wall,group-expanded,storey-solo-L2,model-hidden-STR,palette-open,project-card,tool-measure-active,view-plan,rail,library-open
+STATES=default,tree-predef,search-wall,group-expanded,storey-solo-L2,model-hidden-STR,palette-open,project-card,tool-measure-active,view-plan,rail
 
 # the app, on the design's own mock federation
 for T in dark light; do

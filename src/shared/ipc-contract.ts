@@ -94,8 +94,8 @@ export type SessionEnvelope = z.infer<typeof SessionEnvelope>
 /**
  * One file the user has opened. This list is what the fidelity contract's "the sample library
  * is backed by real IFC files the user provides" resolves to on the desktop: the landing
- * page's pills and the sidebar's library popover render it, with the design's own markup and
- * the design's own "open all N" copy, and nothing at all when it is empty.
+ * page's pills render it (the sidebar's library popover did until 2026-11-08), with the
+ * design's own markup and the design's own "open all N" copy, and nothing at all when empty.
  */
 export const RecentFile = z.object({
   path: z.string().min(1),

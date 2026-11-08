@@ -16,7 +16,7 @@ import {
   treeGroups
 } from '../../src/renderer/state/selectors/tree'
 import { soloStoreyName, storeyRows } from '../../src/renderer/state/selectors/storeys'
-import { addableRows, baseSwatch, modelRows } from '../../src/renderer/state/selectors/models'
+import { baseSwatch, modelRows } from '../../src/renderer/state/selectors/models'
 import { spatialCards, unitsLine, DASH } from '../../src/renderer/state/selectors/spatial'
 import {
   hasActionBar,
@@ -265,12 +265,6 @@ describe('model and library selectors', () => {
     expect(rows[0]).toMatchObject({ name: 'Tower A', file: 'Tower A.ifc' })
   })
 
-  it('offers only unloaded library files, and nothing at all when the library is empty', () => {
-    expect(addableRows(library, ['ARC', 'STR']).map((f) => f.key)).toEqual(['SIT', 'MEP'])
-    expect(addableRows(library, ['ARC', 'STR', 'SIT', 'MEP'])).toEqual([])
-    expect(addableRows([], [])).toEqual([])
-  })
-
   it('hides the unload × while only one model is loaded', () => {
     const one = federate([mockModelIndex('ARC')])
     expect(modelRows({ ...input, federation: one })[0].canRemove).toBe(false)
@@ -303,14 +297,6 @@ describe('model and library selectors', () => {
       files: [{ key: 'STR', path: 'C:\\Models\\Tower\\Struct.ifc' }]
     })
     expect(mixed.map((r) => r.path)).toEqual(['', 'C:\\Models\\Tower\\Struct.ifc'])
-  })
-
-  it('hands the popover each recent with its path, and the design’s own entries without one', () => {
-    // `upload-pipeline.ts`'s `libraryOf`: a recent's key is its path.
-    const path = 'C:\\Models\\Tower\\Arch.ifc'
-    const recent = { key: path, name: 'Arch', file: 'Arch.ifc', swatch: '#35C4B6', path }
-    expect(addableRows([...library, recent], ['ARC', 'STR', 'SIT', 'MEP'])).toEqual([recent])
-    expect(addableRows(library, []).every((f) => f.path === undefined)).toBe(true)
   })
 })
 

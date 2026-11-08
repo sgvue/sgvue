@@ -240,7 +240,8 @@ row 252 × 36.89 px.
 Native `title`s, so nothing to capture: `tests/e2e/smoke.spec.ts` reads them back on the
 committed fixture — the model row's name block, the `library` popover's row and the Recent
 pill all carry the path the session recorded — and checks that the demo building's rows, which
-have no file, carry none.
+have no file, carry none. *(2026-11-08: the title is on the whole model row, and the `library`
+popover is not in the port — both by the owner's request.)*
 
 ## What did not change
 

@@ -13,18 +13,23 @@
  *   here they are `[eye][label][count][chevron]` and `[eye][name / meta]`. Every piece keeps
  *   its own markup, class and handler — only the column order and, on the element row, which
  *   side carries the 2 px and which the 8 px of padding;
- * · **a file's full path on hover**, as a native `title`: on a loaded model's name block (the
- *   path the federation holds, `fed.sessionFiles()`) and on each row of the `library` popover.
- *   A model with no file behind it — the demo building — has no `title` at all.
+ * · **a file's full path on hover**, as a native `title` on a loaded model's whole row (the
+ *   path the federation holds, `fed.sessionFiles()`); the row's buttons keep their own titles,
+ *   and the unload strip and the palette under it are siblings of the row, so they carry none
+ *   (2026-11-08: it was on the name block alone). A model with no file behind it — the demo
+ *   building — has no `title` at all.
+ *
+ * 2026-11-08 — the design's `library` control and its popover (`:139`) are not in the port
+ * (the owner: "remove library, i dont think its useful"); `upload` is unchanged.
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { federation as fed } from '../model/federation-store'
-import { openDialog, openLibrary } from '../model/upload-pipeline'
+import { openDialog } from '../model/upload-pipeline'
 import { LOCATE_LABEL, locateModel } from '../model/project'
 import { uploadRows } from '../state/selectors/uploads'
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
-import { modelRows, addableRows } from '../state/selectors/models'
+import { modelRows } from '../state/selectors/models'
 import { storeyRows } from '../state/selectors/storeys'
 import { groupTree, rowWindow, withSelection, type TreeItem } from '../state/selectors/tree'
 import { treeKeyAction, treeNodes } from '../state/selectors/tree-keys'
@@ -319,10 +324,10 @@ function ConfirmUnload({
 const KEYS = pick(
   'federation', 'library', 'treeMode', 'search', 'expanded', 'hidden', 'selIds', 'storeyVis',
   'modelVis', 'modelColors', 'assignedColors', 'nativeMats', 'uploadNames', 'uploads', 'active', 'palette',
-  'confirmRemove', 'addOpen', 'card', 'visibleCount', 'sideStoreys', 'modelsOpen', 'loaded',
+  'confirmRemove', 'card', 'visibleCount', 'sideStoreys', 'modelsOpen', 'loaded',
   'activate', 'allStoreys', 'askRemove', 'cancelRemove', 'dropUpload', 'hide', 'openCard',
   'select', 'setCtx', 'setModelColor', 'setSearch', 'setSideStoreys', 'setTreeMode', 'show',
-  'soloStorey', 'toggleAdd', 'toggleGroup', 'toggleModel', 'toggleModels', 'toggleNative',
+  'soloStorey', 'toggleGroup', 'toggleModel', 'toggleModels', 'toggleNative',
   'togglePalette', 'togglePanel', 'toggleStorey', 'units'
 )
 
@@ -354,7 +359,6 @@ export default function Sidebar(): React.JSX.Element {
     active,
     palette,
     confirmRemove,
-    addOpen,
     card,
     visibleCount,
     sideStoreys,
@@ -386,7 +390,6 @@ export default function Sidebar(): React.JSX.Element {
       }),
     [federation, library, modelVis, modelColors, assignedColors, nativeMats, uploadNames, active, palette, confirmRemove]
   )
-  const addable = useMemo(() => addableRows(library, st.loaded), [library, st.loaded])
   const storeys = useMemo(
     () => storeyRows({ storeys: federation.storeys, elements: lels, storeyVis, active, units }),
     [federation, lels, storeyVis, active, units]
@@ -688,25 +691,12 @@ export default function Sidebar(): React.JSX.Element {
         >
           upload
         </label>
-        {addable.length > 0 && (
-          <>
-            <span style={s('color:var(--border-strong)')}>·</span>
-            <button
-              onClick={st.toggleAdd}
-              style={s(
-                'font:500 11px/1 var(--sans);letter-spacing:0;text-transform:none;color:var(--accent-ink)'
-              )}
-            >
-              library
-            </button>
-          </>
-        )}
       </div>
 
       {/* 2026-11-07 — everything under the MODELS header: lays out nothing (`display:contents`)
           until the sidebar is tight, then one column that scrolls (`sidebarTight`). */}
       <div ref={column} style={s(tight === null ? LOOSE_COLUMN : TIGHT_COLUMN)}>
-        {/* ── model rows, upload rows, library popover, native-materials toggle (`:91`) ── */}
+        {/* ── model rows, upload rows, native-materials toggle (`:91`) ── */}
         {/* `:98` verbatim, always its full height (2026-11-07); collapsed, it is not drawn. */}
         {modelsOpen && (
           <div
@@ -717,6 +707,7 @@ export default function Sidebar(): React.JSX.Element {
               <div key={md.key} style={s('display:flex;flex-direction:column')}>
                 <div
                   className="hv-step"
+                  title={md.path || undefined}
                   style={s(
                     `display:grid;grid-template-columns:24px 14px minmax(0,1fr) auto 22px 22px;align-items:center;gap:7px;padding:4px 4px 4px 2px;border-left:2px solid ${md.edge};background:${md.bg};border-radius:0 6px 6px 0;opacity:${md.opacity}`
                   )}
@@ -739,10 +730,7 @@ export default function Sidebar(): React.JSX.Element {
                       `width:14px;height:14px;border-radius:3px;background:${md.swatch};border:1px solid var(--border-strong);box-shadow:${md.swatchRing}`
                     )}
                   ></button>
-                  <div
-                    title={md.path || undefined}
-                    style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}
-                  >
+                  <div style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}>
                     <span
                       style={s(
                         'font:500 13px/1.3 var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
@@ -910,40 +898,6 @@ export default function Sidebar(): React.JSX.Element {
                 </div>
               )
             })}
-
-            {/* library popover (`:139`) */}
-            {addOpen && (
-              <div
-                style={s(
-                  'display:flex;flex-direction:column;gap:2px;margin:4px 0 2px 24px;padding:6px;background:var(--card);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow)'
-                )}
-              >
-                {addable.map((a) => (
-                  <button
-                    key={a.key}
-                    onClick={() => {
-                      st.toggleAdd()
-                      void openLibrary([a])
-                    }}
-                    title={a.path || undefined}
-                    className="hv-step"
-                    style={s(
-                      'display:grid;grid-template-columns:10px minmax(0,1fr);align-items:center;gap:8px;padding:6px 8px;border-radius:6px;text-align:left'
-                    )}
-                  >
-                    <span
-                      style={s(
-                        `width:10px;height:10px;border-radius:2px;background:${a.swatch};border:1px solid var(--border-strong)`
-                      )}
-                    ></span>
-                    <span style={s('display:flex;flex-direction:column;gap:2px;min-width:0')}>
-                      <span style={s('font:500 12.5px/1.3 var(--sans);color:var(--ink)')}>{a.name}</span>
-                      <span style={s('font:400 11px/1.3 var(--mono);color:var(--faint)')}>{a.file}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Original materials (`:149`) */}
             <div

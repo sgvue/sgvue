@@ -59,7 +59,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   no colour of its own is still cut in the accent colour.
 - ⌘S / Ctrl+S saves the project; the `S` key turns snapping on and off only without ⌘ or Ctrl.
 - Ask Vee says "Could not reach the API. Check the network." when it cannot connect.
+- A model's full file path shows when hovering anywhere on its MODELS row, not only its name.
 - Electron 44.10.0 and updated dependencies.
+
+### Removed
+
+- The sidebar's **library** button and its list of recent files; **upload** opens any file.
 
 ### Fixed
 

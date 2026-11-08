@@ -4,6 +4,11 @@ The landing page, its drop zone, its upload rows, the Resume card, the warning b
 sample pills, the sidebar's own upload rows, the library popover and the share link's
 "link copied" flash.
 
+**2026-11-08 — `library-popover` is retired**, by the owner's request (*"remove library, i dont
+think its useful"*): the sidebar's `library` control and its popover are not in the port, so the
+state is gone from `scripts/lib/parity-states.cjs` and `link-copied` now clears the upload rows
+itself, with all four models still loaded. Its measurements below are the record.
+
 Same method as Phases 3–7: both sides captured **whole** (`SGVUE_BARE=0` on the prototype),
 both driven through their own real handlers, and the difference measured **per surface**.
 
@@ -38,7 +43,7 @@ panics that put it there.
 
 ```sh
 VITE_SGVUE_DEVTOOLS=1 npm run build
-STATES=landing,landing-dragover,landing-rejections,upload-midstage,upload-ready,landing-samples-open-all,landing-error-banner,sidebar-upload-rows,library-popover,link-copied
+STATES=landing,landing-dragover,landing-rejections,upload-midstage,upload-ready,landing-samples-open-all,landing-error-banner,sidebar-upload-rows,link-copied
 
 # the app, on the design's own mock federation, stopped at the landing page
 for T in dark light; do
@@ -77,7 +82,7 @@ The states run **in order**, each building on or undoing the last:
 | `landing-samples-open-all` | the pointer on the "Site & Landscape" pill — its hover state, with "open all four as a federation →" below it (the Resume card from the previous state is still up: the states are cumulative, as in every phase) |
 | `landing-error-banner` | the warning banner carrying the design's own boot-failure sentence |
 | `sidebar-upload-rows` | the federation opened through the design's own button, then three rows in the sidebar: busy, done, rejected |
-| `library-popover` | one model unloaded, then `library` — the popover the design shows when something is addable |
+| `library-popover` | one model unloaded, then `library` — the popover the design shows when something is addable — **retired 2026-11-08**: the control is not in the port; the measurements below are the record |
 | `link-copied` | the Viewpoints card, `copy link to this state` clicked, the flash standing |
 
 ## What the sidecars answer

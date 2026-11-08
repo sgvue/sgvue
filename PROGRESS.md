@@ -4,6 +4,18 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-08 — the sidebar's library popover removed; the path title on the whole model row
+
+**Did.** The owner, testing 1.4.0: *"Add hover description on the model list and show the file
+path. … remove library, i dont think its useful."* The MODELS header's `·` / `library` button and
+its popover are gone (`addOpen`, `toggleAdd`, `addableRows` with them); `library` and
+`openLibrary` stay for the Recent pills, links and `open_recent`. The file path's native `title`
+moved from the name block to the whole row; the buttons keep their own, the unload strip and the
+palette carry none. The same-name Replace question already existed and is unchanged. Parity states
+`library-open` and `library-popover` retired. **Checked:** typecheck, lint, 3 546 unit tests,
+privacy; reviewer passed the code. **Not yet seen in a window**: the smoke e2e's path test was
+updated, not run.
+
 ## 2026-11-08 — the full e2e suite before 1.4.0
 
 **Did.** `npm run test:e2e`, the whole suite, under the guard: 66 passed, 9 skipped (Windows-only
