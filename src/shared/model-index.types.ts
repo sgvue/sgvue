@@ -394,13 +394,19 @@ export interface IfcElement {
   objectType: string
   /** `IfcTypeObject.GlobalId`, when the element has a type object. */
   typeGuid: string
+  /**
+   * The `Name || LongName` of the effective storey (2026-11-08): the first `IfcBuildingStorey`
+   * at or above `container` — so a part, a nested component or a door that only fills an
+   * opening is on its host's storey, as IfcOpenShell's `get_container` reads it. `''` for none.
+   */
   storey: string
   /**
    * expressId of the spatial element holding this one (2026-11-08) — the site, building,
-   * storey or space of its own `IfcRelContainedInSpatialStructure`; for a part, what holds the
-   * element aggregating it; for a space, the spatial element aggregating it. Local to its file,
-   * an id in `spatial`. The Schedules window's Building, Site and Room / Space come from it.
-   * Absent when nothing holds the element.
+   * storey or space of its own `IfcRelContainedInSpatialStructure`; otherwise, as IfcOpenShell's
+   * `get_container` climbs `get_parent`, where its host is contained — the element aggregating
+   * or nesting it, the opening it fills, the element that opening voids; for a space, the
+   * spatial element aggregating it. Local to its file, an id in `spatial`. The Schedules
+   * window's Building, Site and Room / Space come from it. Absent when nothing holds the element.
    */
   container?: number
   /** The single display string the design shows. `''` when the file names no material. */

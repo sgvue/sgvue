@@ -335,6 +335,40 @@
    "storey": null,
    "tag": "",
    "typeName": ""
+  },
+  "000000000000000000000b": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcDiscreteAccessory",
+   "longName": "",
+   "materials": [],
+   "name": "Clip on a storey wall",
+   "objectType": "",
+   "predefinedType": "",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000f": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcDoor",
+   "longName": "",
+   "materials": [],
+   "name": "Door in an opening",
+   "objectType": "",
+   "predefinedType": "DOOR",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000007",
+   "tag": "",
+   "typeName": ""
   }
  },
  "file": "edge.ifc",
@@ -351,7 +385,7 @@
   "IfcRotationalMassMeasure": "ROTATIONALMASSUNIT",
   "IfcThermalTransmittanceMeasure": "THERMALTRANSMITTANCEUNIT"
  },
- "sha256": "29220fa48fabf2b36f6e2702999b0a9360d1f44edd58ce331a8421f2efc3b405",
+ "sha256": "a4c035eb8a2dfe3f119a54d30202a73ecb482e5eaec4ed187da29594d6629577",
  "spatial": {
   "0000000000000000000002": {
    "longName": "",

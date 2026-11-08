@@ -527,10 +527,15 @@ describe('the Schedules window as a state machine (fc.commands)', () => {
     expect(reached.menusOpen).toBeGreaterThan(0);
     expect(reached.imports).toBeGreaterThan(0);
     expect(reached.undoTop).toBe(HISTORY_LIMIT);
-    expect(reached.redoTop).toBeGreaterThan(20);
-    expect(reached.saveOverYes).toBeGreaterThan(0);
-    expect(reached.saveOverNo).toBeGreaterThan(0);
-    expect(reached.renamesOfOpen).toBeGreaterThan(0);
+    // The rarer boundaries are reached by the default seed's sweep; a replayed seed (`SIM_SEED`)
+    // may reach none of them, as `totals-oracle.test.ts` allows — it replays a failure, it does not
+    // re-prove the sweep.
+    if (process.env.SIM_SEED === undefined) {
+      expect(reached.redoTop).toBeGreaterThan(20);
+      expect(reached.saveOverYes).toBeGreaterThan(0);
+      expect(reached.saveOverNo).toBeGreaterThan(0);
+      expect(reached.renamesOfOpen).toBeGreaterThan(0);
+    }
   }, 240_000);
 
   // Found by this check (2026-11-08): a Save that has to number its name ("Door Schedule" is

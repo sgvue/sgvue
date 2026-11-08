@@ -2,7 +2,7 @@
 // but adding or removing something never does.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { record, redo, redoDepth, resetHistory, setClock, undo, undoDepth } from '../../../src/schedule/history';
+import { record, redo, redoDepth, resetHistory, restate, setClock, undo, undoDepth } from '../../../src/schedule/history';
 import { emptySchedule, type ScheduleDef } from '../../../src/schedule/schedule/def';
 // Phase 2 (2026-09-25): the reorder helper is ported now.
 import { moveItem } from '../../../src/renderer/schedule-ui/dnd';
@@ -181,6 +181,37 @@ describe('undo and redo', () => {
     const prev = undo()!;
     prev.columns.push({ field: { kind: 'core', key: 'guid' } });
     expect(def.columns).toHaveLength(2);
+  });
+});
+
+describe('restate', () => {
+  it('ends a typing burst: typing straight after a numbered save is a step of its own', () => {
+    // Type a heading — one burst of two keystrokes.
+    clock = 1000;
+    def.columns[0].heading = 'N';
+    record(def);
+    clock = 1100;
+    def.columns[0].heading = 'Na';
+    record(def);
+    expect(undoDepth()).toBe(1);
+
+    // Save had to number the name: the state on screen is restated, not recorded.
+    clock = 1200;
+    def.name = 'Door Schedule (2)';
+    restate(def);
+    expect(undoDepth()).toBe(1);
+
+    // Type again, well inside the 700 ms burst window of the typing before the save.
+    clock = 1300;
+    def.columns[0].heading = 'Nam';
+    record(def);
+    expect(undoDepth()).toBe(2);
+
+    // Undo takes back only the new typing, to the numbered name on screen after the save.
+    const back = undo()!;
+    expect(back.name).toBe('Door Schedule (2)');
+    expect(back.columns[0].heading).toBe('Na');
+    expect(undo()?.columns[0].heading).toBeUndefined();
   });
 });
 

@@ -19,8 +19,13 @@ else:
  · a piece of furniture **contained in an `IfcSpace`**, which the storey aggregates, and a wall
    contained in the building with no storey at all;
  · a component **nested** (`IfcRelNests`) on that wall and contained nowhere itself, whose
-   Building and Site are its host's — IfcOpenShell's `get_parent` climbs nesting. It is written
-   last, so every GlobalId and entity number before it is unchanged.
+   Building and Site are its host's — IfcOpenShell's `get_parent` climbs nesting;
+ · a component nested on a wall **in a storey**, and a **door that only fills an opening**
+   (`IfcRelFillsElement` → `IfcOpeningElement` → `IfcRelVoidsElement` → a wall in a storey),
+   each contained nowhere itself, whose storey is their host's.
+
+Each later case is written after the ones before it, so every GlobalId and entity number before
+it is unchanged.
 
 Millimetres, at the repository's synthetic site (`CLAUDE.md`, Rules: 12345.457 / 23456.766 /
 5.05 m, −43.4103°) — nothing here is a real place, project, person or organisation. Deterministic:
@@ -218,6 +223,23 @@ def build() -> None:
         "IfcDiscreteAccessory", "Bracket on the loose wall", fx.bldg_place, (10500.0, 300.0, 1000.0), (200.0, 100.0, 200.0)
     )
     f.create_entity("IfcRelNests", GlobalId=gid(), RelatingObject=loose, RelatedObjects=[bracket])
+
+    # ── on a storey's wall, contained nowhere themselves: their storey is their host's ──
+    # A component nested on a wall in Level 00, and a door that only fills an opening voiding a
+    # wall in Level 01 — IfcOpenShell's `get_parent` climbs the nest, and the fill then the void.
+    clip = fx.element(
+        "IfcDiscreteAccessory", "Clip on a storey wall", place0, (500.0, 300.0, 1000.0), (200.0, 100.0, 200.0)
+    )
+    f.create_entity("IfcRelNests", GlobalId=gid(), RelatingObject=w1, RelatedObjects=[clip])
+    opening = fx.element(
+        "IfcOpeningElement", "Door opening", place1, (1000.0, -50.0, 0.0), (900.0, 300.0, 2100.0),
+        PredefinedType="OPENING",
+    )
+    f.create_entity("IfcRelVoidsElement", GlobalId=gid(), RelatingBuildingElement=w3, RelatedOpeningElement=opening)
+    door = fx.element(
+        "IfcDoor", "Door in an opening", place1, (1000.0, 0.0, 0.0), (900.0, 200.0, 2100.0), PredefinedType="DOOR"
+    )
+    f.create_entity("IfcRelFillsElement", GlobalId=gid(), RelatingOpeningElement=opening, RelatedBuildingElement=door)
 
     fx.write(2)
 

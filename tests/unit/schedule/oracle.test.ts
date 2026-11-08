@@ -13,7 +13,8 @@
  * Three models: `reference.ifc` (2 097 elements, millimetres), `feet.ifc` (feet) and `edge.ifc`
  * (`scripts/make-edge-ifc.py`: Family:Type names, list / enumerated / bounded values, blanks and
  * placeholders, pounds, a count, a non-SI derived unit, furniture in a space, a wall in no storey
- * and a component nested on it).
+ * and a component nested on it, and — contained nowhere themselves — a component nested on a
+ * storey's wall and a door that only fills an opening in one, whose storey is their host's).
  *
  * Per IFC class, two schedules, itemised, unfiltered and unsorted: the class's default schedule
  * (what picking the category opens) and one with every field — every core field and every

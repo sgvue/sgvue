@@ -344,56 +344,29 @@ export function buildModelIndex(
       i + 1 < all.length ? { ...s, h: all[i + 1].elev - s.elev } : s
     )
 
-  /* ── containment: element → storey ────────────────────────────────── */
+  /*
+   * ── containment: element → its spatial container and its storey (2026-11-08) ──
+   * One rule, IfcOpenShell 0.8.4's (`ifcopenshell.util.element`), and both values come from it,
+   * so the storey and the Schedules window's Building, Site and Room / Space cannot disagree:
+   *
+   *  · `contained(x)` is `get_container(x)`: x's own `IfcRelContainedInSpatialStructure`, else
+   *    `get_container(get_parent(x))` — `get_parent` takes, in this order, the aggregate
+   *    (`IfcRelAggregates`), the nest (`IfcRelNests`), the opening x fills
+   *    (`IfcRelFillsElement`) and the element an opening voids (`IfcRelVoidsElement`). So a
+   *    component nested on a wall, and a door that only fills an opening in it, are where the
+   *    wall is contained.
+   *  · `holder(x)` is one step up: `contained(x)`, else the element or spatial element
+   *    aggregating x — a space's storey, which `get_container` alone never gives (it climbs past
+   *    every spatial element to the project). It is the step the oracle's truth climbs
+   *    (`scripts/expected-from-ifcopenshell.py`, `_parent`).
+   *  · an element's **container** is the first spatial element up the `holder` chain, its
+   *    **storey** the first `IfcBuildingStorey` — the first one up from that container.
+   *
+   * Each walk is memoised, so the whole pass is linear in the relationships. A Revit export
+   * contains every element directly, and there every value is what direct containment gives.
+   */
   const storeySet = new Set(storeyNodes.map((n) => n.expressId))
   const storeyNameById = new Map(storeyNodes.map((n) => [n.expressId, n.name || n.longName]))
-  const storeyOf = new Map<number, number>()
-  // The spatial element each element is contained in, whatever its level — see below.
-  const containerOf = new Map<number, number>()
-  // Elements are often contained in an IfcSpace rather than a storey, so spaces are
-  // resolved to their own storey first and their contents inherit it.
-  const inSpace: { space: number; elements: number[] }[] = []
-  for (const relId of ids('IFCRELCONTAINEDINSPATIALSTRUCTURE')) {
-    const rel = line(relId)
-    if (!rel) continue
-    const structure = ref(rel.RelatingStructure)
-    const contents = refs(rel.RelatedElements)
-    if (structure) for (const el of contents) if (!containerOf.has(el)) containerOf.set(el, structure)
-    if (storeySet.has(structure)) for (const el of contents) storeyOf.set(el, structure)
-    else inSpace.push({ space: structure, elements: contents })
-  }
-  for (const node of storeyNodes) for (const kid of node.children) storeyOf.set(kid.expressId, node.expressId)
-  for (const { space, elements } of inSpace) {
-    const storey = storeyOf.get(space) ?? aggregatedIn.get(space) ?? 0
-    if (!storeySet.has(storey)) continue
-    if (!storeyOf.has(space)) storeyOf.set(space, storey)
-    for (const el of elements) if (!storeyOf.has(el)) storeyOf.set(el, storey)
-  }
-  // Aggregated children inherit their parent's storey (curtain-wall panels and mullions are
-  // not contained in a storey at all; they hang off their curtain wall).
-  let frontier = [...storeyOf.keys()]
-  while (frontier.length) {
-    const next: number[] = []
-    for (const parent of frontier) {
-      const storey = storeyOf.get(parent)!
-      for (const kid of aggregates.get(parent) ?? []) {
-        if (storeyOf.has(kid)) continue
-        storeyOf.set(kid, storey)
-        next.push(kid)
-      }
-    }
-    frontier = next
-  }
-
-  /*
-   * ── containment: element → the spatial element holding it (2026-11-08) ──
-   * The site, building, storey or space an element sits in, whatever level that is: its own
-   * `IfcRelContainedInSpatialStructure`, else — for a part or a nested component — what holds
-   * the element that aggregates or nests it; a spatial element (a space) is held by the one
-   * aggregating it. It is what the Schedules window reads Building, Site and Room / Space from,
-   * as IfcOpenShell's `get_parent` walk does (containment, aggregation, then nesting). Seeded by
-   * the containment pass above.
-   */
   const spatialIds = new Set<number>()
   const collectSpatial = (node: SpatialNode | null): void => {
     if (!node) return
@@ -401,20 +374,76 @@ export function buildModelIndex(
     node.children.forEach(collectSpatial)
   }
   collectSpatial(spatial)
-  frontier = [...containerOf.keys(), ...spatialIds]
-  while (frontier.length) {
-    const next: number[] = []
-    for (const parent of frontier) {
-      const holder = spatialIds.has(parent) ? parent : containerOf.get(parent)
-      if (holder === undefined) continue
-      for (const kid of [...(aggregates.get(parent) ?? []), ...(nests.get(parent) ?? [])]) {
-        if (containerOf.has(kid)) continue
-        containerOf.set(kid, holder)
-        next.push(kid)
-      }
-    }
-    frontier = next
+
+  // Each element's own containment — the first relationship naming it, as `[0]` is.
+  const directIn = new Map<number, number>()
+  for (const relId of ids('IFCRELCONTAINEDINSPATIALSTRUCTURE')) {
+    const rel = line(relId)
+    if (!rel) continue
+    const structure = ref(rel.RelatingStructure)
+    if (!structure) continue
+    spatialIds.add(structure)
+    for (const el of refs(rel.RelatedElements)) if (!directIn.has(el)) directIn.set(el, structure)
   }
+
+  /** `get_parent` less its first term (own containment, which `contained` reads first). */
+  const parentOf = (id: number): number =>
+    aggregatedIn.get(id) ?? nestedIn.get(id) ?? fillsWhat.get(id) ?? voidedBy.get(id) ?? 0
+
+  const containedMemo = new Map<number, number>() // node → its `get_container`, 0 for none
+  const contained = (id: number): number => {
+    const path: number[] = []
+    const onPath = new Set<number>()
+    let n = id
+    let found = 0
+    while (n && !onPath.has(n)) {
+      const known = containedMemo.get(n)
+      if (known !== undefined) {
+        found = known
+        break
+      }
+      const direct = directIn.get(n)
+      if (direct !== undefined) {
+        found = direct
+        break
+      }
+      onPath.add(n)
+      path.push(n)
+      n = parentOf(n)
+    }
+    for (const p of path) containedMemo.set(p, found)
+    return found
+  }
+  const holder = (id: number): number => contained(id) || (aggregatedIn.get(id) ?? 0)
+
+  /** The first node up the `holder` chain from `id` (not `id` itself) that `isTarget`, else 0. */
+  const firstAbove = (isTarget: (id: number) => boolean): ((id: number) => number) => {
+    const memo = new Map<number, number>() // node → the first target at or above it, 0 for none
+    return (id) => {
+      const path: number[] = []
+      const onPath = new Set<number>()
+      let n = holder(id)
+      let found = 0
+      while (n && !onPath.has(n)) {
+        const known = memo.get(n)
+        if (known !== undefined) {
+          found = known
+          break
+        }
+        if (isTarget(n)) {
+          found = n
+          break
+        }
+        onPath.add(n)
+        path.push(n)
+        n = holder(n)
+      }
+      for (const p of path) memo.set(p, found)
+      return found
+    }
+  }
+  const containerOf = firstAbove((id) => spatialIds.has(id))
+  const storeyOf = firstAbove((id) => storeySet.has(id))
   stage(
     'spatial structure',
     `${site ? 1 : 0} site · ${building ? 1 : 0} building · ${storeys.length} storeys`,
@@ -666,7 +695,7 @@ export function buildModelIndex(
       effectivePredefinedType,
       objectType: info?.name || occurrenceObjectType,
       typeGuid: info?.guid ?? '',
-      storey: storeyNameById.get(storeyOf.get(id) ?? 0) ?? '',
+      storey: storeyNameById.get(storeyOf(id)) ?? '',
       material: materialDisplay(mats),
       materials: mats,
       classifications: classificationsOf.get(id) ?? [],
@@ -677,8 +706,8 @@ export function buildModelIndex(
       psetMeta: metaOf.get(id) ?? {},
       ...(spaceSet.has(id) ? { isSpace: true as const } : {})
     })
-    const container = containerOf.get(id)
-    if (container !== undefined) elements[elements.length - 1].container = container
+    const container = containerOf(id)
+    if (container) elements[elements.length - 1].container = container
   }
   stage('building elements', `${elements.length.toLocaleString('en-US')} elements`, 1)
 

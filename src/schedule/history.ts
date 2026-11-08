@@ -80,11 +80,15 @@ export function record(def: ScheduleDef, alone = false) {
  * without an undo step of its own. The next change records it, so Undo goes back to the name
  * that was on screen then, never to the one before the save; and a change that changes nothing
  * is still no step at all. The undo and redo stacks are untouched: what they hold was on screen.
+ * It also ends any typing burst, so text typed straight after it cannot join the typing before
+ * it and carry the restated state away inside that earlier step.
  */
 export function restate(def: ScheduleDef) {
   if (current === null) return;
   current = JSON.stringify(def);
   currentShape = shapeOf(def);
+  lastAt = 0;
+  lastWasText = false;
 }
 
 /** Start again from this definition — used when a new model is opened. */
