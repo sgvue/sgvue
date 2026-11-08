@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptySchedule, type ScheduleDef } from '../../../src/schedule/schedule/def';
 import { resetHistory } from '../../../src/schedule/history';
-import { selectedIndex } from '../../../src/renderer/schedule-ui/panels/shared';
+import * as act from '../../../src/schedule/schedule/actions';
 import { flushPending, later, wirePending } from '../../../src/renderer/schedule-ui/pending';
 import { saveSchedule } from '../../../src/renderer/schedule-ui/schedules';
 import { editDef, setPointerDown, setRenderer, state, update, type RenderScope } from '../../../src/renderer/schedule-ui/state';
@@ -39,7 +39,7 @@ beforeEach(() => {
   setRenderer((scope) => { paints.push(scope); });
   const d = def();
   resetHistory(d);
-  Object.assign(state, { def: d, selectedColumn: 0, dirty: false, fieldSearch: '' });
+  Object.assign(state, { def: d, selectedColumn: 0, dirty: false, railQuery: '' });
   const cell = new Map<string, string>();
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -57,18 +57,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** What liveText does: bind the target now, land the text later. */
-function typeInto(box: EventTarget, bind: () => (v: string) => void, value: string, scope: RenderScope = 'all') {
-  const write = bind();
-  later(box, () => editDef(() => write(value)), scope, 200);
+/**
+ * What liveText does: the text and the action are fixed at the keystroke — the box names its
+ * target (`data-i`, `data-defcol`), and v1.5.0's pure actions build the next definition — and
+ * the edit lands later.
+ */
+function typeInto(
+  box: EventTarget, apply: (def: ScheduleDef, v: string) => ScheduleDef, value: string, scope: RenderScope = 'all',
+) {
+  later(box, () => editDef((d) => apply(d, value)), scope, 200);
 }
 
 describe('loss path 1 — typing in one box, then another, inside the delay', () => {
   it('lands the first box\'s text the moment the second box is typed in', () => {
     const rule1 = new EventTarget();
     const rule2 = new EventTarget();
-    typeInto(rule1, () => { const r = state.def.filters[0]; return (v) => { r.value = v; }; }, 'D-1');
-    typeInto(rule2, () => { const r = state.def.filters[1]; return (v) => { r.value = v; }; }, 'L2');
+    typeInto(rule1, (d, v) => act.setFilterValue(d, 0, v), 'D-1');
+    typeInto(rule2, (d, v) => act.setFilterValue(d, 1, v), 'L2');
     expect(state.def.filters[0].value).toBe('D-1');
     vi.advanceTimersByTime(250);
     expect(state.def.filters[1].value).toBe('L2');
@@ -78,8 +83,8 @@ describe('loss path 1 — typing in one box, then another, inside the delay', ()
 describe('loss path 2 — typing a heading, then clicking another column inside the delay', () => {
   it('renames the column that was being formatted when the key was pressed', () => {
     const heading = new EventTarget();
-    // fmt-heading's binder: "the column being formatted", resolved at input time.
-    typeInto(heading, () => { const c = state.def.columns[selectedIndex(state)]; return (v) => { c.heading = v; }; }, 'Mark');
+    // fmt-heading's box names its column (`data-defcol`), read when the key is pressed.
+    typeInto(heading, (d, v) => act.setHeading(d, 0, v), 'Mark');
     // The click on column 2's heading: the window's capture phase runs before its handler.
     win.dispatchEvent(ev('click'));
     update({ selectedColumn: 1 });
@@ -92,7 +97,7 @@ describe('loss path 2 — typing a heading, then clicking another column inside 
     state.def.columns[0].conditional = [{ op: '=', value: '' }];
     state.def.columns[1].conditional = [{ op: '=', value: '' }];
     const box = new EventTarget();
-    typeInto(box, () => { const r = state.def.columns[selectedIndex(state)].conditional![0]; return (v) => { r.value = v; }; }, 'FD30');
+    typeInto(box, (d, v) => act.updateConditionalRule(d, 0, 0, { value: v }), 'FD30');
     win.dispatchEvent(ev('keydown', { key: 'Tab' }));
     update({ selectedColumn: 1 });
     expect(state.def.columns[0].conditional![0].value).toBe('FD30');
@@ -103,7 +108,7 @@ describe('loss path 2 — typing a heading, then clicking another column inside 
 describe('loss path 3 — typing the name, then Save inside the delay', () => {
   it('saves the name that was typed', () => {
     const name = new EventTarget();
-    typeInto(name, () => { const d = state.def; return (v) => { d.name = v; }; }, 'Fire doors', 'table');
+    typeInto(name, (d, v) => act.setName(d, v), 'Fire doors', 'table');
     // The Save button's click: capture phase first, then the handler reads state.def.
     win.dispatchEvent(ev('click'));
     expect(saveSchedule(state.def, null)).toBe('Fire doors');
@@ -112,14 +117,14 @@ describe('loss path 3 — typing the name, then Save inside the delay', () => {
 
 describe('when a pending edit lands, and what repaints', () => {
   it('lands when focus leaves its box, and not before', () => {
-    typeInto(root, () => { const d = state.def; return (v) => { d.name = v; }; }, 'X');
+    typeInto(root, (d, v) => act.setName(d, v), 'X');
     expect(state.def.name).toBe('Door Schedule');
     root.dispatchEvent(ev('focusout'));
     expect(state.def.name).toBe('X');
   });
 
   it('typing in the same box does not land it early; Enter or a shortcut does', () => {
-    typeInto(win, () => { const d = state.def; return (v) => { d.name = v; }; }, 'Y');
+    typeInto(win, (d, v) => act.setName(d, v), 'Y');
     win.dispatchEvent(ev('keydown', { key: 'a' }));
     expect(state.def.name).toBe('Door Schedule');
     win.dispatchEvent(ev('keydown', { key: 'z', ctrlKey: true }));
@@ -128,7 +133,7 @@ describe('when a pending edit lands, and what repaints', () => {
 
   it('never repaints while a pointer is down — only after the release, on a later task', () => {
     win.dispatchEvent(ev('pointerdown'));
-    typeInto(root, () => { const d = state.def; return (v) => { d.name = v; }; }, 'Z');
+    typeInto(root, (d, v) => act.setName(d, v), 'Z');
     root.dispatchEvent(ev('focusout'));
     vi.advanceTimersByTime(1000);
     expect(state.def.name).toBe('Z');
@@ -145,7 +150,7 @@ describe('when a pending edit lands, and what repaints', () => {
     // edit landed and never painted.
     const stuck = () => {
       win.dispatchEvent(ev('pointerdown'));
-      typeInto(root, () => { const d = state.def; return (v) => { d.name = v; }; }, 'S');
+      typeInto(root, (d, v) => act.setName(d, v), 'S');
       root.dispatchEvent(ev('focusout'));
       vi.advanceTimersByTime(1000);
       expect(state.def.name).toBe('S');
@@ -181,7 +186,7 @@ describe('when a pending edit lands, and what repaints', () => {
     // main.ts's paint() calls flushPending() first; the flush asks for a paint, and the paint
     // under way answers it.
     setRenderer((scope) => { flushPending(); paints.push(scope); });
-    typeInto(root, () => { const d = state.def; return (v) => { d.name = v; }; }, 'Q');
+    typeInto(root, (d, v) => act.setName(d, v), 'Q');
     update({ selectedColumn: 1 });
     expect(state.def.name).toBe('Q');
     vi.advanceTimersByTime(1000);
@@ -190,14 +195,14 @@ describe('when a pending edit lands, and what repaints', () => {
 
   it('a panes-only paint that lands a schedule edit still owes the table its paint', () => {
     setRenderer((scope) => { flushPending(); paints.push(scope); });
-    typeInto(root, () => { const d = state.def; return (v) => { d.name = v; }; }, 'R');
-    update({ fieldSearch: 'x' }, 'panes');
+    typeInto(root, (d, v) => act.setName(d, v), 'R');
+    update({ railQuery: 'x' }, 'panes');
     vi.advanceTimersByTime(0);
     expect(paints).toEqual(['panes', 'table']);
   });
 
   it('a repaint that happens anyway crosses the deferred one off — no second paint', () => {
-    typeInto(root, () => { const d = state.def; return (v) => { d.name = v; }; }, 'W');
+    typeInto(root, (d, v) => act.setName(d, v), 'W');
     flushPending();
     update({ selectedColumn: 1 });
     vi.advanceTimersByTime(0);
@@ -206,9 +211,9 @@ describe('when a pending edit lands, and what repaints', () => {
 
   it('a search lands as a panes-only repaint', () => {
     const box = new EventTarget();
-    later(box, () => { state.fieldSearch = 'fire'; }, 'panes', 150);
+    later(box, () => { state.railQuery = 'fire'; }, 'panes', 150);
     vi.advanceTimersByTime(200);
-    expect(state.fieldSearch).toBe('fire');
+    expect(state.railQuery).toBe('fire');
     expect(paints).toEqual(['panes']);
   });
 });

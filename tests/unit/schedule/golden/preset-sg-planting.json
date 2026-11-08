@@ -1,0 +1,1184 @@
+{
+ "def": {
+  "version": 1,
+  "name": "Planting",
+  "entity": [
+   "IfcGeographicElement"
+  ],
+  "columns": [
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "TreeNumber"
+    },
+    "align": "left"
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Species"
+    },
+    "align": "left"
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Girth"
+    },
+    "align": "right",
+    "format": {
+     "display": "m",
+     "decimals": 2,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Height"
+    },
+    "align": "right",
+    "format": {
+     "display": "m",
+     "decimals": 2,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Status"
+    },
+    "align": "left"
+   }
+  ],
+  "filters": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "objectType"
+    },
+    "op": "=",
+    "value": "LANDSCAPE_TREE"
+   }
+  ],
+  "filterLogic": "and",
+  "sort": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "storey"
+    },
+    "dir": "asc",
+    "header": true,
+    "footer": "count"
+   }
+  ],
+  "itemize": true,
+  "grandTotal": false,
+  "appearance": {
+   "showTitle": true,
+   "gridLines": true,
+   "zebra": true,
+   "fontSize": 13,
+   "headerBold": true
+  },
+  "meta": {
+   "notes": "SGVue template — Planting"
+  }
+ },
+ "result": {
+  "columns": [
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "TreeNumber"
+    },
+    "align": "left"
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Species"
+    },
+    "align": "left"
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Girth"
+    },
+    "align": "right",
+    "format": {
+     "display": "m",
+     "decimals": 2,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Height"
+    },
+    "align": "right",
+    "format": {
+     "display": "m",
+     "decimals": 2,
+     "thousands": true
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Status"
+    },
+    "align": "left"
+   }
+  ],
+  "headings": [
+   "TreeNumber",
+   "Species",
+   "Girth",
+   "Height",
+   "Status"
+  ],
+  "rows": [
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 1",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     56
+    ],
+    "cells": [
+     "T1",
+     "Rain Tree",
+     "1.10",
+     "8.00",
+     "Retain"
+    ],
+    "nums": [
+     null,
+     null,
+     1.1,
+     8,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "1",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Level 2",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     59
+    ],
+    "cells": [
+     "T4",
+     "Tembusu",
+     "",
+     "",
+     "Retain"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "1",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "kind": "group",
+    "level": 0,
+    "label": "Roof",
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     57
+    ],
+    "cells": [
+     "T2",
+     "Tembusu",
+     "1.24",
+     "8.14",
+     "Remove"
+    ],
+    "nums": [
+     null,
+     null,
+     1.24,
+     8.14,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "footer",
+    "level": 0,
+    "label": "1",
+    "count": 1,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  ],
+  "totalDataRows": 3,
+  "matchedElements": 3,
+  "truncated": false,
+  "countColumn": false,
+  "numeric": {
+   "2": {
+    "decimals": 2,
+    "unit": ""
+   },
+   "3": {
+    "decimals": 2,
+    "unit": ""
+   }
+  }
+ },
+ "csv": [
+  "TreeNumber,Species,Girth,Height,Status",
+  "Level 1 (1),,,,",
+  "T1,Rain Tree,1.10,8.00,Retain",
+  "1,,,,",
+  "Level 2 (1),,,,",
+  "T4,Tembusu,,,Retain",
+  "1,,,,",
+  "Roof (1),,,,",
+  "T2,Tembusu,1.24,8.14,Remove",
+  "1,,,,"
+ ],
+ "xlsx": [
+  {
+   "pageSetup": {
+    "fitToPage": true,
+    "margins": {
+     "left": 0.7,
+     "right": 0.7,
+     "top": 0.75,
+     "bottom": 0.75,
+     "header": 0.3,
+     "footer": 0.3
+    },
+    "orientation": "landscape",
+    "horizontalDpi": 4294967295,
+    "verticalDpi": 4294967295,
+    "pageOrder": "downThenOver",
+    "blackAndWhite": false,
+    "draft": false,
+    "cellComments": "None",
+    "errors": "displayed",
+    "scale": 100,
+    "fitToWidth": 1,
+    "fitToHeight": 0,
+    "firstPageNumber": 1,
+    "useFirstPageNumber": false,
+    "usePrinterDefaults": false,
+    "copies": 1
+   },
+   "name": "Planting",
+   "autoFilter": "A1:E1",
+   "views": [
+    {
+     "workbookViewId": 0,
+     "rightToLeft": false,
+     "state": "frozen",
+     "xSplit": 0,
+     "ySplit": 1,
+     "topLeftCell": "A2",
+     "showRuler": true,
+     "showRowColHeaders": true,
+     "showGridLines": true,
+     "zoomScale": 100,
+     "zoomScaleNormal": 100
+    }
+   ],
+   "cols": [
+    {
+     "i": 0,
+     "width": 13
+    },
+    {
+     "i": 1,
+     "width": 11
+    },
+    {
+     "i": 2,
+     "width": 10,
+     "al": {
+      "horizontal": "right"
+     }
+    },
+    {
+     "i": 3,
+     "width": 10,
+     "al": {
+      "horizontal": "right"
+     }
+    },
+    {
+     "i": 4,
+     "width": 10
+    }
+   ],
+   "rows": [
+    {
+     "r": 1,
+     "cells": [
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 1,
+       "v": "TreeNumber",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 2,
+       "v": "Species",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 3,
+       "v": "Girth",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 4,
+       "v": "Height",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 5,
+       "v": "Status",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 2,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 1 (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 3,
+     "cells": [
+      {
+       "c": 1,
+       "v": "T1"
+      },
+      {
+       "c": 2,
+       "v": "Rain Tree"
+      },
+      {
+       "c": 3,
+       "v": 1.1,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": 8,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "Retain"
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "1",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Level 2 (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 6,
+     "cells": [
+      {
+       "c": 1,
+       "v": "T4"
+      },
+      {
+       "c": 2,
+       "v": "Tembusu"
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "Retain"
+      }
+     ]
+    },
+    {
+     "r": 7,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "1",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "c": 1,
+       "v": "Roof (1)",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      },
+      {
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "solid",
+        "fgColor": {
+         "argb": "FFF0F3F7"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "r": 9,
+     "cells": [
+      {
+       "c": 1,
+       "v": "T2"
+      },
+      {
+       "c": 2,
+       "v": "Tembusu"
+      },
+      {
+       "c": 3,
+       "v": 1.24,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 4,
+       "v": 8.14,
+       "f": "#,##0.00",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "c": 5,
+       "v": "Remove"
+      }
+     ]
+    },
+    {
+     "r": 10,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 1,
+       "v": "1",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "thin"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

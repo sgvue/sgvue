@@ -23,7 +23,7 @@
 // general list above is unchanged and still never filters.
 
 import type { UnitSystem } from '../ifc/units';
-import { emptySchedule, type Column, type CoreKey, type FilterRule, type ScheduleDef } from './def';
+import { emptySchedule, type Column, type CoreKey, type FieldRef, type FilterRule, type ScheduleDef } from './def';
 import { ANY_PSET } from './resolve';
 
 export interface Preset {
@@ -219,6 +219,35 @@ export function presetsFor(byEntity: Map<string, number[]>): Preset[] {
 
 export function presetById(id: string): Preset | undefined {
   return PRESETS.find((p) => p.id === id);
+}
+
+// Suggested is derived from the category's hand-authored templates (ifcTable's decision of
+// 2026-11-05, ported for SGVue v1.5.0; the field picker that reads it arrives in phase 2).
+/**
+ * The field picker's "Suggested" list for a category: the fields the hand-authored templates
+ * for its classes already ask for, in template order, each once. No list of its own to keep
+ * in step — a template edited here changes what is suggested — and nothing outside the
+ * templates' own choices, so it judges the model no more than they do. A category no
+ * template covers gets an empty list, and the picker omits the section.
+ *
+ * Property fields come back as the template asks for them — by NAME across psets — so the
+ * picker matches each against whatever psets this model carries it in.
+ */
+export function suggestedFor(entities: string[]): FieldRef[] {
+  const out: FieldRef[] = [];
+  const seen = new Set<string>();
+  for (const p of PRESETS) {
+    if (!p.entities.some((e) => entities.includes(e))) continue;
+    for (const c of p.columns) {
+      const f = c.field;
+      const key = f.kind === 'core' ? `core|${f.key}` : f.kind === 'prop' ? `prop|${f.prop.toLowerCase()}` : '';
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      // SGVue: a copy — the templates are module constants, and a caller may edit what it gets.
+      out.push(structuredClone(f));
+    }
+  }
+  return out;
 }
 
 /**

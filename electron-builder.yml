@@ -62,6 +62,9 @@ files:
   - '!reports/*'
   - '!research_notes/*'
   - '!reference/*'
+  # Untracked design work kept in a worktree: throwaway prototypes and spikes (2026-11-08).
+  - '!prototypes/**'
+  - '!spikes/**'
   # Build and scratch output. electron-builder leaves out only the output directory it is
   # writing to, so a build into a folder of its own (`dist/<name>`) packed the whole of `dist/`,
   # every earlier installer with it (2026-10-09).

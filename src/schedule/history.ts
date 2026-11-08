@@ -6,7 +6,8 @@
 //
 // Typing coalesces: renaming a column produces one undo step, not one per keystroke. Two
 // states belong to the same burst when they arrived within 700 ms AND have the same shape
-// (same columns, filters and levels, in the same order) — so only their text differs.
+// (same columns, filters and levels, in the same order) — so only their text differs. A change
+// the assistant made (`define`) is never part of a burst: it is always its own step.
 
 import type { ScheduleDef } from './schedule/def';
 
@@ -46,8 +47,12 @@ function shapeOf(def: ScheduleDef): string {
   ]);
 }
 
-/** Call after every change to the definition. Identical states are ignored. */
-export function record(def: ScheduleDef) {
+/**
+ * Call after every change to the definition. Identical states are ignored. `alone` is a change
+ * that is always an undo step of its own — the assistant's `define` — never joined to the
+ * user's typing, whichever comes first.
+ */
+export function record(def: ScheduleDef, alone = false) {
   const sig = JSON.stringify(def);
   if (sig === current) return;
   const shape = shapeOf(def);
@@ -55,7 +60,7 @@ export function record(def: ScheduleDef) {
   const textOnly = shape === currentShape;
   if (current !== null) {
     const t = now();
-    const burst = textOnly && lastWasText && t - lastAt < BURST_MS && undoStack.length > 0;
+    const burst = !alone && textOnly && lastWasText && t - lastAt < BURST_MS && undoStack.length > 0;
     // In a burst the entry already on the stack holds the pre-typing state — keep it.
     if (!burst) {
       undoStack.push(current);
@@ -66,7 +71,24 @@ export function record(def: ScheduleDef) {
   }
   current = sig;
   currentShape = shape;
-  lastWasText = textOnly;
+  lastWasText = textOnly && !alone;
+}
+
+/**
+ * The definition on screen changed in a way that is not an edit — a save that had to number
+ * its name, or the saved setup on screen renamed — so it takes the place of the current state
+ * without an undo step of its own. The next change records it, so Undo goes back to the name
+ * that was on screen then, never to the one before the save; and a change that changes nothing
+ * is still no step at all. The undo and redo stacks are untouched: what they hold was on screen.
+ * It also ends any typing burst, so text typed straight after it cannot join the typing before
+ * it and carry the restated state away inside that earlier step.
+ */
+export function restate(def: ScheduleDef) {
+  if (current === null) return;
+  current = JSON.stringify(def);
+  currentShape = shapeOf(def);
+  lastAt = 0;
+  lastWasText = false;
 }
 
 /** Start again from this definition — used when a new model is opened. */

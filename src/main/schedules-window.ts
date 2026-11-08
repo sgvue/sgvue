@@ -46,7 +46,7 @@ export function openSchedules(): void {
   const win = new BrowserWindow({
     width: 1100,
     height: 720,
-    minWidth: 560,
+    minWidth: 780, // ifcTable's layout floor without the inspector (owner, v1.5.0)
     minHeight: 360,
     show: false,
     autoHideMenuBar: false,

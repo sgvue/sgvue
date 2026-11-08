@@ -3,11 +3,11 @@
 // is a permanent list rather than a dropdown you have to open.
 //
 // Ported from ifcTable's `ui/rail.ts` — phase 1 (2026-09-25) took the category list, its
-// filter box and its A→Z order; phase 2 the collapse strip and the saved setups under the
-// list, each row loading or deleting its setup and the loaded one marked. What stays out:
-// "Browse templates…", "My templates…" and Save, which the header carries for this window;
-// Export… and Import…, which return with phase 4; and the "Open model…" foot — models are
-// opened in the main window.
+// filter box and its A→Z order; phase 2 the collapse strip. v1.5.0, phase 3 (ifcTable
+// 2026-11-07): under the list, one way into the Templates library (`T`) and the schedule in
+// use, where the saved rows were. What stays out: Save, Export and Import, which this window's
+// header and the library carry; and the "Open model…" foot — models are opened in the main
+// window.
 //
 // Drawn in SGVue's sidebar idiom: the uppercase 11 px section label with its mono count, the
 // 13 px row with a 2 px accent edge when on, `hv-step` under the pointer.
@@ -15,8 +15,7 @@
 import { disciplineForEntity } from '../../schedule/ifc/entities';
 import type { ModelStore } from '../../schedule/ifc/store';
 import { esc } from './dom';
-import { AZ, chevronRight, cross, panel } from './icons';
-import { listSaved } from './schedules';
+import { ICON } from './icons';
 import type { AppState } from './state';
 
 export function renderRail(state: AppState, store: ModelStore): string {
@@ -24,7 +23,7 @@ export function renderRail(state: AppState, store: ModelStore): string {
   // sits inside it, and this is where its way back lives — the pane never fully disappears.
   if (!state.railOpen) {
     return `<button class="strip-open hv-step-ink" data-act="rail-toggle" aria-expanded="false"
-      title="Show the categories panel" aria-label="Show the categories panel">${chevronRight(12)}</button>`;
+      title="Show the categories panel" aria-label="Show the categories panel">${ICON.chevronRight}</button>`;
   }
   const q = state.railQuery.trim().toLowerCase();
   const az = state.railSort === 'name';
@@ -47,20 +46,14 @@ export function renderRail(state: AppState, store: ModelStore): string {
     </button>`;
   }).join('') || `<div class="rail-empty">Nothing matches “${esc(state.railQuery)}”.</div>`;
 
-  const saved = listSaved();
-  // Two sibling buttons rather than a clickable span, so both are focusable and neither is
-  // nested inside the other. `aria-current`, not `aria-pressed`: the mark says which setup
-  // you are on, and the button is not a toggle.
-  const savedRows = saved.map((s) => {
-    const on = s.name === state.savedName;
-    return `<div class="rail-saved hv-step${on ? ' on' : ''}">
-      <button class="grow" data-act="load-saved" data-name="${esc(s.name)}"${on ? ' aria-current="true"' : ''}
-        title="Saved ${esc(s.savedAt.slice(0, 10))} · ${esc(s.def.entity.join(', ') || 'no category')}">${esc(s.name)}</button>
-      ${on ? `<span class="n">${state.dirty ? 'edited' : 'in use'}</span>` : ''}
-      <button class="x hv-warn-both" data-act="delete-saved" data-name="${esc(s.name)}"
-        title="Delete this saved schedule" aria-label="Delete ${esc(s.name)}">${cross(10)}</button>
-    </div>`;
-  }).join('') || '<div class="rail-empty">Nothing saved yet.</div>';
+  // v1.5.0, phase 3 (ifcTable 2026-11-07): the saved rows give way to one way into the
+  // Templates library and the schedule in use — its name, and whether it is saved.
+  const from = state.savedName ?? (state.templateId ? 'template' : null);
+  const status = !from ? '<span class="state edited">not saved</span>'
+    : state.dirty ? '<span class="state edited">edited</span>' : '<span class="state">in use</span>';
+  const current = state.def.entity.length ? `<div class="rail-item cur-row on" title="${esc(state.def.name)}">
+      <span class="grow">${esc(state.def.name)}</span>${status}
+    </div>` : '';
 
   return `<div class="rail-search">
       <input type="search" data-act="rail-query" class="field"
@@ -68,9 +61,9 @@ export function renderRail(state: AppState, store: ModelStore): string {
         value="${esc(state.railQuery)}" />
       <button class="icon-btn hv-step${az ? ' on' : ''}" data-act="rail-sort" aria-pressed="${az}"
         data-tip="${az ? 'sort by count' : 'sort A to Z'}"
-        aria-label="${az ? 'Sort categories by count' : 'Sort categories A to Z'}">${AZ}</button>
+        aria-label="${az ? 'Sort categories by count' : 'Sort categories A to Z'}">${ICON.sortAsc}</button>
       <button class="icon-btn hv-step-ink" data-act="rail-toggle" aria-controls="rail-pane"
-        aria-expanded="true" data-tip="hide categories" aria-label="Hide the categories panel">${panel}</button>
+        aria-expanded="true" data-tip="hide categories" aria-label="Hide the categories panel">${ICON.panel}</button>
     </div>
     <div class="rail-label">
       <span>Categories</span>
@@ -78,10 +71,9 @@ export function renderRail(state: AppState, store: ModelStore): string {
     </div>
     <div class="rail-body">${categories}</div>
     <div class="rail-sched">
-      <div class="rail-label">
-        <span>Saved</span>
-        <span class="n">${saved.length}</span>
-      </div>
-      <div class="rail-group">${savedRows}</div>
+      <div class="rail-label"><span>Templates</span></div>
+      <button class="rail-lib hv-step" data-act="open-library" title="Browse, use and manage templates (T)"
+        >${ICON.templates}<span class="grow">Templates library</span><kbd>T</kbd></button>
+      ${current}
     </div>`;
 }

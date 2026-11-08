@@ -13,7 +13,7 @@ import { clamp } from './dom';
 const EDGE = 6;
 /**
  * The one range a column width may be set to. This module owns it because the drag is the
- * gesture that produces widths; the Format tab's Width box (its min/max attributes, and the
+ * gesture that produces widths; the column menu's Width box (its min/max attributes, and the
  * one commit in events.ts, which clamps through `clampWidth` below) imports from here so it
  * cannot disagree.
  */
@@ -37,7 +37,7 @@ export interface ColResizeHooks {
   /**
    * The release, or a double-click's fit. Always a measured number — no gesture here commits
    * "auto" any more, because under a table that stretches to its pane "auto" is not a fit.
-   * Clearing a width is the Format tab's Width box, emptied.
+   * Clearing a width is the column menu's Width box, emptied.
    */
   commit: (widths: [number, number][]) => void;
 }

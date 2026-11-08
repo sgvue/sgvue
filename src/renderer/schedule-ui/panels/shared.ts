@@ -1,14 +1,13 @@
-// Shared helpers for the config tabs: field lists, type/unit lookup, and the
+// Shared helpers for the column menu and the view bar's popovers: field lists, type/unit lookup, and the
 // unit conversion the filter boxes need (values are stored in SI, typed in display units).
 
 import type { UnitKind } from '../../../schedule/ifc/types';
 import type { UnitSystem } from '../../../schedule/ifc/units';
 import { kindOf, kindsByHeading, statOf, typeOf } from '../../../schedule/schedule/columns';
-import { fieldKey, headingOf, CORE_KEYS, CORE_LABELS, type FieldRef, type ScheduleDef } from '../../../schedule/schedule/def';
-import { defaultUnit, fromDisplay, toDisplay } from '../../../schedule/schedule/format';
+import { defaultHeading, fieldKey, headingOf, CORE_KEYS, CORE_LABELS, type FieldRef } from '../../../schedule/schedule/def';
+import { defaultUnit, toDisplay } from '../../../schedule/schedule/format';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
-import { cross, grip } from '../icons';
 
 /** Every field the user may filter or sort on: the scheduled columns plus all core fields. */
 export function selectableFields(state: AppState): { id: string; label: string; field: FieldRef }[] {
@@ -42,65 +41,13 @@ export function fieldFromKey(key: string): FieldRef | null {
 // decides a column's unit and decimals by the rule the Format tab offers them by.
 export { kindOf, kindsByHeading, statOf, typeOf };
 
-/**
- * The column the section is editing — column 0 when nothing has been picked.
- *
- * It lives here rather than in formatSection because the table marks this column too, and a
- * panel importing the table's `cellStyle` while the table imported the panel's answer to
- * this was a cycle for no gain. `shared.ts` is the leaf both sides already depend on.
- */
+/** The column whose heading was last clicked — column 0 when none has been. Equal width
+ *  copies its width. */
 export function selectedIndex(state: AppState): number {
   const n = state.def.columns.length;
   if (!n) return -1;
   const i = state.selectedColumn ?? 0;
   return i >= 0 && i < n ? i : 0;
-}
-
-interface ColumnRowOpts {
-  /** The overlay's copy: boxed, smaller, and without the coverage read-out. */
-  compact?: boolean;
-  selected?: boolean;
-  /** 0…1 coverage, and the class that colours it. Full rows only. */
-  cover?: { pct: number; cls: string; title: string; pset: string };
-}
-
-/**
- * One row of the scheduled-column list. It is rendered in two places — the Fields panel and
- * the field browser's "In this schedule" pane — and the two carry identical data-act and
- * data-i attributes. Keeping them one function is what stops them drifting apart, which is
- * how the focus-restore code came to find the wrong one of the pair.
- */
-export function columnRow(def: ScheduleDef, i: number, o: ColumnRowOpts = {}): string {
-  const c = def.columns[i];
-  const heading = headingOf(c, def);
-  const classes = ['drag-row',
-    o.compact ? 'boxed' : '',
-    !o.compact && o.cover?.cls === 'none' ? 'empty' : '',
-    o.selected ? 'on' : ''].filter(Boolean).join(' ');
-
-  const name = o.compact
-    ? `<span class="name small">${esc(heading)}</span>`
-    : `<span class="name${c.hidden ? ' off' : ''}" data-act="select-col" data-i="${i}"
-        title="${esc(heading)} — click to format">${esc(heading)}</span>`;
-
-  // Name, source, then the coverage as a number — once, not twice. The bar that used to sit
-  // between them said nothing the coloured percentage beside it did not, on a row already
-  // carrying a handle, a name, a pset and a remove button. The field browser keeps its bars:
-  // there the job is scanning an unfamiliar model, and a bar is faster to compare down a
-  // long list than to read.
-  const coverage = !o.compact && o.cover
-    ? `<span class="pset" title="${esc(o.cover.pset)}">${esc(o.cover.pset)}</span>
-      <span class="cover ${o.cover.cls}" title="${esc(o.cover.title)}">${o.cover.pct}%</span>`
-    : '';
-
-  return `<div class="${classes}" draggable="true" data-drag="col" data-i="${i}">
-      <span class="handle" tabindex="0" data-act="col-handle" data-i="${i}"
-        title="${o.compact ? 'Drag to reorder' : 'Drag to reorder, or focus and use the arrow keys'}"
-        aria-label="Reorder ${esc(heading)}">${grip}</span>
-      ${name}
-      ${coverage}
-      <button class="x-btn hv-warn-both" data-act="col-remove" data-i="${i}" title="Remove this column">${cross()}</button>
-    </div>`;
 }
 
 /**
@@ -133,7 +80,14 @@ export function toggle(
 }
 
 export function fieldSelect(state: AppState, selected: FieldRef | undefined, act: string, idx: number): string {
-  const opts = selectableFields(state)
+  const fields = selectableFields(state);
+  // A rule or level can be on a field that is not a column — the field picker offers every
+  // field the category has. Without its own option the select would SHOW the first one and,
+  // touched, rewrite the rule onto it (ifcTable, 2026-11-05).
+  if (selected && !fields.some((f) => f.id === fieldKey(selected))) {
+    fields.unshift({ id: fieldKey(selected), label: defaultHeading(selected, state.def), field: selected });
+  }
+  const opts = fields
     .map((f) => option(f.id, f.label, !!selected && fieldKey(selected) === f.id))
     .join('');
   return `<select data-act="${act}" data-i="${idx}" aria-label="Field">${opts}</select>`;
@@ -151,8 +105,5 @@ export function displayNum(v: unknown, kind: UnitKind, system?: UnitSystem): str
   return String(Math.round(out * 1e6) / 1e6);
 }
 
-export function storeNum(raw: string, kind: UnitKind, system?: UnitSystem): number | undefined {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return undefined;
-  return fromDisplay(n, kind, defaultUnit(kind, system) || undefined);
-}
+/** The box's text, read back to SI — moved to the engine (v1.5.0, phase 1); one copy. */
+export { storeNum } from '../../../schedule/schedule/format';

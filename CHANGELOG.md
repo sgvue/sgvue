@@ -8,6 +8,76 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-08
+
+### Added
+
+- **The Schedules window is table-first**, after ifcTable's redesign: the table takes the whole
+  window. Click a column heading for everything about that column — its heading text, total,
+  decimals, unit, alignment, sorting, grouping, colour rules, filter, width, position, hide and
+  remove; Left and Right move between headings. What the schedule does reads as chips above the
+  table — each filter as a sentence with how many rows it removes, each sort and group level,
+  Rows (itemise, grand total) and Style — and each chip opens its own small popover. Columns are
+  added from a search-first field picker, from **+ Column** at the end of the headings or the
+  fields chip, which shows how many elements carry each field.
+- **One Templates library** (the header's templates button, the rail's **Templates library**, or
+  `T`) holds the built-in templates and your own, under Mine · Built-in · IFC-SG, with a search,
+  sortable columns and a preview of what the selected template gives on the models open — how
+  many elements, which columns it finds and its first rows. Use, save, rename, duplicate,
+  delete, export and import from one place.
+- A new icon set in the Schedules window, from ifcTable, drawn in SGVue's stroke style.
+- From the repository only: every Schedules cell of three synthetic models is checked against
+  IfcOpenShell (`tests/unit/schedule/oracle.test.ts`, `scripts/make-edge-ifc.py`); the drawn
+  table against the engine's rows, totals and filters against an independent oracle, and seeded
+  simulations of the Schedules window and of the messages between the two windows.
+
+### Changed
+
+- The Schedules window's right-hand panel — its Fields, Filter, Sort, Format and Style tabs and
+  the field browser — is gone; every control in it is in a column's menu, a chip above the
+  table or the field picker. The calculated-value editor opens as a dialog of its own.
+- The template gallery and **My templates** are replaced by the Templates library; your saved
+  templates are its **Mine**.
+- At 100 saved templates, a save or a duplicate is refused with "Saved templates are full (100).
+  Delete one to make room." — the oldest is no longer dropped to make room.
+- Importing a `.schedule.json` adds it to Mine; it no longer replaces the schedule on screen.
+- A **between** filter with one box empty is open-ended — only "to" filled reads as at most,
+  only "from" as at least — and with both empty it keeps every row.
+- Values such as `-`, `—`, `n/a`, `none` or a blank count as no value where the Schedules window
+  counts which elements carry a field.
+- The Schedules window is at least 780 px wide (was 560).
+- A part, a nested component or a door or window that only fills an opening, with no storey of
+  its own, now stands on its host's storey and in its host's container, as IfcOpenShell reads
+  it — in STOREYS, a storey's eye, Level rules, the element tree, the Schedules window and
+  Ask Vee. Models where every element is placed on a storey directly, such as most Revit
+  exports, are unchanged.
+- In the Schedules window, a value in one of the file's derived units is shown in SI units, a
+  mass in it counted in kilograms; the main window still shows it as the file writes it.
+- In the Schedules window, Building, Site and Room / Space come from the element's own place
+  in the spatial structure, so a wall placed in the building names it, and furniture placed in
+  a room names the room.
+
+### Fixed
+
+- A mass per length and a rotational mass in the Schedules window are no longer scaled as a
+  length or a mass.
+- A group footer or grand total whose first total is a hidden zero now shows its label on
+  screen, as the Excel and CSV exports already did.
+- Saving a template under a numbered name, or renaming the saved template on screen, no longer
+  brings the old name back on Undo; a schedule changed by Ask Vee is always its own Undo step.
+- When the Schedules window does not answer Ask Vee in time, Vee says it is not known whether
+  the action happened, instead of saying it most likely did not.
+
+### Security
+
+- Excel exports write every cell as plain text or a number, so a value from a doctored
+  template can never become a live formula or link in the workbook.
+- A schedule's calculated columns are rebuilt from known fields wherever a schedule comes in —
+  a `.schedule.json`, a saved template, a project file or Ask Vee — and anything else in them
+  is dropped.
+
+See [docs/releases/1.5.0.md](docs/releases/1.5.0.md).
+
 ## [1.4.0] - 2026-11-08
 
 ### Added

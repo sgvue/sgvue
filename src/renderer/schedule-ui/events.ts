@@ -19,30 +19,43 @@
 //     saved-setup and print handlers live in `actions.ts`, unchanged, so that a request over the
 //     port runs the very function a click runs (`manage.ts`). What a click asks first — "Replace
 //     the current schedule setup?", the rename prompt — is still asked here.
+//
+// v1.5.0, phase 2 — ifcTable's table-first redesign (2026-11-05): the inspector's five tabs are
+// gone. Every handler builds the next definition with a pure action from
+// `schedule/schedule/actions` (`act.*`) instead of editing it in place; the column menu
+// (`columnMenu.ts`), the view bar's chips and popovers (`viewBar.ts`, `viewPopovers.ts`) and the
+// field picker (`fieldPicker.ts`) are wired here, and a heading's plain click, Enter or Space
+// opens its column menu (its right-click is still the colour-by menu). A typed edit still waits
+// in pending.ts — the one pending edit, which lands before any other input, focus change, click
+// or key — so ifcTable's `flushText()` calls have no counterpart here.
 
+import type { UnitKind } from '../../schedule/ifc/types';
+import * as act from '../../schedule/schedule/actions';
+import { alignForCalc, columnForCore, columnForProp, defaultColumnsFor } from '../../schedule/schedule/columns';
 import {
-  alignForCalc, columnForCore, columnForProp, defaultColumnsFor,
-} from '../../schedule/schedule/columns';
-import {
-  emptySchedule, headingOf,
-  type CondRule, type FilterRule, type SortLevel, type TotalKind,
+  emptySchedule, MAX_FILTERS, MAX_SORT_LEVELS,
+  type Column, type CondRule, type FieldRef, type FilterRule, type ScheduleDef, type SortLevel, type TotalKind,
 } from '../../schedule/schedule/def';
-import { clampDecimals } from '../../schedule/schedule/format';
-import { presetById } from '../../schedule/schedule/presets';
+import { clampDecimals, defaultDecimals } from '../../schedule/schedule/format';
 import { dimensionOf } from '../../schedule/schedule/formula';
-import {
-  applyTemplate, askDeleteSaved, duplicateSaved, loadSaved, printSchedule, renameSaved, saveCurrent,
-  stepHistory,
-} from './actions';
+import { printSchedule, stepHistory } from './actions';
 import { later } from './pending';
-import { editDef, state, update, updateDef, type AppState, type Section } from './state';
+import { editDef, state, update, updateDef, type RenderScope } from './state';
 import { clampWidth, fitAll, naturalWidths } from './colResize';
-import { moveItem, wireReorder } from './dnd';
-import { confirmDialog, dialogOpen, promptDialog } from './dialog';
+import { followColumn, menuColumn, openHiddenColumnMenu, setMenuView, toggleColumnMenu, toggleMore } from './columnMenu';
+import { wireReorder } from './dnd';
+import { confirmDialog, dialogOpen } from './dialog';
 import { menuOpen, openMenu } from './menu';
-import { EXPORT_ACTIONS, exportScheduleFile, openScheduleFile } from './exporting';
-import { clamp, onChange, onClick, onInput } from './dom';
-import { fieldFromKey, fieldKey, kindOf, kindsByHeading, newId, selectedIndex, statOf, storeNum } from './panels';
+import { EXPORT_ACTIONS, openScheduleFile } from './exporting';
+import { wireLibrary } from './libraryEvents';
+import { clamp, flash, onChange, onClick, onInput } from './dom';
+import { fieldFromKey, kindOf, kindsByHeading, selectedIndex, statOf, storeNum, typeOf } from './panels/shared';
+import { closePopover, paintPopover, popoverId } from './popover';
+import {
+  clearPicks, hoverPeek, peekKey, pickedIds, pickerKey, pickerMode, refreshPicker, resetPicker, setQuery, setView,
+  toggleEmpty, toggleFold, toggleTick,
+} from './fieldPicker';
+import { openChip, openChipPopover, toggleChip } from './viewBar';
 import { listSaved } from './schedules';
 
 const num = (el: HTMLElement) => Number((el as HTMLInputElement).value);
@@ -56,9 +69,9 @@ const checked = (el: HTMLElement) => (el as HTMLInputElement).checked;
  */
 const idx = (el: HTMLElement) => Number(el.dataset.i ?? -1);
 /**
- * Category, saved setup and template all replace the whole definition. If the user has
- * customized anything there is no way back, so ask first. One predicate and one string for
- * all three: written out twice, the template's copy could be — and was — the odd one out.
+ * A category replaces the whole definition. If the user has customized anything there is no
+ * way back, so ask first. (A saved setup or a template is the Templates library's, which asks
+ * in its own words — libraryActions.ts `requestUse`.)
  */
 //
 // SGVue: the question is the window's own dialog, so the answer arrives later. With nothing
@@ -66,6 +79,24 @@ const idx = (el: HTMLElement) => Number(el.dataset.i ?? -1);
 function ifReplaceOk(apply: () => void) {
   if (!state.dirty || !state.def.columns.length) { apply(); return; }
   void confirmDialog('Replace the current schedule setup?', 'Replace').then((ok) => { if (ok) apply(); });
+}
+
+/**
+ * The column a field becomes when someone adds it by hand — from the field picker. One
+ * function, so every way a column is added by hand gives it the same units and alignment. It
+ * defaults the way one the app generated does: in the model's own system of units.
+ */
+function columnFor(def: ScheduleDef, f: FieldRef): Column {
+  const system = state.store?.meta.unitSystem;
+  if (f.kind === 'core') return columnForCore(f.key, system);
+  if (f.kind === 'prop') {
+    const stat = state.store && statOf(state.store, def, f);
+    return stat ? columnForProp(stat, system) : { field: f };
+  }
+  // Aligned by what the calculated value says it holds. This used to be a flat 'right',
+  // from when a formula could only ever be a number — which left a column of the word
+  // "Small" hard against the right-hand rule.
+  return { field: f, align: alignForCalc(def.calculated?.find((c) => c.id === f.id)) };
 }
 
 export interface Hooks {
@@ -81,25 +112,24 @@ export interface Hooks {
   frameSelection: () => void;
 }
 
-/** What a typed box writes to, resolved when the key is pressed: the rule, the column, the def. */
-type Bind = (el: HTMLElement) => ((value: string) => void) | null | undefined;
-
 /**
  * Text inputs repaint everything, because a panel's own text can depend on what was typed
  * (a rule's "removes 353", a formula's error). main.ts restores focus and caret around the
  * repaint, so it still behaves like an ordinary text box.
  *
- * SGVue (2026-09-25): `bind` resolves the edit's TARGET at input time, and the edit waits in
- * pending.ts — the one pending edit, which lands before any other box's input, when focus
- * leaves this box, and before any click or key action. ifcTable's per-selector timers lost
- * or misplaced text three ways (pending.ts lists them).
+ * SGVue (2026-09-25): the edit waits in pending.ts — the one pending edit, which lands before
+ * any other box's input, when focus leaves this box, and before any click or key action.
+ * ifcTable's per-selector timers lost or misplaced text three ways (pending.ts lists them).
+ * v1.5.0: `apply` is a pure action; its target is named by the box itself (`data-i`,
+ * `data-defcol`, `data-id`), and nothing can move a column or a rule before the edit lands.
  */
-function liveText(root: HTMLElement, selector: string, bind: Bind, scope: 'all' | 'table' = 'all') {
+function liveText(
+  root: HTMLElement, selector: string,
+  apply: (def: ScheduleDef, value: string, el: HTMLElement) => ScheduleDef, scope: RenderScope = 'all',
+) {
   onInput(root, selector, (el) => {
-    const write = bind(el);
-    if (!write) return;
     const value = text(el);
-    later(el, () => editDef(() => write(value)), scope, 200);
+    later(el, () => editDef((def) => apply(def, value, el)), scope, 200);
   });
 }
 
@@ -110,7 +140,7 @@ function liveText(root: HTMLElement, selector: string, bind: Bind, scope: 'all' 
  */
 function liveState(
   root: HTMLElement, selector: string,
-  key: 'railQuery' | 'fieldSearch' | 'templateQuery' | 'savedQuery',
+  key: 'railQuery',
 ) {
   onInput(root, selector, (el) => {
     const value = text(el);
@@ -127,24 +157,28 @@ export function wireApp(root: HTMLElement, hooks: Hooks) {
   }));
   wireRows(root, hooks);
   wireHistory(root);
+  // The field picker's "In this table" rows are the one drag list left.
   wireReorder(root, (kind, from, to) => updateDef((def) => {
-    const list = kind === 'lvl' ? def.sort : def.columns;
-    if (!moveItem(list, from, to)) return;
-    if (kind !== 'col') return;
-    // The formatting section follows the column the user just moved.
+    if (kind !== 'col' || !act.canMove(def.columns.length, from, to)) return def;
+    const next = act.moveColumn(def, from, to);
+    // The last-clicked column follows the column the user just moved.
     if (state.selectedColumn === from) state.selectedColumn = to;
     // Every index between `from` and `to` shifted, so a header selection built on the old
     // positions would now mark — and resize — the wrong columns. The colour preview holds
     // a column index too, and would narrow the table by whatever slid into that slot.
     state.selectedCols = [];
     state.litBy = null;
+    return next;
   }));
   wireOverlays(root);
-  wireFields(root);
+  wireLibrary(root);
+  wireColumns(root);
   wireFilter(root);
   wireSort(root);
   wireFormat(root);
   wireAppearance(root);
+  wireColumnMenu(root);
+  wireViewBar(root);
   wireCalculated(root);
   onClick(root, '[data-act="print"]', () => printSchedule());
   wireExports(root);
@@ -167,10 +201,8 @@ function wireExports(root: HTMLElement) {
       { label: 'Schedule file (.schedule.json)', sep: true, run: () => void EXPORT_ACTIONS.schedule_file() },
     ], 'Export');
   });
-  onClick(root, '[data-act="export-saved"]', (el) => {
-    const entry = listSaved().find((s) => s.name === el.dataset.name);
-    if (entry) void exportScheduleFile(entry.def);
-  });
+  // The Templates library's Import: the native Open dialog, and the file goes into Mine
+  // (exporting.ts). Its Export is the pane's own (libraryActions.ts).
   onClick(root, '[data-act="import-schedule"]', () => void openScheduleFile());
 }
 
@@ -178,18 +210,6 @@ function wireExports(root: HTMLElement) {
 
 function wireShell(root: HTMLElement) {
   onClick(root, '[data-act="rail-toggle"]', () => update({ railOpen: !state.railOpen }));
-
-  // ---- inspector tabs ----
-  // A tab click also reopens a collapsed panel — the icon strip's icons are these same
-  // controls, so the way back in is one click, not an open followed by a pick.
-  onClick(root, '[data-act="section"]', (el) => {
-    const section = el.dataset.section as Section;
-    // Column formatting always works on a concrete column, so opening it selects one.
-    const selectedColumn = section === 'format' && state.selectedColumn === null && state.def.columns.length
-      ? 0 : state.selectedColumn;
-    update({ open: section, inspectorOpen: true, selectedColumn });
-  });
-  onClick(root, '[data-act="panel-toggle"]', () => update({ inspectorOpen: !state.inspectorOpen }));
 
   // ---- rail ----
   liveState(root, '[data-act="rail-query"]', 'railQuery');
@@ -199,42 +219,45 @@ function wireShell(root: HTMLElement) {
     const entity = el.dataset.entity ?? '';
     const store = state.store;
     if (!store || state.def.entity.includes(entity)) return;
-    ifReplaceOk(() => update({
-      selectedColumn: null,
-      selectedCols: [],
-      dirty: false,
-      removedBy: null,
-      litBy: null,
-      // A generated schedule came from neither a template nor a saved setup, and saying so
-      // is what keeps both IN USE markers honest.
-      templateId: null,
-      savedName: null,
-      def: {
-        ...emptySchedule(`${entity.replace(/^Ifc/, '')} Schedule`, [entity]),
-        columns: defaultColumnsFor(store, [entity]),
-      },
-    }));
+    ifReplaceOk(() => {
+      // A menu or chip names a position in the schedule being replaced.
+      if (popoverId()) closePopover();
+      update({
+        selectedColumn: null,
+        selectedCols: [],
+        dirty: false,
+        removedBy: null,
+        litBy: null,
+        // A generated schedule came from neither a template nor a saved setup, and saying so
+        // is what keeps both IN USE markers honest.
+        templateId: null,
+        savedName: null,
+        def: {
+          ...emptySchedule(`${entity.replace(/^Ifc/, '')} Schedule`, [entity]),
+          columns: defaultColumnsFor(store, [entity]),
+        },
+      });
+    });
   });
 
-  liveText(root, '[data-act="name"]', () => {
-    const def = state.def;
-    return (v) => { def.name = v; };
-  }, 'table');
+  liveText(root, '[data-act="name"]', (def, v) => act.setName(def, v), 'table');
 
   // ---- table ----
   // data-defcol, not data-i: a header carries where its column sits in def.columns, which
   // is not the same as its position among the visible headers once one is hidden.
   //
   // The two modifiers mean what they mean everywhere else: Ctrl (Cmd) adds or removes one
-  // column, Shift takes the whole run from the anchor to here. Neither opens Format — the
-  // point of the gesture is what happens next at the grip, where main.ts hands the
-  // selection to the resizer as its group. A plain click clears the marks and formats.
+  // column, Shift takes the whole run from the anchor to here. Neither opens the column
+  // menu — the point of the gesture is what happens next at the grip, where main.ts hands
+  // the selection to the resizer as its group. A plain click clears the marks and opens (or
+  // closes) that column's menu. A click that ends a grip drag never gets here: colResize
+  // swallows it at window capture. selectedColumn follows: it anchors the next Shift+click
+  // and is the width Equal width copies.
   //
-  // Both branches repaint at 'all', not 'table': the centre head's Equal width button is
-  // enabled by this selection, and the centre head only renders on an 'all' pass — at
-  // 'table' the button would keep claiming whatever the previous selection made true. The
-  // cost is nothing: a full rebuild measures ~0.03ms (LESSONS.md), and preserveUi restores
-  // focus, caret and scroll around every repaint.
+  // Both marking branches repaint at 'all', not 'table': the header's Equal width button is
+  // enabled by this selection, and a 'table' pass would leave it claiming whatever the
+  // previous selection made true. preserveUi restores focus, caret and scroll around every
+  // repaint.
   onClick(root, 'th[data-defcol]', (el, ev) => {
     const i = Number(el.dataset.defcol);
     if (ev.ctrlKey || ev.metaKey) {
@@ -251,7 +274,7 @@ function wireShell(root: HTMLElement) {
         if (!c.hidden) out.push(n);
         return out;
       }, []);
-      // The last mark is the anchor; failing that, the column Format is on. An anchor that
+      // The last mark is the anchor; failing that, the column last clicked. An anchor that
       // is hidden or no longer there names no run, so the click stands alone.
       const anchor = state.selectedCols.at(-1) ?? state.selectedColumn ?? i;
       const from = visible.indexOf(anchor);
@@ -261,7 +284,13 @@ function wireShell(root: HTMLElement) {
       update({ selectedCols: picked });
       return;
     }
-    update({ selectedColumn: i, selectedCols: [], open: 'format', inspectorOpen: true });
+    toggleColumnMenu(i);
+    // Marks to clear means a repaint (they are drawn on the headings and enable Equal width);
+    // otherwise this is only a menu opening, and the table is left alone.
+    if (state.selectedCols.length) { update({ selectedColumn: i, selectedCols: [] }); return; }
+    // Not drawn anywhere — read at event time only (Shift+click anchor, Equal width source).
+    state.selectedColumn = i;
+    paintPopover();
   });
   onClick(root, '[data-act="clear-removed"]', () => update({ removedBy: null }));
 
@@ -278,19 +307,16 @@ function wireShell(root: HTMLElement) {
     if (!table) return;
     const widths = fitAll(table);
     if (!widths.length) return;
-    updateDef((def) => {
-      for (const [i, w] of widths) if (def.columns[i]) def.columns[i].width = w;
-    });
+    updateDef((def) => act.setWidths(def, widths));
   });
 
-  // "Make these look like that one." The marked columns take the width of the column the
-  // Format tab is editing — `selectedIndex`, column-0 fallback and all, which is the same
-  // answer the panel's header and the table's editing mark already give, so the source is a
-  // column the user can see named in two places. Its own width is read first and measured
-  // only if it has none; the source itself is never written, whether or not it is marked.
-  // Clipping is not a risk: a column with a width wraps, by the rule in tableView.
+  // "Make these look like that one." The marked columns take the width of the column whose
+  // heading was last clicked — `selectedIndex`, column-0 fallback and all. Its own width is
+  // read first and measured only if it has none; the source itself is never written,
+  // whether or not it is marked. Clipping is not a risk: a column with a width wraps, by the
+  // rule in tableView.
   //
-  // The guards repeat what disables the button in centre.ts, because a handler may not trust
+  // The guards repeat what disables the button in header.ts, because a handler may not trust
   // its own markup — and the filter is the same one main.ts applies before handing a
   // selection to the resizer. One task and one updateDef, exactly as above.
   onClick(root, '[data-act="fit-equal"]', () => {
@@ -301,49 +327,23 @@ function wireShell(root: HTMLElement) {
     // One measurement answers both questions below. A HIDDEN source renders no heading, so
     // it can be neither measured nor seen — and a width taken from a column the user cannot
     // look at is not "make these look like that one". That case falls back to the widest
-    // marked column, which is what this button did before it took its width from Format.
+    // marked column, which is what this button did before it took a source column.
     const measured = naturalWidths(table, [src, ...picked]);
     const source = state.def.columns[src]?.width
       ?? measured.find((c) => c.i === src)?.px
       ?? measured.filter((c) => picked.includes(c.i)).reduce((m, c) => Math.max(m, c.px), 0);
     if (!source) return;
     const w = clampWidth(Math.ceil(source));
-    updateDef((def) => {
-      for (const i of picked) if (def.columns[i]) def.columns[i].width = w;
-    });
+    updateDef((def) => act.setWidths(def, picked.map((i) => [i, w])));
   });
-
-  // ---- saved schedules ----
-  // The bodies of these handlers are in actions.ts since 2026-10-02: a request from the
-  // assistant (manage.ts) runs the same function a click does.
-  onClick(root, '[data-act="save-schedule"]', () => { saveCurrent(); });
-  onClick(root, '[data-act="load-saved"]', (el) => {
-    const entry = listSaved().find((s) => s.name === el.dataset.name);
-    if (!entry) return;
-    // Clicking the one already loaded reloads it over your edits, a genuinely useful act.
-    // ifcTable's start-screen branch, where the row arms a setup for the next model, has no
-    // counterpart here: the model is always open.
-    ifReplaceOk(() => { loadSaved(entry); });
-  });
-  onClick(root, '[data-act="delete-saved"]', (el) => askDeleteSaved(el.dataset.name ?? ''));
-
-  // ---- my templates panel ----
-  liveState(root, '[data-act="saved-search"]', 'savedQuery');
-
-  onClick(root, '[data-act="rename-saved"]', (el) => {
-    const name = el.dataset.name ?? '';
-    void promptDialog('Rename this template', name, 'Rename').then((answer) => {
-      const next = answer?.trim();
-      if (!next || next === name) return;
-      renameSaved(name, next);
-    });
-  });
-
-  onClick(root, '[data-act="duplicate-saved"]', (el) => { duplicateSaved(el.dataset.name ?? ''); });
-
+  // Save, and every saved setup, are the Templates library's since v1.5.0, phase 3
+  // (libraryEvents.ts).
 }
 
 // ---------------------------------------------------------------- rows (phase 3)
+
+/** A heading the keyboard can reach: a column's own cell, or the "+ Column" button. */
+const HEAD_STOP = 'th[data-defcol], .th-add';
 
 function wireRows(root: HTMLElement, hooks: Hooks) {
   // Shift-click takes a range of rows, not a run of text.
@@ -360,11 +360,29 @@ function wireRows(root: HTMLElement, hooks: Hooks) {
     if (tr) hooks.rowMenu(Number(tr.dataset.row), at);
     else hooks.headMenu(Number(th!.dataset.defcol), at);
   });
-  // A focused heading: the ContextMenu key or Shift+F10 opens its menu, under it — the
-  // keyboard's route to "Colour 3D by this column". Enter or Space is its click (phase 4),
-  // with the click's own modifiers: Shift takes the run, Ctrl / ⌘ adds or removes one.
   root.addEventListener('keydown', (e) => {
-    const th = (e.target as HTMLElement).closest?.<HTMLElement>('th[data-defcol]');
+    const t = e.target as HTMLElement;
+    // Left and Right move between the headings, as in a menu bar (ifcTable, 2026-11-05) —
+    // a heading with no menu (Count) is skipped, so "+ Column" stays reachable. Nothing else
+    // reads those keys on a heading: the grip is pointer-only.
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      let cell = t.closest?.(HEAD_STOP)?.closest<HTMLElement>('th');
+      if (!cell) return;
+      let to: HTMLElement | null = null;
+      while (!to && cell) {
+        cell = (e.key === 'ArrowRight' ? cell.nextElementSibling : cell.previousElementSibling) as HTMLElement | null;
+        to = cell?.dataset.defcol !== undefined ? cell : cell?.querySelector<HTMLElement>('.th-add') ?? null;
+      }
+      if (!to) return;
+      e.preventDefault();
+      to.focus();
+      return;
+    }
+    // A focused heading: the ContextMenu key or Shift+F10 opens its right-click menu, under
+    // it — the keyboard's route to "Colour 3D by this column". Enter or Space is its click
+    // (phase 4), with the click's own modifiers: Shift takes the run, Ctrl / ⌘ adds or removes
+    // one, and a plain one opens the column menu (v1.5.0).
+    const th = t.closest?.<HTMLElement>('th[data-defcol]');
     if (!th) return;
     if (e.key === 'Enter' || e.key === ' ') {
       if (e.altKey || e.repeat) return;
@@ -413,7 +431,9 @@ function wireHistory(root: HTMLElement) {
     if (key !== 'z' && key !== 'y') return;
     // A dialog owns the keyboard while it is open; its text box keeps its own undo. So does
     // any text box of the window's: the caret in a box means "undo my typing", not the schedule.
-    if (dialogOpen() || editable(e.target)) return;
+    // The Templates library takes these first and drops them outside a text box (libraryEvents.ts);
+    // inside one they are the box's own — never the schedule hidden behind the library.
+    if (dialogOpen() || editable(e.target) || state.overlay === 'library') return;
     e.preventDefault();
     stepHistory(wantRedo);
   });
@@ -426,15 +446,16 @@ function wireHistory(root: HTMLElement) {
 // ---------------------------------------------------------------- overlays
 
 function wireOverlays(root: HTMLElement) {
-  onClick(root, '[data-act="open-fields"]', () => update({ overlay: 'fields' }));
-  onClick(root, '[data-act="open-templates"]', () => update({ overlay: 'templates' }));
-  onClick(root, '[data-act="open-saved"]', () => update({ overlay: 'saved' }));
+  // The calculated-value editor: from a calculated column's "Edit formula", the view bar's
+  // "N formulas to fix" chip, the picker's "+ Calculated value" and the syntax guide's way
+  // back. The modal replaces the popover.
+  onClick(root, '[data-act="open-calc"]', () => { closePopover(); update({ overlay: 'calc' }); });
   // The formula syntax guide, which ifcTable served as a page of its own (`/formula.html`).
   onClick(root, '[data-act="open-formula"]', () => update({ overlay: 'formula' }));
   // Its section links scroll the guide; an in-page anchor would be a navigation.
   onClick(root, '[data-act="formula-jump"]', (el) =>
     root.querySelector(`#help-${CSS.escape(el.dataset.v ?? '')}`)?.scrollIntoView({ block: 'start' }));
-  onClick(root, '[data-act="close-overlay"]', () => update({ overlay: null }));
+  onClick(root, '[data-act="close-overlay"]', () => update({ overlay: null, libraryDraft: null }));
   // Clicking the dimmed surround closes; clicking anywhere inside the card must not.
   // Both ends of the gesture have to land there, not just the release. When a press and a
   // release happen on different elements the browser fires `click` on their nearest common
@@ -447,84 +468,44 @@ function wireOverlays(root: HTMLElement) {
     pressOnBackdrop = t?.closest('[data-act="overlay-backdrop"]') === t;
   });
   onClick(root, '[data-act="overlay-backdrop"]', (el, ev) => {
-    if (pressOnBackdrop && ev.target === el) update({ overlay: null });
+    if (pressOnBackdrop && ev.target === el) update({ overlay: null, libraryDraft: null });
   });
   // One Escape handler, in the order things sit on top of each other: an overlay first,
   // then a column selection — the other thing that outstays its welcome. The window's own
-  // dialog (dialog.ts) owns Escape while it is open.
+  // dialog (dialog.ts) owns Escape while it is open, and the popover takes its Escape at
+  // window capture before this one sees it (popover.ts), and the Templates library orders its
+  // own Escape (name row → search → close) at window capture too (libraryEvents.ts).
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || dialogOpen()) return;
-    // The syntax guide is opened from the field browser, so Escape goes back there.
-    if (state.overlay === 'formula') { update({ overlay: 'fields' }); return; }
+    if (e.key !== 'Escape' || dialogOpen() || state.overlay === 'library') return;
+    // The syntax guide is opened from the calculated-value editor, so Escape goes back there.
+    if (state.overlay === 'formula') { update({ overlay: 'calc' }); return; }
     if (state.overlay) { update({ overlay: null }); return; }
     // 'all', for the same reason as the two selection branches in wireShell: clearing the
-    // marks also disables the centre head's Equal width button, and the centre head is only
-    // drawn on a full pass. A rebuild is ~0.03ms and preserveUi keeps focus and caret.
+    // marks also disables the header's Equal width button.
     if (state.selectedCols.length) update({ selectedCols: [] });
-  });
-
-  // ---- field browser ----
-  liveState(root, '[data-act="field-search"]', 'fieldSearch');
-  // A list filter cannot change the schedule, so only the panes repaint ('panes', state.ts).
-  onClick(root, '[data-act="field-type"]', (el) =>
-    update({ fieldType: el.dataset.type as AppState['fieldType'] }, 'panes'));
-  onClick(root, '[data-act="field-pset"]', (el) => update({ fieldPset: el.dataset.pset ?? 'all' }, 'panes'));
-  onChange(root, '[data-act="hide-empty"]', (el) => update({ hideEmpty: checked(el) }, 'panes'));
-
-  onClick(root, '[data-act="browse-add"]', (el) => {
-    const f = fieldFromKey(el.dataset.id ?? '');
-    if (!f) return;
-    // A column added by hand defaults the same way one the app generated does: in the
-    // model's own system of units.
-    const system = state.store?.meta.unitSystem;
-    updateDef((def) => {
-      if (f.kind === 'core') def.columns.push(columnForCore(f.key, system));
-      else if (f.kind === 'prop') {
-        const stat = state.store && statOf(state.store, def, f);
-        def.columns.push(stat ? columnForProp(stat, system) : { field: f });
-      } else {
-        // Aligned by what the calculated value says it holds. This used to be a flat
-        // 'right', from when a formula could only ever be a number — which left a column
-        // of the word "Small" hard against the right-hand rule.
-        def.columns.push({ field: f, align: alignForCalc(def.calculated?.find((c) => c.id === f.id)) });
-      }
-    });
-  });
-  onClick(root, '[data-act="browse-remove"]', (el) => {
-    const id = el.dataset.id ?? '';
-    updateDef((def) => { def.columns = def.columns.filter((c) => fieldKey(c.field) !== id); });
-    update({ selectedColumn: null, selectedCols: [] });
-  });
-
-  // ---- template gallery ----
-  liveState(root, '[data-act="template-search"]', 'templateQuery');
-  onClick(root, '[data-act="apply-template"]', (el) => {
-    const preset = presetById(el.dataset.id ?? '');
-    if (!preset) return;
-    ifReplaceOk(() => applyTemplate(preset));
   });
 }
 
-// ---------------------------------------------------------------- fields
+// ---------------------------------------------------------------- columns
 
-function wireFields(root: HTMLElement) {
-  onClick(root, '[data-act="select-col"]', (el) =>
-    update({ selectedColumn: idx(el), open: 'format' }));
-
+// Removing a column (the column menu, the picker's "In this table" ×) and pointing an empty
+// one at another field (the column menu's remap).
+function wireColumns(root: HTMLElement) {
   onClick(root, '[data-act="col-remove"]', (el) => {
     const i = idx(el);
     // Asked BEFORE the shift below, never after: a column that merely slides down into slot
     // `i` would otherwise answer yes and be cleared in place of the one actually removed.
     const wasEditing = state.selectedColumn === i;
+    // The menu names columns by position too: it closes rather than describe a neighbour.
+    if (menuColumn() !== null) closePopover();
     // Every index after this one shifts down, so a header selection made against the old
     // positions is meaningless. Cleared before the repaint, not after, or one paint marks
     // the wrong headings.
     state.selectedCols = [];
-    // Same currency, same deadline. A Format selection sitting to the RIGHT of the removed
-    // column named its neighbour once the list closed up, and the table now marks the column
-    // Format is editing — so a shift left until after the repaint highlights the wrong one.
+    // Same currency, same deadline: a last-clicked column to the RIGHT of the removed one
+    // names its neighbour once the list closes up.
     if (state.selectedColumn !== null && state.selectedColumn > i) state.selectedColumn -= 1;
-    updateDef((def) => { def.columns.splice(i, 1); });
+    updateDef((def) => act.removeColumn(def, i));
     if (wasEditing) update({ selectedColumn: null });
   });
 
@@ -533,80 +514,65 @@ function wireFields(root: HTMLElement) {
     const i = idx(el);
     const dot = key.indexOf('.');
     if (!key || dot < 0) return;
-    updateDef((def) => {
-      const col = def.columns[i];
-      if (!col) return;
-      // Keep the heading so the schedule still reads as the user labelled it.
-      col.heading = col.heading ?? headingOf(col, def);
-      col.field = { kind: 'prop', pset: key.slice(0, dot), prop: key.slice(dot + 1) };
-    });
+    // Keeps the heading so the schedule still reads as the user labelled it.
+    updateDef((def) => act.remapColumn(def, i, { kind: 'prop', pset: key.slice(0, dot), prop: key.slice(dot + 1) }));
   });
 }
 
 // ---------------------------------------------------------------- filter
 
 function wireFilter(root: HTMLElement) {
-  onClick(root, '[data-act="filter-add"]', () => updateDef((def) => {
-    const first = def.columns[0]?.field ?? { kind: 'core', key: 'name' } as const;
-    def.filters.push({ field: first, op: 'hasValue' } as FilterRule);
-  }));
   onClick(root, '[data-act="filter-remove"]', (el) => {
     const i = idx(el);
-    updateDef((def) => { def.filters.splice(i, 1); });
+    // Positions shift down, so a rule's popover would now describe its neighbour.
+    if (openChip()?.kind === 'filter') closePopover();
+    updateDef((def) => act.removeFilterRule(def, i));
     if (state.removedBy !== null) update({ removedBy: null });
   });
-  // A segmented pair, not a select — data-v carries which side was clicked.
+  // A segmented pair, not a select — data-v carries which side was clicked. The view bar's
+  // and / or join between two chips sends the other value through the same act.
   onClick(root, '[data-act="filter-logic"]', (el) =>
-    updateDef((def) => { def.filterLogic = el.dataset.v === 'or' ? 'or' : 'and'; }));
+    updateDef((def) => act.setFilterMode(def, el.dataset.v === 'or' ? 'or' : 'and')));
   onChange(root, '[data-act="filter-field"]', (el) => updateDef((def) => {
     const f = fieldFromKey(text(el));
-    if (!f) return;
-    // The old value may be meaningless against a different field, so clear it.
-    def.filters[idx(el)] = { field: f, op: 'hasValue' };
+    // The old value may be meaningless against a different field, so the action clears it.
+    return f ? act.setFilterField(def, idx(el), f) : def;
   }));
-  onChange(root, '[data-act="filter-op"]', (el) => updateDef((def) => {
+  onChange(root, '[data-act="filter-op"]', (el) =>
+    updateDef((def) => act.setFilterOp(def, idx(el), text(el) as FilterRule['op'])));
+
+  // The value a box stores. Numeric boxes hold display units; store SI so comparisons stay
+  // honest. Decided by the FIELD, not the box: the boxes are text (inputmode=decimal) so a
+  // repaint cannot eat what is typed, and every box must store the same thing. A number field
+  // never stores text: what storeNum cannot read is '' — what the old number input handed
+  // back for junk — not a string matchRule would then read as a display-unit number and
+  // compare against SI (ifcTable, 2026-11-05).
+  const setValue = (def: ScheduleDef, el: HTMLElement, raw: string): ScheduleDef => {
     const rule = def.filters[idx(el)];
-    rule.op = text(el) as FilterRule['op'];
-    if (rule.op !== 'in' && rule.op !== 'between') rule.values = undefined;
-  }));
-
-  // The rule a value box writes to, and how, resolved when the key is pressed.
-  const valueTo: Bind = (el) => {
-    const rule = state.def.filters[idx(el)];
     const store = state.store;
-    if (!rule || !store) return null;
-    const kind = kindOf(store, state.def, rule.field);
-    const numeric = (el as HTMLInputElement).type === 'number';
-    return (raw) => {
-      const n = storeNum(raw, kind, store.meta.unitSystem);
-      // Numeric boxes hold display units; store SI so comparisons stay honest.
-      rule.value = raw !== '' && n !== undefined && numeric ? n : raw;
-    };
+    if (!rule || !store) return def;
+    if (typeOf(store, def, rule.field) !== 'number') return act.setFilterValue(def, idx(el), raw);
+    const kind = kindOf(store, def, rule.field);
+    return act.setFilterValue(def, idx(el), storeNum(raw, kind, store.meta.unitSystem) ?? '');
   };
-  liveText(root, 'input[data-act="filter-value"]', valueTo);
-  onChange(root, 'select[data-act="filter-value"]', (el) => {
-    const write = valueTo(el);
-    if (write) updateDef(() => write(text(el)));
-  });
+  liveText(root, 'input[data-act="filter-value"]', (def, v, el) => setValue(def, el, v));
+  onChange(root, 'select[data-act="filter-value"]', (el) => updateDef((def) => setValue(def, el, text(el))));
 
-  const rangeTo = (slot: 0 | 1): Bind => (el) => {
-    const rule = state.def.filters[idx(el)];
+  // A cleared box is an open end, not 0 (Number('') is 0) — and so is one storeNum cannot
+  // read, exactly as the old number input reported junk as empty (phase 1 made an empty end
+  // open-ended in the engine; this is the box that writes it).
+  const setRange = (slot: 0 | 1) => (def: ScheduleDef, raw: string, el: HTMLElement): ScheduleDef => {
+    const rule = def.filters[idx(el)];
     const store = state.store;
-    if (!rule || !store) return null;
-    const kind = kindOf(store, state.def, rule.field);
-    return (raw) => {
-      const vals = [...(rule.values ?? [])] as (string | number)[];
-      vals[slot] = storeNum(raw, kind, store.meta.unitSystem) ?? 0;
-      rule.values = vals;
-    };
+    if (!rule || !store) return def;
+    const kind = kindOf(store, def, rule.field);
+    return act.setFilterRange(def, idx(el), slot, storeNum(raw, kind, store.meta.unitSystem));
   };
-  liveText(root, '[data-act="filter-lo"]', rangeTo(0));
-  liveText(root, '[data-act="filter-hi"]', rangeTo(1));
+  liveText(root, '[data-act="filter-lo"]', setRange(0));
+  liveText(root, '[data-act="filter-hi"]', setRange(1));
 
-  liveText(root, '[data-act="filter-values"]', (el) => {
-    const rule = state.def.filters[idx(el)];
-    return rule && ((v) => { rule.values = v.split(',').map((s) => s.trim()).filter(Boolean); });
-  });
+  liveText(root, '[data-act="filter-values"]', (def, v, el) =>
+    act.setFilterValues(def, idx(el), v.split(',').map((s) => s.trim()).filter(Boolean)));
 
   onClick(root, '[data-act="show-removed"]', (el) => {
     const i = idx(el);
@@ -619,155 +585,104 @@ function wireFilter(root: HTMLElement) {
 // ---------------------------------------------------------------- sorting
 
 function wireSort(root: HTMLElement) {
-  // A new level sorts and nothing else: Header row, Footer and Blank line all start off.
-  // Seeding `header: true` decided for the user, and the group heading it inserted read as
-  // something the app had done to their schedule rather than something they asked for. The
-  // hand-authored templates in schedule/presets.ts still set their own headers.
-  onClick(root, '[data-act="sort-add"]', () => updateDef((def) => {
-    const first = def.columns[0]?.field ?? { kind: 'core', key: 'name' } as const;
-    def.sort.push({ field: first, dir: 'asc' } as SortLevel);
-  }));
-  onClick(root, '[data-act="sort-remove"]', (el) =>
-    updateDef((def) => { def.sort.splice(idx(el), 1); }));
+  onClick(root, '[data-act="sort-remove"]', (el) => {
+    if (openChip()?.kind === 'sort') closePopover();
+    updateDef((def) => act.removeSortLevel(def, idx(el)));
+  });
+  // The level popover's Earlier / Later, through moveSortLevel. The popover follows the
+  // level it moved.
+  onClick(root, '[data-act="sort-move"]', (el) => {
+    const from = idx(el);
+    const to = from + Number(el.dataset.v);
+    if (!act.canMove(state.def.sort.length, from, to)) return;
+    if (openChip()?.kind === 'sort') openChipPopover('sort', to, false);
+    updateDef((def) => act.moveSortLevel(def, from, to));
+  });
   onChange(root, '[data-act="sort-field"]', (el) => updateDef((def) => {
     const f = fieldFromKey(text(el));
-    if (f) def.sort[idx(el)].field = f;
+    return f ? act.setSortField(def, idx(el), f) : def;
   }));
   onClick(root, '[data-act="sort-dir"]', (el) =>
-    updateDef((def) => { def.sort[idx(el)].dir = el.dataset.v === 'desc' ? 'desc' : 'asc'; }));
+    updateDef((def) => act.setSortDir(def, idx(el), el.dataset.v === 'desc' ? 'desc' : 'asc')));
   onChange(root, '[data-act="sort-header"]', (el) =>
-    updateDef((def) => { def.sort[idx(el)].header = checked(el); }));
+    updateDef((def) => act.setGroupOptions(def, idx(el), { header: checked(el) })));
   onChange(root, '[data-act="sort-blank"]', (el) =>
-    updateDef((def) => { def.sort[idx(el)].blankLine = checked(el); }));
+    updateDef((def) => act.setGroupOptions(def, idx(el), { blankLine: checked(el) })));
   // The chip is on/off; the select underneath chooses what an enabled footer shows.
   onChange(root, '[data-act="sort-footer"]', (el) =>
-    updateDef((def) => { def.sort[idx(el)].footer = checked(el) ? 'titleCountTotals' : 'none'; }));
+    updateDef((def) => act.setGroupOptions(def, idx(el), { footer: checked(el) ? 'titleCountTotals' : 'none' })));
   onChange(root, '[data-act="sort-footer-style"]', (el) =>
-    updateDef((def) => { def.sort[idx(el)].footer = text(el) as SortLevel['footer']; }));
+    updateDef((def) => act.setGroupOptions(def, idx(el), { footer: text(el) as SortLevel['footer'] })));
   onChange(root, '[data-act="itemize"]', (el) =>
-    updateDef((def) => { def.itemize = checked(el); }));
+    updateDef((def) => act.setItemize(def, checked(el))));
   onChange(root, '[data-act="grand-total"]', (el) =>
-    updateDef((def) => { def.grandTotal = checked(el); }));
-  liveText(root, '[data-act="grand-title"]', () => {
-    const def = state.def;
-    return (v) => { def.grandTotalTitle = v; };
-  });
+    updateDef((def) => act.setGrandTotal(def, checked(el))));
+  liveText(root, '[data-act="grand-title"]', (def, v) => act.setGrandTotalTitle(def, v));
 }
 
 // ---------------------------------------------------------------- formatting
 
 function wireFormat(root: HTMLElement) {
-  const col = () => state.def.columns[selectedIndex(state)] ?? null;
-  const fmt = () => {
-    const c = col();
-    if (!c) return null;
-    c.format = c.format ?? {};
-    return c.format;
-  };
+  // The column a control edits: every column-menu control (and colour-rule card) names its
+  // own in data-defcol, read off the element itself — never off where it sits, since a
+  // repaint may already have detached it.
+  const at = (el: HTMLElement) => Number(el.dataset.defcol);
+  const setFmt = (el: HTMLElement, patch: Partial<NonNullable<ScheduleDef['columns'][number]['format']>>) =>
+    updateDef((def) => act.setColumnFormat(def, at(el), patch));
 
-  onChange(root, '[data-act="fmt-col"]', (el) => update({ selectedColumn: Number(text(el)) }));
-
-  // The column being formatted NOW, not whichever one is when the edit lands.
-  liveText(root, '[data-act="fmt-heading"]', () => {
-    const c = col();
-    return c && ((v) => { c.heading = v; });
-  });
-  onChange(root, '[data-act="fmt-orient"]', (el) => updateDef(() => {
-    const c = col(); if (c) c.headingOrientation = text(el) === 'vertical' ? 'vertical' : 'horizontal';
-  }));
-  onClick(root, '[data-act="fmt-align"]', (el) => updateDef(() => {
-    const c = col(); if (c) c.align = el.dataset.v as 'left' | 'center' | 'right';
-  }));
-  onChange(root, '[data-act="fmt-unit"]', (el) => updateDef(() => {
-    const f = fmt(); if (f) f.display = text(el);
-  }));
+  liveText(root, '[data-act="fmt-heading"]', (def, v, el) => act.setHeading(def, at(el), v));
+  onClick(root, '[data-act="fmt-align"]', (el) => updateDef((def) =>
+    act.setAlign(def, at(el), el.dataset.v as 'left' | 'center' | 'right')));
   // Same reasoning as the Width box below: `change` alone — Enter, or leaving the field — so
   // typing never reformats the table mid-number, since the box is re-rendered from what was
   // stored. An empty box means "no choice made": `undefined`, which both readers fall back
   // from with `?? defaultDecimals(kind)`. The old per-keystroke handler could not say that —
   // a number input hands back '' for an empty box AND for junk, `Number('')` is 0, so
   // clearing it silently pinned the column to 0 decimals with no way back to its default.
-  onChange(root, '[data-act="fmt-decimals"]', (el) => updateDef(() => {
-    const f = fmt();
-    if (!f) return;
+  onChange(root, '[data-act="fmt-decimals"]', (el) => {
     const n = num(el);
-    f.decimals = text(el).trim() === '' || !Number.isFinite(n) ? undefined : clampDecimals(n);
-  }));
-  onChange(root, '[data-act="fmt-thousands"]', (el) => updateDef(() => {
-    const f = fmt(); if (f) f.thousands = checked(el);
-  }));
-  onChange(root, '[data-act="fmt-symbol"]', (el) => updateDef(() => {
-    const f = fmt(); if (f) f.showSymbol = checked(el);
-  }));
-  onChange(root, '[data-act="fmt-suppress"]', (el) => updateDef(() => {
-    const f = fmt(); if (f) f.suppressZero = checked(el);
-  }));
-  onChange(root, '[data-act="fmt-bool"]', (el) => updateDef(() => {
-    const f = fmt(); if (f) f.boolStyle = text(el) as never;
-  }));
-  onChange(root, '[data-act="fmt-total"]', (el) => updateDef(() => {
-    const c = col(); if (c) c.total = (text(el) || null) as TotalKind | null;
-  }));
+    setFmt(el, { decimals: text(el).trim() === '' || !Number.isFinite(n) ? undefined : clampDecimals(n) });
+  });
+  onChange(root, '[data-act="fmt-thousands"]', (el) => setFmt(el, { thousands: checked(el) }));
+  onChange(root, '[data-act="fmt-symbol"]', (el) => setFmt(el, { showSymbol: checked(el) }));
+  onChange(root, '[data-act="fmt-suppress"]', (el) => setFmt(el, { suppressZero: checked(el) }));
+  onChange(root, '[data-act="fmt-bool"]', (el) => setFmt(el, { boolStyle: text(el) as never }));
   // The box commits on `change` alone — Enter, or leaving the field — so typing never
   // reformats the table mid-number: the box is re-rendered from the stored width, and
   // applying each keystroke rewrote "1" to "30" before the second digit arrived. Both clamps
   // land at that one commit. The range comes from colResize.ts, which owns it — the drag and
-  // the input's own min/max are the same numbers.
-  onChange(root, '[data-act="fmt-width"]', (el) => updateDef(() => {
-    const c = col();
-    if (c) c.width = num(el) > 0 ? clampWidth(num(el)) : undefined;
-  }));
-  onChange(root, '[data-act="fmt-hidden"]', (el) => updateDef(() => {
-    const c = col(); if (c) c.hidden = checked(el);
-  }));
+  // the box's own hint are the same numbers.
+  onChange(root, '[data-act="fmt-width"]', (el) => updateDef((def) =>
+    act.setWidths(def, [[at(el), num(el) > 0 ? clampWidth(num(el)) : undefined]])));
 
   // conditional colour rules
   // Seeded with BOTH colours, so a new rule visibly does something the moment its value
   // matches. With a fill and no text colour it inherited the cell's, which is the one
   // combination the presets exist to stop anyone choosing by accident.
-  onClick(root, '[data-act="cond-add"]', () => updateDef(() => {
-    const c = col(); if (!c) return;
-    c.conditional = [...(c.conditional ?? []), { op: '=', value: '', bg: '#fff3cd', fg: '#664d03' } as CondRule];
-  }));
+  onClick(root, '[data-act="cond-add"]', (el) => updateDef((def) => act.addConditionalRule(def, at(el))));
   onClick(root, '[data-act="cond-remove"]', (el) => {
-    updateDef(() => {
-      const c = col(); if (c?.conditional) c.conditional.splice(idx(el), 1);
-    });
+    updateDef((def) => act.removeConditionalRule(def, at(el), idx(el)));
     // Every rule after the removed one moved down a slot, so the preview would now be of a
     // different rule. Dropped wholesale, exactly as filter-remove drops removedBy.
     if (state.litBy !== null) update({ litBy: null });
   });
-  const cond = (el: HTMLElement) => col()?.conditional?.[idx(el)];
+  const setRule = (def: ScheduleDef, el: HTMLElement, patch: Partial<CondRule>) =>
+    act.updateConditionalRule(def, at(el), idx(el), patch);
   // Fill and text together in one updateDef, so a preset is one undo step and never lands
   // as a half-applied pair.
-  onClick(root, '[data-act="cond-preset"]', (el) => updateDef(() => {
-    const r = cond(el);
-    if (!r) return;
-    r.bg = el.dataset.bg;
-    r.fg = el.dataset.fg;
-  }));
-  onChange(root, '[data-act="cond-op"]', (el) => updateDef(() => {
-    const r = cond(el); if (r) r.op = text(el) as CondRule['op'];
-  }));
-  liveText(root, '[data-act="cond-value"]', (el) => {
-    const r = cond(el);
-    return r && ((v) => { r.value = v; });
-  });
-  onInput(root, '[data-act="cond-bg"]', (el) => updateDef(() => {
-    const r = cond(el); if (r) r.bg = text(el);
-  }, 'table'));
-  onInput(root, '[data-act="cond-fg"]', (el) => updateDef(() => {
-    const r = cond(el); if (r) r.fg = text(el);
-  }, 'table'));
-  onChange(root, '[data-act="cond-bold"]', (el) => updateDef(() => {
-    const r = cond(el); if (r) r.bold = checked(el);
-  }));
+  onClick(root, '[data-act="cond-preset"]', (el) => updateDef((def) =>
+    setRule(def, el, { bg: el.dataset.bg, fg: el.dataset.fg })));
+  onChange(root, '[data-act="cond-op"]', (el) => updateDef((def) =>
+    setRule(def, el, { op: text(el) as CondRule['op'] })));
+  liveText(root, '[data-act="cond-value"]', (def, v, el) => setRule(def, el, { value: v }));
+  onInput(root, '[data-act="cond-bg"]', (el) => updateDef((def) => setRule(def, el, { bg: text(el) }), 'table'));
+  onInput(root, '[data-act="cond-fg"]', (el) => updateDef((def) => setRule(def, el, { fg: text(el) }), 'table'));
+  onChange(root, '[data-act="cond-bold"]', (el) => updateDef((def) => setRule(def, el, { bold: checked(el) })));
 
-  // Show the rows one colour rule claims, and the way back. The target is the column the
-  // panel is editing — the same fallback the whole tab runs on — so nothing new has to be
-  // carried on the button beyond its position in the list.
+  // Show the rows one colour rule claims, and the way back. The rule names its column on
+  // itself, like every other control in the menu.
   onClick(root, '[data-act="cond-show"]', (el) => {
-    const target = { col: selectedIndex(state), rule: idx(el) };
+    const target = { col: at(el), rule: idx(el) };
     const same = state.litBy?.col === target.col && state.litBy.rule === target.rule;
     update({ litBy: same ? null : target, removedBy: null });
   });
@@ -777,64 +692,254 @@ function wireFormat(root: HTMLElement) {
 // ---------------------------------------------------------------- appearance
 
 function wireAppearance(root: HTMLElement) {
-  const app = () => {
-    state.def.appearance = state.def.appearance ?? {};
-    return state.def.appearance;
-  };
-  liveText(root, '[data-act="app-title"]', () => {
-    const a = app();
-    return (v) => { a.title = v; };
-  });
-  const toggle = (act: string, key: 'showTitle' | 'gridLines' | 'outline' | 'blankRowBeforeData' | 'zebra' | 'headerBold') =>
-    onChange(root, `[data-act="${act}"]`, (el) => updateDef(() => { app()[key] = checked(el); }));
+  liveText(root, '[data-act="app-title"]', (def, v) => act.setAppearance(def, { title: v }));
+  const toggle = (name: string, key: 'showTitle' | 'gridLines' | 'outline' | 'blankRowBeforeData' | 'zebra' | 'headerBold') =>
+    onChange(root, `[data-act="${name}"]`, (el) => updateDef((def) => act.setAppearance(def, { [key]: checked(el) })));
   toggle('app-showtitle', 'showTitle');
   toggle('app-grid', 'gridLines');
   toggle('app-outline', 'outline');
   toggle('app-blankfirst', 'blankRowBeforeData');
   toggle('app-zebra', 'zebra');
   toggle('app-headerbold', 'headerBold');
-  // Full repaint, not 'table': the picker shows a note about the chosen face, and that
-  // note lives in the inspector.
+  // Full repaint, not 'table': the Style popover shows a note about the chosen face.
   onChange(root, '[data-act="app-font"]', (el) =>
-    updateDef(() => { app().bodyFont = text(el); }));
+    updateDef((def) => act.setAppearance(def, { bodyFont: text(el) })));
   onInput(root, '[data-act="app-fontsize"]', (el) =>
-    updateDef(() => { app().fontSize = clamp(num(el), 8, 24); }));
+    updateDef((def) => act.setAppearance(def, { fontSize: clamp(num(el), 8, 24) })));
+}
+
+// ---------------------------------------------------------------- view bar
+
+// The chips at the top of the centre column. Their controls' acts are wired by concern
+// (filter, sorting, appearance); what is wired here is opening them and the two "+" field
+// lists.
+function wireViewBar(root: HTMLElement) {
+  onClick(root, '[data-act="vb-open"]', (el) => {
+    const kind = el.dataset.v ?? '';
+    toggleChip(kind, el.dataset.i === undefined ? undefined : idx(el), el.dataset.id);
+    // The picker opens fresh: nothing typed, nothing ticked.
+    if ((kind === 'picker' || kind === 'add-filter' || kind === 'add-sort') && openChip()?.kind === kind) resetPicker(kind);
+    paintPopover();
+  });
+  // "+ Filter" and "+ Sort / group" pick a field and land in that rule's or level's own
+  // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. Both adds are
+  // no-ops at the cap.
+  onClick(root, '[data-act="vb-add"]', (el) => addFrom(el.dataset.v ?? '', el.dataset.id ?? ''));
+  wirePicker(root);
+}
+
+/** A single-pick picker row (or Enter on it): a new filter rule or sort level on that field. */
+function addFrom(kind: string, id: string) {
+  const f = fieldFromKey(id);
+  if (!f) return;
+  if (kind === 'filter') {
+    if (state.def.filters.length >= MAX_FILTERS) return;
+    openChipPopover('filter', state.def.filters.length);
+    updateDef((def) => {
+      const next = act.addFilterRule(def);
+      return act.setFilterField(next, next.filters.length - 1, f);
+    });
+    return;
+  }
+  if (state.def.sort.length >= MAX_SORT_LEVELS) return;
+  openChipPopover('sort', state.def.sort.length);
+  updateDef((def) => {
+    const next = act.addSortLevel(def);
+    return act.setSortField(next, next.sort.length - 1, f);
+  });
+}
+
+// ---------------------------------------------------------------- field picker
+
+// The picker's own controls (fieldPicker.ts holds what is typed and ticked). Typing,
+// ticking and moving the highlight redraw only its list, in place — the search box is never
+// rebuilt by them. Adding the ticked fields is one addColumns, through the same columnFor as
+// every other hand-added column.
+function wirePicker(root: HTMLElement) {
+  const search = () => root.querySelector<HTMLInputElement>('#popover [data-act="pick-search"]');
+  const commit = () => {
+    const fields = pickedIds().map(fieldFromKey).filter((f): f is FieldRef => !!f);
+    if (!fields.length) return;
+    clearPicks();
+    closePopover();
+    updateDef((def) => act.addColumns(def, fields.map((f) => columnFor(def, f))));
+  };
+
+  onInput(root, '[data-act="pick-search"]', (el) => { setQuery(text(el)); refreshPicker(); });
+  root.addEventListener('keydown', (e) => {
+    const box = e.target as HTMLInputElement;
+    if (box.dataset?.act !== 'pick-search') return;
+    const k = pickerKey(e.key, e.ctrlKey || e.metaKey, box);
+    if (!k) return;
+    e.preventDefault();
+    if (k.kind === 'redraw') refreshPicker();
+    else if (k.kind === 'commit') commit();
+    else if (k.kind === 'moved') return;
+    else addFrom(pickerMode() === 'add-filter' ? 'filter' : 'sort', k.id);
+  });
+  // Hovering a row previews it in the strip; leaving the list hands the strip back to the
+  // keyboard highlight. Only the strip is rewritten — never the list, never the table.
+  root.addEventListener('mouseover', (e) => {
+    const t = e.target as HTMLElement;
+    const row = t.closest?.<HTMLElement>('#popover .prow, #popover .crow');
+    if (row) hoverPeek(peekKey(row));
+    // A section heading, "N more" or the empty-fields link: no row to preview.
+    else if (t.closest?.('#popover .pick-list')) hoverPeek(null);
+  });
+  root.addEventListener('mouseout', (e) => {
+    const list = (e.target as HTMLElement).closest?.('#popover .pick-list');
+    if (list && !list.contains(e.relatedTarget as Node | null)) hoverPeek(null);
+  });
+  // A tick keeps the keyboard in the search box, so the next name can be typed at once.
+  onClick(root, '[data-act="pick-toggle"]', (el) => { toggleTick(el.dataset.id ?? ''); refreshPicker(); search()?.focus(); });
+  onClick(root, '[data-act="pick-commit"]', commit);
+  onClick(root, '[data-act="pick-view"]', (el) => { setView(el.dataset.v ?? ''); paintPopover(); search()?.focus(); });
+  onClick(root, '[data-act="pick-fold"]', (el) => { toggleFold(el.dataset.pset ?? ''); refreshPicker(); });
+  onClick(root, '[data-act="pick-empty"]', () => { toggleEmpty(); refreshPicker(); search()?.focus(); });
+  // A row in "In this table": go to the column — or, for a hidden one, open its menu.
+  onClick(root, '[data-act="pick-jump"]', (el) => {
+    const i = idx(el);
+    if (!state.def.columns[i]) return;
+    if (state.def.columns[i].hidden) { openHiddenColumnMenu(i); paintPopover(); return; }
+    closePopover();
+    const th = root.querySelector<HTMLElement>(`#output-pane th[data-defcol="${i}"]`);
+    th?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    th?.focus({ preventScroll: true });
+  });
+  // "+ Calculated value": a new formula, finished in the calculated-value editor's modal —
+  // the same flow as that modal's own "Add formula".
+  onClick(root, '[data-act="pick-calc"]', () => {
+    closePopover();
+    updateDef((def) => act.addCalculated(def, 'formula'));
+    update({ overlay: 'calc' });
+  });
+  // "/" (when not typing) or Ctrl+K anywhere opens the picker at its chip.
+  window.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target as HTMLElement)?.tagName ?? '');
+    const ctrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+    if (!ctrlK && !(e.key === '/' && !typing && !e.ctrlKey && !e.metaKey)) return;
+    // Not over a modal, the window's dialog or its right-click menu — they are on top, and
+    // own the keyboard.
+    if (!state.store || state.overlay || dialogOpen() || menuOpen()) return;
+    e.preventDefault();
+    // Already open: go back to its search, keeping what is typed and ticked.
+    if (openChip()?.kind === 'picker') { search()?.focus(); return; }
+    openChipPopover('picker', undefined, true, 'chip');
+    resetPicker('picker');
+    paintPopover();
+  });
+}
+
+// ---------------------------------------------------------------- column menu
+
+// The menu's own buttons. The rest of its controls (heading, decimals box, align, width, the
+// switches, the colour rules) are wired in wireFormat and reach the column through
+// data-defcol. What is here composes existing actions — none of it is new schedule logic.
+// Each repaints synchronously from its own handler, as every other control does; nothing
+// re-tests its target, and the popover's outside-click is decided at pointerdown, so a
+// repaint inside the dispatch closes nothing.
+function wireColumnMenu(root: HTMLElement) {
+  const col = (el: HTMLElement) => Number(el.dataset.defcol);
+  const setFmt = (el: HTMLElement, patch: Partial<NonNullable<ScheduleDef['columns'][number]['format']>>) =>
+    updateDef((def) => act.setColumnFormat(def, col(el), patch));
+
+  onClick(root, '[data-act="cm-unit"]', (el) => setFmt(el, { display: el.dataset.v }));
+  onClick(root, '[data-act="cm-total"]', (el) => updateDef((def) =>
+    act.setTotal(def, col(el), (el.dataset.v || null) as TotalKind | null)));
+  onClick(root, '[data-act="cm-orient"]', (el) => updateDef((def) =>
+    act.setHeadingOrientation(def, col(el), el.dataset.v === 'vertical' ? 'vertical' : 'horizontal')));
+  // One step from what the column shows now — its stored count, or the default it falls
+  // back to, exactly as the decimals box beside it reads.
+  onClick(root, '[data-act="cm-dec"]', (el) => updateDef((def) => {
+    const c = def.columns[col(el)];
+    if (!c || !state.store) return def;
+    const now = c.format?.decimals ?? defaultDecimals(kindOf(state.store, def, c.field));
+    return act.setColumnFormat(def, col(el), { decimals: clampDecimals(now + Number(el.dataset.v)) });
+  }));
+
+  // Sort or group by this column: the level that already sorts by its field, or a new one.
+  // addSortLevel is a no-op at the cap, which is checked first so it can be said.
+  const levelFor = (def: ScheduleDef, i: number): [ScheduleDef, number] => {
+    const key = act.fieldKey(def.columns[i].field);
+    const k = def.sort.findIndex((l) => act.fieldKey(l.field) === key);
+    if (k >= 0) return [def, k];
+    const added = act.addSortLevel(def);
+    return [act.setSortField(added, added.sort.length - 1, def.columns[i].field), added.sort.length - 1];
+  };
+  const hasLevel = (i: number) => state.def.sort.some((l) => act.fieldKey(l.field) === act.fieldKey(state.def.columns[i].field));
+  const atCap = (i: number) => {
+    if (hasLevel(i) || state.def.sort.length < MAX_SORT_LEVELS) return false;
+    flash(`${MAX_SORT_LEVELS} sort levels is the most a schedule holds — remove one first.`, true);
+    return true;
+  };
+  onClick(root, '[data-act="cm-sort"]', (el) => {
+    const i = col(el);
+    if (!state.def.columns[i] || atCap(i)) return;
+    updateDef((def) => {
+      const [next, k] = levelFor(def, i);
+      return act.setSortDir(next, k, el.dataset.v === 'desc' ? 'desc' : 'asc');
+    });
+  });
+  // Grouped = a level with a header or a footer. Ungrouping keeps the sort.
+  onClick(root, '[data-act="cm-group"]', (el) => {
+    const i = col(el);
+    if (!state.def.columns[i] || atCap(i)) return;
+    updateDef((def) => {
+      const [next, k] = levelFor(def, i);
+      const l = next.sort[k];
+      const grouped = !!l.header || (l.footer ?? 'none') !== 'none';
+      return act.setGroupOptions(next, k, grouped
+        ? { header: false, footer: 'none', blankLine: false }
+        : { header: true, footer: 'titleCountTotals' });
+    });
+  });
+  // A new rule on this field, finished in its own chip's popover.
+  onClick(root, '[data-act="cm-filter"]', (el) => {
+    const i = col(el);
+    if (!state.def.columns[i]) return;
+    if (state.def.filters.length >= MAX_FILTERS) {
+      flash(`${MAX_FILTERS} filter rules is the most a schedule holds.`, true);
+      return;
+    }
+    // The new rule's own chip popover replaces the menu, anchored at its chip.
+    openChipPopover('filter', state.def.filters.length);
+    updateDef((def) => {
+      const next = act.addFilterRule(def);
+      return act.setFilterField(next, next.filters.length - 1, def.columns[i].field);
+    });
+  });
+  onClick(root, '[data-act="cm-show"]', (el) => updateDef((def) => act.setHidden(def, col(el), false)));
+  // Also the Hide / Show on an "In this table" row in the field picker.
+  onClick(root, '[data-act="cm-hide"]', (el) => updateDef((def) => act.setHidden(def, col(el), true)));
+  // The menu follows the column it moved, and so does everything else that names a position.
+  onClick(root, '[data-act="cm-move"]', (el) => {
+    const from = col(el);
+    const to = from + Number(el.dataset.v);
+    if (!act.canMove(state.def.columns.length, from, to)) return;
+    followColumn(to);
+    state.selectedColumn = to;
+    state.selectedCols = [];
+    state.litBy = null;
+    updateDef((def) => act.moveColumn(def, from, to));
+  });
+  onClick(root, '[data-act="cm-view"]', (el) => { setMenuView(el.dataset.v ?? ''); paintPopover(); });
+  onClick(root, '[data-act="cm-more"]', () => { toggleMore(); paintPopover(); });
 }
 
 // ---------------------------------------------------------------- calculated values
 
 function wireCalculated(root: HTMLElement) {
   const byId = (el: HTMLElement) => el.dataset.id ?? '';
-  const calcOf = (el: HTMLElement) => state.def.calculated?.find((c) => c.id === byId(el));
+  onClick(root, '[data-act="calc-add-formula"]', () => updateDef((def) => act.addCalculated(def, 'formula')));
+  onClick(root, '[data-act="calc-add-percent"]', () => updateDef((def) => act.addCalculated(def, 'percentage')));
 
-  const addCalc = (kind: 'formula' | 'percentage') => updateDef((def) => {
-    def.calculated = def.calculated ?? [];
-    const id = newId('calc', def.calculated);
-    def.calculated.push(kind === 'formula'
-      ? { id, name: `Calculated ${def.calculated.length + 1}`, kind, formula: '' }
-      : { id, name: `Percentage ${def.calculated.length + 1}`, kind, ofField: def.columns[0]?.field });
-  });
-  onClick(root, '[data-act="calc-add-formula"]', () => addCalc('formula'));
-  onClick(root, '[data-act="calc-add-percent"]', () => addCalc('percentage'));
-
-  onClick(root, '[data-act="calc-remove"]', (el) => updateDef((def) => {
-    const id = byId(el);
-    def.calculated = (def.calculated ?? []).filter((c) => c.id !== id);
-    // A column pointing at a deleted calculation would render blank forever.
-    def.columns = def.columns.filter((c) => !(c.field.kind === 'formula' && c.field.id === id));
-  }));
-  liveText(root, '[data-act="calc-name"]', (el) => {
-    const c = calcOf(el);
-    return c && ((v) => { c.name = v; });
-  });
-  liveText(root, '[data-act="calc-formula"]', (el) => {
-    const c = calcOf(el);
-    return c && ((v) => { c.formula = v; });
-  });
-  onChange(root, '[data-act="calc-of"]', (el) => updateDef(() => {
-    const c = calcOf(el);
+  // A column pointing at a deleted calculation would render blank forever, so it goes too.
+  onClick(root, '[data-act="calc-remove"]', (el) => updateDef((def) => act.removeCalculated(def, byId(el))));
+  liveText(root, '[data-act="calc-name"]', (def, v, el) => act.updateCalculated(def, byId(el), { name: v }));
+  liveText(root, '[data-act="calc-formula"]', (def, v, el) => act.updateCalculated(def, byId(el), { formula: v }));
+  onChange(root, '[data-act="calc-of"]', (el) => updateDef((def) => {
     const f = fieldFromKey(text(el));
-    if (c && f) c.ofField = f;
+    return f ? act.updateCalculated(def, byId(el), { ofField: f }) : def;
   }));
   // What the result measures. Not inferred: `Width * 2` is a length and `Width * Height` is
   // an area, and the parser cannot tell them apart — so the author says, and the column then
@@ -845,25 +950,16 @@ function wireCalculated(root: HTMLElement) {
   // The only writer of the three fields that answer it. `yesNo` is cleared rather than
   // mirrored: keeping a second copy in step is a promise every future edit would have to
   // remember, and resultOf() already reads the old flag for schedules saved before this.
-  onChange(root, '[data-act="calc-kind"]', (el) => updateDef((def) => {
-    const c = def.calculated?.find((x) => x.id === byId(el));
-    if (!c) return;
-    const v = text(el);
-    c.result = v === 'yesno' ? 'yesNo' : v === 'text' ? 'text' : 'number';
-    c.unitKind = c.result === 'number' ? (v as NonNullable<typeof c.unitKind>) : undefined;
-    c.yesNo = undefined;
-    // Saying what the result is re-decides how the column reads: words left, a yes/no
-    // centred, a number right. It overrides an alignment picked by hand, and should — the
-    // declaration is the stronger statement, and Column formatting can still say otherwise.
-    for (const col of def.columns) {
-      if (col.field.kind === 'formula' && col.field.id === c.id) col.align = alignForCalc(c);
-    }
-  }));
+  // Saying what the result is re-decides how the column reads: words left, a yes/no
+  // centred, a number right. It overrides an alignment picked by hand, and should — the
+  // declaration is the stronger statement, and the column menu can still say otherwise.
+  onChange(root, '[data-act="calc-kind"]', (el) =>
+    updateDef((def) => act.setCalculatedResult(def, byId(el), text(el))));
   // One click to accept what the expression works out to, rather than making the author
   // find the same answer again in the dropdown next to it.
   onClick(root, '[data-act="calc-kind-accept"]', (el) => updateDef((def) => {
     const c = def.calculated?.find((x) => x.id === byId(el));
-    const k = c?.formula ? dimensionOf(c.formula, kindsByHeading(state.store!, def)).kind : null;
-    if (c && k) c.unitKind = k as NonNullable<typeof c.unitKind>;
+    const k = c?.formula && state.store ? dimensionOf(c.formula, kindsByHeading(state.store, def)).kind : null;
+    return c && k ? act.setCalculatedUnitKind(def, c.id, k as UnitKind) : def;
   }));
 }

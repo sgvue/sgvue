@@ -12,12 +12,14 @@
 
   .hdr,
   .rail,
-  .inspector,
+  .centre-head,
   .status,
   .overlay,
   .dlg-scrim,
   .toast,
-  .notice { display: none !important; }
+  .notice,
+  .popover,
+  table.schedule th.add-col { display: none !important; }
 
   .app, .layout { display: block; height: auto; overflow: visible; min-width: 0; }
   .centre, .centre-body { display: block; overflow: visible; padding: 0; }

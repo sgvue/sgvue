@@ -187,7 +187,7 @@ const ScheduleInput = z.object({
           .optional()
       })
     )
-    .max(MAX_FILTERS, `at most ${MAX_FILTERS} filters — the Filter tab's own limit`)
+    .max(MAX_FILTERS, `at most ${MAX_FILTERS} filters — the Schedules window's own limit`)
     .optional(),
   sortBy: z
     .array(z.object({ field: SchedField, descending: z.boolean().optional() }))

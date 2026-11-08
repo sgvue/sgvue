@@ -1,0 +1,422 @@
+{
+ "derivedScales": {
+  "THERMALTRANSMITTANCEUNIT": 10.763910416709722
+ },
+ "elements": {
+  "0000000000000000000009": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcSpace",
+   "longName": "Meeting room",
+   "materials": [],
+   "name": "S01",
+   "objectType": "",
+   "predefinedType": "INTERNAL",
+   "psets": {},
+   "qtos": {
+    "Qto_SpaceBaseQuantities": {
+     "NetFloorArea": {
+      "m": "IfcAreaMeasure",
+      "v": 20.0
+     }
+    }
+   },
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000E": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall one colon",
+   "objectType": "occurrence text the type name wins over",
+   "predefinedType": "SOLIDWALL",
+   "psets": {
+    "SGVue_Edge": {
+     "Blank": {
+      "m": "IfcLabel",
+      "v": ""
+     },
+     "Colours": {
+      "m": "IfcLabel",
+      "p": "IfcPropertyListValue",
+      "v": [
+       "Red",
+       "Green"
+      ]
+     },
+     "Dash": {
+      "m": "IfcLabel",
+      "v": "-"
+     },
+     "Finishes": {
+      "m": "IfcLabel",
+      "p": "IfcPropertyEnumeratedValue",
+      "v": [
+       "Paint",
+       "Tile"
+      ]
+     },
+     "Flag": {
+      "m": "IfcBoolean",
+      "v": false
+     },
+     "Limit": {
+      "m": {
+       "UpperBoundValue": "IfcPositiveLengthMeasure"
+      },
+      "p": "IfcPropertyBoundedValue",
+      "v": {
+       "UpperBoundValue": 50.0
+      }
+     },
+     "LinearMass": {
+      "m": "IfcMassPerLengthMeasure",
+      "v": 12.5
+     },
+     "NotApplicable": {
+      "m": "IfcLabel",
+      "v": "n/a"
+     },
+     "Offsets": {
+      "m": "IfcLengthMeasure",
+      "p": "IfcPropertyListValue",
+      "v": [
+       1000.0,
+       2500.0
+      ]
+     },
+     "Range": {
+      "m": {
+       "LowerBoundValue": "IfcLengthMeasure",
+       "SetPointValue": "IfcLengthMeasure",
+       "UpperBoundValue": "IfcLengthMeasure"
+      },
+      "p": "IfcPropertyBoundedValue",
+      "v": {
+       "LowerBoundValue": 100.0,
+       "SetPointValue": 900.0,
+       "UpperBoundValue": 2000.0
+      }
+     },
+     "Rating": {
+      "m": "IfcLabel",
+      "p": "IfcPropertyEnumeratedValue",
+      "v": [
+       "FIRE"
+      ]
+     },
+     "RotationalMass": {
+      "m": "IfcRotationalMassMeasure",
+      "v": 3.25
+     },
+     "UValue": {
+      "m": "IfcThermalTransmittanceMeasure",
+      "v": 0.5
+     }
+    }
+   },
+   "qtos": {
+    "Qto_WallBaseQuantities": {
+     "Length": {
+      "m": "IfcLengthMeasure",
+      "v": 4000.0
+     },
+     "NetWeight": {
+      "m": "IfcMassMeasure",
+      "v": 1250.0
+     },
+     "Panels": {
+      "m": "IfcCountMeasure",
+      "v": 3.0
+     }
+    }
+   },
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": "Basic Wall:Generic 200"
+  },
+  "000000000000000000000F": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall two colons",
+   "objectType": "",
+   "predefinedType": "SOLIDWALL",
+   "psets": {
+    "SGVue_Edge": {
+     "Blank": {
+      "m": "IfcLabel",
+      "v": ""
+     },
+     "Colours": {
+      "m": "IfcLabel",
+      "p": "IfcPropertyListValue",
+      "v": [
+       "Red",
+       "Green"
+      ]
+     },
+     "Dash": {
+      "m": "IfcLabel",
+      "v": "-"
+     },
+     "Finishes": {
+      "m": "IfcLabel",
+      "p": "IfcPropertyEnumeratedValue",
+      "v": [
+       "Paint",
+       "Tile"
+      ]
+     },
+     "Flag": {
+      "m": "IfcBoolean",
+      "v": false
+     },
+     "Limit": {
+      "m": {
+       "UpperBoundValue": "IfcPositiveLengthMeasure"
+      },
+      "p": "IfcPropertyBoundedValue",
+      "v": {
+       "UpperBoundValue": 50.0
+      }
+     },
+     "LinearMass": {
+      "m": "IfcMassPerLengthMeasure",
+      "v": 12.5
+     },
+     "NotApplicable": {
+      "m": "IfcLabel",
+      "v": "n/a"
+     },
+     "Offsets": {
+      "m": "IfcLengthMeasure",
+      "p": "IfcPropertyListValue",
+      "v": [
+       1000.0,
+       2500.0
+      ]
+     },
+     "Range": {
+      "m": {
+       "LowerBoundValue": "IfcLengthMeasure",
+       "SetPointValue": "IfcLengthMeasure",
+       "UpperBoundValue": "IfcLengthMeasure"
+      },
+      "p": "IfcPropertyBoundedValue",
+      "v": {
+       "LowerBoundValue": 100.0,
+       "SetPointValue": 900.0,
+       "UpperBoundValue": 2000.0
+      }
+     },
+     "Rating": {
+      "m": "IfcLabel",
+      "p": "IfcPropertyEnumeratedValue",
+      "v": [
+       "FIRE"
+      ]
+     },
+     "RotationalMass": {
+      "m": "IfcRotationalMassMeasure",
+      "v": 3.25
+     },
+     "UValue": {
+      "m": "IfcThermalTransmittanceMeasure",
+      "v": 0.5
+     }
+    }
+   },
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": "A:B:C"
+  },
+  "000000000000000000000G": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall no colon",
+   "objectType": "",
+   "predefinedType": "SOLIDWALL",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000007",
+   "tag": "",
+   "typeName": "Plain"
+  },
+  "000000000000000000000H": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall untyped",
+   "objectType": "Curtain:Panel 1",
+   "predefinedType": "USERDEFINED",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000007",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000I": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcWall",
+   "longName": "",
+   "materials": [],
+   "name": "Wall in no storey",
+   "objectType": "",
+   "predefinedType": "SOLIDWALL",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": null,
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000J": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcFurniture",
+   "longName": "",
+   "materials": [],
+   "name": "Table 1",
+   "objectType": "",
+   "predefinedType": "TABLE",
+   "psets": {},
+   "qtos": {
+    "Qto_FurnitureBaseQuantities": {
+     "GrossWeight": {
+      "m": "IfcMassMeasure",
+      "v": 88.5
+     }
+    }
+   },
+   "site": "0000000000000000000002",
+   "space": "0000000000000000000009",
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000Z": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcDiscreteAccessory",
+   "longName": "",
+   "materials": [],
+   "name": "Bracket on the loose wall",
+   "objectType": "",
+   "predefinedType": "",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": null,
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000b": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcDiscreteAccessory",
+   "longName": "",
+   "materials": [],
+   "name": "Clip on a storey wall",
+   "objectType": "",
+   "predefinedType": "",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000006",
+   "tag": "",
+   "typeName": ""
+  },
+  "000000000000000000000f": {
+   "building": "0000000000000000000003",
+   "description": "",
+   "entity": "IfcDoor",
+   "longName": "",
+   "materials": [],
+   "name": "Door in an opening",
+   "objectType": "",
+   "predefinedType": "DOOR",
+   "psets": {},
+   "qtos": {},
+   "site": "0000000000000000000002",
+   "space": null,
+   "storey": "0000000000000000000007",
+   "tag": "",
+   "typeName": ""
+  }
+ },
+ "file": "edge.ifc",
+ "generatedBy": "IfcOpenShell 0.8.4.post1",
+ "measureUnitTypes": {
+  "IfcAreaMeasure": "AREAUNIT",
+  "IfcBoolean": "BOOLEANUNIT",
+  "IfcCountMeasure": "COUNTUNIT",
+  "IfcLabel": "LABELUNIT",
+  "IfcLengthMeasure": "LENGTHUNIT",
+  "IfcMassMeasure": "MASSUNIT",
+  "IfcMassPerLengthMeasure": "MASSPERLENGTHUNIT",
+  "IfcPositiveLengthMeasure": "LENGTHUNIT",
+  "IfcRotationalMassMeasure": "ROTATIONALMASSUNIT",
+  "IfcThermalTransmittanceMeasure": "THERMALTRANSMITTANCEUNIT"
+ },
+ "sha256": "a4c035eb8a2dfe3f119a54d30202a73ecb482e5eaec4ed187da29594d6629577",
+ "spatial": {
+  "0000000000000000000002": {
+   "longName": "",
+   "name": "Site"
+  },
+  "0000000000000000000003": {
+   "longName": "",
+   "name": "Building"
+  },
+  "0000000000000000000009": {
+   "longName": "Meeting room",
+   "name": "S01"
+  }
+ },
+ "storeys": {
+  "0000000000000000000006": {
+   "elevation": 0.0,
+   "longName": "",
+   "name": "Level 00"
+  },
+  "0000000000000000000007": {
+   "elevation": 3.5,
+   "longName": "",
+   "name": "Level 01"
+  }
+ },
+ "unitScales": {
+  "AREAUNIT": 1,
+  "LENGTHUNIT": 0.001,
+  "MASSUNIT": 453.59237,
+  "PLANEANGLEUNIT": 1,
+  "VOLUMEUNIT": 1
+ }
+}

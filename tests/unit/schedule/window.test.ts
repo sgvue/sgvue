@@ -7,7 +7,8 @@
 //   · the element last clicked marks the one data row that carries it, through any regroup;
 //   · the header escapes what it prints and enables undo / redo / Equal width only when they
 //     can act;
-//   · the rail's saved group marks the setup in use and escapes names;
+//   · the rail's Templates group (v1.5.0, phase 3) is the way into the library and the schedule
+//     in use, saying whether it is saved, with its name escaped;
 //   · the formula guide is text only — no link, so nothing in it can navigate the window.
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -141,7 +142,7 @@ describe('the header', () => {
 
   it('the status line says what the table amounts to', () => {
     const { res } = render(grouped);
-    const text = renderStatus(stateOf({ def: grouped }), res, buildCoverage(store, ['IfcDoor']), 3)
+    const text = renderStatus(stateOf({ def: grouped }), res, buildCoverage(store, ['IfcDoor']))
       .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     expect(text).toContain('4 rows');
     expect(text).toContain('6 of 6 elements matched');
@@ -149,7 +150,7 @@ describe('the header', () => {
   });
 });
 
-describe('the rail keeps the saved setups under the categories', () => {
+describe('the rail: the categories, then the way into the Templates library', () => {
   const cell = new Map<string, string>();
   beforeEach(() => {
     cell.clear();
@@ -163,18 +164,25 @@ describe('the rail keeps the saved setups under the categories', () => {
     });
   });
 
-  it('says so when nothing is saved', () => {
-    expect(renderRail(stateOf({ def: itemised }), store)).toContain('Nothing saved yet.');
+  it('opens the library, with its key, and lists no saved rows of its own', () => {
+    saveSchedule({ ...itemised, name: 'Doors saved' }, null);
+    const html = renderRail(stateOf({ def: itemised }), store);
+    expect(html).toContain('data-act="open-library"');
+    expect(html).toContain('Templates library');
+    expect(html).toContain('<kbd>T</kbd>');
+    expect(html).not.toContain('Doors saved');
+    expect(html).not.toContain('data-act="load-saved"');
   });
 
-  it('marks the setup in use, says when it has been edited, and escapes names', () => {
-    saveSchedule({ ...itemised, name: 'Doors <b>' }, null);
-    const on = renderRail(stateOf({ def: itemised, savedName: 'Doors <b>' }), store);
-    expect(on).toContain('rail-saved hv-step on');
+  it('says whether the schedule in use is saved, edited or not saved — and escapes its name', () => {
+    expect(renderRail(stateOf({ def: itemised }), store)).toContain('>not saved<');
+    const on = renderRail(stateOf({ def: { ...itemised, name: 'Doors <b>' }, savedName: 'Doors <b>' }), store);
+    expect(on).toContain('cur-row on');
     expect(on).toContain('>in use<');
     expect(on).toContain('Doors &lt;b&gt;');
     expect(on).not.toContain('Doors <b>');
-    expect(renderRail(stateOf({ def: itemised, savedName: 'Doors <b>', dirty: true }), store)).toContain('>edited<');
+    expect(renderRail(stateOf({ def: itemised, savedName: 'Doors', dirty: true }), store)).toContain('>edited<');
+    expect(renderRail(stateOf({ def: itemised, templateId: 'door-schedule' }), store)).toContain('>in use<');
   });
 
   it('a collapsed rail is nothing but the way back', () => {

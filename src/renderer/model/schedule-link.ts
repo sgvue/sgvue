@@ -399,7 +399,7 @@ function sendProjectSchedules(withOpen: boolean): void {
 
 /**
  * The open project's saved setups and open schedule — or `null`, the project closed. The
- * Schedules window, when one is joined, shows them at once: the list as My templates, and with
+ * Schedules window, when one is joined, shows them at once: the list as the Templates library's Mine, and with
  * `show`, the open schedule as its current one (a project being opened). A project that was
  * already open and is closing, or a first save's import (`show` false), leaves the schedule on
  * screen alone.
@@ -509,7 +509,8 @@ export function requestExport(format: ExportFormat, ms: number): Promise<ExportA
 /**
  * What became of a `manage_schedules` request (2026-10-02): the Schedules window's own answer
  * (`schedule/messages.ts`, `ManageAckMessage` — already validated, field by field), or `closed`
- * (no window, or it went) or `timeout` (no answer in time). `busy` is the window's — one of its
+ * (no window, or it went) or `timeout` (no answer in time — whether the window acted is not
+ * known: it may have, and answered too late to be heard). `busy` is the window's — one of its
  * dialogs is up — or this side's: another request is still waiting for its answer.
  */
 export interface ManageAnswer extends Omit<ManageAck, 'type' | 'n' | 'result'> {

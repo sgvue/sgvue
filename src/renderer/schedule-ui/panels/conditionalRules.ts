@@ -1,7 +1,7 @@
 // The colour rules for one column: a condition read as a sentence, the pair of colours a
 // matching cell takes, and what that rule is actually doing to the schedule.
 //
-// What the result LOOKS like is not shown here — the Format tab's Preview box holds a real
+// What the result LOOKS like is not shown here — the column menu's preview holds a real
 // value from the model and wears whichever rule fires on it, which is the same question
 // asked on an actual value rather than on the letters "Aa". What IS shown here is the half
 // a preview cannot answer: how many rows the rule reaches, and a way to see them. A rule
@@ -13,8 +13,7 @@ import type { Column, Op } from '../../../schedule/schedule/def';
 import type { ScheduleResult } from '../../../schedule/schedule/engine';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
-import { toggle } from './shared';
-import { cross } from '../icons';
+import { ICON } from '../icons';
 
 /**
  * Six ready-made pairs: a soft fill with text deep enough to stay readable on it. Picking
@@ -37,8 +36,8 @@ const COND_BG = '#fff3cd';
 const COND_FG = '#1b1f24';
 
 /**
- * The operators a colour rule may use on this column — the same type-aware list the Filter
- * tab offers, minus `in` and `between`. Those two need a SECOND value, and a CondRule holds
+ * The operators a colour rule may use on this column — the same type-aware list a filter
+ * rule offers, minus `in` and `between`. Those two need a SECOND value, and a CondRule holds
  * one; the saved format is frozen, so they are withheld rather than half-supported.
  *
  * A stored op outside the list is appended rather than dropped. Rules saved under the old
@@ -60,12 +59,15 @@ export function conditionalRules(
   // Undefined for a hidden column: it has no cells in this result, so there is nothing
   // honest to count and the effect line is left off entirely.
   const claims = res.conditionalHits?.[colIndex];
+  // Every control names its column: events.ts reads data-defcol off the control itself,
+  // never which column the menu is showing (ifcTable, 2026-11-05).
+  const at = ` data-defcol="${colIndex}"`;
 
   const cards = rules.map((r, n) => {
     const bg = (r.bg ?? COND_BG).toLowerCase();
     const fg = (r.fg ?? COND_FG).toLowerCase();
     const presets = COND_PRESETS.map(([pb, pf]) => `<button class="cond-preset${
-      pb === bg && pf === fg ? ' on' : ''}" data-act="cond-preset" data-i="${n}"
+      pb === bg && pf === fg ? ' on' : ''}" data-act="cond-preset" data-i="${n}"${at}
       data-bg="${esc(pb)}" data-fg="${esc(pf)}" style="background:${esc(pb)};color:${esc(pf)}"
       title="Use this pair" aria-label="Colour pair">Aa</button>`).join('');
 
@@ -79,27 +81,29 @@ export function conditionalRules(
     const hits = claims?.hits[n] ?? 0;
     const effect = claims ? `<div class="row ends rule-effect">
         <span class="sub">Colours <strong>${hits.toLocaleString()}</strong> of ${claims.of.toLocaleString()} rows
-          <button class="link" data-act="cond-show" data-i="${n}"${hits ? '' : ' disabled'}>${showing ? 'back to schedule' : 'show them'}</button>
+          <button class="link" data-act="cond-show" data-i="${n}"${at}${hits ? '' : ' disabled'}>${showing ? 'back to schedule' : 'show them'}</button>
         </span>
       </div>` : '';
 
-    return `<div class="subcard" data-i="${n}">
+    return `<div class="subcard" data-i="${n}"${at}>
       <div class="row">
         <span class="cond-when">When</span>
-        <select class="cond-op${presence ? ' solo' : ''}" data-act="cond-op" data-i="${n}" aria-label="Condition">${ops}</select>
-        ${presence ? '' : `<input class="grow-1" type="text" data-act="cond-value" data-i="${n}" value="${esc(r.value ?? '')}"
+        <select class="cond-op${presence ? ' solo' : ''}" data-act="cond-op" data-i="${n}"${at} aria-label="Condition">${ops}</select>
+        ${presence ? '' : `<input class="grow-1" type="text" data-act="cond-value" data-i="${n}"${at} value="${esc(r.value ?? '')}"
           placeholder="value" aria-label="Value" />`}
-        <button class="x-btn hv-warn-both" data-act="cond-remove" data-i="${n}" title="Remove">${cross()}</button>
+        <button class="icon-btn sm hv-warn-both" data-act="cond-remove" data-i="${n}"${at}
+          title="Remove rule" aria-label="Remove rule">${ICON.remove}</button>
       </div>
       <div class="row block snug">
         <span class="cond-presets">${presets}</span>
       </div>
       <div class="row block snug">
-        <label class="cond-swatch"><span class="lbl">Fill</span>
-          <input type="color" data-act="cond-bg" data-i="${n}" value="${esc(bg)}" aria-label="Fill colour" /></label>
-        <label class="cond-swatch"><span class="lbl">Text</span>
-          <input type="color" data-act="cond-fg" data-i="${n}" value="${esc(fg)}" aria-label="Text colour" /></label>
-        ${toggle('cond-bold', 'Bold', !!r.bold, ` data-i="${n}"`)}
+        <label class="cond-swatch" title="Fill colour">${ICON.fill}
+          <input type="color" data-act="cond-bg" data-i="${n}"${at} value="${esc(bg)}" aria-label="Fill colour" /></label>
+        <label class="cond-swatch" title="Text colour">${ICON.textColour}
+          <input type="color" data-act="cond-fg" data-i="${n}"${at} value="${esc(fg)}" aria-label="Text colour" /></label>
+        <label class="icon-btn sm cond-bold hv-step" title="Bold"><input type="checkbox" data-act="cond-bold" data-i="${n}"${at}
+          aria-label="Bold"${r.bold ? ' checked' : ''} />${ICON.bold}</label>
       </div>
       ${effect}
     </div>`;
@@ -109,5 +113,5 @@ export function conditionalRules(
   // Literally what firingRule does: it returns on the first rule that claims the cell.
   const order = rules.length > 1 ? '<div class="sub block snug">When rules overlap, the first match wins.</div>' : '';
   return `<div class="stack">${cards || empty}</div>${order}
-    <button class="dashed block snug" data-act="cond-add">+ Add rule</button>`;
+    <button class="dashed block snug" data-act="cond-add"${at}>+ Add rule</button>`;
 }

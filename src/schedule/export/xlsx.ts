@@ -2,8 +2,10 @@
 // asks for a workbook — it never lands in the initial bundle.
 //
 // Ported from ifcTable's `export/xlsx.ts` for the Schedules window (2026-09-25, phase 4), with
-// one change: the workbook's `creator` names SGVue. The Blob it hands back is turned into bytes
-// by the page and written by main, behind the native Save dialog (`src/main/exports.ts`).
+// one change: the workbook's `creator` names SGVue. Since v1.5.0 it also carries ifcTable's
+// later fix that hands exceljs only plain strings and numbers (`plain`). The Blob it hands
+// back is turned into bytes by the page and written by main, behind the native Save dialog
+// (`src/main/exports.ts`).
 
 import { firingRule } from '../schedule/conditional';
 import type { Column, ScheduleDef } from '../schedule/def';
@@ -96,6 +98,12 @@ export function argbOf(colour: string): string | undefined {
     .toUpperCase()}`;
 }
 
+/** A cell value exceljs can only write as a literal: a number stays one, anything else is text. */
+function plain(v: unknown): number | string {
+  if (typeof v === 'number') return v;
+  return v == null ? '' : String(v);
+}
+
 /** A plain integer, for the trailing Count column and for any count total. */
 const INTEGER = '0';
 
@@ -142,7 +150,10 @@ function writeSheet(ws: any, sheet: Sheet): void {
   });
 
   for (const r of rows) {
-    const row = ws.addRow(r.cells);
+    // Only primitives reach exceljs: it reads a cell's TYPE from the value's shape, so an
+    // object carrying `formula` or `hyperlink` (say a heading from a doctored template)
+    // would be written as a live formula or link. (ifcTable's fix of 2026-11-07.)
+    const row = ws.addRow(r.cells.map(plain));
     // Numeric cells hold NUMBERS: the value the schedule displays, so a SUM over the column
     // adds the figures the reader sees. Text, yes/no and blank cells stay as they were.
     r.nums?.forEach((n, i) => {
@@ -190,7 +201,7 @@ function writeSheet(ws: any, sheet: Sheet): void {
   // A schedule whose class this model lacks still gets a sheet, saying so. Silently
   // dropping it would leave a workbook that looks complete and is not.
   if (note) {
-    const row = ws.addRow([note]);
+    const row = ws.addRow([plain(note)]);
     row.font = { italic: true, color: { argb: 'FF8A5300' } };
   }
 
@@ -201,7 +212,7 @@ function writeSheet(ws: any, sheet: Sheet): void {
   for (let i = 0; i < width; i++) {
     const col = res.columns[i];
     const sheetCol = ws.getColumn(i + 1);
-    const widest = rows.reduce((w, r) => Math.max(w, (r.cells[i] ?? '').length), 8);
+    const widest = rows.reduce((w, r) => Math.max(w, plain(r.cells[i]).toString().length), 8);
     sheetCol.width = Math.min(46, widest + 2);
     if (!col || col.align === 'right' || col.total) sheetCol.alignment = { horizontal: 'right' };
     else if (col.align === 'center') sheetCol.alignment = { horizontal: 'center' };

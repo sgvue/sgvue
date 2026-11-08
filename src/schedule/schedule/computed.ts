@@ -13,7 +13,7 @@ import { resolveField, type Computed } from './resolve';
 
 export interface ComputedPlan {
   compute: (store: ModelStore, row: number) => Computed;
-  /** Formulas that failed to parse, keyed by calculated id — surfaced in the Fields tab. */
+  /** Formulas that failed to parse, keyed by calculated id — surfaced in the calculated-value editor. */
   errors: Map<string, string>;
 }
 
@@ -41,7 +41,7 @@ export function planComputed(def: ScheduleDef): ComputedPlan {
     .filter(([, v]) => v.count === 1)
     .map(([heading, v]) => ({ heading, field: v.field }));
 
-  /** Headings a formula can legally reference — used by the Fields tab's warning. */
+  /** Headings a formula can legally reference — used by the calculated-value editor's warning. */
   const ambiguous = [...byHeading].filter(([, v]) => v.count > 1).map(([h]) => h);
 
   const formulas = (def.calculated ?? [])

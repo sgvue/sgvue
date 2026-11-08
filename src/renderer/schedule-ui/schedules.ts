@@ -9,8 +9,25 @@ import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def'
 import { SavedListShape } from '../../schedule/messages';
 
 export const SAVED_KEY = 'sgvue.schedules.saved.v1';
-/** How many setups the list keeps. Saves unshift, so the oldest entry is the last one. */
+/**
+ * How many setups the list keeps. v1.5.0, phase 3 — ifcTable's rule of 2026-11-07 ("saved
+ * setups are never silently overwritten"): at the cap a save, a duplicate or an import that
+ * would ADD an entry is refused, rather than making room by dropping the oldest. Replacing the
+ * entry the schedule was loaded from never grows the list, so it still goes through.
+ */
 export const CAP = 100;
+
+/** What the caller says when a write was refused, and why. */
+export const FULL_MESSAGE = `Saved templates are full (${CAP}). Delete one to make room.`;
+export const STORAGE_MESSAGE = 'Could not save — storage is unavailable or full.';
+
+/** Would a save that may replace `own` have to add an entry to a list already at the cap? */
+export function isFull(own: string | null = null, entries = listSaved()): boolean {
+  return entries.length >= CAP && !(own !== null && entries.some((e) => e.name === own));
+}
+
+/** Why a write just came back null: the cap, or storage refused it. */
+export const refusal = (own: string | null = null) => (isFull(own) ? FULL_MESSAGE : STORAGE_MESSAGE);
 
 /** The name is the identity, and it always equals `def.name`. Every writer below keeps
  *  the two in step, so the rail and the panel agree. */
@@ -33,7 +50,7 @@ export function setProjectList(entries: SavedEntry[] | null, onWrite?: (entries:
 /**
  * The main window sent a project's list this window could not read (2026-11-07). A project is
  * open there, so `localStorage` is not this window's list either: until a list it can read
- * arrives (or a new main page), My templates is empty and every write is refused — the caller
+ * arrives (or a new main page), the library's Mine is empty and every write is refused — the caller
  * says "Could not save — storage is unavailable or full." — rather than land in the wrong place.
  */
 export function refuseProjectList(): void {
@@ -116,14 +133,18 @@ export function uniqueName(base: string, taken: string[]): string {
  * overwrite by name, and since picking a category always names the schedule "Door
  * Schedule", the second door setup silently destroyed the first.
  *
- * Returns the name actually used, or null when storage refused the write.
+ * Returns the name actually used, or null when the list is full (`isFull`) or storage refused
+ * the write — `refusal()` says which.
  */
 export function saveSchedule(def: ScheduleDef, own: string | null): string | null {
   // A setup with no columns is refused: it could never be read back (`parseScheduleDef`
   // rejects it), so saving it would store a template that silently vanishes. The caller says
   // so before asking; this is the backstop.
   if (!def.columns.length) return null;
-  const { name, kept } = planSave(def, own, listSaved());
+  const entries = listSaved();
+  const { name, kept } = planSave(def, own, entries);
+  // Only replacing `own` itself keeps the count; anything else adds an entry.
+  if (isFull(name === own ? own : null, entries)) return null;
   const copy = structuredClone(def);
   copy.name = name;
   return write([{ name, def: copy, savedAt: new Date().toISOString() }, ...kept]) ? name : null;
@@ -131,38 +152,33 @@ export function saveSchedule(def: ScheduleDef, own: string | null): string | nul
 
 /**
  * What a save would do to the list, without doing it: the name it would be stored under, the
- * entries that stay, and the two ways an entry is lost — `replaced`, the one entry of that name
- * (which can only be `own`: every other clash is numbered), and `evicted`, whatever the cap
- * pushes off the end. `saveSchedule` writes exactly this plan.
+ * entries that stay, and `replaced` — the one entry of that name, which can only be `own`:
+ * every other clash is numbered. `saveSchedule` writes exactly this plan. (Nothing is pushed off
+ * the end any more: at the cap the save is refused.)
  */
 function planSave(def: ScheduleDef, own: string | null, entries: SavedEntry[]) {
   const wanted = def.name.trim() || 'Untitled schedule';
   const name = wanted !== own && entries.some((e) => e.name === wanted)
     ? uniqueName(wanted, entries.map((e) => e.name))
     : wanted;
-  // Only `own` can still be sitting under this name — every other clash was numbered above.
-  const rest = entries.filter((e) => e.name !== name);
   return {
     name,
     replaced: entries.find((e) => e.name === name)?.name ?? null,
-    kept: rest.slice(0, CAP - 1),
-    evicted: rest.slice(CAP - 1).map((e) => e.name),
+    kept: entries.filter((e) => e.name !== name),
   };
 }
 
 /**
  * What a save of `def` would take away from the saved list — 2026-10-02, the assistant's
- * `manage_schedules`. A user's own Save replaces the setup it was loaded from and, at the cap,
- * lets the oldest go, by ifcTable's rule and without a question; a save asked for from chat
- * must not take a saved setup away by itself (the consent gate — it found the same hole in
- * saved filter sets), so it asks first, and this says what it would be asking about.
- * `name` is what the setup would be saved as.
+ * `manage_schedules`. A user's own Save replaces the setup it was loaded from, by ifcTable's
+ * rule and without a question; a save asked for from chat must not take a saved setup away by
+ * itself (the consent gate — it found the same hole in saved filter sets), so it asks first,
+ * and this says what it would be asking about. `name` is what the setup would be saved as.
+ * v1.5.0, phase 3: the only way left — at the cap a save is refused, never makes room.
  */
-export function forgottenBySave(
-  def: ScheduleDef, own: string | null,
-): { name: string; replaced: string | null; evicted: string[] } {
-  const { name, replaced, evicted } = planSave(def, own, listSaved());
-  return { name, replaced, evicted };
+export function forgottenBySave(def: ScheduleDef, own: string | null): { name: string; replaced: string | null } {
+  const { name, replaced } = planSave(def, own, listSaved());
+  return { name, replaced };
 }
 
 /** Rename in place: same position in the list, and the definition's own name follows. */
@@ -182,29 +198,19 @@ export function renameSchedule(
   return write(entries) ? 'ok' : 'failed';
 }
 
-/** Copy an entry under a free name, directly after the original — a base to edit from. */
+/**
+ * Copy an entry under a free name, directly after the original — a base to edit from.
+ * Refused at the cap like any other new entry: nothing is dropped to make room.
+ */
 export function duplicateSchedule(name: string): string | null {
   const entries = listSaved();
   const at = entries.findIndex((e) => e.name === name);
-  if (at < 0) return null;
+  if (at < 0 || isFull(null, entries)) return null;
   const fresh = uniqueName(name, entries.map((e) => e.name));
   const def = structuredClone(entries[at].def);
   def.name = fresh;
-  // Trim before putting the pair back, so the cap can never take the copy: capping after
-  // the splice threw the copy away whenever the original sat last, and this still
-  // returned the name, so the caller flashed "Copied to …" for a copy nobody stored. The
-  // original is held out of the trim too — duplicating must not delete what you copied,
-  // and the copy has to stay directly behind it. What goes is the oldest of the rest.
-  const rest = entries.filter((_, i) => i !== at).slice(0, CAP - 2);
-  rest.splice(at, 0, entries[at], { name: fresh, def, savedAt: new Date().toISOString() });
-  return write(rest) ? fresh : null;
-}
-
-/** The saved setups a duplicate of `name` would push off the end of the list — none, below the cap. */
-export function forgottenByDuplicate(name: string): string[] {
-  const entries = listSaved();
-  const at = entries.findIndex((e) => e.name === name);
-  return at < 0 ? [] : entries.filter((_, i) => i !== at).slice(CAP - 2).map((e) => e.name);
+  entries.splice(at + 1, 0, { name: fresh, def, savedAt: new Date().toISOString() });
+  return write(entries) ? fresh : null;
 }
 
 export function deleteSchedule(name: string): void {

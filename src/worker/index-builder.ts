@@ -344,43 +344,106 @@ export function buildModelIndex(
       i + 1 < all.length ? { ...s, h: all[i + 1].elev - s.elev } : s
     )
 
-  /* ── containment: element → storey ────────────────────────────────── */
+  /*
+   * ── containment: element → its spatial container and its storey (2026-11-08) ──
+   * One rule, IfcOpenShell 0.8.4's (`ifcopenshell.util.element`), and both values come from it,
+   * so the storey and the Schedules window's Building, Site and Room / Space cannot disagree:
+   *
+   *  · `contained(x)` is `get_container(x)`: x's own `IfcRelContainedInSpatialStructure`, else
+   *    `get_container(get_parent(x))` — `get_parent` takes, in this order, the aggregate
+   *    (`IfcRelAggregates`), the nest (`IfcRelNests`), the opening x fills
+   *    (`IfcRelFillsElement`) and the element an opening voids (`IfcRelVoidsElement`). So a
+   *    component nested on a wall, and a door that only fills an opening in it, are where the
+   *    wall is contained.
+   *  · `holder(x)` is one step up: `contained(x)`, else the element or spatial element
+   *    aggregating x — a space's storey, which `get_container` alone never gives (it climbs past
+   *    every spatial element to the project). It is the step the oracle's truth climbs
+   *    (`scripts/expected-from-ifcopenshell.py`, `_parent`).
+   *  · an element's **container** is the first spatial element up the `holder` chain, its
+   *    **storey** the first `IfcBuildingStorey` — the first one up from that container.
+   *
+   * Each walk is memoised, so the whole pass is linear in the relationships. A Revit export
+   * contains every element directly, and there every value is what direct containment gives.
+   */
   const storeySet = new Set(storeyNodes.map((n) => n.expressId))
   const storeyNameById = new Map(storeyNodes.map((n) => [n.expressId, n.name || n.longName]))
-  const storeyOf = new Map<number, number>()
-  // Elements are often contained in an IfcSpace rather than a storey, so spaces are
-  // resolved to their own storey first and their contents inherit it.
-  const inSpace: { space: number; elements: number[] }[] = []
+  const spatialIds = new Set<number>()
+  const collectSpatial = (node: SpatialNode | null): void => {
+    if (!node) return
+    spatialIds.add(node.expressId)
+    node.children.forEach(collectSpatial)
+  }
+  collectSpatial(spatial)
+
+  // Each element's own containment — the first relationship naming it, as `[0]` is.
+  const directIn = new Map<number, number>()
   for (const relId of ids('IFCRELCONTAINEDINSPATIALSTRUCTURE')) {
     const rel = line(relId)
     if (!rel) continue
     const structure = ref(rel.RelatingStructure)
-    const contents = refs(rel.RelatedElements)
-    if (storeySet.has(structure)) for (const el of contents) storeyOf.set(el, structure)
-    else inSpace.push({ space: structure, elements: contents })
+    if (!structure) continue
+    spatialIds.add(structure)
+    for (const el of refs(rel.RelatedElements)) if (!directIn.has(el)) directIn.set(el, structure)
   }
-  for (const node of storeyNodes) for (const kid of node.children) storeyOf.set(kid.expressId, node.expressId)
-  for (const { space, elements } of inSpace) {
-    const storey = storeyOf.get(space) ?? aggregatedIn.get(space) ?? 0
-    if (!storeySet.has(storey)) continue
-    if (!storeyOf.has(space)) storeyOf.set(space, storey)
-    for (const el of elements) if (!storeyOf.has(el)) storeyOf.set(el, storey)
-  }
-  // Aggregated children inherit their parent's storey (curtain-wall panels and mullions are
-  // not contained in a storey at all; they hang off their curtain wall).
-  let frontier = [...storeyOf.keys()]
-  while (frontier.length) {
-    const next: number[] = []
-    for (const parent of frontier) {
-      const storey = storeyOf.get(parent)!
-      for (const kid of aggregates.get(parent) ?? []) {
-        if (storeyOf.has(kid)) continue
-        storeyOf.set(kid, storey)
-        next.push(kid)
+
+  /** `get_parent` less its first term (own containment, which `contained` reads first). */
+  const parentOf = (id: number): number =>
+    aggregatedIn.get(id) ?? nestedIn.get(id) ?? fillsWhat.get(id) ?? voidedBy.get(id) ?? 0
+
+  const containedMemo = new Map<number, number>() // node → its `get_container`, 0 for none
+  const contained = (id: number): number => {
+    const path: number[] = []
+    const onPath = new Set<number>()
+    let n = id
+    let found = 0
+    while (n && !onPath.has(n)) {
+      const known = containedMemo.get(n)
+      if (known !== undefined) {
+        found = known
+        break
       }
+      const direct = directIn.get(n)
+      if (direct !== undefined) {
+        found = direct
+        break
+      }
+      onPath.add(n)
+      path.push(n)
+      n = parentOf(n)
     }
-    frontier = next
+    for (const p of path) containedMemo.set(p, found)
+    return found
   }
+  const holder = (id: number): number => contained(id) || (aggregatedIn.get(id) ?? 0)
+
+  /** The first node up the `holder` chain from `id` (not `id` itself) that `isTarget`, else 0. */
+  const firstAbove = (isTarget: (id: number) => boolean): ((id: number) => number) => {
+    const memo = new Map<number, number>() // node → the first target at or above it, 0 for none
+    return (id) => {
+      const path: number[] = []
+      const onPath = new Set<number>()
+      let n = holder(id)
+      let found = 0
+      while (n && !onPath.has(n)) {
+        const known = memo.get(n)
+        if (known !== undefined) {
+          found = known
+          break
+        }
+        if (isTarget(n)) {
+          found = n
+          break
+        }
+        onPath.add(n)
+        path.push(n)
+        n = holder(n)
+      }
+      for (const p of path) memo.set(p, found)
+      return found
+    }
+  }
+  const containerOf = firstAbove((id) => spatialIds.has(id))
+  const storeyOf = firstAbove((id) => storeySet.has(id))
   stage(
     'spatial structure',
     `${site ? 1 : 0} site · ${building ? 1 : 0} building · ${storeys.length} storeys`,
@@ -632,7 +695,7 @@ export function buildModelIndex(
       effectivePredefinedType,
       objectType: info?.name || occurrenceObjectType,
       typeGuid: info?.guid ?? '',
-      storey: storeyNameById.get(storeyOf.get(id) ?? 0) ?? '',
+      storey: storeyNameById.get(storeyOf(id)) ?? '',
       material: materialDisplay(mats),
       materials: mats,
       classifications: classificationsOf.get(id) ?? [],
@@ -643,6 +706,8 @@ export function buildModelIndex(
       psetMeta: metaOf.get(id) ?? {},
       ...(spaceSet.has(id) ? { isSpace: true as const } : {})
     })
+    const container = containerOf(id)
+    if (container) elements[elements.length - 1].container = container
   }
   stage('building elements', `${elements.length.toLocaleString('en-US')} elements`, 1)
 
@@ -805,11 +870,8 @@ function unitFactor(
   entity: string
 ): number | undefined {
   if (entity === 'IfcSIUnit') return siFactor(text(unit.Name), text(unit.Prefix))
-  if (entity !== 'IfcConversionBasedUnit') {
-    // IfcDerivedUnit (thermal transmittance, …) is recorded but not resolved to an SI
-    // factor: its values are reported exactly as authored.
-    return undefined
-  }
+  if (entity === 'IfcDerivedUnit') return derivedFactor(src, modelID, unit)
+  if (entity !== 'IfcConversionBasedUnit') return undefined
   // e.g. DEGREE = 0.01745… RADIAN, INCH = 0.0254 METRE, expressed against an SI unit.
   const conversion = src.line(modelID, ref(unit.ConversionFactor))
   const value = numberOf(conversion?.ValueComponent)
@@ -817,6 +879,35 @@ function unitFactor(
   const baseName = base ? text(base.Name) : ''
   const basePrefix = base ? text(base.Prefix) : ''
   return value !== null ? value * siFactor(baseName, basePrefix) : undefined
+}
+
+/**
+ * SI base units per one of an `IfcDerivedUnit` (2026-11-08) — W/(ft²·K) is 10.7639… W/(m²·K):
+ * the product of its elements' factors, each raised to its exponent, as IfcOpenShell composes
+ * one. A mass element counts in **kilograms**, so the factor is in SI base units, where the
+ * `MASSUNIT` entry itself is in grams (the file's own reading, `scalesOf` in the Schedules
+ * adapter). `undefined` when any element does not resolve. Only the Schedules window converts
+ * with it; the main window shows every value as authored.
+ */
+function derivedFactor(src: ReadOnlyIfcSource, modelID: number, unit: IfcLine): number | undefined {
+  const elements = refs(unit.Elements)
+  if (!elements.length) return undefined
+  let factor = 1
+  for (const id of elements) {
+    const element = src.line(modelID, id)
+    const exponent = numberOf(element?.Exponent)
+    const namedId = ref(element?.Unit)
+    const named = namedId ? src.line(modelID, namedId) : null
+    if (exponent === null || !named) return undefined
+    const entity = src.typeName(src.lineType(modelID, namedId))
+    // A derived unit's elements are named units; never recurse into another derived one.
+    if (entity === 'IfcDerivedUnit') return undefined
+    let f = unitFactor(src, modelID, named, entity)
+    if (f === undefined) return undefined
+    if (text(named.UnitType) === 'MASSUNIT') f /= 1000
+    factor *= f ** exponent
+  }
+  return factor
 }
 
 /* ────────────── property / quantity set resolution ────────────── */

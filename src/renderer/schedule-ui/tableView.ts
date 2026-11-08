@@ -15,18 +15,22 @@
 // selection is the main window's too, both ways — and while the 3D view is coloured by one of
 // this table's columns, each of that column's cells starts with its colour's swatch and the
 // heading says it is the source.
+//
+// v1.5.0, phase 2 (ifcTable's table-first redesign, 2026-11-05): the Format tab and its editing
+// mark are gone — a heading opens its column's menu — and the last heading is "+ Column", the
+// field picker's way in.
 
 import { headingOf, type Column } from '../../schedule/schedule/def';
 import { firingRule, litTarget } from '../../schedule/schedule/conditional';
 import { fontStack } from '../../schedule/schedule/fonts';
 import type { RenderRow, ScheduleResult } from '../../schedule/schedule/engine';
-import { RENDER_CAP } from '../../schedule/schedule/engine';
+import { RENDER_CAP, labelTakesFirstCell } from '../../schedule/schedule/engine';
 import type { AppState } from './state';
 import { populated, type Coverage } from './coverage';
 import { esc } from './dom';
 // Straight from the leaf, not through ./panels: the barrel re-exports formatSection, which
 // imports cellStyle from here, and that round trip would be a cycle.
-import { fieldKey, selectedIndex } from './panels/shared';
+import { fieldKey } from './panels/shared';
 import { colourKey } from '../../schedule/colour';
 
 /**
@@ -94,8 +98,8 @@ function renderRow(
       const cls = row.kind === 'grand' ? 'grand' : `footer level-${row.level}`;
       const cells = cols.map((c, i) => {
         const v = row.cells[i];
-        // The label sits in the first column that has no total of its own.
-        if (i === 0 && v === null) return `<td>${esc(row.label)}</td>`;
+        // The label sits in the first column when it shows no total of its own.
+        if (i === 0 && labelTakesFirstCell(row.cells)) return `<td>${esc(row.label)}</td>`;
         return `<td${alignClass(c)}>${esc(v ?? '')}</td>`;
       });
       return `<tr class="${cls}">${cells.join('')}${tail(row.count)}</tr>`;
@@ -147,35 +151,6 @@ function widthRules(defIndex: number[], columns: Column[]): string {
     + `${columns[d]?.width ? ';white-space:normal;overflow-wrap:anywhere' : ''}}`).join('');
 }
 
-/**
- * Which column the Format tab is editing, marked in the table while that tab is showing.
- *
- * "Editing column" names a column the eye then has to find, and it names one even when
- * nothing was picked — the panel falls back to column 0, so the table has to say so too or
- * the first edit lands somewhere the user was not looking. `selectedIndex` is that same
- * fallback, asked once here rather than re-derived.
- *
- * The heading gets exactly what a Shift-selected one gets: "this column is being acted on"
- * must not read as two different things. The cells get a tint painted as an inset shadow
- * rather than a background, because zebra and row-hover both set a background and both
- * out-specify a positional rule — a shadow paints over whatever the background turns out
- * to be. `:not([colspan])` keeps the group and blank rows out, exactly as widthRules does.
- *
- * `@media screen` because this is UI chrome, not content: the width rules are unscoped on
- * purpose (a printout keeps the widths it was given), but nothing should print because a
- * panel happened to be open.
- */
-function editingRule(state: AppState, defIndex: number[]): string {
-  if (state.open !== 'format' || !state.inspectorOpen) return '';
-  const n = defIndex.indexOf(selectedIndex(state)) + 1;
-  // 0 covers both "no columns" and "the edited column is hidden" — nothing to mark.
-  if (!n) return '';
-  return `@media screen{table.schedule thead th:nth-child(${n})`
-    + '{background:var(--sel-bg);color:var(--sel-ink);box-shadow:inset 0 -3px 0 var(--accent)}'
-    + `table.schedule td:not([colspan]):nth-child(${n})`
-    + '{box-shadow:inset 0 0 0 9999px var(--col-tint)}}';
-}
-
 export function renderSchedule(state: AppState, res: ScheduleResult, cov: Coverage): string {
   const def = state.def;
   const a = def.appearance ?? {};
@@ -188,7 +163,15 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
          no walls, doors, spaces or other building elements.</div>`
       : '<div class="empty-note">Pick a category in the left rail to start a schedule.</div>';
   }
-  if (!res.columns.length) return '<div class="empty-note">No fields yet. Add some from the inspector.</div>';
+  // A template can be used on a model without its class (the library says so first); the
+  // table then says it plainly and offers the way back, rather than drawing empty headings
+  // (ifcTable, 2026-11-07).
+  const store = state.store;
+  if (store && !def.entity.some((e) => (store.byEntity.get(e)?.length ?? 0) > 0)) {
+    return `<div class="empty-note">This model has no ${esc(def.entity.join(' or '))}.
+      <button class="link" data-act="open-library">Pick another template</button></div>`;
+  }
+  if (!res.columns.length) return '<div class="empty-note">No columns yet. Add some from the fields chip above, or press /.</div>';
 
   // Map visible column index back to its index in def.columns, so a header click opens
   // the right column in Column formatting and the badge lands on the right heading.
@@ -209,7 +192,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
   const head = res.columns.map((c, i) => {
     const vertical = c.headingOrientation === 'vertical' ? 'vertical' : '';
     const badge = populated(cov, c.field) === 0
-      ? ` <span class="badge" title="No element in this category carries this property. Fields &rsaquo; the column offers a remap.">0 values</span>`
+      ? ` <span class="badge" title="No element in this category carries this property. Click the heading: its menu offers a remap.">0 values</span>`
       : '';
     // The heading follows its column. It used to honour `center` only, so a right-aligned
     // column of numbers sat under a left-aligned heading.
@@ -221,12 +204,20 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
     // NOT data-i. A header's position in its own list is its VISIBLE index; what the
     // formatting panel needs is where that column sits in def.columns, which differs as
     // soon as any column is hidden. Different question, different name.
-    // tabindex: a heading is the keyboard's way to its menu (ContextMenu key / Shift+F10), and
-    // since phase 4 Enter / Space is its click (events.ts) — both named in the title.
-    return `<th${cls ? ` class="${cls}"` : ''} data-defcol="${defIndex[i]}" tabindex="0"
-      title="Click to format this column, or drag its right edge to resize. Shift+click to select the columns in between, Ctrl+click to add or remove one, then drag or double-click a grip to size them together. Right-click to colour the 3D view by it. Keys: Enter or Space for a click (with Shift or Ctrl as above); Shift+F10 or the menu key for the right-click menu.">${i === colourCol ? sourceMark : ''}${esc(res.headings[i])}${badge}</th>`;
+    // tabindex: a heading is the keyboard's way to its menus — Enter / Space is its click
+    // (events.ts), which opens the column menu, and the ContextMenu key / Shift+F10 the
+    // right-click menu — all named in the title. v1.5.0 (ifcTable's table-first port): the
+    // heading is the column menu's trigger, so it says it opens one (`aria-haspopup`), and
+    // popover.ts marks it `aria-expanded` in place while that menu is open. ifcTable puts a
+    // <button> inside the cell for this; SGVue's cell is already focusable, and one tab stop a
+    // heading is what the keyboard had.
+    return `<th${cls ? ` class="${cls}"` : ''} data-defcol="${defIndex[i]}" tabindex="0" aria-haspopup="dialog"
+      title="Click for this column's settings, or drag its right edge to resize. Shift+click to select the columns in between, Ctrl+click to add or remove one, then drag or double-click a grip to size them together. Right-click to colour the 3D view by it. Keys: Enter or Space for a click (with Shift or Ctrl as above); Left and Right to the next heading; Shift+F10 or the menu key for the right-click menu.">${i === colourCol ? sourceMark : ''}${esc(res.headings[i])}${badge}</th>`;
   }).join('')
-    + (res.countColumn ? '<th class="num" title="How many elements this row stands for">Count</th>' : '');
+    + (res.countColumn ? '<th class="num" title="How many elements this row stands for">Count</th>' : '')
+    // The field picker's third way in, where a new column would go. Not a column itself: no
+    // data-defcol, so the resizer, the menus and every width rule pass it by.
+    + '<th class="add-col"><button class="th-add" type="button" data-act="vb-open" data-v="picker" data-id="th" aria-haspopup="dialog">+ Column</button></th>';
 
   const body = res.rows.map((r, i) =>
     renderRow(r, i, res.columns, res.countColumn, state.selected, sw)).join('');
@@ -251,7 +242,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
     ? `<tr class="blank"><td colspan="${res.columns.length + (res.countColumn ? 1 : 0)}"></td></tr>` : '';
 
   return `${title}${notices(state, res)}
-    <style>${widthRules(defIndex, def.columns)}${editingRule(state, defIndex)}</style>
+    <style>${widthRules(defIndex, def.columns)}</style>
     <div class="table-wrap${a.outline === false ? ' no-outline' : ''}">
       <table class="${classes}"${style ? ` style="${style}"` : ''}>
         <thead><tr>${head}</tr></thead>

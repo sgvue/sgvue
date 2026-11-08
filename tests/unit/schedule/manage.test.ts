@@ -2,8 +2,10 @@
 // assistant's parity work): a request that arrives over the port names one of this window's own
 // controls, and what runs is that control's own handler (`schedule-ui/actions.ts`) — the same
 // function the click runs. Three things are only ever put in front of the user here (deleting
-// a saved setup, printing, opening a schedule file), and so is a save or a duplicate that would
-// take a saved setup away.
+// a saved setup, printing, opening a schedule file), and so is a save that would take a saved
+// setup away. v1.5.0, phase 3: the template gallery and My templates are the one Templates
+// library, and at the cap of a hundred a save or a duplicate is refused (`full`) — nothing is
+// pushed off the end, so neither asks about that any more.
 //
 // Runs in Node: `localStorage`, the toast's `document`, `window.print` and the preload's
 // bridge are stood in for, and this window's own dialog is a recording one a test answers.
@@ -27,7 +29,7 @@ import {
 } from '../../../src/renderer/schedule-ui/actions';
 import { ASKER, FOR_ASSISTANT, manageFromChat } from '../../../src/renderer/schedule-ui/manage';
 import {
-  CAP, forgottenByDuplicate, forgottenBySave, listSaved, SAVED_KEY, saveSchedule,
+  CAP, FULL_MESSAGE, forgottenBySave, listSaved, SAVED_KEY, saveSchedule,
 } from '../../../src/renderer/schedule-ui/schedules';
 import { state, update } from '../../../src/renderer/schedule-ui/state';
 
@@ -179,6 +181,8 @@ describe('the `manage` and `manageAck` messages', () => {
     const template = { id: 'door-schedule', name: 'Door Schedule', classes: ['IfcDoor'], columns: 7, fit: 5, elements: 17, inUse: false };
     expect(ManageAckMessage.safeParse({ ...ack, saved: [saved], unlisted: 2, templates: [template], undo: 3, redo: 0, lacks: 1,
       name: 'Doors', forgets: 'replace', gone: 'Doors' }).success).toBe(true);
+    // v1.5.0: nothing is pushed off the end any more, so `evict` is no longer an answer.
+    expect(ManageAckMessage.safeParse({ ...ack, result: 'asked', forgets: 'evict' }).success).toBe(false);
     for (const bad of [
       { ...ack, result: 'opened' },
       { ...ack, def: {} },
@@ -262,7 +266,7 @@ describe('the window’s own actions, as one function each', () => {
     expect(lastToast()).toBe('Could not save — storage is unavailable or full.');
   });
 
-  it('renameSaved and duplicateSaved are My templates’ own, and askDeleteSaved deletes only on its Delete button', async () => {
+  it('renameSaved and duplicateSaved are the library’s own, and askDeleteSaved deletes only on its Delete button', async () => {
     saveSchedule(def('A'), null);
     saveSchedule(def('B'), null);
     state.savedName = 'A';
@@ -273,8 +277,9 @@ describe('the window’s own actions, as one function each', () => {
     expect(renameSaved('A', 'Doors')).toBe('ok');
     // The marker follows the name; the schedule on screen is called what its setup is.
     expect([state.savedName, state.def.name, names()]).toEqual(['Doors', 'Doors', ['B', 'Doors']]);
+    expect(lastToast()).toBe('Renamed to “Doors”.');
     expect(duplicateSaved('B')).toBe('B (2)');
-    expect(lastToast()).toBe('Copied to “B (2)”.');
+    expect(lastToast()).toBe('Duplicated to Mine as “B (2)”.');
     expect(duplicateSaved('Nope')).toBeNull();
 
     // The user's own click: the window's label, and its confirm button takes the focus as ever.
@@ -295,6 +300,21 @@ describe('the window’s own actions, as one function each', () => {
     await vi.waitFor(() => expect(names()).not.toContain('Doors'));
     // The setup the marker pointed at is gone, and the marker with it.
     expect(state.savedName).toBeNull();
+    expect(lastToast()).toBe('Deleted “Doors”.');
+  });
+
+  it('at the cap, saveCurrent and duplicateSaved are refused and say so — nothing is dropped', () => {
+    for (let i = 1; i <= CAP; i++) saveSchedule(def(`S${i}`), null);
+    state.def = def('New');
+    expect(saveCurrent()).toEqual({ result: 'full' });
+    expect(lastToast()).toBe(FULL_MESSAGE);
+    expect(duplicateSaved('S3')).toBe('full');
+    expect(lastToast()).toBe(FULL_MESSAGE);
+    expect([names().length, names()]).toEqual([CAP, expect.arrayContaining(['S1', 'S100'])]);
+    // The one it was loaded from is still saved over: that never grows the list.
+    state.def = { ...def('S5'), columns: [col, col] };
+    state.savedName = 'S5';
+    expect(saveCurrent()).toEqual({ result: 'done', name: 'S5' });
   });
 
   it('printSchedule is the native print dialog, and nothing else', () => {
@@ -305,33 +325,26 @@ describe('the window’s own actions, as one function each', () => {
 
 /* ────────────────────────────── what a save would forget ────────────────────────────── */
 
-describe('a save, or a duplicate, that would take a saved setup away', () => {
+describe('a save that would take a saved setup away', () => {
   it('a save forgets nothing while the title is free or belongs to someone else — and replaces only its own', () => {
-    expect(forgottenBySave(def('Doors'), null)).toEqual({ name: 'Doors', replaced: null, evicted: [] });
+    expect(forgottenBySave(def('Doors'), null)).toEqual({ name: 'Doors', replaced: null });
     saveSchedule(def('Doors'), null);
     // Not loaded from it: numbered, nothing replaced.
-    expect(forgottenBySave(def('Doors'), null)).toEqual({ name: 'Doors (2)', replaced: null, evicted: [] });
+    expect(forgottenBySave(def('Doors'), null)).toEqual({ name: 'Doors (2)', replaced: null });
     // Loaded from it: the saved copy is what a save replaces.
-    expect(forgottenBySave(def('Doors'), 'Doors')).toEqual({ name: 'Doors', replaced: 'Doors', evicted: [] });
+    expect(forgottenBySave(def('Doors'), 'Doors')).toEqual({ name: 'Doors', replaced: 'Doors' });
     // It says, and the save does: exactly this plan is what `saveSchedule` writes.
     expect(saveSchedule({ ...def('Doors'), columns: [col, col] }, 'Doors')).toBe('Doors');
     expect(listSaved()).toHaveLength(1);
   });
 
-  it('at the cap a new one pushes the oldest off the end — and a duplicate does too', () => {
+  it('at the cap nothing is pushed off the end: a new one is refused, and replacing its own still forgets only that', () => {
     for (let i = 1; i <= CAP; i++) saveSchedule(def(`S${i}`), null);
     expect(names()).toHaveLength(CAP);
-    // Saves unshift: the oldest is last.
+    expect(forgottenBySave(def('New'), null)).toEqual({ name: 'New', replaced: null });
+    expect(saveSchedule(def('New'), null)).toBeNull();
     expect(names().at(-1)).toBe('S1');
-    expect(forgottenBySave(def('New'), null)).toEqual({ name: 'New', replaced: null, evicted: ['S1'] });
-    // Replacing its own at the cap pushes nothing out.
-    expect(forgottenBySave(def('S50'), 'S50')).toEqual({ name: 'S50', replaced: 'S50', evicted: [] });
-    expect(forgottenByDuplicate('S100')).toEqual(['S1']);
-    expect(forgottenByDuplicate('Nope')).toEqual([]);
-    // One below the cap, neither forgets anything.
-    cell.set(SAVED_KEY, JSON.stringify(listSaved().slice(0, CAP - 1)));
-    expect(forgottenBySave(def('New'), null).evicted).toEqual([]);
-    expect(forgottenByDuplicate('S100')).toEqual([]);
+    expect(forgottenBySave(def('S50'), 'S50')).toEqual({ name: 'S50', replaced: 'S50' });
   });
 });
 
@@ -349,7 +362,7 @@ describe('manage_schedules, in the Schedules window', () => {
     expect([undoDepth(), redoDepth()]).toEqual([1, 0]);
   });
 
-  it('lists the gallery’s templates for this model, and applies one by its id or its name', () => {
+  it('lists the library’s built-in templates for this model, and applies one by its id or its name', () => {
     const offered = presetsFor(state.store!.byEntity);
     expect(offered.length).toBeGreaterThan(0);
     const { ack } = manageFromChat(ask('templates'));
@@ -369,7 +382,7 @@ describe('manage_schedules, in the Schedules window', () => {
     expect(lastToast()).toBe(`Applied “${preset.name}”.`);
     expect(manageFromChat(ask('templates')).ack.templates!.find((t) => t.id === preset.id)!.inUse).toBe(true);
     expect(manageFromChat(ask('apply_template', { name: preset.id })).ack).toEqual({ result: 'done', name: preset.name });
-    // Only what the gallery offers for this model: a template for a class it lacks is not one.
+    // Only a built-in the library lists for this model: a template for a class it lacks is not one.
     expect(manageFromChat(ask('apply_template', { name: 'No such template' })).ack).toEqual({ result: 'missing' });
     expect(manageFromChat(ask('apply_template')).ack).toEqual({ result: 'missing' });
   });
@@ -406,7 +419,7 @@ describe('manage_schedules, in the Schedules window', () => {
     expect(manageFromChat(ask('load')).ack).toEqual({ result: 'missing' });
   });
 
-  it('saves when nothing is taken away, renames and duplicates — each the panel’s own action', () => {
+  it('saves when nothing is taken away, renames and duplicates — each the library’s own action', () => {
     expect(manageFromChat(ask('save'))).toEqual({ ack: { result: 'done', name: 'Door Schedule' } });
     expect([names(), state.savedName]).toEqual([['Door Schedule'], 'Door Schedule']);
     expect(manageFromChat(ask('rename', { name: 'door schedule', to: 'Doors' })).ack).toEqual({ result: 'done', name: 'Doors' });
@@ -462,30 +475,18 @@ describe('manage_schedules, in the Schedules window', () => {
     expect(listSaved()[0].def.columns).toHaveLength(1);
   });
 
-  it('at the cap a save or a duplicate that would push the oldest out asks, naming it', async () => {
+  it('at the cap a save or a duplicate is refused — `full` — and asks nothing', () => {
     for (let i = 1; i <= CAP; i++) saveSchedule(def(`S${i}`), null);
     state.def = def('New');
-    const save = manageFromChat(ask('save'));
-    expect(save.ack).toEqual({ result: 'asked', forgets: 'evict', name: 'New', gone: 'S1' });
-    expect(names()).not.toContain('New');
-    save.then!();
-    expect(dialog.asked[0]).toEqual({
-      message: 'Save “New” to My templates? Only 100 are kept, so the oldest — “S1” — would be forgotten, and cannot be brought back.',
-      confirm: 'Save', danger: false, title: 'Ask Vee', forAssistant: true,
-    });
-    dialog.answer(false);
-    await Promise.resolve();
-    const copy = manageFromChat(ask('duplicate', { name: 'S100' }));
-    expect(copy.ack).toEqual({ result: 'asked', forgets: 'evict', name: 'S100', gone: 'S1' });
-    copy.then!();
-    expect(dialog.asked[1]).toEqual({
-      message: 'Duplicate the saved template “S100”? Only 100 are kept, so the oldest — “S1” — would be forgotten, and cannot be brought back.',
-      confirm: 'Duplicate', danger: false, title: 'Ask Vee', forAssistant: true,
-    });
-    dialog.answer(true);
-    await vi.waitFor(() => expect(names()).toContain('S100 (2)'));
-    expect(names()).not.toContain('S1');
+    for (const m of [ask('save'), ask('save', { ask: false }), ask('duplicate', { name: 'S100' })]) {
+      const out = manageFromChat(m);
+      expect([m.op, out.ack, out.then]).toEqual([m.op, { result: 'full' }, undefined]);
+    }
+    expect(dialog.asked).toEqual([]);
     expect(names()).toHaveLength(CAP);
+    expect(names()).not.toContain('New');
+    expect(names()).not.toContain('S100 (2)');
+    expect(lastToast()).toBe(FULL_MESSAGE);
   });
 
   it('quotes a name in its question without control or direction characters', async () => {
@@ -590,9 +591,13 @@ describe('manage_schedules, in the Schedules window', () => {
     // It still lists: reading changes nothing.
     expect(manageFromChat(ask('saved_list')).ack.result).toBe('done');
     expect(manageFromChat(ask('templates')).ack.result).toBe('done');
-    // The file the user picks becomes the schedule — this window's own "Open schedule file…".
+    // The file the user picks goes into the library's Mine, selected there — the library's own
+    // Import (v1.5.0, phase 3). The schedule on screen stays as it is.
     opened[0](JSON.stringify(def('From a file')));
-    await vi.waitFor(() => expect(state.def.name).toBe('From a file'));
+    await vi.waitFor(() => expect(names()).toContain('From a file'));
+    expect(state.def.name).toBe('Edited');
+    expect([state.overlay, state.librarySel]).toEqual(['library', 'm:From a file']);
+    expect(lastToast()).toBe('Imported “From a file” into Mine.');
     expect(manageFromChat(ask('open_file')).ack).toEqual({ result: 'asked' });
   });
 

@@ -41,11 +41,18 @@
 //
 // 2026-11-07 — the `.sgvue` project file, phase 3 (plan D9):
 //   port → `projectSchedules` → while a project is open in the main window, its saved setups
-//                       are My templates (schedules.ts), and every change to them goes back as
+//                       are the Templates library's Mine (schedules.ts), and every change to them goes back as
 //                       `projectSaved`; `null` — the project closed — is this window's own
 //                       `localStorage` list again. With `open`, the project's open schedule is
 //                       shown as the current one, as `define` shows one, without its toast.
 //                       A new port is a new main page with no project until it says otherwise.
+//
+// v1.5.0, phase 2 — ifcTable's table-first redesign (2026-11-05): the right-hand inspector is
+// gone. A column's settings open from its heading (`columnMenu.ts`), what the schedule is doing
+// reads as chips at the top of the centre column (`viewBar.ts`, `#centre-head`), and fields are
+// added from a search-first picker (`fieldPicker.ts`) — all three drawn into the one popover
+// (`popover.ts`), which opens, closes and moves without repainting the table. A repaint asked
+// for while a button is held waits for its release (`pressGate.ts`).
 
 import '../styles/fonts.css';
 import '../styles/design.css';
@@ -65,30 +72,39 @@ import {
   type PortSavedEntry,
 } from '../../schedule/messages';
 import { StoreBuilder } from '../../schedule/ifc/store';
+import { setWidths } from '../../schedule/schedule/actions';
 import { openingSchedule } from '../../schedule/schedule/columns';
 import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def';
 import { runSchedule, type ScheduleResult } from '../../schedule/schedule/engine';
 import { wireColumnResize } from './colResize';
-import { buildCoverage, type Coverage } from './coverage';
+import { renderColumnMenu } from './columnMenu';
+import { buildCoverage, clearCoverageCache, type Coverage } from './coverage';
+import { cancelPreview, clearLibraryCache } from './libraryCache';
+import { afterPaintLibrary, setLibraryPainter } from './libraryPaint';
 import { dialogOpen } from './dialog';
 import { byId, flash } from './dom';
 import { EXPORT_ACTIONS, exportRefusal } from './exporting';
 import { wireApp } from './events';
 import { renderHeader, renderStatus, selNoteHtml } from './header';
-import { renderInspector } from './inspector';
 import { manageFromChat } from './manage';
 import { projectListOn, refuseProjectList, setProjectList } from './schedules';
-import { openMenu } from './menu';
+import { menuOpen, openMenu } from './menu';
 import { renderOverlay } from './overlays';
 import { flushPending, wirePending } from './pending';
+import { clearPickerMemo } from './pickerModel';
+import {
+  afterPaintPopover, closePopover, fillPopover, popoverId, setPopoverPainter, wirePopover,
+} from './popover';
+import { deferWhilePressed } from './pressGate';
 import { restoreUi, snapshotUi, type Ui } from './preserve';
 import { renderRail } from './rail';
-import { initInspectorWidth, wireInspectorResize } from './resize';
 import {
   markedRows, nextDataRow, rangeElements, rowMenu, rowOfElement, type RowMenuItem,
 } from './selection';
 import { render, renderSoon, setRenderer, state, update, updateDef, type RenderScope } from './state';
 import { renderSchedule } from './tableView';
+import { afterPaintViewBar, renderViewBar } from './viewBar';
+import { renderViewPopover } from './viewPopovers';
 
 const app = byId('app');
 const header = byId('header');
@@ -96,7 +112,7 @@ const layout = byId('layout');
 const railPane = byId('rail-pane');
 const outputPane = byId('output-pane');
 const statusBar = byId('status-bar');
-const inspectorPane = byId('inspector-pane');
+const centreHead = byId('centre-head');
 const overlayRoot = byId('overlay-root');
 const emptyPane = byId('empty-pane');
 
@@ -122,7 +138,9 @@ function drawnRows(): Map<number, HTMLElement> {
 
 // Which fields the category actually carries. Recomputed only on a full pass — every coverage
 // bar, badge and fit score reads it.
-let coverage: Coverage = { total: 0, byKey: new Map(), byProp: new Map(), byCore: new Map() };
+let coverage: Coverage = {
+  total: 0, byKey: new Map(), byProp: new Map(), byCore: new Map(), tallies: new Map(), coreTallies: new Map(),
+};
 
 // ---------- overlays own the keyboard ----------
 // ifcTable's overlays had neither; SGVue's Preferences does (`app/focus.ts`), so these match
@@ -177,6 +195,11 @@ function paint(scope: RenderScope) {
     overlayShown = null;
     shown = null;
     drawn = null;
+    // Nothing for a menu to point at, and no model for the caches to hold on to.
+    closePopover();
+    clearCoverageCache();
+    clearLibraryCache();
+    clearPickerMemo();
     queueCurrent();
     return;
   }
@@ -187,7 +210,6 @@ function paint(scope: RenderScope) {
   // Collapsed panes stay in the layout as thin strips — the way back in lives where the pane
   // was.
   railPane.classList.toggle('closed', !state.railOpen);
-  inspectorPane.classList.toggle('closed', !state.inspectorOpen);
 
   // 'panes' (a search box, a list filter) leaves the schedule as it is: no engine run, no
   // coverage sweep, no table — the table is the whole cost of a paint on a large category.
@@ -196,8 +218,8 @@ function paint(scope: RenderScope) {
   const panes = full || scope === 'panes';
   const table = full || scope === 'table';
 
-  // Run FIRST, then paint. The rules panel reports what each colour rule claims, and it can
-  // only read that off the result — so the result has to exist before the inspector is built.
+  // Run FIRST, then paint. The column menu's colour rules report what each one claims, and they
+  // can only read that off the result — so the result has to exist before the popover is built.
   let ms = 0;
   if (table) {
     const t0 = performance.now();
@@ -216,10 +238,13 @@ function paint(scope: RenderScope) {
   if (panes) {
     // eslint-disable-next-line no-unsanitized/property -- renderRail: every file- or user-derived value in it goes through esc()
     railPane.innerHTML = renderRail(state, store);
-    // eslint-disable-next-line no-unsanitized/property -- renderInspector and its panels: every file- or user-derived value in it goes through esc()
-    inspectorPane.innerHTML = renderInspector(state, store, coverage, res);
+    // eslint-disable-next-line no-unsanitized/property -- renderViewBar: every file- or user-derived value in it goes through esc()
+    centreHead.innerHTML = renderViewBar(state, store);
     // eslint-disable-next-line no-unsanitized/property -- renderOverlay and its overlays: every file- or user-derived value in it goes through esc()
     overlayRoot.innerHTML = renderOverlay(state, store, coverage);
+    // Not on a 'table' pass: that one comes from a colour box being dragged, and rebuilding
+    // the menu would close the native picker under the pointer (ifcTable's rule).
+    fillPopover(renderColumnMenu(state, store, coverage, res) || renderViewPopover(state, store, coverage));
   }
   // The header on every scope: its undo / redo buttons follow every edit, and the name box
   // it holds is kept focused by preserve.ts like any other.
@@ -230,16 +255,56 @@ function paint(scope: RenderScope) {
     outputPane.innerHTML = renderSchedule(state, res, coverage);
     drawn = null;
     // eslint-disable-next-line no-unsanitized/property -- renderStatus: numbers, and the selection note through esc()
-    statusBar.innerHTML = renderStatus(state, res, coverage, ms);
+    statusBar.innerHTML = renderStatus(state, res, coverage);
   }
 
   restoreUi(ui);
+  // After restoreUi, never before: the rebuilt table's scroll is back, so the heading is where
+  // the user sees it — and a first focus here is not undone by the restore.
+  afterPaintPopover();
+  afterPaintViewBar(state);
   settleOverlayFocus(ui);
+  // After the overlay's own first focus: the library may ask for its name row instead.
+  afterPaintLibrary();
+  // A closed library wants no preview: drop one still waiting to run.
+  if (state.overlay !== 'library') cancelPreview();
   if (ms > 120) console.warn(`[schedules] schedule took ${ms.toFixed(0)}ms`);
   queueCurrent();
 }
 
-setRenderer(paint);
+// A repaint asked for mid-press waits for the release (pressGate.ts).
+setRenderer(deferWhilePressed(paint));
+
+/** The popover alone: open, close, or move inside it, with the table left as it is. */
+function paintPopoverOnly() {
+  const { store } = state;
+  if (!store || !shown) return;
+  const ui = snapshotUi();
+  // `shown` is the result the last table paint drew; a popover-only paint never changes the
+  // definition, so it is still the right one for the colour rules' counts.
+  fillPopover(renderColumnMenu(state, store, coverage, shown) || renderViewPopover(state, store, coverage));
+  restoreUi(ui);
+  afterPaintPopover();
+  afterPaintViewBar(state);
+}
+setPopoverPainter(paintPopoverOnly);
+
+/**
+ * The Templates library alone: a move of its selection, its search, sort or folds — and a
+ * background count arriving (libraryCache.ts). The table and every other pane are left as they
+ * are: a full paint re-runs the schedule (v1.5.0, phase 3; ifcTable's `paintLibraryOnly`).
+ */
+function paintLibraryOnly() {
+  const { store } = state;
+  if (!store || !shown || state.overlay !== 'library') return;
+  const ui = snapshotUi();
+  // eslint-disable-next-line no-unsanitized/property -- renderOverlay and the library: every file- or user-derived value in it goes through esc()
+  overlayRoot.innerHTML = renderOverlay(state, store, coverage);
+  restoreUi(ui);
+  afterPaintLibrary();
+}
+const gatedLibraryPaint = deferWhilePressed(() => paintLibraryOnly());
+setLibraryPainter(() => gatedLibraryPaint('all'));
 
 // ---------- the schedule on screen, for the assistant (2026-09-28) ----------
 
@@ -295,6 +360,8 @@ function define(raw: unknown, kind: 'made' | 'edited'): void {
   }
   // A half-typed edit belongs to the schedule on screen: land it before that is replaced.
   flushPending();
+  // A column menu or a chip names a position in the schedule being replaced.
+  if (popoverId()) closePopover();
   defaultJson = null;
   // Whatever was queued for the old schedule is dropped; the paint below queues this one, and
   // it is always echoed back.
@@ -308,7 +375,8 @@ function define(raw: unknown, kind: 'made' | 'edited'): void {
     selectedColumn: null, selectedCols: [], removedBy: null, litBy: null,
     // A new schedule is nobody's template or saved setup; a changed one still is, edited.
     ...(kind === 'made' ? { templateId: null, savedName: null } : {}),
-  });
+  // Always an undo step of its own: never folded into the user's typing, before or after it.
+  }, 'all', true);
   // The assistant by its own name, as the main window's panel and pill call it (2026-10-01).
   flash(kind === 'made' ? 'Schedule from Ask Vee' : 'Schedule changed by Ask Vee');
 }
@@ -325,7 +393,7 @@ function projectSchedules(saved: PortSavedEntry[] | null, open: unknown): void {
     const sent = SavedListShape.safeParse(entries);
     if (sent.success) port?.postMessage({ type: 'projectSaved', saved: entries });
   });
-  // A repaint either way, so My templates shows the list it now has.
+  // A repaint either way, so the library's Mine shows the list it now has.
   if (!(open && showProjectSchedule(open)) && (was || saved)) render();
 }
 
@@ -343,6 +411,7 @@ function showProjectSchedule(raw: unknown): boolean {
     return false;
   }
   flushPending();
+  if (popoverId()) closePopover();
   defaultJson = null;
   clearTimeout(currentTimer);
   currentTimer = undefined;
@@ -393,6 +462,8 @@ function load(snapshot: ScheduleSnapshot): void {
   // markers; otherwise the history refers to categories that are gone, and starts again.
   const { def, fits } = openingSchedule(store, state.store ? state.def : null);
   if (!fits) resetHistory(def);
+  // A menu names a column of the schedule that is going.
+  if (!fits && popoverId()) closePopover();
   // A schedule chosen by itself, not by anyone: `current` says so while it stays exactly this.
   if (!fits) defaultJson = JSON.stringify(def);
   update({
@@ -403,7 +474,7 @@ function load(snapshot: ScheduleSnapshot): void {
     sel3d: 0,
     ...(fits ? {} : {
       selectedColumn: null, selectedCols: [], removedBy: null, litBy: null,
-      templateId: null, savedName: null, dirty: false, open: 'fields' as const, overlay: null,
+      templateId: null, savedName: null, dirty: false, overlay: null, libraryDraft: null,
     }),
   });
 }
@@ -597,7 +668,7 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (event.source !== window || event.data !== CH_SCHEDULE_PORT) return;
   port?.close();
   port = event.ports[0] ?? null;
-  // A new main page has opened no project yet: My templates is this window's own list until
+  // A new main page has opened no project yet: Mine is this window's own list until
   // that page says otherwise (`projectSchedules`).
   if (projectListOn()) projectSchedules(null, null);
   if (port) port.onmessage = (m: MessageEvent) => receive(m.data);
@@ -608,9 +679,6 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 // ---------- boot ----------
 
-// Motion state, wired straight onto the panes and never through render().
-initInspectorWidth(inspectorPane);
-wireInspectorResize(app, inspectorPane);
 // The column drag writes --colw variables on the table and never repaints. Only the release
 // lands in the definition. A grip drags its own column unless the user has marked several at
 // their headings (ifcTable's rule, word for word in its main.ts).
@@ -619,10 +687,12 @@ wireColumnResize(outputPane, {
     const picked = state.selectedCols.filter((n) => state.def.columns[n]);
     return picked.includes(i) ? picked : [i];
   },
-  commit: (widths) => updateDef((def) => {
-    for (const [i, w] of widths) if (def.columns[i]) def.columns[i].width = w;
-  }),
+  commit: (widths) => updateDef((def) => setWidths(def, widths)),
 });
+
+// Outside click, Escape, scroll and resize for the one popover. The window's own dialog and
+// right-click menu sit above it and keep Escape while they are open.
+wirePopover(outputPane, () => dialogOpen() || menuOpen());
 
 // A typed edit lands before any click or key action: the window's capture phase runs first.
 wirePending(app, window);
@@ -673,6 +743,8 @@ wireApp(app, {
     const box = at ? null : drawnRows().get(picks[0])?.getBoundingClientRect();
     const pos = at ?? (box ? { x: box.left + 24, y: box.bottom } : { x: 40, y: 40 });
     const items = rowMenu([...rows].map((r) => rowIds[r]), selIds, state.vis);
+    // One menu at a time: the right-click menu is drawn under a popover's z-index.
+    closePopover();
     openMenu(pos.x, pos.y, items.map((item) => ({
       label: item.label, disabled: item.disabled, sep: item.sep, run: () => runRowItem(item, rows),
     })), 'Rows');
@@ -685,6 +757,7 @@ wireApp(app, {
     // A column with no value anywhere has nothing to colour — certain only when every row is
     // on screen.
     const empty = !res.truncated && !res.rows.some((r) => r.kind === 'data' && r.cells[vi] !== '');
+    closePopover();
     openMenu(at.x, at.y, [
       { label: 'Colour 3D by this column', disabled: vi < 0 || empty, run: () => colourByColumn(defcol) },
       {

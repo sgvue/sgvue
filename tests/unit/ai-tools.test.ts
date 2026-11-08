@@ -1313,11 +1313,13 @@ describe('parity with the user — phase 4: the Schedules window, and placing ma
     for (const said of [
       'op:"open" opens the window or brings it to the front; every other op needs it open',
       'step the schedule it shows through that window’s own history, which is where make_schedule’s changes land',
-      'My templates, kept on this computer',
+      'Mine in the Templates library, kept on this computer',
       'apply_template and load replace the open schedule, which the user can undo there',
       'Three things are only asked for, in the Schedules window, where the user’s own click decides and you are not told what they chose',
       '"delete" raises that window’s confirmation for one saved setup, "print" asks there whether to open the print dialog — which opens only if the user says so there — and "open_file" raises its Open dialog for a .schedule.json',
-      'So is a save or a duplicate that would take a saved setup away',
+      'So is a save that would take a saved setup away',
+      'At a hundred saved setups a save or a duplicate is refused, and nothing is dropped to make room',
+      'which adds the file picked to the saved setups without changing the open schedule',
       'Saved setups are the user’s own: list them before acting on one'
     ]) {
       expect([said, d.includes(said)]).toEqual([said, true])

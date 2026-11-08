@@ -20,7 +20,11 @@ function walk(dir: string): string[] {
 
 const files = walk(UI);
 const read = (f: string) => readFileSync(f, 'utf8');
-const events = read(resolve(UI, 'events.ts'));
+/** The wiring files: their selectors are what is HANDLED, never what is emitted. v1.5.0,
+ *  phase 3: the Templates library's wiring is its own file, as in ifcTable. */
+const WIRING = ['events.ts', 'libraryEvents.ts'];
+const isWiring = (f: string) => WIRING.some((w) => f.endsWith(`/${w}`) || f.endsWith(`\\${w}`));
+const events = WIRING.map((w) => read(resolve(UI, w))).join('\n');
 
 /** Act names written into markup, from every ui module except the wiring itself. */
 const emitted = new Set<string>();
@@ -28,7 +32,7 @@ const emitted = new Set<string>();
 const interpolated: string[] = [];
 
 for (const f of files) {
-  if (f.endsWith('events.ts')) continue;
+  if (isWiring(f)) continue;
   const src = read(f);
   for (const m of src.matchAll(/data-act="([a-z][a-z0-9-]*)"/g)) emitted.add(m[1]);
   // Three places build the name instead of writing it. Each is resolved by reading the
@@ -45,6 +49,9 @@ for (const f of files) {
   for (const m of src.matchAll(/\bfieldSelect\([^)]*?'([a-z][a-z0-9-]*)'/g)) interpolated.push(m[1]);
   // SGVue's header (2026-09-25): tool('undo', …) — the fourth helper, added as the note says.
   for (const m of src.matchAll(/(?<![.\w])tool\('([a-z][a-z0-9-]*)'/g)) interpolated.push(m[1]);
+  // columnMenu.ts (v1.5.0, ifcTable's 2026-11-05 helper): seg('cm-unit', …) — one act shared by
+  // a row of segmented buttons.
+  for (const m of src.matchAll(/(?<![.\w])seg\('([a-z][a-z0-9-]*)'/g)) interpolated.push(m[1]);
 }
 for (const a of interpolated) emitted.add(a);
 
@@ -57,12 +64,13 @@ for (const m of events.matchAll(/(?<![.\w])toggle\('([a-z][a-z0-9-]*)'/g)) handl
  * Acts that legitimately appear on only one side. Keep this empty if you can — an entry
  * here is a promise that the control works for some other reason.
  *
- * The two drag handles are that case: dnd.ts finds them by their `.handle` class, not by
- * act. They carry a data-act anyway because that is how preserve.ts names a control when
- * restoring focus to it after a repaint. The inspector's resize grip is the same shape:
- * ui/resize.ts owns its pointer events, delegated from the root like everything else.
+ * The field picker's drag handle is that case: dnd.ts finds it by its `.handle` class, not by
+ * act. It carries a data-act anyway because that is how preserve.ts names a control when
+ * restoring focus to it after a repaint. (v1.5.0: the sort levels' handle and the inspector's
+ * resize grip went with the inspector; ifcTable's heading button, `col-menu`, has no
+ * counterpart — SGVue's heading cell is its own trigger.)
  */
-const ALLOW_UNHANDLED = ['col-handle', 'lvl-handle', 'panel-resize'];
+const ALLOW_UNHANDLED = ['col-handle'];
 const ALLOW_UNEMITTED: string[] = [];
 
 /**
@@ -115,7 +123,7 @@ describe('a backdrop closes only for a click that also began on it', () => {
   const close = events.match(/onClick\(root, '\[data-act="overlay-backdrop"\]'[\s\S]*?\n  \}\);/)?.[0] ?? '';
 
   it('found both halves, so the test is not vacuously passing', () => {
-    expect(close).toMatch(/update\(\{ overlay: null \}\)/);
+    expect(close).toMatch(/update\(\{ overlay: null[ ,]/);
     expect(press, 'wireOverlays must record the press origin on pointerdown')
       .toMatch(/overlay-backdrop/);
   });

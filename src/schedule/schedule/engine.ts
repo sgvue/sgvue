@@ -42,6 +42,13 @@ export interface GrandRow {
 }
 interface BlankRow { kind: 'blank'; level: number }
 
+/**
+ * Whether a footer or grand-total row's label takes its first cell: when that column's total
+ * shows nothing — none at all, or one that renders blank (a zero under `suppressZero`). The
+ * one rule for the table on screen and every export.
+ */
+export const labelTakesFirstCell = (cells: readonly (string | null)[]): boolean => !cells[0];
+
 export type RenderRow = DataRow | GroupRow | FooterRow | GrandRow | BlankRow;
 
 export interface ScheduleResult {

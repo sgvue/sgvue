@@ -26,7 +26,7 @@
  * heading menu's own colour-by.
  *
  * 2026-10-02, parity with the user, phase 4 — `manage_schedules`: the Schedules window's own
- * controls (its undo and redo, the template gallery, My templates, Print, Open schedule file),
+ * controls (its undo and redo, the Templates library, Print, Import),
  * each run **in that window by the control's own handler** (`schedule-ui/manage.ts`). What this
  * file sends is an operation and at most two names; what it gets back, at once, is what became
  * of it. Deleting a saved setup, printing and opening a file are only ever *asked for* there —
@@ -202,7 +202,7 @@ const NOT_EXPORTED: Record<Exclude<ExportAnswer, 'opened'>, string> = {
   busy: 'The Schedules window is busy — an export is already under way (its Save dialog may be open), or one of that window’s own dialogs is still waiting for an answer. Nothing more was asked for; the user finishes or cancels that first.',
   no_schedule: `${NO_SCHEDULE} Nothing was exported.`,
   nothing_saved:
-    'There are no saved schedules to export: the Export menu’s "All saved schedules" entry stays off until the user saves a schedule in My templates. Nothing was exported.',
+    'There are no saved schedules to export: the Export menu’s "All saved schedules" entry stays off until the user saves a schedule in the Templates library. Nothing was exported.',
   closed: 'The Schedules window closed, so nothing was exported.',
   timeout: `The Schedules window did not answer within ${EXPORT_ACK_MS / 1000} s. If a Save dialog appears there, the user chooses where the file goes; nothing is saved unless they click Save.`
 }
@@ -339,6 +339,15 @@ function askedThere(what: string, clicks: string, more: Record<string, unknown> 
   }
 }
 
+/**
+ * What `manage_schedules` says when the Schedules window's answer did not come back within
+ * `MANAGE_ACK_MS`: whether it was done is not known, and the state says — never that it was
+ * not done, because a request the window acted on can be answered too late to be heard.
+ */
+export const MANAGE_TIMEOUT_MESSAGE =
+  `The Schedules window did not answer within ${MANAGE_ACK_MS / 1000} s, so whether this was done is not known — it may have been. ` +
+  'Read get_schedule (its undo and redo steps), or op:"saved_list", before saying either way and before asking again: asking again could do it twice.'
+
 const nothing = (message: string, more: Record<string, unknown> = {}): ToolOutcome => ({
   forModel: { message, done: false, ...more }
 })
@@ -356,9 +365,9 @@ function refusedThere(answer: ManageAnswer, op: ManageOp, asked: string, to: str
     case 'closed':
       return nothing('The Schedules window closed, so nothing was done.')
     case 'timeout':
-      return nothing(
-        `The Schedules window did not answer within ${MANAGE_ACK_MS / 1000} s. It drops a request it gets to that late, so most likely nothing was done — read get_schedule, or saved_list, before saying either way.`
-      )
+      // Not "nothing was done": the window may have acted and its answer come back late (a
+      // busy renderer here). `done: null` — not known — and a retry could do it twice.
+      return { forModel: { message: MANAGE_TIMEOUT_MESSAGE, done: null } }
     case 'busy':
       return nothing(
         'The Schedules window has a dialog of its own up, or is still answering another request. Nothing was done — the user finishes that first.'
@@ -373,6 +382,12 @@ function refusedThere(answer: ManageAnswer, op: ManageOp, asked: string, to: str
       )
     case 'taken':
       return nothing(`A saved setup is already called "${to}", so "${asked}" was not renamed.`)
+    case 'full':
+      // v1.5.0, phase 3 — ifcTable's rule: at a hundred a save or a copy is refused, and
+      // nothing is dropped to make room.
+      return nothing(
+        'A hundred setups are saved, which is all the Schedules window keeps, so nothing was saved. The user deletes one in its Templates library to make room.'
+      )
     case 'failed':
       return nothing('This computer’s storage for saved setups is unavailable or full, so nothing was saved.')
     case 'done':
@@ -478,16 +493,14 @@ export const manage_schedules: Executor = async (input, ctx) => {
     if (act === 'open_file') {
       return askedThere(
         'is opening its Open dialog for a schedule file (.schedule.json)',
-        'The file the user picks there becomes the open schedule, and nothing changes if they cancel',
+        'The file the user picks there is added to their saved setups (the Templates library’s Mine) — it does not replace the open schedule — and nothing changes if they cancel',
         { dialog: true }
       )
     }
-    // A save or a duplicate that would forget a saved setup.
-    const how =
-      answer.forgets === 'replace'
-        ? `is asking whether to save over the saved setup ${quoted(answer.gone)}, whose present contents cannot be brought back`
-        : `is asking whether to ${act === 'duplicate' ? 'duplicate' : 'save'} ${quoted(answer.name)}, because only a hundred are kept and the oldest, ${quoted(answer.gone)}, would be forgotten`
-    return askedThere(how, `Nothing is saved unless the user clicks ${act === 'duplicate' ? 'Duplicate' : 'Save'} there`, {
+    // A save over the saved setup the schedule was loaded from. (Since v1.5.0 nothing else forgets
+    // one: at the cap a save or a copy is refused — `full`.)
+    const how = `is asking whether to save over the saved setup ${quoted(answer.gone)}, whose present contents cannot be brought back`
+    return askedThere(how, 'Nothing is saved unless the user clicks Save there', {
       name: named,
       wouldForget: shown(answer.gone)
     })
@@ -517,8 +530,8 @@ export const manage_schedules: Executor = async (input, ctx) => {
         forModel: {
           message:
             (saved.length
-              ? `${saved.length} saved setup${saved.length === 1 ? '' : 's'} in My templates, newest first.`
-              : 'There are no saved setups in My templates.') +
+              ? `${saved.length} saved setup${saved.length === 1 ? '' : 's'} in the Templates library (Mine), newest first.`
+              : 'There are no saved setups in the Templates library (Mine).') +
             (unlisted
               ? ` ${unlisted} more cannot be listed here: their names are too long, or hold characters that cannot be shown — the user reaches them in the Schedules window.`
               : ''),
@@ -580,7 +593,7 @@ export const manage_schedules: Executor = async (input, ctx) => {
     case 'save':
       return {
         forModel: {
-          message: `Saved the open schedule to My templates as ${quoted(answer.name)}. A setup of another name is never replaced: when the title was taken, the copy was numbered.`,
+          message: `Saved the open schedule to the Templates library (Mine) as ${quoted(answer.name)}. A setup of another name is never replaced: when the title was taken, the copy was numbered.`,
           done: true,
           name: named,
           ...nowShows()

@@ -1,0 +1,872 @@
+{
+ "def": {
+  "version": 1,
+  "name": "Bare",
+  "entity": [
+   "IfcSpace",
+   "IfcGeographicElement",
+   "IfcRoof"
+  ],
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "guid"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "objectType"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "space"
+    },
+    "hidden": true
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "NetFloorArea"
+    },
+    "format": {
+     "display": "ft²",
+     "decimals": 1
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Height"
+    },
+    "format": {
+     "display": "in",
+     "decimals": 0,
+     "thousands": true
+    }
+   }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [],
+  "itemize": true,
+  "grandTotal": false,
+  "appearance": {
+   "showTitle": true,
+   "gridLines": true,
+   "zebra": true,
+   "fontSize": 13,
+   "headerBold": true
+  }
+ },
+ "result": {
+  "columns": [
+   {
+    "field": {
+     "kind": "core",
+     "key": "guid"
+    }
+   },
+   {
+    "field": {
+     "kind": "core",
+     "key": "objectType"
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "NetFloorArea"
+    },
+    "format": {
+     "display": "ft²",
+     "decimals": 1
+    }
+   },
+   {
+    "field": {
+     "kind": "prop",
+     "pset": "*",
+     "prop": "Height"
+    },
+    "format": {
+     "display": "in",
+     "decimals": 0,
+     "thousands": true
+    }
+   }
+  ],
+  "headings": [
+   "GUID",
+   "Object Type",
+   "NetFloorArea",
+   "Height"
+  ],
+  "rows": [
+   {
+    "kind": "data",
+    "rows": [
+     28
+    ],
+    "cells": [
+     "GUID0028",
+     "",
+     "129.2",
+     "106"
+    ],
+    "nums": [
+     null,
+     null,
+     129.2,
+     106
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     29
+    ],
+    "cells": [
+     "GUID0029",
+     "",
+     "142.4",
+     "112"
+    ],
+    "nums": [
+     null,
+     null,
+     142.4,
+     112
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     30
+    ],
+    "cells": [
+     "GUID0030",
+     "",
+     "",
+     "117"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     117
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     31
+    ],
+    "cells": [
+     "GUID0031",
+     "",
+     "169.0",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     169,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     32
+    ],
+    "cells": [
+     "GUID0032",
+     "",
+     "182.3",
+     "128"
+    ],
+    "nums": [
+     null,
+     null,
+     182.3,
+     128
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     42
+    ],
+    "cells": [
+     "GUID0042",
+     "Roof:Flat",
+     "",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     43
+    ],
+    "cells": [
+     "GUID0043",
+     "Roof:Flat",
+     "",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     56
+    ],
+    "cells": [
+     "GUID0056",
+     "LANDSCAPE_TREE",
+     "",
+     "315"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     315
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     57
+    ],
+    "cells": [
+     "GUID0057",
+     "LANDSCAPE_TREE",
+     "",
+     "320"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     320
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     58
+    ],
+    "cells": [
+     "GUID0058",
+     "GREEN_VERGE",
+     "",
+     "326"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     326
+    ],
+    "count": 1
+   },
+   {
+    "kind": "data",
+    "rows": [
+     59
+    ],
+    "cells": [
+     "GUID0059",
+     "LANDSCAPE_TREE",
+     "",
+     ""
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "count": 1
+   }
+  ],
+  "totalDataRows": 11,
+  "matchedElements": 11,
+  "truncated": false,
+  "countColumn": false,
+  "numeric": {
+   "2": {
+    "decimals": 1,
+    "unit": ""
+   },
+   "3": {
+    "decimals": 0,
+    "unit": ""
+   }
+  }
+ },
+ "csv": [
+  "GUID,Object Type,NetFloorArea,Height",
+  "GUID0028,,129.2,106",
+  "GUID0029,,142.4,112",
+  "GUID0030,,,117",
+  "GUID0031,,169.0,",
+  "GUID0032,,182.3,128",
+  "GUID0042,Roof:Flat,,",
+  "GUID0043,Roof:Flat,,",
+  "GUID0056,LANDSCAPE_TREE,,315",
+  "GUID0057,LANDSCAPE_TREE,,320",
+  "GUID0058,GREEN_VERGE,,326",
+  "GUID0059,LANDSCAPE_TREE,,"
+ ],
+ "xlsx": [
+  {
+   "pageSetup": {
+    "fitToPage": true,
+    "margins": {
+     "left": 0.7,
+     "right": 0.7,
+     "top": 0.75,
+     "bottom": 0.75,
+     "header": 0.3,
+     "footer": 0.3
+    },
+    "orientation": "landscape",
+    "horizontalDpi": 4294967295,
+    "verticalDpi": 4294967295,
+    "pageOrder": "downThenOver",
+    "blackAndWhite": false,
+    "draft": false,
+    "cellComments": "None",
+    "errors": "displayed",
+    "scale": 100,
+    "fitToWidth": 1,
+    "fitToHeight": 0,
+    "firstPageNumber": 1,
+    "useFirstPageNumber": false,
+    "usePrinterDefaults": false,
+    "copies": 1
+   },
+   "name": "Bare",
+   "autoFilter": "A1:D1",
+   "views": [
+    {
+     "workbookViewId": 0,
+     "rightToLeft": false,
+     "state": "frozen",
+     "xSplit": 0,
+     "ySplit": 1,
+     "topLeftCell": "A2",
+     "showRuler": true,
+     "showRowColHeaders": true,
+     "showGridLines": true,
+     "zoomScale": 100,
+     "zoomScaleNormal": 100
+    }
+   ],
+   "cols": [
+    {
+     "i": 0,
+     "width": 10
+    },
+    {
+     "i": 1,
+     "width": 16
+    },
+    {
+     "i": 2,
+     "width": 14
+    },
+    {
+     "i": 3,
+     "width": 10
+    }
+   ],
+   "rows": [
+    {
+     "r": 1,
+     "cells": [
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 1,
+       "v": "GUID",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 2,
+       "v": "Object Type",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 3,
+       "v": "NetFloorArea",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "bottom": {
+         "style": "medium"
+        }
+       },
+       "c": 4,
+       "v": "Height",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 2,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0028"
+      },
+      {
+       "c": 2,
+       "v": ""
+      },
+      {
+       "c": 3,
+       "v": 129.2,
+       "f": "#,##0.0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": 106,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 3,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0029"
+      },
+      {
+       "c": 2,
+       "v": ""
+      },
+      {
+       "c": 3,
+       "v": 142.4,
+       "f": "#,##0.0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": 112,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0030"
+      },
+      {
+       "c": 2,
+       "v": ""
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": 117,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0031"
+      },
+      {
+       "c": 2,
+       "v": ""
+      },
+      {
+       "c": 3,
+       "v": 169,
+       "f": "#,##0.0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 6,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0032"
+      },
+      {
+       "c": 2,
+       "v": ""
+      },
+      {
+       "c": 3,
+       "v": 182.3,
+       "f": "#,##0.0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "c": 4,
+       "v": 128,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 7,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0042"
+      },
+      {
+       "c": 2,
+       "v": "Roof:Flat"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0043"
+      },
+      {
+       "c": 2,
+       "v": "Roof:Flat"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "r": 9,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0056"
+      },
+      {
+       "c": 2,
+       "v": "LANDSCAPE_TREE"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": 315,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 10,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0057"
+      },
+      {
+       "c": 2,
+       "v": "LANDSCAPE_TREE"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": 320,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 11,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0058"
+      },
+      {
+       "c": 2,
+       "v": "GREEN_VERGE"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": 326,
+       "f": "#,##0",
+       "font": {
+        "color": {
+         "theme": 1
+        },
+        "family": 2,
+        "scheme": "minor",
+        "size": 11,
+        "name": "Calibri"
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 12,
+     "cells": [
+      {
+       "c": 1,
+       "v": "GUID0059"
+      },
+      {
+       "c": 2,
+       "v": "LANDSCAPE_TREE"
+      },
+      {
+       "c": 3,
+       "v": ""
+      },
+      {
+       "c": 4,
+       "v": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

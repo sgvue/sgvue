@@ -1,7 +1,7 @@
 // The hand-authored templates: the general list, and the IFC-SG section beside it. No DOM.
 //
 // What is worth pinning is the boring stuff a template gets wrong silently: an IFC class
-// misspelt (the gallery would just never offer it), a template applied and then edited
+// misspelt (the Templates library would just never offer it), a template applied and then edited
 // writing back into the module constant, and a schedule that cannot survive being saved and
 // reopened — which is what applying a template and hitting Save actually does.
 
@@ -11,7 +11,7 @@ import { StoreBuilder, type ModelStore } from '../../../src/schedule/ifc/store';
 import type { Cell, ElemCore, ModelMeta } from '../../../src/schedule/ifc/types';
 import { headingOf, parseScheduleDef } from '../../../src/schedule/schedule/def';
 import { runSchedule, type DataRow } from '../../../src/schedule/schedule/engine';
-import { PRESETS, presetById, presetCount, presetsFor, scheduleFromPreset } from '../../../src/schedule/schedule/presets';
+import { PRESETS, presetById, presetCount, presetsFor, scheduleFromPreset, suggestedFor } from '../../../src/schedule/schedule/presets';
 
 const general = PRESETS.filter((p) => !p.section);
 const ifcsg = PRESETS.filter((p) => p.section === 'ifcsg');
@@ -155,7 +155,7 @@ describe('the Planting template against a model', () => {
   // The fake-store pattern from engine.test.ts: three IfcGeographicElement, of which two
   // are trees. IFC-SG classifies by ObjectType on a generic class, so the class count and
   // the schedule's row count are two different numbers — which is the whole reason the
-  // gallery runs a filtered template through the engine for its "N in model".
+  // Templates library runs a filtered template through the engine for its "N in model".
   const meta: ModelMeta = {
     fileName: 'sg.ifc', schema: 'IFC4', projectName: '', authoringTool: '',
     lengthUnit: 'mm', unitSystem: 'metric', elementCount: 0, parseMs: 0,
@@ -193,10 +193,37 @@ describe('the Planting template against a model', () => {
     expect(rows[0].cells[2]).toBe('0.30');
   });
 
-  it('counts what the gallery card claims', () => {
-    // The gallery's own inModel() is not exported and lives in a DOM module, so the count
+  it('counts what the Templates library claims', () => {
+    // The library's own count (libraryCache.ts) lives in a DOM module, so the count
     // is pinned here at its source: matchedElements under the template's own filters.
     const res = runSchedule(store, scheduleFromPreset(presetById('sg-planting')!), { cap: 0 });
     expect(res.matchedElements).toBe(2);
+  });
+});
+
+describe('suggestedFor — what a category\'s templates ask for', () => {
+  // ifcTable 2026-11-05 (faa2b27), ported for SGVue v1.5.0; the field picker that shows it is
+  // phase 2's. The case is ifcTable's own.
+  const names = (entities: string[]) =>
+    suggestedFor(entities).map((f) => (f.kind === 'core' ? f.key : f.kind === 'prop' ? f.prop : ''));
+
+  it('is the fields the templates name, in template order, each once, matched by name', () => {
+    expect(names(['IfcDoor'])).toEqual(['mark', 'typeName', 'storey', 'Width', 'Height', 'FireRating']);
+  });
+
+  it('is empty for a category no template covers', () => {
+    expect(suggestedFor(['IfcBuildingElementProxy'])).toEqual([]);
+  });
+
+  it('every suggested field is one a template asks for', () => {
+    const all = new Set(PRESETS.flatMap((p) => p.columns.map((c) => JSON.stringify(c.field))));
+    for (const p of PRESETS) for (const f of suggestedFor(p.entities)) expect(all.has(JSON.stringify(f))).toBe(true);
+  });
+
+  it('hands back copies, so editing a suggestion cannot rewrite a template (SGVue)', () => {
+    const f = suggestedFor(['IfcDoor'])[0];
+    const before = JSON.stringify(PRESETS);
+    (f as { key?: string }).key = 'name';
+    expect(JSON.stringify(PRESETS)).toBe(before);
   });
 });

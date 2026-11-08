@@ -92,6 +92,29 @@ export function fromDisplay(value: number, kind: UnitKind | undefined, display?:
   return factor ? value * factor : value;
 }
 
+/**
+ * What a filter box holds, read back to SI: a number, or nothing. The boxes get what people
+ * actually type — "1,200" (a thousands separator, as the table itself shows numbers) and
+ * "900 mm" (the unit the box is labelled in); both are stripped. Anything else that is not a
+ * plain number is no number at all — never Number('') = 0, and never a string a later regex
+ * would read in the wrong unit.
+ *
+ * ifcTable's `storeNum` of 2026-11-05 ("number filters store a number or nothing"), ported for
+ * SGVue v1.5.0 and moved here from `schedule-ui/panels/shared.ts`, which re-exports it, so the
+ * filter controls of phase 2 and the engine's tests read one copy. With the number inputs the
+ * Filter tab has today it reads exactly what the old one read: a valid number, or ''.
+ */
+export function storeNum(raw: string, kind: UnitKind, system?: UnitSystem): number | undefined {
+  const unit = defaultUnit(kind, system);
+  let s = raw.trim();
+  if (unit && s.toLowerCase().endsWith(unit.toLowerCase())) s = s.slice(0, -unit.length).trim();
+  s = s.replace(/,/g, '');
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s)) return undefined;
+  // SGVue: an exponent past a double ("1e400") is no number either, as it was before.
+  const n = Number(s);
+  return Number.isFinite(n) ? fromDisplay(n, kind, unit || undefined) : undefined;
+}
+
 const BOOL_TEXT: Record<NonNullable<UnitFormat['boolStyle']>, [string, string]> = {
   'TRUE/FALSE': ['TRUE', 'FALSE'],
   'Yes/No': ['Yes', 'No'],

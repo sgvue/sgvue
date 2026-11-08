@@ -114,8 +114,26 @@ const ANCHORS_M = [12345.457, 23456.766, 28500, 30200]
 /** …and the same in international and US survey feet. */
 const ANCHORS = [...ANCHORS_M, ...ANCHORS_M.map((m) => m / 0.3048), ...ANCHORS_M.map((m) => (m * 3937) / 1200)]
 const ANCHOR_RADIUS = 500
-/** Numbers in the coordinate band that are not coordinates: `value: reason`. None today. */
-const ALLOWED_NUMBERS = {}
+/** Numbers in the coordinate band that are not coordinates: `value: reason`. */
+const DOOR_COST = "a door's synthetic cost in the schedule golden master (1250 + i × 333.33, tests/unit/schedule/support/fixture.ts)"
+const MOCK_MM = 'a length in millimetres of the design\'s mock federation, in the schedule golden master (tests/unit/schedule/golden/federation-*.json)'
+const ALLOWED_NUMBERS = {
+  '2249.99': DOOR_COST,
+  '2583.32': DOOR_COST,
+  '2666.65': "a total / average over the doors' synthetic costs, in the kitchen-sink golden master's grand-total row (tests/unit/schedule/golden/hand-kitchen-sink.json)",
+  '2916.65': DOOR_COST,
+  '3249.98': DOOR_COST,
+  '3583.31': DOOR_COST,
+  '3916.64': DOOR_COST,
+  '2100.00': MOCK_MM,
+  '2400.00': MOCK_MM,
+  '3500.00': MOCK_MM,
+  '5250.00': MOCK_MM,
+  '5600.00': MOCK_MM,
+  '8550.00': MOCK_MM,
+  '18200.00': MOCK_MM,
+  '24600.00': MOCK_MM
+}
 /** The public centre of Singapore (1.3521° N, 103.8198° E), used by tests as a site. */
 const LONGITUDE_ANCHORS = [103.8198]
 

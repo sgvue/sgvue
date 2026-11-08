@@ -4,7 +4,7 @@
 // is a display concession, and silently exporting 5,000 of 12,000 rows would be a lie.
 
 import type { ScheduleDef } from '../schedule/def';
-import { runSchedule, type CellNumbers, type ScheduleResult } from '../schedule/engine';
+import { labelTakesFirstCell, runSchedule, type CellNumbers, type ScheduleResult } from '../schedule/engine';
 import type { ModelStore } from '../ifc/store';
 
 type ExportKind = 'header' | 'data' | 'group' | 'footer' | 'grand' | 'blank';
@@ -65,7 +65,7 @@ export function toRows(res: ScheduleResult, includeHeader = true): ExportRow[] {
         const nums = numsOf(r);
         // The label only borrows the first cell when that column totalled nothing, so the
         // number it would have carried is gone with it.
-        if (!cells[0]) { cells[0] = r.label; nums[0] = null; }
+        if (labelTakesFirstCell(cells)) { cells[0] = r.label; nums[0] = null; }
         out.push({
           kind: r.kind,
           cells: pad([...cells, ...(count ? [String(r.count)] : [])]),

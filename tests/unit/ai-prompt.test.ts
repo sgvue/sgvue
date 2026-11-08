@@ -421,7 +421,7 @@ describe('the system contract', () => {
     expect(DESIGN_SYSTEM_LINES[at + 2]).toMatch(/^You have twelve tool rounds/)
     const [schedules, placing] = DESIGN_SYSTEM_LINES.slice(at, at + 2)
     for (const said of [
-      'its undo and redo, the ready-made templates, and the user’s saved setups (My templates)',
+      'its undo and redo, the ready-made templates, and the user’s saved setups (Mine, in the Templates library)',
       'lists, loads, saves, renames and duplicates',
       'Saved setups are the user’s own, so list them before acting on one and change them only when asked',
       'pass schedule:true where you would pass ids',

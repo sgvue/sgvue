@@ -22,9 +22,14 @@
  *                   token, `USERDEFINED` kept, as ifcTable keeps it — the occurrence's, or its
  *                   type object's when the occurrence states none
  *   storey          `storey` (the index's `Name || LongName`; ifcTable reads LongName first)
- *   storeyElevation / building / site   from the model's own spatial tree, by storey name
- *   space           an `IfcSpace`'s own `LongName || Name`; for everything else '' — the
- *                   index keeps neither space containment nor `IfcRelSpaceBoundary` (gap)
+ *   storeyElevation from the model's own spatial tree, by storey name
+ *   building / site the `LongName || Name` of the building and site above the element's own
+ *                   spatial container (`IfcElement.container`, 2026-11-08) — whatever level
+ *                   it is contained at, as IfcOpenShell walks it; by storey name when the
+ *                   index names no container (the dev mock)
+ *   space           an `IfcSpace`'s own `LongName || Name`; for everything else the
+ *                   `LongName || Name` of the space above its container (2026-11-08: furniture
+ *                   contained in a room). `IfcRelSpaceBoundary` is not read (gap)
  *   material        every distinct layer / profile / constituent material, ', '-joined, as
  *                   `matNames` does
  *   discipline      `disciplineForEntity`, as ifcTable
@@ -43,7 +48,7 @@ import type { PropValue, PsetInstance, SpatialNode, Units } from '../shared/mode
 import { unitLabel } from '../shared/units'
 import { disciplineForEntity } from './ifc/entities'
 import type { Cell, ElemCore, ModelMeta, UnitKind } from './ifc/types'
-import { IMPERIAL_LENGTH, measureKind, type UnitScales } from './ifc/units'
+import { IMPERIAL_LENGTH, measureKind, measureUnitType, type UnitScales } from './ifc/units'
 
 /** What the main window sends the Schedules window: the store's input, and row → element. */
 export interface ScheduleSnapshot {
@@ -90,8 +95,32 @@ function scalesOf(units: Units): UnitScales {
 const str = (v: string | number | boolean): string =>
   typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v)
 
-/** ifcTable's `toCell`, over a value SGVue has already read. `null` = no cell. */
-function toCell(value: PropValue, measure: string | undefined, scales: UnitScales): Cell | null {
+/**
+ * SI per one of each `IfcDerivedUnit` the file assigns, by unit type (2026-11-08) — the index's
+ * `factor` (`index-builder.ts`, `derivedFactor`). `USERDEFINED` is left out: a file may assign
+ * several, and `byType` keeps one.
+ */
+function derivedOf(units: Units): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const u of Object.values(units.byType)) {
+    if (u.entity === 'IfcDerivedUnit' && u.unitType !== 'USERDEFINED' && u.factor !== undefined) {
+      out.set(u.unitType, u.factor)
+    }
+  }
+  return out
+}
+
+/**
+ * ifcTable's `toCell`, over a value SGVue has already read. `null` = no cell. A number whose
+ * measure is in one of the file's derived units is converted to SI and carries no unit kind
+ * (the engine has no display unit for it), so its column shows the SI number with no symbol.
+ */
+function toCell(
+  value: PropValue,
+  measure: string | undefined,
+  scales: UnitScales,
+  derived: ReadonlyMap<string, number>
+): Cell | null {
   if (Array.isArray(value)) {
     const parts = value.map(str).filter(Boolean)
     return parts.length ? { v: parts.join(', ') } : null
@@ -99,7 +128,9 @@ function toCell(value: PropValue, measure: string | undefined, scales: UnitScale
   if (typeof value === 'boolean') return { v: value }
   if (typeof value === 'number') {
     const kind: UnitKind = measureKind(measure)
-    return kind === 'none' ? { v: value } : { v: value * scales[kind], k: kind }
+    if (kind !== 'none') return { v: value * scales[kind], k: kind }
+    const factor = measure ? derived.get(measureUnitType(measure)) : undefined
+    return factor !== undefined ? { v: value * factor } : { v: value }
   }
   const text = value as string
   if (text === '') return null
@@ -114,13 +145,28 @@ interface Place {
   site: string
 }
 
+/** What stands above (and at) one spatial element: the building, site and space names. */
+interface Above {
+  building: string
+  site: string
+  space: string
+}
+
 const label = (n: SpatialNode): string => n.longName || n.name
 
-/** Storey name → where it sits, and space expressId → its name, from one walk of the tree. */
-function walkSpatial(root: SpatialNode | null): { storeys: Map<string, Place>; spaces: Map<number, string> } {
+/**
+ * From one walk of the tree: storey name → where it sits, space expressId → its name, and
+ * every spatial element's expressId → the building, site and space at or above it.
+ */
+function walkSpatial(root: SpatialNode | null): {
+  storeys: Map<string, Place>
+  spaces: Map<number, string>
+  above: Map<number, Above>
+} {
   const storeys = new Map<string, Place>()
   const spaces = new Map<number, string>()
-  const visit = (n: SpatialNode, building: string, site: string, depth: number): void => {
+  const above = new Map<number, Above>()
+  const visit = (n: SpatialNode, building: string, site: string, space: string, depth: number): void => {
     if (depth > 64) return
     if (n.type === 'IfcSite') site = label(n)
     if (n.type === 'IfcBuilding') building = label(n)
@@ -129,11 +175,15 @@ function walkSpatial(root: SpatialNode | null): { storeys: Map<string, Place>; s
       const key = n.name || n.longName
       if (!storeys.has(key)) storeys.set(key, { elevation: n.elevation ?? null, building, site })
     }
-    if (n.type === 'IfcSpace') spaces.set(n.expressId, label(n))
-    for (const c of n.children) visit(c, building, site, depth + 1)
+    if (n.type === 'IfcSpace') {
+      space = label(n)
+      spaces.set(n.expressId, space)
+    }
+    above.set(n.expressId, { building, site, space })
+    for (const c of n.children) visit(c, building, site, space, depth + 1)
   }
-  if (root) visit(root, '', '', 0)
-  return { storeys, spaces }
+  if (root) visit(root, '', '', '', 0)
+  return { storeys, spaces, above }
 }
 
 /** One element's material string, as ifcTable's `matNames` joins it. */
@@ -175,13 +225,14 @@ export function snapshotOf(
     set: Record<string, PropValue>,
     meta: PsetInstance | undefined,
     scales: UnitScales,
+    derived: ReadonlyMap<string, number>,
     into: Record<string, Cell>
   ): void => {
     let hit = converted.get(set)
     if (!hit || hit.name !== name) {
       const entries: [string, Cell][] = []
       for (const prop in set) {
-        const cell = toCell(set[prop], meta?.measures[prop], scales)
+        const cell = toCell(set[prop], meta?.measures[prop], scales, derived)
         if (cell) entries.push([key(name, prop), cell])
       }
       hit = { name, entries }
@@ -192,18 +243,22 @@ export function snapshotOf(
 
   // What each model contributes, looked up per element in the one pass below.
   const byModel = new Map(
-    federation.models.map((m) => [m.meta.modelKey, { scales: scalesOf(m.meta.units), ...walkSpatial(m.meta.spatial) }])
+    federation.models.map((m) => [
+      m.meta.modelKey,
+      { scales: scalesOf(m.meta.units), derived: derivedOf(m.meta.units), ...walkSpatial(m.meta.spatial) }
+    ])
   )
 
   for (const el of federation.elements) {
     const model = byModel.get(el.model)
     if (!model || SKIP.has(el.type)) continue
-    const { scales, storeys, spaces } = model
+    const { scales, derived, storeys, spaces, above } = model
     const colon = el.objectType.indexOf(':')
     const place = el.storey ? storeys.get(el.storey) : undefined
+    const held = el.container !== undefined ? above.get(el.container) : undefined
     const row: Record<string, Cell> = {}
-    for (const name in el.psets) setCells(name, el.psets[name], el.psetMeta[name], scales, row)
-    for (const name in el.qto) setCells(name, el.qto[name], el.psetMeta[name], scales, row)
+    for (const name in el.psets) setCells(name, el.psets[name], el.psetMeta[name], scales, derived, row)
+    for (const name in el.qto) setCells(name, el.qto[name], el.psetMeta[name], scales, derived, row)
 
     cores.push({
       entity: el.type,
@@ -217,9 +272,9 @@ export function snapshotOf(
       guid: el.guid,
       storey: el.storey,
       storeyElevation: place?.elevation ?? null,
-      building: place?.building ?? '',
-      site: place?.site ?? '',
-      space: el.isSpace ? (spaces.get(el.expressId) ?? el.name) : '',
+      building: held ? held.building : (place?.building ?? ''),
+      site: held ? held.site : (place?.site ?? ''),
+      space: el.isSpace ? (spaces.get(el.expressId) ?? el.name) : (held?.space ?? ''),
       material: materialOf(el),
       discipline: disciplineForEntity(el.type),
       model: labels[el.model] ?? el.model

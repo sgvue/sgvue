@@ -8,7 +8,9 @@
 // and a suggested name. Main shows the native Save dialog, attached to this window, and writes
 // where the user points (`src/main/exports.ts`, the third writer). `openScheduleFile` is the
 // reverse: main's Open dialog, the text of the file picked (at most 1 MB), and ifcTable's strict
-// `parseScheduleDef` here.
+// `parseScheduleDef` here. v1.5.0, phase 3 (ifcTable 2026-11-07, its owner's decision 1): the
+// file goes into the Templates library's Mine and is selected there — it no longer replaces the
+// schedule on screen.
 //
 // Exports cover the FULL schedule (`fullResult`: uncapped, numbers without separators), never
 // the 5 000 rows the screen draws — ifcTable's rule.
@@ -21,7 +23,9 @@ import { oneSheet, xlsxBlob, type Sheet } from '../../schedule/export/xlsx';
 import { parseScheduleDef, ScheduleImportError, type ScheduleDef } from '../../schedule/schedule/def';
 import { dialogOpen } from './dialog';
 import { exportName, flash } from './dom';
-import { listSaved } from './schedules';
+import { classCount, mineKey, revealFolds } from './libraryModel';
+import { closePopover, popoverId } from './popover';
+import { listSaved, refusal, saveSchedule } from './schedules';
 import { state, update } from './state';
 
 /** What `preload/schedule.ts` exposes — the whole of this window's reach beyond its port. */
@@ -188,7 +192,12 @@ let opening = false;
  */
 export const fileDialogUp = (): boolean => busy || opening;
 
-/** Open a `.schedule.json` and make it the schedule on screen — one undo step, like a template. */
+/**
+ * Open a `.schedule.json` and add it to the Templates library's Mine, selected there — the
+ * library opening on it when it was shut. It never replaces the schedule on screen (ifcTable,
+ * 2026-11-07). A name already taken is numbered, by the save rule; at the cap of a hundred it is
+ * refused, as a save is.
+ */
 export async function openScheduleFile(): Promise<void> {
   const api = bridge();
   if (!api) { flash('Could not open — this window cannot read files.', true); return; }
@@ -214,14 +223,24 @@ export async function openScheduleFile(): Promise<void> {
     flash(errMsg(e) || 'That file is not a schedule definition.', true);
     return;
   }
-  // A schedule saved from another model may name a category this one lacks.
-  const missing = def.entity.filter((e) => !state.store?.byEntity.has(e));
-  update({
-    def, selectedColumn: null, selectedCols: [], dirty: false,
-    removedBy: null, litBy: null, templateId: null, savedName: null,
-    // Opened from My templates, this is the answer to why it was opened.
-    overlay: null,
-  });
-  if (missing.length) flash(`Loaded, but this model has no ${missing.join(', ')}.`, true);
-  else flash(`Loaded “${def.name}”.`);
+  const asked = def.name.trim() || 'Untitled schedule';
+  // Saving needs no model: a file picked while none is open still goes into Mine.
+  const name = saveSchedule(def, null);
+  if (!name) { flash(refusal(), true); return; }
+  const store = state.store;
+  // A schedule saved from another model may name a category this one lacks. With no model
+  // open there is no library to show it in (it opens with a model only), so the toast says
+  // where it went and nothing else changes.
+  const absent = !!store && !classCount(store, { entities: def.entity });
+  if (store?.entities.length) {
+    // The library is a modal: whatever popover was open closes under it.
+    if (state.overlay !== 'library' && popoverId()) closePopover();
+    update({
+      ...(state.overlay !== 'library' ? { overlay: 'library' as const, libraryDraft: null } : {}),
+      libraryQuery: '', librarySel: mineKey(name),
+      libraryFolds: revealFolds(state.libraryFolds, { section: 'mine' }, absent),
+    });
+  }
+  flash(`Imported “${name}” into Mine${name !== asked ? ` — “${asked}” was taken` : ''}${
+    absent ? ` · this model has no ${def.entity.join(', ')}` : ''}.`);
 }

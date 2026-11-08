@@ -22,15 +22,17 @@
  *     runs the engine.
  *
  * 2026-10-02 — parity with the user, phase 4 (the owner: *"assistant should possess everything
- * user can do on the app"*). `buildSchedule` also takes what the window's Filter, Sorting and
- * Format tabs and its calculated-value editor set — filter logic, itemise, a column's hidden,
- * decimals, unit, alignment and place, and calculated columns — each by the tab's own rule
- * (`kindOf`, `typeOf`, `unitOptions`, `calcProblems`: the engine's, which the tabs call too), and
+ * user can do on the app"*). `buildSchedule` also takes what the window's filter, sort and column
+ * controls (the Filter, Sorting and Format tabs until v1.5.0; its view-bar chips and column menus
+ * since) and its calculated-value editor set — filter logic, itemise, a column's hidden,
+ * decimals, unit, alignment and place, and calculated columns — each by the control's own rule
+ * (`kindOf`, `typeOf`, `unitOptions`, `calcProblems`: the engine's, which the controls call too), and
  * `simplify` reads every one of them back. And `scheduleElementIds` is the schedule's rows as a
  * set of elements, for the view tools' `schedule:true` target.
  */
 import type { ScheduleBrief } from '../shared/ai-schema'
 import { ATTR_KEYS } from '../shared/attr'
+import { SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
 import { ambiguousText, nearestKeys, normKey, resolveKey } from '../shared/prop-names'
 import { keysForEntity, type ModelStore } from './ifc/store'
 import type { PropStat, UnitKind } from './ifc/types'
@@ -91,11 +93,12 @@ export const SCHEDULE_TOTALS = ['sum', 'count', 'min', 'max', 'avg', 'none'] as 
 export const SCHEDULE_OPS = Object.keys(OP_LABELS) as Op[]
 
 /*
- * 2026-10-02 — parity with the user, phase 4: what the Filter, Sorting and Format tabs and the
+ * 2026-10-02 — parity with the user, phase 4: what the Schedules window's filter, sort and
+ * column-format controls (since v1.5.0 its view-bar chips and column menus) and the
  * calculated-value editor set, and `make_schedule` could only keep.
  */
 
-/** The Format tab's three alignments. */
+/** A column menu's three alignments. */
 export const SCHEDULE_ALIGNS = ['left', 'center', 'right'] as const
 /**
  * What a calculated value's result is — the editor's own "Result is a" list: a plain number, a
@@ -106,8 +109,9 @@ export const SCHEDULE_RESULTS = ['number', 'yes_no', 'text', 'length', 'area', '
 export type ScheduleResultKind = (typeof SCHEDULE_RESULTS)[number]
 /** Calculated values one call may define — and the most `get_schedule` lists. */
 export const SCHEDULE_CALC_CAP = 20
-/** A formula as one call may send it. The port takes 4 000 (`messages.ts`, `DefShape`). */
-export const SCHEDULE_FORMULA_CHARS = 1000
+/** A formula as one call may send it. The port takes 4 000 (`messages.ts`, `DefShape`). Since
+ *  v1.5.0 the tool's own description states it, so it lives beside that description. */
+export { SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
 
 /* ────────────────────────────── the input ────────────────────────────── */
 
@@ -115,7 +119,7 @@ export interface AskColumn {
   field: string
   heading?: string
   total?: (typeof SCHEDULE_TOTALS)[number]
-  /** The Format tab's "Hidden column". Omitted, a column that is asked for is shown. */
+  /** A column menu's "Hide column". Omitted, a column that is asked for is shown. */
   hidden?: boolean
   /** Decimal places, 0–6: a numeric column only. */
   decimals?: number
@@ -151,11 +155,11 @@ export interface AskSchedule {
   /** Columns worked out per row. Each is defined — or, by name, redefined — and shown. */
   calculated?: AskCalculated[]
   filters?: AskFilter[]
-  /** The Filter tab's "All rules" / "Any rule". */
+  /** The filter popover's "All rules" / "Any rule". */
   filterLogic?: 'and' | 'or'
   sortBy?: AskSort[]
   groupBy?: string[]
-  /** The Sorting tab's "Itemise every instance"; off, identical rows collapse into one with a count. */
+  /** The Rows popover's "Itemise every instance"; off, identical rows collapse into one with a count. */
   itemize?: boolean
   grandTotals?: boolean
 }
@@ -347,12 +351,12 @@ const unitAsked = (unit: string): string =>
  * appearance) is kept as it was. Any name that does not resolve refuses the whole call: nothing
  * half-built is ever sent.
  *
- * 2026-10-02 — parity with the user, phase 4. What the window's tabs set and this could only
- * keep, it can now set, by the tabs' own rules:
+ * 2026-10-02 — parity with the user, phase 4. What the window's controls set and this could only
+ * keep, it can now set, by the controls' own rules:
  *
- *   · `filterLogic` and `itemize` — the Filter tab's All rules / Any rule, the Sorting tab's
- *     "Itemise every instance";
- *   · per column `hidden`, `decimals`, `unit` and `align` — the Format tab: decimals only where
+ *   · `filterLogic` and `itemize` — the filter popover's All rules / Any rule, the Rows
+ *     popover's "Itemise every instance";
+ *   · per column `hidden`, `decimals`, `unit` and `align` — the column menu: decimals only where
  *     it offers them (a numeric column), a unit only from the list it offers for what the
  *     column measures (`unitOptions`), anything else refused with the reason;
  *   · per column `after` — its place: directly behind the named column, `""` for first. A

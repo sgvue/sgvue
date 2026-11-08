@@ -24,10 +24,10 @@
  *                                          opens the native Save dialog; answered by `exportAck`
  *                             `manage`     the assistant's `manage_schedules` (2026-10-02): one
  *                                          of the window's own actions — undo, redo, a template,
- *                                          a saved setup, Print, Open schedule file — by name;
+ *                                          a saved setup, Print, Import — by name;
  *                                          answered by `manageAck`
  *                             `projectSchedules`  (2026-11-07, project file phase 3) an open
- *                                          project's saved setups — the window's My templates
+ *                                          project's saved setups — the Templates library's Mine
  *                                          list while it is open, never written to this
  *                                          window's `localStorage` — or `null`: no project, the
  *                                          window's own list again; and, with `open`, the
@@ -257,14 +257,15 @@ export const ExportMessage = z
  * (`schedule-ui/actions.ts`); what crosses the port is **which one**, and a name.
  *
  *   undo · redo            the header's two buttons (that window's history)
- *   templates              the template gallery's cards, listed
- *   apply_template         a click on one
- *   saved_list             My templates, listed
- *   load · save · rename · duplicate   the panel's own buttons
+ *   templates              the Templates library's built-in templates for these models, listed
+ *   apply_template         Use on one
+ *   saved_list             the library's Mine, listed
+ *   load · save · rename · duplicate   the library's own controls
  *   delete                 its Delete — which only raises that window's own confirm dialog
  *   print                  the header's Print — after that window's own confirm, raised first:
  *                          the native print dialog's default button prints
- *   open_file              "Open schedule file…" — the native Open dialog
+ *   open_file              the library's Import — the native Open dialog; the file picked is
+ *                          added to Mine (v1.5.0, phase 3), never made the open schedule
  *
  * Opening the window is not one of them: that is main's, through the toolbar button's own call.
  */
@@ -286,10 +287,13 @@ export type ManageOp = (typeof MANAGE_OPS)[number]
 
 /**
  * How long the asker waits for `manageAck`, and how old a request the window will still act on.
- * The window's limit is the shorter one: whatever it does, it answers within the asker's wait.
- * A Schedules renderer held up by a modal dialog — the print dialog blocks its scripts — works
- * through what queued up when the dialog closes, and must not then save, load or print for a
- * request the assistant gave up on minutes ago. Both pages read the same clock.
+ * The window's limit is the shorter one, so a request it acts on is normally answered within
+ * the asker's wait. A Schedules renderer held up by a modal dialog — the print dialog blocks its
+ * scripts — works through what queued up when the dialog closes, and must not then save, load
+ * or print for a request the assistant gave up on minutes ago. Both pages read the same clock.
+ * Nothing bounds how long the answer takes to come back, though (the main renderer may be
+ * busy), so a request can be acted on and still time out: a `timeout` means the outcome is NOT
+ * KNOWN, and the assistant is told so (`executors/schedule.ts` `MANAGE_TIMEOUT_MESSAGE`).
  */
 export const MANAGE_ACK_MS = 3000
 export const MANAGE_FRESH_MS = 2000
@@ -354,7 +358,7 @@ export const ManageMessage = z
 export const MAX_SAVED_LIST_CHARS = 16 * 1024 * 1024
 
 /**
- * One saved setup, as the window's My templates holds it (`SavedEntry`): its name — the identity,
+ * One saved setup, as the window's Templates library holds it in Mine (`SavedEntry`): its name — the identity,
  * the user's own text — its definition and when it was saved. `.strict()`; the definition is
  * `DefShape`'s, and then `parseScheduleDef`'s on receipt.
  */
@@ -543,6 +547,8 @@ export const ExportAckMessage = z
  *   nothing      there was nothing to do: nothing to undo or redo, nothing to save
  *   missing      no saved setup, or no template, of that name
  *   taken        a rename onto a name another saved setup has
+ *   full         a save or a duplicate that would add a hundred-and-first saved setup — refused,
+ *                since v1.5.0 phase 3 (ifcTable's rule: nothing is dropped to make room)
  *   failed       the window's storage refused the write
  *   busy         a dialog of the window's is already up
  *   no_schedule  the window shows no schedule — no model, or no category
@@ -554,18 +560,22 @@ export const MANAGE_RESULTS = [
   'nothing',
   'missing',
   'taken',
+  'full',
   'failed',
   'busy',
   'no_schedule'
 ] as const
 export type ManageResult = (typeof MANAGE_RESULTS)[number]
 
-/** How a save or a duplicate would take a saved setup away: over its own copy, or off the end of the list. */
-export const MANAGE_FORGETS = ['replace', 'evict'] as const
+/**
+ * How a save would take a saved setup away: over its own copy. (Until v1.5.0 also `evict`, off
+ * the end of the list at the cap — a save there is now refused, `full`, and forgets nothing.)
+ */
+export const MANAGE_FORGETS = ['replace'] as const
 
 const Count = z.number().int().min(0).max(100_000_000)
 
-/** One card of the template gallery. Its text is the app's own, never the file's. */
+/** One built-in template of the Templates library. Its text is the app's own, never the file's. */
 const TemplateRow = z
   .object({
     id: SafeName,
@@ -580,7 +590,7 @@ const TemplateRow = z
   })
   .strict()
 
-/** One saved setup, as My templates lists it. */
+/** One saved setup, as the library's Mine lists it. */
 const SavedRow = z
   .object({
     name: SafeName,
@@ -611,7 +621,7 @@ export const ManageAckMessage = z
     redo: z.number().int().min(0).max(1000).optional(),
     /** `load`: how many of the setup's classes the loaded models have none of. */
     lacks: z.number().int().min(0).max(MANAGE_CLASSES_MAX * 8).optional(),
-    /** `save` / `duplicate`, when `asked` or `held`: how a saved setup would be lost… */
+    /** `save`, when `asked` or `held`: how a saved setup would be lost… */
     forgets: z.enum(MANAGE_FORGETS).optional(),
     /** …and which one, when its name can be sent. */
     gone: SafeName.optional(),

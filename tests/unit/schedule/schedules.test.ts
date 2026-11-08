@@ -1,6 +1,8 @@
-// The save rule, and the panel that exists because of it — ported from ifcTable's
-// `tests/schedules.test.ts` with the Schedules window's saved setups (2026-09-25, phase 2).
-// The three download-name cases (`exportName`) came back with phase 4's export.
+// The save rule — ported from ifcTable's `tests/schedules.test.ts` with the Schedules window's
+// saved setups (2026-09-25, phase 2). The three download-name cases (`exportName`) came back
+// with phase 4's export. v1.5.0, phase 3: the cap refuses rather than dropping the oldest
+// (ifcTable 2026-11-07), and the panel these once drew is the Templates library
+// (tests/unit/schedule/library.test.ts).
 //
 // Save used to overwrite whatever entry had the same name — and since picking a category
 // always names the schedule "Door Schedule", a user could keep exactly one setup per IFC
@@ -12,11 +14,12 @@ import { StoreBuilder, type ModelStore } from '../../../src/schedule/ifc/store';
 import type { Cell, ElemCore, ModelMeta } from '../../../src/schedule/ifc/types';
 import { emptySchedule, type Column, type ScheduleDef } from '../../../src/schedule/schedule/def';
 import { state as blankState, type AppState } from '../../../src/renderer/schedule-ui/state';
-import { savedPanel } from '../../../src/renderer/schedule-ui/overlays/savedPanel';
+import { renderLibrary } from '../../../src/renderer/schedule-ui/overlays/library';
 import { EXPORT_NAME_MAX, exportName } from '../../../src/renderer/schedule-ui/dom';
 import { ExportSaveRequest } from '../../../src/shared/ipc-contract';
 import {
-  deleteSchedule, duplicateSchedule, listSaved, renameSchedule, saveSchedule, SAVED_KEY, uniqueName,
+  CAP, deleteSchedule, duplicateSchedule, FULL_MESSAGE, isFull, listSaved, refusal, renameSchedule,
+  saveSchedule, SAVED_KEY, STORAGE_MESSAGE, uniqueName,
 } from '../../../src/renderer/schedule-ui/schedules';
 
 // schedule-ui/schedules.ts reads the global lazily inside its functions, so this is enough — the
@@ -145,41 +148,59 @@ describe('renaming and duplicating', () => {
   });
 });
 
-describe('the 100-entry cap', () => {
+describe('the 100-entry cap refuses instead of dropping the oldest (ifcTable, 2026-11-07)', () => {
   /** Saves unshift, so this leaves ["Setup 99", …, "Setup 0"] — oldest last. */
-  const fill = () => { for (let i = 0; i < 100; i++) saveSchedule(def(`Setup ${i}`), null); };
+  const fill = () => { for (let i = 0; i < CAP; i++) saveSchedule(def(`Setup ${i}`), null); };
 
-  it('drops the oldest when a 101st is saved', () => {
+  it('is 100, and the list fills to it', () => {
+    expect(CAP).toBe(100);
     fill();
-    expect(saveSchedule(def('Newcomer'), null)).toBe('Newcomer');
-    const list = names();
-    expect(list).toHaveLength(100);
-    expect(list[0]).toBe('Newcomer');
-    expect(list).not.toContain('Setup 0');
-    expect(list[99]).toBe('Setup 1');
+    expect(names()).toHaveLength(100);
+    expect(isFull()).toBe(true);
   });
 
-  it('keeps a copy of the LAST entry — the cap may never eat what was just made', () => {
+  it('refuses a 101st save and keeps every entry, oldest included', () => {
     fill();
-    // The original sits last, so the copy lands past the cap. `.slice(0, 100)` threw it
-    // straight back out and the caller still flashed "Copied to …". The copy stays, and
-    // so does the original it sits behind — duplicating must not delete what you copied
-    // — so the entry that goes is the oldest one that is neither of them.
+    expect(saveSchedule(def('Newcomer'), null)).toBe(null);
+    const list = names();
+    expect(list).toHaveLength(100);
+    expect(list).toContain('Setup 0');
+    expect(list).not.toContain('Newcomer');
+    // A numbered save would ADD an entry too, so it is refused the same way.
+    expect(saveSchedule(def('Setup 5'), null)).toBe(null);
+    expect(refusal()).toBe(FULL_MESSAGE);
+    expect(FULL_MESSAGE).toBe('Saved templates are full (100). Delete one to make room.');
+  });
+
+  it('still lets the entry you loaded be saved over — that never grows the list', () => {
+    fill();
+    const edited = { ...def('Setup 7'), columns: [col, col] };
+    expect(isFull('Setup 7')).toBe(false);
+    expect(saveSchedule(edited, 'Setup 7')).toBe('Setup 7');
+    expect(names()).toHaveLength(100);
+    expect(listSaved().find((s) => s.name === 'Setup 7')!.def.columns).toHaveLength(2);
+    // Loaded from it but renamed on screen: that is a new entry, and it is refused.
+    expect(saveSchedule(def('Setup 7 b'), 'Setup 7')).toBe(null);
+  });
+
+  it('refuses a duplicate at the cap, and the original stays', () => {
+    fill();
+    expect(duplicateSchedule('Setup 0')).toBe(null);
+    expect(names()).toHaveLength(100);
+    expect(names()).toContain('Setup 0');
+    expect(names()).not.toContain('Setup 0 (2)');
+  });
+
+  it('says storage, not the cap, when the write itself was refused', () => {
+    expect(refusal()).toBe(STORAGE_MESSAGE);
+  });
+
+  it('puts the copy directly after the original under the cap', () => {
+    for (let i = 0; i < CAP - 1; i++) saveSchedule(def(`Setup ${i}`), null);
     expect(duplicateSchedule('Setup 0')).toBe('Setup 0 (2)');
     const list = names();
     expect(list).toHaveLength(100);
-    expect(list).toContain('Setup 0 (2)');
     expect(list.indexOf('Setup 0 (2)')).toBe(list.indexOf('Setup 0') + 1);
-    expect(list).not.toContain('Setup 1');
-  });
-
-  it('stays at 100 when the FIRST entry is duplicated', () => {
-    fill();
-    expect(duplicateSchedule('Setup 99')).toBe('Setup 99 (2)');
-    const list = names();
-    expect(list).toHaveLength(100);
-    expect(list[1]).toBe('Setup 99 (2)');
-    expect(list).not.toContain('Setup 0');
   });
 });
 
@@ -197,7 +218,8 @@ describe('the key is the Schedules window\'s own', () => {
   });
 
   it('drops an entry that is not a schedule, instead of blanking the window', () => {
-    // Review, 2026-09-25: these threw inside a paint (the rail, My templates, load).
+    // Review, 2026-09-25: these threw inside a paint (the rail, My templates — now the
+    // Templates library — load).
     cell.set(SAVED_KEY, JSON.stringify([
       { name: 'empty', def: {}, savedAt: '' },
       { name: 'bad columns', def: { entity: 'IfcDoor', columns: 'nope' }, savedAt: '' },
@@ -208,8 +230,8 @@ describe('the key is the Schedules window\'s own', () => {
     const entry = listSaved()[0];
     expect(Array.isArray(entry.def.entity)).toBe(true);
     expect(Array.isArray(entry.def.columns)).toBe(true);
-    // The panel and the rail render over it without throwing.
-    expect(() => panel()).not.toThrow();
+    // The library renders over it without throwing.
+    expect(() => renderLibrary({ ...blankState, overlay: 'library' } as AppState, model())).not.toThrow();
   });
 
   it('fills what a saved def left out, and keeps its name as the identity', () => {
@@ -279,14 +301,14 @@ describe('every download says what it is and when it was taken', () => {
   });
 });
 
-// ---------------------------------------------------------------- the panel
+// ---------------------------------------------------------------- a model for the library
 
 const meta: ModelMeta = {
   fileName: 'f.ifc', schema: 'IFC4', projectName: '', authoringTool: '',
   lengthUnit: 'mm', unitSystem: 'metric', elementCount: 0, parseMs: 0,
 };
 
-/** A model holding one IfcDoor — the panel reads nothing but byEntity. */
+/** A model holding one IfcDoor. */
 function model(): ModelStore {
   const b = new StoreBuilder();
   const cores: ElemCore[] = [{
@@ -298,68 +320,3 @@ function model(): ModelStore {
   b.add(cores, cells);
   return b.finish(meta);
 }
-
-const panel = (over: Partial<AppState> = {}) =>
-  savedPanel({ ...blankState, ...over } as AppState, model());
-
-describe('the my-templates panel', () => {
-  it('says so when nothing is saved, and when nothing matches', () => {
-    expect(panel()).toContain('Nothing saved yet');
-    saveSchedule(def('Door Schedule'), null);
-    expect(panel({ savedQuery: 'zzz' })).toContain('No template matches that.');
-  });
-
-  it('groups by the classes a setup schedules, and counts each group', () => {
-    saveSchedule(def('Door Schedule'), null);
-    saveSchedule(def('Entrance doors'), null);
-    saveSchedule(def('Wall Schedule', ['IfcWall', 'IfcCurtainWall']), null);
-    const html = panel();
-    expect(html).toContain('IfcWall + IfcCurtainWall');
-    // Doors group before walls, and inside the door group the names sort too.
-    expect(html.indexOf('IfcDoor')).toBeLessThan(html.indexOf('IfcWall + IfcCurtainWall'));
-    expect(html.indexOf('Door Schedule')).toBeLessThan(html.indexOf('Entrance doors'));
-  });
-
-  it('marks the setup in use, and says EDITED once it has been changed', () => {
-    saveSchedule(def('Door Schedule'), null);
-    expect(panel({ savedName: 'Door Schedule' })).toContain('>IN USE<');
-    expect(panel({ savedName: 'Door Schedule', dirty: true })).toContain('>EDITED<');
-    expect(panel()).not.toContain('IN USE');
-  });
-
-  it('warns before the click that a setup names a class this model lacks', () => {
-    saveSchedule(def('Pipe Schedule', ['IfcPipeSegment']), null);
-    saveSchedule(def('Door Schedule'), null);
-    expect(panel()).toContain('not in this model');
-    expect(panel({ savedQuery: 'door' })).not.toContain('not in this model');
-  });
-
-  it('filters by name and by class, ignoring case', () => {
-    saveSchedule(def('Door Schedule'), null);
-    saveSchedule(def('Wall Schedule', ['IfcWall']), null);
-    expect(panel({ savedQuery: 'DOOR' })).not.toContain('Wall Schedule');
-    expect(panel({ savedQuery: 'ifcwall' })).toContain('Wall Schedule');
-  });
-
-  it('shows the column count and the day it was saved', () => {
-    saveSchedule(def('Door Schedule'), null);
-    const html = panel();
-    expect(html).toContain('1 column · saved ');
-    expect(html).toContain(listSaved()[0].savedAt.slice(0, 10));
-  });
-
-  it('escapes a name, the same as everything else built from user text', () => {
-    saveSchedule(def('"><img src=x onerror=alert(1)>'), null);
-    const html = panel();
-    expect(html).not.toContain('<img');
-    expect(html).not.toContain('"><img');
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    expect(html).toContain('&quot;&gt;&lt;img');
-  });
-
-  it('renders a long list without losing anyone', () => {
-    for (let i = 0; i < 40; i++) saveSchedule(def(`Setup ${i}`), null);
-    const html = panel();
-    expect([...html.matchAll(/data-act="load-saved"/g)]).toHaveLength(40);
-  });
-});

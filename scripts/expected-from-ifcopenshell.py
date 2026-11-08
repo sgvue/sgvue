@@ -9,10 +9,15 @@ to document — never to hide (SYSTEM_SPEC §5).
 Usage:
     python3 scripts/expected-from-ifcopenshell.py "samples/Sample Ifc Model.ifc"
     python3 scripts/expected-from-ifcopenshell.py            # every .ifc in samples/
+    python3 scripts/expected-from-ifcopenshell.py --cells-only tests/fixtures/feet.ifc
 
 Writes tests/fixtures/<file-stem>.expected.json — since 2026-11-07 with `identities`, every
 indexed element's PredefinedType code as written, `get_predefined_type` and ObjectType by GlobalId,
-which the test compares element by element (an older file lacks it, and that case skips). Requires the system python3 to have
+which the test compares element by element (an older file lacks it, and that case skips) — and,
+since 2026-11-08, tests/fixtures/<file-stem>.cells.json: every indexed element's property and
+quantity values with their measure types, the fields a schedule shows, and the file's unit
+scales, which `tests/unit/schedule/oracle.test.ts` checks every schedule cell against.
+`--cells-only` writes just the cells file. Requires the system python3 to have
 IfcOpenShell installed (0.8.4 was used to write this). This is a development script and
 lives outside src/ on purpose: only settings.ts and sessions.ts may write to disk inside
 the app.
@@ -29,6 +34,7 @@ from pathlib import Path
 
 import ifcopenshell
 import ifcopenshell.geom
+import ifcopenshell.ifcopenshell_wrapper
 import ifcopenshell.util.classification
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
@@ -217,6 +223,229 @@ def identity(element) -> dict:
         "objectType": (type_object.Name if type_object else None)
         or getattr(element, "ObjectType", None)
         or "",
+    }
+
+
+# ── every element's schedule cells (2026-11-08) ──────────────────────────────────────────────
+#
+# `tests/unit/schedule/oracle.test.ts` checks every cell of the Schedules window against what
+# IfcOpenShell reads. The values come from `get_psets` (the type's sets first, the occurrence's
+# over them key by key); the measure type of each value is read off the property / quantity
+# line itself, in the same order, so a value and its measure cannot come from different lines.
+
+# The unit types whose scale IfcOpenShell's `calculate_unit_scale` resolves from the file's own
+# unit assignment. Every other measure (a count, a ratio, a derived unit) is reported as written.
+SCALED_UNIT_TYPES = ("LENGTHUNIT", "AREAUNIT", "VOLUMEUNIT", "PLANEANGLEUNIT", "MASSUNIT")
+
+
+def _schema_attribute_type(model, entity, index: int) -> str | None:
+    """The declared IFC type of an entity's attribute — `IfcLengthMeasure` for a length."""
+    schema = ifcopenshell.ifcopenshell_wrapper.schema_by_name(model.schema)
+    declared = schema.declaration_by_name(entity.is_a()).attribute_by_index(index).type_of_attribute()
+    named = getattr(declared, "declared_type", None)
+    return named().name() if named else None
+
+
+def _line_info(model, line) -> dict:
+    """What a property or quantity line says about its value: the measure type, and — for any
+    property that is not a single value — its class (`p`), since `get_psets` reads an enumerated
+    value and a list value alike."""
+    if line.is_a("IfcPhysicalSimpleQuantity"):
+        return {"m": _schema_attribute_type(model, line, 3)}
+    if line.is_a("IfcPropertySingleValue"):
+        value = line.NominalValue
+        return {"m": value.is_a() if value is not None else None}
+    items = getattr(line, "EnumerationValues", None) or getattr(line, "ListValues", None) or []
+    return {"m": items[0].is_a() if items else None, "p": line.is_a()}
+
+
+def _set_lines(model, definition) -> dict:
+    """prop / quantity name → `_line_info`, for one IfcPropertySet or IfcElementQuantity."""
+    if definition.is_a("IfcPropertySet"):
+        return {prop.Name: _line_info(model, prop) for prop in definition.HasProperties or []}
+    if definition.is_a("IfcElementQuantity"):
+        return {q.Name: _line_info(model, q) for q in definition.Quantities or []}
+    return {}
+
+
+def _definitions(element) -> list:
+    """The type's property definitions, then the occurrence's — `get_psets`' own precedence."""
+    out = []
+    type_object = ifcopenshell.util.element.get_type(element)
+    if type_object is not None:
+        out += list(getattr(type_object, "HasPropertySets", None) or [])
+    for rel in getattr(element, "IsDefinedBy", None) or []:
+        if rel.is_a("IfcRelDefinesByProperties"):
+            relating = rel.RelatingPropertyDefinition
+            out += list(relating) if isinstance(relating, tuple) else [relating]
+    return out
+
+
+def _without_ids(sets: dict) -> dict:
+    """`strip_ids` without making the values plain: `_cell` still needs a bounded value's lines."""
+    return {name: {k: v for k, v in values.items() if k != "id"} for name, values in sets.items()}
+
+
+BOUNDS = ("LowerBoundValue", "UpperBoundValue", "SetPointValue")
+
+
+def _cell(value, info: dict) -> dict:
+    """One value as `get_psets` read it. A bounded value comes back as its line's attributes;
+    it is written as {"v": {bound: value}, "m": {bound: measure}} with the absent bounds left out."""
+    if isinstance(value, dict) and value.get("type") == "IfcPropertyBoundedValue":
+        present = {b: value[b] for b in BOUNDS if value.get(b) is not None}
+        return {
+            "v": {b: v.wrappedValue for b, v in present.items()},
+            "m": {b: v.is_a() for b, v in present.items()},
+            "p": "IfcPropertyBoundedValue",
+        }
+    return {"v": plain(value), **info}
+
+
+def _measured(model, element, values: dict) -> dict:
+    """{set: {prop: {"v": value as written, "m": measure type or null, "p"?: property class}}}."""
+    lines: dict = {}
+    for definition in _definitions(element):
+        if definition is not None and getattr(definition, "Name", None):
+            lines.setdefault(definition.Name, {}).update(_set_lines(model, definition))
+    return {
+        name: {prop: _cell(value, lines.get(name, {}).get(prop, {"m": None})) for prop, value in props.items()}
+        for name, props in values.items()
+    }
+
+
+def _parent(product):
+    """The spatial element above a product: its container, else what aggregates it."""
+    return ifcopenshell.util.element.get_container(product) or ifcopenshell.util.element.get_aggregate(
+        product
+    )
+
+
+def _above(product, ifc_class: str):
+    node, depth = _parent(product), 0
+    while node is not None and depth < 64:
+        if node.is_a(ifc_class):
+            return node
+        node, depth = _parent(node), depth + 1
+    return None
+
+
+def _names(product) -> dict:
+    return {"name": product.Name or "", "longName": getattr(product, "LongName", None) or ""}
+
+
+def _material_names(element) -> list:
+    """Every individual material IfcOpenShell finds for the element, in the file's order."""
+    material = ifcopenshell.util.element.get_material(element, should_skip_usage=True)
+    if material is None:
+        return []
+    if material.is_a("IfcMaterial"):
+        return [material.Name or ""]
+    if material.is_a("IfcMaterialLayerSet"):
+        return [layer.Material.Name or "" for layer in material.MaterialLayers if layer.Material]
+    if material.is_a("IfcMaterialList"):
+        return [m.Name or "" for m in material.Materials if m]
+    parts = list(getattr(material, "MaterialProfiles", None) or []) + list(
+        getattr(material, "MaterialConstituents", None) or []
+    )
+    return [p.Material.Name or "" for p in parts if getattr(p, "Material", None)]
+
+
+def _unit_scale(unit) -> float:
+    """SI per one of a named unit — `calculate_unit_scale`'s own walk, for one unit line."""
+    scale = 1.0
+    while unit.is_a("IfcConversionBasedUnit"):
+        scale *= unit.ConversionFactor.ValueComponent.wrappedValue
+        unit = unit.ConversionFactor.UnitComponent
+    if unit.is_a("IfcSIUnit"):
+        scale *= ifcopenshell.util.unit.get_prefix_multiplier(unit.Prefix)
+    return scale
+
+
+def _derived_scales(model) -> dict:
+    """UnitType → SI per one of each `IfcDerivedUnit` the project assigns: the product of its
+    elements' scales, each raised to its exponent. `calculate_unit_scale` takes named units only."""
+    out: dict = {}
+    for project in model.by_type("IfcProject"):
+        for unit in (project.UnitsInContext.Units if project.UnitsInContext else None) or []:
+            if unit.is_a("IfcDerivedUnit") and unit.UnitType != "USERDEFINED":
+                scale = 1.0
+                for element in unit.Elements:
+                    scale *= _unit_scale(element.Unit) ** element.Exponent
+                out[unit.UnitType] = scale
+        break
+    return out
+
+
+def _measures_of(cell: dict) -> list:
+    m = cell.get("m")
+    return list(m.values()) if isinstance(m, dict) else [m] if m else []
+
+
+def cells(path: Path) -> dict:
+    """What a schedule shows for every indexed element, as IfcOpenShell reads it."""
+    model = ifcopenshell.open(str(path))
+    openings = {e.id() for e in model.by_type("IfcOpeningElement")}
+    indexed = [e for e in model.by_type("IfcElement") if e.id() not in openings]
+    indexed += model.by_type("IfcSpace")
+
+    scales = {u: ifcopenshell.util.unit.calculate_unit_scale(model, u) for u in SCALED_UNIT_TYPES}
+    measure_types: dict = {}
+    storeys: dict = {}
+    spatial: dict = {}
+    elements: dict = {}
+
+    def ref(product):
+        if product is None:
+            return None
+        spatial.setdefault(product.GlobalId, _names(product))
+        return product.GlobalId
+
+    for element in indexed:
+        storey = _above(element, "IfcBuildingStorey")
+        if storey is not None and storey.GlobalId not in storeys:
+            storeys[storey.GlobalId] = {
+                **_names(storey),
+                "elevation": storey.Elevation * scales["LENGTHUNIT"] if storey.Elevation is not None else None,
+            }
+        type_object = ifcopenshell.util.element.get_type(element)
+        psets = _measured(model, element, _without_ids(ifcopenshell.util.element.get_psets(element, psets_only=True)))
+        qtos = _measured(model, element, _without_ids(ifcopenshell.util.element.get_psets(element, qtos_only=True)))
+        for sets in (psets, qtos):
+            for props in sets.values():
+                for cell in props.values():
+                    for m in _measures_of(cell):
+                        if m not in measure_types:
+                            measure_types[m] = ifcopenshell.util.unit.get_measure_unit_type(m)
+        elements[element.GlobalId] = {
+            "entity": element.is_a(),
+            "name": element.Name or "",
+            "description": element.Description or "",
+            "tag": getattr(element, "Tag", None) or "",
+            "objectType": getattr(element, "ObjectType", None) or "",
+            "typeName": (type_object.Name or "") if type_object else "",
+            "predefinedType": predefined_code(element),
+            "longName": getattr(element, "LongName", None) or "",
+            "storey": storey.GlobalId if storey is not None else None,
+            # The spatial elements above the element itself, by GlobalId into `spatial`.
+            "building": ref(_above(element, "IfcBuilding")),
+            "site": ref(_above(element, "IfcSite")),
+            "space": None if element.is_a("IfcSpace") else ref(_above(element, "IfcSpace")),
+            "materials": _material_names(element),
+            "psets": psets,
+            "qtos": qtos,
+        }
+
+    return {
+        "generatedBy": f"IfcOpenShell {ifcopenshell.version}",
+        "file": path.name,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "unitScales": scales,
+        "derivedScales": _derived_scales(model),
+        "measureUnitTypes": measure_types,
+        "storeys": storeys,
+        "spatial": spatial,
+        "elements": elements,
     }
 
 
@@ -468,7 +697,9 @@ def build(path: Path) -> dict:
 
 
 def main(argv: list[str]) -> int:
-    targets = [Path(a) for a in argv[1:]] or sorted(SAMPLES.glob("*.ifc"))
+    args = argv[1:]
+    cells_only = "--cells-only" in args
+    targets = [Path(a) for a in args if a != "--cells-only"] or sorted(SAMPLES.glob("*.ifc"))
     if not targets:
         print("no .ifc files in samples/ — nothing to do", file=sys.stderr)
         return 0
@@ -477,10 +708,13 @@ def main(argv: list[str]) -> int:
         if not path.is_absolute():
             path = ROOT / path
         print(f"reading {path.name} …", flush=True)
-        expected = build(path)
-        out = FIXTURES / f"{path.stem}.expected.json"
-        out.write_text(json.dumps(expected, indent=2, sort_keys=True) + "\n")
-        print(f"wrote {out.relative_to(ROOT)} ({out.stat().st_size / 1024:.0f} kB)")
+        outputs = [] if cells_only else [(f"{path.stem}.expected.json", build(path), 2)]
+        # Every element of the model: indented by one space a level, which keeps it diffable at about half the size.
+        outputs.append((f"{path.stem}.cells.json", cells(path), 1))
+        for name, data, indent in outputs:
+            out = FIXTURES / name
+            out.write_text(json.dumps(data, indent=indent, sort_keys=True) + "\n")
+            print(f"wrote {out.relative_to(ROOT)} ({out.stat().st_size / 1024:.0f} kB)")
     return 0
 
 

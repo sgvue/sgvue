@@ -90,7 +90,8 @@
  *
  * **2026-10-02 — phase 4 of 4: the Schedules window, and placing markups.**
  *
- *   · `make_schedule` gains what that window's Filter, Sorting and Format tabs and its
+ *   · `make_schedule` gains what that window's Filter, Sorting and Format tabs (since v1.5.0 its
+ *     column menus and view-bar chips) and its
  *     calculated-value editor set: `filterLogic`, `itemize`, per column `hidden`, `decimals`,
  *     `unit`, `align` and a position (`after`), and `calculated` columns in the engine's own
  *     formula grammar — refused, with the engine's reason, when one does not parse;
@@ -99,11 +100,11 @@
  *     schedule lists, resolved in the main renderer and acted on through the store's own guarded
  *     actions — never through the Schedules port's `act` message, which has no scope guard;
  *   · one more view tool in `PARITY_TOOLS`, `manage_schedules`: that window's own controls —
- *     open it, its undo and redo, the template gallery, My templates (list, load, save, rename,
+ *     open it, its undo and redo, the Templates library (built-ins; saved setups: list, load, save, rename,
  *     duplicate) — each run there by the control's own handler. Deleting a saved setup, printing
  *     and opening a schedule file only **ask** — that window's own confirmation before a
  *     deletion and before its print dialog is opened, its native Open dialog — and so does a
- *     save or a duplicate that would forget a saved setup;
+ *     save that would forget a saved setup (v1.5.0: at a hundred a save or a copy is refused);
  *   · `manage_markups` gains `place_spot`, `place_measure` and `show`: the click with the spot
  *     tool or the laser meter, at a point that is named — an element's box, or a world
  *     point — and committed by the viewer's own function for that click.
@@ -1122,7 +1123,7 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
   {
     /**
      * 2026-10-02, phase 4 — the Schedules window's own controls: its undo and redo, the
-     * template gallery, My templates, Print and "Open schedule file…". Each runs in that window,
+     * Templates library (v1.5.0; the template gallery and My templates before), Print and its Import. Each runs in that window,
      * by the control's own handler; what crosses the port is which one and a name. Deleting,
      * printing and opening a file only raise that window's own dialog — for printing, its own
      * confirm: the native print dialog opens on the user's click there, never from chat.
@@ -1130,8 +1131,8 @@ const PARITY_TOOLS: readonly ToolSpec[] = [
     name: 'manage_schedules',
     kind: 'view',
     description:
-      'The Schedules window’s own controls, for what make_schedule does not cover. op:"open" opens the window or brings it to the front; every other op needs it open. "undo" and "redo" step the schedule it shows through that window’s own history, which is where make_schedule’s changes land. "templates" lists the ready-made templates that fit the loaded models, and "apply_template" starts the schedule from one (name: its name or id). The user’s saved setups — My templates, kept on this computer — are listed by "saved_list"; "load" makes one the open schedule, "save" saves the open schedule under its own title (make_schedule’s title sets that), "rename" gives a saved one a new name (to), and "duplicate" copies one. apply_template and load replace the open schedule, which the user can undo there. ' +
-      'Three things are only asked for, in the Schedules window, where the user’s own click decides and you are not told what they chose: "delete" raises that window’s confirmation for one saved setup, "print" asks there whether to open the print dialog — which opens only if the user says so there — and "open_file" raises its Open dialog for a .schedule.json. So is a save or a duplicate that would take a saved setup away — a save over the one the schedule was loaded from, or past the hundred that are kept. Saved setups are the user’s own: list them before acting on one, and save, rename, duplicate or ask to delete one only when asked.',
+      'The Schedules window’s own controls, for what make_schedule does not cover. op:"open" opens the window or brings it to the front; every other op needs it open. "undo" and "redo" step the schedule it shows through that window’s own history, which is where make_schedule’s changes land. "templates" lists the ready-made templates that fit the loaded models, and "apply_template" starts the schedule from one (name: its name or id). The user’s saved setups — Mine in the Templates library, kept on this computer — are listed by "saved_list"; "load" makes one the open schedule, "save" saves the open schedule under its own title (make_schedule’s title sets that), "rename" gives a saved one a new name (to), and "duplicate" copies one. apply_template and load replace the open schedule, which the user can undo there. ' +
+      'Three things are only asked for, in the Schedules window, where the user’s own click decides and you are not told what they chose: "delete" raises that window’s confirmation for one saved setup, "print" asks there whether to open the print dialog — which opens only if the user says so there — and "open_file" raises its Open dialog for a .schedule.json, which adds the file picked to the saved setups without changing the open schedule. So is a save that would take a saved setup away — a save over the one the schedule was loaded from. At a hundred saved setups a save or a duplicate is refused, and nothing is dropped to make room. Saved setups are the user’s own: list them before acting on one, and save, rename, duplicate or ask to delete one only when asked.',
     gate: { by: 'op', asks: { delete: 'confirm', print: 'confirm', open_file: 'dialog' } },
     input_schema: obj(
       {
@@ -1183,7 +1184,7 @@ export const SCHEDULE_EXPORT_FORMATS = ['xlsx', 'csv', 'all_saved', 'schedule_fi
 
 /**
  * 2026-10-02, phase 4 — `make_schedule`'s Format-tab and calculated-value inputs, spelled here
- * for the same reason: the Format tab's three alignments, what a calculated value's result may
+ * for the same reason: a column menu's three alignments, what a calculated value's result may
  * be (the editor's own "Result is a" list), and how many one call may define. A unit test keeps
  * each identical to the engine side's (`schedule/assistant.ts`).
  */
@@ -1199,6 +1200,8 @@ export const SCHEDULE_RESULT_ENUM = [
   'angle'
 ] as const
 export const SCHEDULE_CALCULATED_MAX = 20
+/** A calculated value's formula, at most — what `parseScheduleDef` keeps on read and `make_schedule`'s zod check allows; its description says so (v1.5.0). */
+export const SCHEDULE_FORMULA_CHARS = 1000
 
 /** A column's field, wherever `make_schedule` takes one. The tool description lists them. */
 const SCHEDULE_FIELD: JsonSchema = {
@@ -1250,7 +1253,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
               description:
                 'Total this column in each group footer and the grand total; none takes a total away'
             },
-            // 2026-10-02 — the Format tab's switches for this column, and its place.
+            // 2026-10-02 — the column menu's switches for this column, and its place.
             hidden: {
               type: 'boolean',
               description: 'true keeps the column in the schedule without showing it'
@@ -1284,7 +1287,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
             name: { type: 'string', description: 'Its name, which is also its heading' },
             formula: {
               type: 'string',
-              description: 'An expression over the other columns’ headings; [Heading] for one with a space'
+              description: `An expression over the other columns’ headings; [Heading] for one with a space. At most ${SCHEDULE_FORMULA_CHARS} characters.`
             },
             percentageOf: {
               type: 'string',
@@ -1311,7 +1314,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
               type: 'string',
               enum: SCHEDULE_OP_ENUM,
               description:
-                'The Filter tab’s operators. hasValue and noValue take no value; in takes values (any of); between takes values with two numbers.'
+                'The Schedules window’s filter operators. hasValue and noValue take no value; in takes values (any of); between takes values with two numbers.'
             },
             value: { type: 'string' },
             values: { type: 'array', items: { type: 'string' } }
@@ -1363,7 +1366,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
     name: 'export_schedule',
     kind: 'view',
     description:
-      'Export the schedule open in the Schedules window through that window’s own Export menu: xlsx (Excel), csv, all_saved (every schedule the user saved in My templates, one sheet each, run against the loaded models — only once they have saved one) or schedule_file (the schedule’s setup as a .schedule.json, to reuse or share). It only opens the native Save dialog in the Schedules window and brings that window to the front: the user picks the file name and the folder, and nothing is written unless they click Save. It returns as soon as the dialog is asked for and is never told whether a file was saved, so never say that one was, or where. Refused while the Schedules window is busy with an export or one of its own dialogs.',
+      'Export the schedule open in the Schedules window through that window’s own Export menu: xlsx (Excel), csv, all_saved (every schedule the user saved in the Templates library, one sheet each, run against the loaded models — only once they have saved one) or schedule_file (the schedule’s setup as a .schedule.json, to reuse or share). It only opens the native Save dialog in the Schedules window and brings that window to the front: the user picks the file name and the folder, and nothing is written unless they click Save. It returns as soon as the dialog is asked for and is never told whether a file was saved, so never say that one was, or where. Refused while the Schedules window is busy with an export or one of its own dialogs.',
     // 2026-10-02: every call of it asks, through the Save dialog — the marker says what the
     // description always did.
     gate: { by: null, asks: { '*': 'dialog' } },
