@@ -180,6 +180,15 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > `SGVue-1.4.0-arm64.dmg` 135 651 172 and `SGVue-1.4.0-x64.dmg` 142 221 161 (ad-hoc signed);
 > installed, the Mac app is 336 MB (Apple silicon) and 342 MB (Intel). All three were published
 > together on `sgvue/releases`, after the owner's test of the Mac build.
+> **2026-11-09, version 1.5.0:** its published requirements (`docs/releases/1.5.0.md`) are 1.3.0's,
+> measured then, with the download sizes of the files published: built by `release.yml` from the
+> tag `v1.5.0` (commit `d6d22f4`), each file's SHA-256 and build-provenance attestation verified
+> with `gh attestation verify` — `SGVue-1.5.0-setup.exe` 124 904 558 bytes (about 119 MB, unsigned),
+> `SGVue-1.5.0-arm64.dmg` 135 687 554 and `SGVue-1.5.0-x64.dmg` 142 289 643 (ad-hoc signed), each
+> Mac app holding `LICENSES.chromium.html` and `LICENSE.electron.txt`; installed, the Mac app is
+> 337 MB (Apple silicon) and 342 MB (Intel), measured from the disk images. The Windows installed
+> size, about 390 MB, is 1.4.0's and was not re-measured. All three were published together on
+> `sgvue/releases`, the owner's choice.
 
 ---
 
