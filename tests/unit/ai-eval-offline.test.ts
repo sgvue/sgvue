@@ -74,7 +74,7 @@ interface Kase extends Json {
   fixture: 'mock' | 'mock-hostile' | 'mock-messy'
   prompt: string
   requires?: string[]
-  setup?: { tool: string; input?: Json }[]
+  setup?: { tool: string; input?: Json; apply?: boolean }[]
   applyPending?: boolean
   harness?: { schedules?: boolean }
   turns?: Json[]
@@ -255,7 +255,17 @@ function choose(value: string): boolean {
 
 async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
   open(kase.fixture, !!kase.harness?.schedules)
-  for (const step of kase.setup || []) await runToolOnce(step.tool, step.input || {})
+  for (const step of kase.setup || []) {
+    if (!step.apply) {
+      await runToolOnce(step.tool, step.input || {})
+      continue
+    }
+    // `apply: true` — the user's own step, so a row the scope guard held is applied by its Apply
+    // button, as the window's runner does; the setup's reply is then cleared, as `chat.reset` does.
+    const { index } = await runTurnOnce('(setup)', [{ name: step.tool, input: step.input || {} }])
+    if (st().chatMsgs[index]?.pending) st().applyPending(index)
+    useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatEpoch: st().chatEpoch + 1 })
+  }
   const truth = await O.collectTruth(kase, {
     sql: (statement) => fed.query(statement),
     tool: (name, input) => runToolOnce(name, input)

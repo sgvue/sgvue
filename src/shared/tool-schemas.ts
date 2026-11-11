@@ -595,7 +595,7 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     name: 'set_storeys',
     kind: 'view',
     description:
-      'Show only the named storeys, or all of them when the list is empty. Names must match the storey list exactly; a wrong name changes nothing and returns the valid names. This is independent of the filter stack — a storey hidden here stays hidden whatever the stack says — and it also prunes the current selection to what is still visible.',
+      'Show only the named storeys, or all of them when the list is empty. Names must match the storey list exactly; a wrong name changes nothing and returns the valid names. This is independent of the filter stack — a storey hidden here stays hidden whatever the stack says — and it also prunes the current selection to what is still visible. It is undoable, and held to the same guard as apply_visibility: a change that would leave nothing visible is refused, and one that would leave under 5 % of the elements visible waits for the user’s Apply.',
     input_schema: obj({ visible: { type: 'array', items: { type: 'string' } } }, ['visible']),
     strict: true
   },

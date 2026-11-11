@@ -646,9 +646,17 @@ async function runCase(kase, rep, caps, settings) {
     // A Schedules window for the cases that need one: the stand-in joins before the setup runs.
     if (kase.harness && kase.harness.schedules) await js('window.__sgvueDev.schedules.attach()')
     for (const step of kase.setup || []) {
-      await jsonOf(
-        js,
-        `window.__sgvueDev.tool(${JSON.stringify(step.tool)}, ${JSON.stringify(step.input || {})})`
+      if (!step.apply) {
+        await jsonOf(
+          js,
+          `window.__sgvueDev.tool(${JSON.stringify(step.tool)}, ${JSON.stringify(step.input || {})})`
+        )
+        continue
+      }
+      // `apply: true` — the user's own step: a row the scope guard held is applied by its Apply
+      // button, then the setup's reply is cleared (`chat.reset`), so the case starts as before.
+      await js(
+        `(async () => { const d = window.__sgvueDev.chat; const { index } = await d.turn('(setup)', [{ name: ${JSON.stringify(step.tool)}, input: ${JSON.stringify(step.input || {})} }]); if (d.messages()[index] && d.messages()[index].pending) d.apply(index); d.reset(); return true })()`
       )
     }
     const asked = await collectTruth(kase, probesIn(js))

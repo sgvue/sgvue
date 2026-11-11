@@ -1744,7 +1744,7 @@ const CASES = [
     tags: ['operate', 'gate', 'history', 'scope-guard'],
     fixture: 'mock',
     setup: [
-      { tool: 'set_storeys', input: { visible: ['Roof'] } },
+      { tool: 'set_storeys', input: { visible: ['Roof'] }, apply: true },
       { tool: 'apply_visibility', input: { action: 'reset' } }
     ],
     prompt: 'Undo that — take me back to the view I had before I showed everything again.',
