@@ -119,6 +119,23 @@ let pendingSession: SessionPayload | null = null
 export interface AfterJoin {
   order: readonly string[]
   then: () => Promise<void>
+  /**
+   * 2026-11-11 — the batch failed to join (`addBatch` threw, or the boot was refused after it
+   * committed), so `then` will never run. Called once the federation is in its final state, only
+   * while the load that queued it is still the current one (`epoch`).
+   */
+  failed?: () => void | Promise<void>
+}
+
+const report = (err: unknown): void => console.error('[sgvue] project restore failed —', err)
+
+/** One `AfterJoin.failed`, never throwing: a failure inside it is logged, not passed on. */
+const runFailed = async (a: AfterJoin | null): Promise<void> => {
+  try {
+    await a?.failed?.()
+  } catch (err) {
+    report(err)
+  }
 }
 
 /**
@@ -130,8 +147,12 @@ export const chainAfter = (a: AfterJoin | null, b: AfterJoin): AfterJoin =>
     ? {
         order: [...a.order, ...b.order],
         then: async () => {
-          await a.then().catch((err: unknown) => console.error('[sgvue] project restore failed —', err))
+          await a.then().catch(report)
           await b.then()
+        },
+        failed: async () => {
+          await runFailed(a)
+          await runFailed(b)
         }
       }
     : b
@@ -476,6 +497,7 @@ async function join(hold: Promise<unknown>): Promise<void> {
       for (const id of rows) {
         useShell.getState().patchUpload(id, { pct: 0, stage: message, error: true, dismiss: true, done: false })
       }
+      await runFailed(afterJoin)
       return
     }
     dropRows()
@@ -487,6 +509,9 @@ async function join(hold: Promise<unknown>): Promise<void> {
     // off) and cancel the worker under it. `removeModel` keeps the offset while one is on its way.
     if (mine === epoch) for (const m of [...fed.current.models]) await fed.removeModel(m.meta.modelKey)
     bootFailed(err)
+    // 2026-11-11 — `then` will not run: whoever queued the batch (a project) is told, so it is not
+    // left loading. Not for a load that was replaced or torn down meanwhile.
+    if (mine === epoch) await runFailed(afterJoin)
   }
 }
 

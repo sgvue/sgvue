@@ -1098,7 +1098,13 @@ export async function openProjectMessage(msg: ProjectOpened): Promise<void> {
   }
   const queued = await openProjectFiles(files, [], {
     order: files.map((f) => f.path),
-    then: () => restore(file, admittedAs)
+    then: () => restore(file, admittedAs),
+    // 2026-11-11 — the batch failed, so `then` never runs: the load is over all the same, and a
+    // model located meanwhile is restored as the project's boot once it joins (`restoreLocated`).
+    // Only for this project: one closed, or another opened, since is left alone.
+    failed: () => {
+      if (project.open && project.loading && carried?.file === file) settle()
+    }
   })
   // A model located while the load ran (D4) is open already: no row for it.
   for (const l of left) if (!project.bound.has(l.id)) addError(l.row, l.why, l.id)
