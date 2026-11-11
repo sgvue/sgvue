@@ -226,3 +226,39 @@ describe('AfterJoin.failed — a batch that fails to join says so to whoever que
     expect(calls).toEqual([])
   })
 })
+
+describe('a replaced load fails in silence — its failure never stands over the newer load', () => {
+  /**
+   * 2026-11-11 — `join()`'s catch: a load torn down while it joined (a newer pick, or a second
+   * project's `startOver`) whose join then fails leaves the landing state — `booted`, `ready`
+   * and the banner — exactly as the newer load set it. Only the current load (`epoch`) reports.
+   */
+  const ARC = { path: '/projects/synthetic/models/ARC.ifc', name: 'ARC.ifc', size: 10 }
+  let rejectJoin: (err: Error) => void = () => undefined
+
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(federation, 'isOpen').mockReturnValue(false)
+    vi.mocked(federation.prepare).mockImplementation(async (f) => {
+      keys.push(f.key!)
+      return { index: mockModelIndex(f.key!), chunks: [], offset: [0, 0, 0], file: { key: f.key!, path: f.path, name: f.name, sha256: 'a'.repeat(64) } }
+    })
+    vi.spyOn(federation, 'addBatch').mockImplementation(
+      () => new Promise<boolean>((_, reject) => (rejectJoin = reject))
+    )
+  })
+
+  it('a load torn down while it joined, whose join then fails: `initErr`, `booted` and `ready` are left as they were', async () => {
+    useShell.setState({ ...INITIAL, uploads: [], booted: false })
+    await openProjectFiles([ARC], [], { order: [ARC.path], then: async () => undefined })
+    for (let i = 0; i < 100 && !vi.mocked(federation.addBatch).mock.calls.length; i++) await vi.advanceTimersByTimeAsync(500)
+    expect(federation.addBatch).toHaveBeenCalledTimes(1)
+    disposeUploads()
+    // What the newer load has set by now — not the defaults, so a write over it shows.
+    useShell.setState({ booted: true, ready: true, initErr: 'the newer load’s own banner' })
+    rejectJoin(new Error('the scene could not take ARC'))
+    await vi.advanceTimersByTimeAsync(1000)
+    const s = useShell.getState()
+    expect([s.booted, s.ready, s.initErr]).toEqual([true, true, 'the newer load’s own banner'])
+  })
+})

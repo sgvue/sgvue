@@ -320,6 +320,9 @@ export class FederationController {
         joined.push(at)
       }
     } catch (err) {
+      // 2026-11-11 — replaced while it joined (`resetUnshown`), which already took everything of
+      // it out: nothing to undo, and a `close` here would close the newer load's model of that key.
+      if (gen !== this.gen) return false
       this.undoBatch(at, joined, replaced, boot)
       throw err
     }
