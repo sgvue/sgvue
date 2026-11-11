@@ -7,16 +7,17 @@
  *
  * Read-only in three independent ways, so no single mistake opens a write path:
  *   1. `guardSql` rejects anything that is not one `SELECT` / `WITH` / `EXPLAIN`.
- *   2. `PRAGMA query_only = 1` is set on the connection once the tables are full.
+ *   2. `PRAGMA query_only = 1` is set on the connection once the tables are full, and again
+ *      after the export, which reopens the connection and resets it (`exportDatabase`).
  *   3. The database is a copy of the index. Nothing here can reach the IFC file.
  *
- * `db.export()` is sent back as soon as the build finishes, so the bridge — not the worker
+ * The exported bytes are sent back as soon as the build finishes, so the bridge — not the worker
  * — owns the bytes. After a timeout kill there is then something to rebuild from without
  * re-reading the model.
  */
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
-import { buildDatabase, type SqlPayload } from './sql-schema'
+import { buildDatabase, exportDatabase, type SqlPayload } from './sql-schema'
 import { runQuery, type SqlQueryResult } from './sql-query'
 
 /* ────────────────────────────── protocol ────────────────────────────── */
@@ -69,7 +70,7 @@ ctx.onmessage = (event: MessageEvent<SqlRequest>): void => {
           db?.close()
           db = null
           db = buildDatabase(SQL, request.payload)
-          const bytes = db.export()
+          const bytes = exportDatabase(db)
           ctx.postMessage(
             {
               type: 'ready',

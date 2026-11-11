@@ -9,7 +9,7 @@
  *   python3 -m http.server 8765 --directory design-reference/design &
  *   SGVUE_OUT=tests/parity/phase2a/prototype \
  *   SGVUE_STATES=iso,plan,north,section-C,highlight,activate,isolate \
- *   npx electron scripts/parity-prototype.cjs
+ *   node scripts/safe-run.cjs parity-prototype.cjs
  *
  * The prototype is served over http because it loads its modules with dynamic `import()`,
  * which Chromium refuses from `file://`; it pulls React and three from CDNs, so the machine

@@ -40,7 +40,9 @@ type BetaTextBlockParam = Anthropic.Beta.BetaTextBlockParam
  * schedule's rows as a set; placing a markup) — each marked where it sits. 37 lines — 39 since
  * 2026-10-08, when one design line became three (below), and 40 since 2026-10-09, when the app
  * began to print every length in the user's display unit and the replies were asked to as well.
+ * 2026-11-08: two more — what answers a tabulation in the chat, and IFC terms in backticks.
  * 2026-11-09: one more, after the reply-quote line — a follow-up continues the previous answer's set.
+ * 43 lines.
  *
  * Phase 3 also brought two of the *added* lines up to date, because each said something that
  * stopped being true: `delete_set` forgets nothing by itself any more, and a viewpoint or a

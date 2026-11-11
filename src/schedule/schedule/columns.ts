@@ -60,7 +60,7 @@ export function columnForCore(key: CoreKey, system: UnitSystem = 'metric'): Colu
  * What a field's values are — its statistics, its type and what it measures. SGVue (phase 4 of
  * the assistant's parity work, 2026-10-02): moved here from `schedule-ui/panels/shared.ts`,
  * which re-exports them, so that `schedule/assistant.ts` decides which unit and how many decimals
- * a column may take by the very rule the Format tab offers them by. Unchanged, comments and all.
+ * a column may take by the very rule the column menu offers them by. Unchanged, comments and all.
  */
 
 /** What we know about a field's values, so the UI offers the right operators and units. */

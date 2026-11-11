@@ -16,13 +16,11 @@ export { focusables, trapTab } from './focus-trap'
 
 /**
  * Move focus into `container` while `open`, and give it back to whatever had it when the
- * surface opened once it closes. `startAt` picks which control receives it; the default is
- * the first one Tab would reach.
+ * surface opened once it closes. Focus goes to the first control Tab would reach.
  */
 export function useDialogFocus(
   open: boolean,
-  container: RefObject<HTMLElement | null>,
-  startAt: 'first' | 'container' = 'first'
+  container: RefObject<HTMLElement | null>
 ): void {
   useEffect(() => {
     if (!open) return
@@ -31,7 +29,7 @@ export function useDialogFocus(
     // time an unmount's cleanup runs, and this node is what the check below is about.
     const root = container.current
     if (root) {
-      const target = startAt === 'container' ? root : (focusables(root)[0] ?? root)
+      const target = focusables(root)[0] ?? root
       target.focus()
     }
     return () => {
@@ -43,5 +41,5 @@ export function useDialogFocus(
         !active || active === document.body || !active.isConnected || !!root?.contains(active)
       if (opener && opener.isConnected && ours) opener.focus()
     }
-  }, [open, container, startAt])
+  }, [open, container])
 }

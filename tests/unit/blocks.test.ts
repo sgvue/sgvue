@@ -12,7 +12,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { cellsOf, hasTable, parseBlocks, plainText, wordCount, type Block } from '../../src/renderer/ai/blocks'
+import { cellsOf, hasTable, parseBlocks, plainText, type Block } from '../../src/renderer/ai/blocks'
 import { BlockView } from '../../src/renderer/app/Trace'
 import { plainOf, replyStrip } from '../../src/renderer/state/selectors/chat'
 
@@ -202,22 +202,6 @@ describe('the blocks of a reply', () => {
   })
 })
 
-describe('how many pieces the reveal brings in', () => {
-  it('counts a paragraph’s words, as it always did', () => {
-    // Thirteen words, as the handoff's `ANSWER` has.
-    expect(wordCount('**9 of 86 walls** have no Fire Rating. All 9 are in `SB_ARC_R25`.')).toBe(13)
-    expect(wordCount('One.\nTwo words.')).toBe(3)
-    expect(wordCount('')).toBe(0)
-  })
-
-  it('counts each list marker and each word of each item, and a table as one', () => {
-    // The sentence's 13 words; 3 markers and 8 + 9 + 7 words (a name in the mono face is as many
-    // words as it has, `EW 200 Brick` three); the table whole.
-    expect(wordCount(WALLS)).toBe(13 + 3 + 8 + 9 + 7 + 1)
-    expect(wordCount('1. a b\n2.  ')).toBe(1 + 2 + 1)
-  })
-})
-
 describe('a reply as plain text, for its quote', () => {
   it('is a plain sentence itself, and a marked one without its marks', () => {
     expect(plainText('Isolated 18 walls on L2.')).toBe('Isolated 18 walls on L2.')
@@ -254,7 +238,7 @@ describe('a long reply', () => {
     return [out, performance.now() - t0]
   }
   const linear = (text: string): void => {
-    for (const fn of [parseBlocks, wordCount, plainText, hasTable] as ((t: string) => unknown)[]) {
+    for (const fn of [parseBlocks, plainText, hasTable] as ((t: string) => unknown)[]) {
       const [, ms] = timed(() => fn(text))
       expect([fn.name, text.length >= 200_000, ms < 1000]).toEqual([fn.name, true, true])
     }

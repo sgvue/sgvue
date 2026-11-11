@@ -43,9 +43,6 @@ function libraryBody(state: AppState, store: ModelStore): string {
     </div>`;
 }
 
-/** The card's contents alone — what a library-only paint rewrites (main.ts). */
-export const renderLibraryCard = libraryBody;
-
 export function renderLibrary(state: AppState, store: ModelStore): string {
   return `<div class="overlay" data-act="overlay-backdrop">
     <div class="overlay-card lib-card" role="dialog" aria-modal="true" aria-label="Templates">

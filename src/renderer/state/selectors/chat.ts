@@ -1,21 +1,24 @@
 /**
  * The chat panel's pure pieces — `SGVue.dc.html:2015–2051` (the per-message view model, the
- * reply strip, the suggestion list) and `:1127–1136` (the resize clamp).
+ * reply strip, the suggestion list). (`:1127–1136`'s resize clamp went with the panel on
+ * 2026-11-07, when the chat became a window of its own.)
  *
  * The same split every other selector in this folder uses: the **decision** is a function of
  * data, so a bubble's corner radius, a quantity column, the CSV a table copies and the size a
  * drag settles on can all be tested without a DOM, a viewer or a model call.
  *
  * 2026-10-01: the assistant has a name of its own, **Vee** (`ASSISTANT`, `authorOf` — the
- * design's three `'SGVue'` literals in one place), its label carries the mascot (`hasSprite`),
- * and the resize clamp takes the bottom row's lane.
+ * design's three `'SGVue'` literals in one place), and the resize clamp took the bottom row's
+ * lane.
  *
  * The same day, the owner's "Ask Vee" handoff in full: **a user's row stands on the left**, as
  * the assistant's does, with the assistant's corner — the handoff's, and what makes the typed
  * line's lift from the composer a straight line (the design: on the right, `:2015`); a reply
- * that came from a turn carries what its thinking trace left (`ChatMessage.trace`: the status
- * beside the name, whether its bubble is the trace's full-width one, its rows); and the mascot
- * in front of the newest such reply is `done` (`veeStateOf`).
+ * that came from a turn carries what its thinking trace left (`ChatMessage.trace`: its status,
+ * whether its bubble is the trace's full-width one, its rows); and the mascot of the newest
+ * such reply is `done` (`veeStateOf`). Since 2026-11-08 the Ask Vee window draws `You` on the
+ * right, the mascot at the foot of a reply's group, and the status only as the folded line of
+ * a reply written before then.
  */
 import type { ChatPending, ChatTable, PendingAction } from '../../ai/executors/context'
 import { group } from '../../../shared/fmt'
@@ -40,39 +43,20 @@ export const ASSISTANT = 'Vee'
 export const authorOf = (m: Pick<ChatMessage, 'role'>): string =>
   m.role === 'user' ? 'You' : ASSISTANT
 
-/** One message, as `:2015` derives it. Every value is what the markup interpolates. */
+/**
+ * One message, as `:2015` derives it — what the Ask Vee window still reads of it. The old chat
+ * panel's other fields (side, colour, corner, width, label, mascot, the has-chips / has-table /
+ * has-pending flags, the trace's status and width) went with that panel on 2026-11-08; the
+ * quote and the opacity stay because a test reads the stored quote and the reverted flag
+ * through them.
+ */
 export interface ChatRow {
-  key: number
-  who: string
-  /** 2026-10-01 — the mascot stands in front of the assistant's label, never the user's. */
-  hasSprite: boolean
-  fg: string
-  bg: string
-  align: string
-  just: string
-  radius: string
-  maxW: string
   opacity: string
-  hasQuote: boolean
   quoteWho: string
   quoteText: string
-  hasChips: boolean
-  hasTable: boolean
   tableTitle: string
-  tableClash: boolean
   tableRows: { k: string; n: string; q: string; ids: readonly number[] }[]
-  hasPending: boolean
-  pendingLabel: string
   canRevert: boolean
-  /**
-   * 2026-10-01 — the reply came from a turn, so it carries its trace: its bubble is the trace's
-   * (its words revealed one by one, its rows under them) rather than the plain one.
-   */
-  traced: boolean
-  /** …the status beside the name: `checked 86 walls · 7s`, `3s`. `''` for none. */
-  status: string
-  /** …and the turn opened the trace bubble, so the reply keeps its full width. */
-  wide: boolean
 }
 
 /**
@@ -116,13 +100,10 @@ export function tableCsv(table: ChatTable, unit: DisplayUnit = 'mm'): string {
     `${csvCell(table.groupBy)},count,quantity`,
     ...table.rows.map(
       (r) =>
-        `"${defuse(r.k).replace(/"/g, '""')}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : ''}`
+        `"${defuse(r.k).replace(/"/g, '""')}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : r.volume ? r.volume.toFixed(3) : ''}`
     )
   ].join('\n')
 }
-
-/** The corner every bubble has since 2026-10-01: both sides stand on the left. `:2015`'s assistant value. */
-export const BUBBLE_RADIUS = '11px 11px 11px 3px'
 
 /**
  * 2026-11-07 — a message as the Ask Vee window has it: what the panel draws of it, and nothing
@@ -203,37 +184,18 @@ export function messageView(m: ChatMessage, id = 0, pending = 0): ChatMessageVie
   }
 }
 
-/**
- * `:2015`. `mine` decides the colour and how wide the bubble may grow. Until 2026-10-01 it also
- * decided the side (`flex-end`) and the corner the notch is on (`11px 11px 3px 11px`); the
- * owner's handoff puts `You` on the left with the assistant's corner.
- */
+/** `:2015`. A stored message's row: `viewRow` over `messageView`, which the tests reach it through. */
 export const chatRow = (m: ChatMessage, i: number, unit: DisplayUnit = 'mm'): ChatRow =>
   viewRow(messageView(m), i, unit)
 
 /** `chatRow` for a message as the Ask Vee window has it (2026-11-07). */
-export function viewRow(m: ChatMessageView, i: number, unit: DisplayUnit = 'mm'): ChatRow {
-  const mine = m.role === 'user'
+export function viewRow(m: ChatMessageView, _i: number, unit: DisplayUnit = 'mm'): ChatRow {
   const table = m.table
-  const trace = mine ? null : m.trace
   return {
-    key: i,
-    who: authorOf(m),
-    hasSprite: !mine,
-    fg: 'var(--ink)',
-    bg: mine ? 'var(--sel-bg)' : 'var(--step-bg)',
-    align: 'flex-start',
-    just: 'flex-start',
-    radius: BUBBLE_RADIUS,
-    maxW: mine ? '86%' : '100%',
     opacity: m.reverted ? '0.5' : '1',
-    hasQuote: !!m.quote,
     quoteWho: m.quote ? m.quote.who : '',
     quoteText: m.quote ? m.quote.text : '',
-    hasChips: !!m.chips.length,
-    hasTable: !!table,
     tableTitle: table ? table.groupBy : '',
-    tableClash: !!(table && table.clash),
     tableRows: table
       ? table.rows.map((r) => ({
           k: r.k,
@@ -242,17 +204,12 @@ export function viewRow(m: ChatMessageView, i: number, unit: DisplayUnit = 'mm')
           ids: r.ids ?? []
         }))
       : [],
-    hasPending: !!m.pending,
-    pendingLabel: m.pending ? m.pending.label : '',
-    canRevert: m.canRevert,
-    traced: !!trace,
-    status: trace ? trace.status : '',
-    wide: !!trace && trace.wide
+    canRevert: m.canRevert
   }
 }
 
 /**
- * The mascot in front of a reply that is not being written: **`done` while the reply is a
+ * The mascot at the foot of a reply that is not being written: **`done` while the reply is a
  * turn's and the newest message in the transcript**, `idle` otherwise — every older reply, and
  * the boot audit, which no turn produced. (The reply being written takes its state from the
  * trace; the header's sprite and the pill's are always `idle`.)

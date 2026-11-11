@@ -44,6 +44,46 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   where a wall used to read as a box several metres wide and walls a metre apart "overlapped".
   The model database gains a `plan_box` table beside `bbox`. Nothing changes for a building that
   is not turned.
+- **Ask Vee asks before it shows only a storey or two.** "Show only Level 5" used to be applied
+  at once, where every other way the assistant can hide elements waits for your Apply click when
+  it would leave less than 5 % of the model in view, and is refused when it would leave nothing.
+  Showing only some storeys now follows the same rule. What works differently: on a tall
+  building, showing a single storey can wait behind Apply; bringing storeys back never does.
+- **Ask Vee's clash list is in order when it had to be cut short.** A clash check that reached
+  its limit returned its pairs unsorted while the reply called the first three the largest.
+- **A spot Ask Vee places is quoted in the unit on screen.** With the unit set to ft the reply
+  gave the coordinates in metres while the tag and the Markups card showed feet.
+- **`copy csv` writes the volumes of a volume table.** The quantity column was left blank for a
+  table that totals volumes; areas were already written.
+- **Two Ask Vee messages name what is on screen.** When two recent files share a name, the
+  message points to the sidebar's upload button, not the removed library; and a tabulated answer
+  is no longer asked to be one sentence long, since the table is shown beside it.
+- **Preferences' Model box saves once.** It sent every keystroke to be saved, and an emptied box
+  was refused mid-typing; it now saves on Enter or when you leave the field.
+- **The Spatial-structure card names the file's own coordinate system.** The site line always
+  read "(SVY21)", whatever the file said. What works differently: a file that declares another
+  coordinate system shows that name, and a file that declares none shows no name at all.
+- **Schedules says why nothing happened.** Picking a ninth filter or a fifth sort level now says
+  the limit is reached; deleting a saved template that storage refuses says so instead of
+  "Deleted"; the formula guide points to the column's menu, not the retired Column formatting
+  panel.
+- **The Schedules window redraws less.** Opening or closing the rail, the calculated-value
+  editor, the formula guide or the Templates library, and renaming, deleting or duplicating a
+  saved template that is not on screen, no longer redraw the whole table; removing a column,
+  removing a rule during a preview and adding a calculated value draw once, not twice.
+- **Schedules filters read four inputs they got wrong.** A number typed as `.5` or `1e3` is read
+  as 0.5 and 1000 (it was 5 and 1). A yes/no filter set to `✓` matched the No rows; every
+  spelling the window offers now reads as written. A schedule file that names a class twice
+  lists its rows once. What works differently: a yes/no filter value that is neither a yes nor a
+  no spelling (`f`, `off`, `.T.`) now matches nothing, where it used to match the No rows; and a
+  filter or colour rule whose operator SGVue does not know is dropped when the file is opened,
+  where it used to keep every row.
+- **The assistant's model database stays read-only after it is built.** One of its three
+  read-only safeguards was switched off by the step that copies the database, for as long as
+  the model stayed open; the other two held, and nothing wrote to it. It is switched back on.
+- **A schedule file cannot name a field that does not exist.** A crafted `.schedule.json` (or
+  saved template, or project) could name built-in JavaScript words such as `constructor` as a
+  column, which showed program text as the heading. Such a column is dropped on load.
 
 ## [1.5.0] - 2026-11-08
 
@@ -387,6 +427,7 @@ assistant, and the accessibility, performance and packaging pass. It was not pub
 releases page.
 
 [Unreleased]: https://github.com/sgvue/sgvue/commits/main
+[1.5.0]: https://github.com/sgvue/releases/releases/tag/v1.5.0
 [1.4.0]: https://github.com/sgvue/releases/releases/tag/v1.4.0
 [1.3.0]: https://github.com/sgvue/releases/releases/tag/v1.3.0
 [1.2.0]: https://github.com/sgvue/releases/releases/tag/v1.2.0

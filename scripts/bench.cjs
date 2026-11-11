@@ -2,7 +2,7 @@
  * Dev utility — NOT application code. The renderer benchmark: a real IFC file loaded through
  * the real pipeline inside the built app, then orbited while `on.stats` is sampled.
  *
- *   npm run build && SGVUE_IFC="samples/Sample Ifc Model.ifc" npx electron scripts/bench.cjs
+ *   npm run build && SGVUE_IFC="samples/Sample Ifc Model.ifc" node scripts/safe-run.cjs bench.cjs
  *
  * **WebGL2 only.** A real model on WebGPU is what kernel-panicked this machine twice on
  * 2026-09-17 (`scripts/lib/electron-guard.cjs`), and `scripts/lib/backend.cjs` refuses it

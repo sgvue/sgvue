@@ -174,7 +174,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
   if (!res.columns.length) return '<div class="empty-note">No columns yet. Add some from the fields chip above, or press /.</div>';
 
   // Map visible column index back to its index in def.columns, so a header click opens
-  // the right column in Column formatting and the badge lands on the right heading.
+  // the right column's menu and the badge lands on the right heading.
   const defIndex: number[] = [];
   def.columns.forEach((c, i) => { if (!c.hidden) defIndex.push(i); });
 
@@ -202,7 +202,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
       state.selectedCols.includes(defIndex[i]) ? 'sel' : '',
       i === colourCol ? 'colour-src' : ''].filter(Boolean).join(' ');
     // NOT data-i. A header's position in its own list is its VISIBLE index; what the
-    // formatting panel needs is where that column sits in def.columns, which differs as
+    // column menu needs is where that column sits in def.columns, which differs as
     // soon as any column is hidden. Different question, different name.
     // tabindex: a heading is the keyboard's way to its menus — Enter / Space is its click
     // (events.ts), which opens the column menu, and the ContextMenu key / Shift+F10 the

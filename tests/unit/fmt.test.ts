@@ -9,7 +9,6 @@ import {
   f3,
   fixed2,
   fixed3,
-  fmtMM,
   fmtV,
   mmPlain,
   mmTxt,
@@ -39,7 +38,6 @@ describe('fmt', () => {
   it('formats millimetres with the right space before the unit', () => {
     // SGVue.dc.html:1838 and viewer-core.js:9 use a plain space …
     expect(mmv(2.4)).toBe(`2${THIN_SPACE}400 mm`)
-    expect(fmtMM(2.4)).toBe(`2${THIN_SPACE}400 mm`)
     // … viewer-core.js:435 (dimension labels) uses a thin space.
     expect(mmTxt(2.4)).toBe(`2${THIN_SPACE}400${THIN_SPACE}mm`)
     expect(mmTxt(2.4)).not.toBe(mmv(2.4))

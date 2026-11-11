@@ -4,8 +4,8 @@
  * It exists so the assistant can answer questions that no fixed tool signature covers —
  * "which fire doors on L3 have no FRL", "count walls by type and storey" — with an
  * arbitrary join instead of a new tool per question. It is built from the index already in
- * memory, held only in RAM, and set `PRAGMA query_only = 1` once it is full; there is no
- * write path from it back to the IFC file.
+ * memory, held only in RAM, and set `PRAGMA query_only = 1` once it is full and again after
+ * every export (`exportDatabase`); there is no write path from it back to the IFC file.
  *
  * `SQL_SCHEMA` is the DDL **and** the documentation: Phase 9 puts this exact string in the
  * assistant's prompt, so the model reads the same column names the database has. Keep the
@@ -244,6 +244,18 @@ export function buildDatabase(SQL: SqlJsStatic, payload: SqlPayload): Database {
   // From here the connection refuses every write, whatever reaches it.
   db.run('PRAGMA query_only = 1')
   return db
+}
+
+/**
+ * The database's bytes, with the connection left read-only.
+ *
+ * sql.js's `export()` closes and reopens the connection, which resets every pragma — so
+ * `query_only` is set again here, or the live connection would accept writes after it.
+ */
+export function exportDatabase(db: Database): Uint8Array {
+  const bytes = db.export()
+  db.run('PRAGMA query_only = 1')
+  return bytes
 }
 
 /** The schema and every row, in one transaction. `buildDatabase` owns the cleanup. */

@@ -54,6 +54,12 @@ export interface SpatialInput {
    * `ft`. `mm` and `m` print what these rows always printed, which was metres.
    */
   units?: DisplayUnit
+  /**
+   * The CRS chip's short name (`crsChip(georefSource).short`), as the status bar and the
+   * Coordinate-system card print it. Omitted, the design's literal `(SVY21)` (`:1769`); the em
+   * dash or empty — no CRS stated — no parenthesis at all; any other name, that name.
+   */
+  crs?: string
 }
 
 /** `MILLI.METRE · SQUARE_METRE · CUBIC_METRE` from the file's own `IfcUnitAssignment`. */
@@ -70,7 +76,8 @@ export function unitsLine(units: Units): string {
 const or = (v: string | undefined | null): string => (v ? v : DASH)
 
 export function spatialCards(input: SpatialInput): SpatialCard[] {
-  const { federation: m, library, files = [], coords: co, uploadNames, units = 'mm', assigned = {} } = input
+  const { federation: m, library, files = [], coords: co, uploadNames, units = 'mm', assigned = {}, crs = 'SVY21' } = input
+  const crsTail = crs && crs !== DASH ? ` (${crs})` : ''
   /** A coordinate, comma-grouped to three decimals as the design's own `f3` here (`:1749`). */
   const xyz = (v: number): string => group3(coordIn(v, units))
   const cu = coordUnit(units)
@@ -120,7 +127,7 @@ export function spatialCards(input: SpatialInput): SpatialCard[] {
           v:
             co.E == null || co.N == null
               ? DASH
-              : `${xyz(co.E)} E · ${xyz(co.N)} N (SVY21)`
+              : `${xyz(co.E)} E · ${xyz(co.N)} N${crsTail}`
         },
         {
           k: 'True north',

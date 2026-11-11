@@ -4,7 +4,7 @@
 import type { UnitKind } from '../ifc/types';
 import { isBodyFont } from './fonts';
 // The decimal range lives in the file that owns decimals; this parser clamps to the same
-// numbers the Format tab's box does, for the reason spelled out at clampDecimals.
+// numbers the column menu's box does, for the reason spelled out at clampDecimals.
 import { DECIMALS_MAX, DECIMALS_MIN } from './format';
 
 /** Core (non-property) fields. Mirrors ElemCore. */
@@ -45,14 +45,19 @@ export type FieldRef =
   | { kind: 'prop'; pset: string; prop: string }
   | { kind: 'formula'; id: string };
 
-export type Op =
-  | '=' | '!=' | '>' | '>=' | '<' | '<='
-  | 'contains' | 'startsWith' | 'endsWith'
-  | 'hasValue' | 'noValue' | 'in' | 'between';
+/** Every filter / colour-rule operator. ONE list: `Op` is derived from it and the parser reads it. */
+export const OPS = [
+  '=', '!=', '>', '>=', '<', '<=',
+  'contains', 'startsWith', 'endsWith',
+  'hasValue', 'noValue', 'in', 'between',
+] as const;
+export type Op = (typeof OPS)[number];
+
+const isOp = (v: unknown): v is Op => (OPS as readonly unknown[]).includes(v);
 
 /**
  * How a boolean may be spelled. ONE list: the type below, the import sanitiser and the
- * Format tab's dropdown all read it, and `format.ts`'s BOOL_TEXT is keyed over the union it
+ * column menu's dropdown all read it, and `format.ts`'s BOOL_TEXT is keyed over the union it
  * produces — so a fifth spelling is a single edit that the compiler then chases.
  * Yes/No first, because that is the default and the order the dropdown offers.
  */
@@ -236,8 +241,9 @@ export function fieldKey(f: FieldRef): string {
 
 /**
  * Ids only need to be unique inside one schedule. SGVue (2026-10-02): moved here from
- * `schedule-ui/panels/fieldsSection.ts`, which re-exports it — the editor's Add buttons and the
- * assistant's `make_schedule` both name a new calculated value with it.
+ * `schedule-ui/panels/fieldsSection.ts` (gone with the inspector in v1.5.0) — the calculated-value
+ * actions (`actions/calculated.ts`) and the assistant's `make_schedule` both name a new
+ * calculated value with it.
  */
 export function newId(prefix: string, existing: { id: string }[]): string {
   let n = existing.length + 1;
@@ -309,7 +315,8 @@ function cleanField(v: unknown): FieldRef | null {
   if (!v || typeof v !== 'object') return null;
   const kind = (v as { kind?: unknown }).kind;
   if (kind !== 'core' && kind !== 'prop' && kind !== 'formula') return null;
-  if (kind === 'core' && !(((v as { key?: string }).key ?? '') in CORE_LABELS)) return null;
+  // Own keys only: `in` also accepts names every object inherits (`constructor`, `toString`).
+  if (kind === 'core' && !Object.hasOwn(CORE_LABELS, (v as { key?: string }).key ?? '')) return null;
   return v as FieldRef;
 }
 
@@ -332,7 +339,7 @@ function cleanColumn(v: unknown): Column | null {
     hidden: c.hidden === true ? true : undefined,
     conditional: Array.isArray(c.conditional)
       ? (c.conditional as Record<string, unknown>[])
-        .filter((r) => r && typeof r === 'object' && typeof r.op === 'string')
+        .filter((r) => r && typeof r === 'object' && isOp(r.op))
         .map((r) => ({
           op: r.op as Op,
           value: typeof r.value === 'number' ? r.value : text(r.value, 120),
@@ -426,7 +433,7 @@ export function parseScheduleDef(input: unknown): ScheduleDef {
 
   const base = emptySchedule(typeof o.name === 'string' ? o.name : 'Imported Schedule');
   const entity = Array.isArray(o.entity)
-    ? o.entity.filter((e): e is string => typeof e === 'string')
+    ? [...new Set(o.entity.filter((e): e is string => typeof e === 'string'))]
     : typeof o.entity === 'string' ? [o.entity] : [];
 
   const columns = (o.columns as unknown[])
@@ -443,7 +450,7 @@ export function parseScheduleDef(input: unknown): ScheduleDef {
       ? (o.calculated as unknown[]).map(cleanCalculated).filter((c): c is Calculated => c !== null)
       : undefined,
     filters: Array.isArray(o.filters)
-      ? (o.filters as FilterRule[]).filter((f) => f?.field && f.op).slice(0, MAX_FILTERS).map(cleanRange) : [],
+      ? (o.filters as FilterRule[]).filter((f) => f?.field && isOp(f.op)).slice(0, MAX_FILTERS).map(cleanRange) : [],
     filterLogic: o.filterLogic === 'or' ? 'or' : 'and',
     sort: Array.isArray(o.sort)
       ? (o.sort as SortLevel[]).filter((s) => s?.field).slice(0, MAX_SORT_LEVELS) : [],

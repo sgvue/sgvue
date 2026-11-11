@@ -85,7 +85,6 @@ import { planePatch } from '../../state/selectors/section'
 import { getViewer, peekHistory, planRotationRad, restoredVis, useShell } from '../../state/shell'
 import type { ShellState } from '../../state/shell'
 import {
-  CHIP_CAP,
   COLOR_GROUP_CAP,
   COLOR_HEAD,
   askApply,
@@ -1167,6 +1166,55 @@ export const set_storeys: Executor = (input, ctx) => {
   }
   const storeyVis: Record<string, boolean> = {}
   if (visible.length) for (const n of names) storeyVis[n] = visible.includes(n)
+
+  // Compared first, as `set_models` is: a storey shows unless it is `false`.
+  const hiddenNow = names.filter((n) => s.storeyVis[n] === false)
+  const hiddenNext = names.filter((n) => storeyVis[n] === false)
+  if (hiddenNow.length === hiddenNext.length && hiddenNow.every((n) => hiddenNext.includes(n))) {
+    return {
+      forModel: {
+        message: `${visible.length ? `Showing ${visible.join(', ')}` : 'All storeys visible'} — that is how it already was, so nothing changed.`,
+        applied: false,
+        storeysShown: visible.length ? visible : names
+      }
+    }
+  }
+
+  const total = s.federation.elements.length
+  const would = s.federation.elements.filter(visFn({ ...s, storeyVis })).length
+  // Only bringing storeys back can never hide anything.
+  const scope = scopeCheck(would, total, hiddenNext.every((n) => hiddenNow.includes(n)))
+  if (scope === 'empty') {
+    return {
+      forModel: {
+        message: `That would leave nothing visible, so it was not applied. ${hiddenNow.length ? `Hidden storeys now: ${hiddenNow.join(', ')}.` : 'Every storey is showing now.'} Check the models and the filter stack, or use apply_visibility with action:"reset" to start from the whole model.`,
+        applied: false,
+        wouldLeaveVisible: 0,
+        totalElements: total
+      }
+    }
+  }
+  if (scope === 'confirm') {
+    // Each name once — two models' storeys of one name at different elevations are two entries
+    // of the ladder (`unionStoreys`) — and bounded, as `set_models` bounds its names.
+    const shownNames = [...new Set(names.filter((n) => storeyVis[n] !== false))].map((n) => labelText(n, SET_NAME_CHARS))
+    return {
+      forModel: {
+        message: confirmText(would, total),
+        applied: false,
+        pending: true,
+        wouldLeaveVisible: would,
+        totalElements: total
+      },
+      ui: {
+        pending: {
+          label: `show only ${firstFew(shownNames)} — leaves ${would} of ${total} visible`,
+          patch: { storeyVis }
+        }
+      }
+    }
+  }
+
   s.up({ storeyVis })
   return {
     forModel: {
@@ -1725,9 +1773,6 @@ export const set_models: Executor = (input, ctx) => {
   }
 }
 
-/** Kept beside the chip caps so the panel and the executors cannot drift. */
-export { CHIP_CAP }
-
 export const VIEW_EXECUTORS: Record<string, Executor> = {
   set_filter_stack,
   manage_filters,
@@ -1743,8 +1788,4 @@ export const VIEW_EXECUTORS: Record<string, Executor> = {
   set_models
 }
 
-/** Reused by `read.ts`'s `get_view_state`, so both report the same numbers. */
-export { visibleCount, groupCounts }
-
-/** The outcome shape, re-exported so `index.ts` has one import. */
-export type { ToolOutcome }
+export { groupCounts }

@@ -13,7 +13,7 @@
  * Every rule below appears verbatim in the design; the comment names where.
  */
 
-/* L72 project button · L94 model row · L142 library item · L163 storey row
+/* L72 project button · L94 model row · L163 storey row
  * L179 group header · L191 tree row · L224–248 toolbar buttons · L420 colour-legend row
  * L475 a chat result-table row */
 .hv-step:hover {
@@ -98,7 +98,7 @@
   outline: none !important;
 }
 
-/* L757 the Resume-last-session card · L804 a sample-federation pill */
+/* L804 a sample-federation pill (a Recent pill) */
 .hv-accent-step:hover {
   border-color: var(--accent) !important;
   background: var(--step-bg) !important;
@@ -109,13 +109,6 @@
 .hv-accent-both:hover {
   border-color: var(--accent) !important;
   color: var(--accent-ink) !important;
-}
-
-/* L432 the chat panel's resize corner — the design's one custom-property hover: the stroke
- * reads `var(--grab, var(--border-strong))`, so setting `--grab` on the 34 px hit area is what
- * turns both of its borders accent. */
-.hv-grab:hover {
-  --grab: var(--accent) !important;
 }
 
 /* Not in the design — 2026-09-24, the owner's resizable sidebar sections: a drag handle's

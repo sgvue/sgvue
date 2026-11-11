@@ -559,7 +559,7 @@ function placeMarkup(input: Record<string, unknown>, ctx: ToolContext, laser: bo
     ? measureRows(after.measures, after.units)[at].v.replace(/\s+/g, ' ')
     : 'level' in record
       ? `level ${record.level} m in the file’s own coordinates — the model has no base point`
-      : spotRows(after.spots)[at].v
+      : spotRows(after.spots, after.units)[at].v
   return {
     forModel: {
       message:

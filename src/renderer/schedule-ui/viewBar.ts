@@ -1,7 +1,7 @@
 // The view bar: under the schedule's name, what the schedule is doing, as chips. Filters
 // read as sentences with what each removes; sort and group levels follow; on the right,
-// how rows are shown and the table's style. Each chip opens its popover (ui/popover.ts,
-// bodies in ui/viewPopovers.ts); nothing here edits anything itself.
+// how rows are shown and the table's style. Each chip opens its popover (popover.ts,
+// bodies in viewPopovers.ts); nothing here edits anything itself.
 //
 // Which chip is open, and which column a filter or sort chip points at, is transient UI —
 // read from the popover's id, never AppState. The column mark is a static class set in

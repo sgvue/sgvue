@@ -136,7 +136,8 @@ export function candidateRows(store: ModelStore, def: ScheduleDef): number[] {
   if (!def.entity.length) return [];
   if (def.entity.length === 1) return (store.byEntity.get(def.entity[0]) ?? []).slice();
   const out: number[] = [];
-  for (const e of def.entity) {
+  // A class named twice is read once, so no element is listed twice.
+  for (const e of new Set(def.entity)) {
     const rows = store.byEntity.get(e);
     if (rows) out.push(...rows);
   }

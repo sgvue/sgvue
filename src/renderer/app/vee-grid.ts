@@ -194,7 +194,9 @@ export const VEE_PALETTE: Readonly<Record<'dark' | 'light', Readonly<Record<VeeR
 
 /**
  * The three layout slots, in CSS px: the reference's 32, 28 and 24 px sprites (`px` 2, 1.75 and
- * 1.5 a cell, `:143`, `:315`, `:367`) ÷ 1.5 — the scale between the handoff and the app.
+ * 1.5 a cell, `:143`, `:315`, `:367`) ÷ 1.5 — the scale between the handoff and the app. Only
+ * the pill's is read now: since 2026-11-08 the Ask Vee window's header and avatars are
+ * `VEE_FACE` and `VEE_AVATAR`.
  */
 export const VEE_SLOT = { header: 21, label: 19, pill: 16 } as const
 
@@ -213,7 +215,8 @@ export const VEE_AVATAR = { slot: 16, mult: 1 } as const
  * pulled in by negative margins, as the reference's are (`ask-thinking-hex.jsx:315`, `:367`).
  * The top margin is the larger one: it lifts the grid by about a cell, which is what puts the
  * **body** on the row's centre line. (Moved here from `ChatPanel.tsx` on 2026-11-07, when the
- * panel left the main window and the pill stayed: both still read them.)
+ * panel left the main window and the pill stayed. Only the pill's is read now; the header and
+ * label rows below are the panel's as it was before 2026-11-08.)
  *
  *   header  21 px, 15 px of flow — the sparkle's 15, so the title starts where it did. The slot
  *           spans 11–32 px from the panel's edge; the reference's, 11.5–32.8.

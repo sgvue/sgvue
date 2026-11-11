@@ -1,8 +1,8 @@
 // Saved schedule definitions: a named list in this window's localStorage — ported from
 // ifcTable's `ui/schedules.ts` (2026-09-25, phase 2). The save rule, the numbering and the
-// cap are ifcTable's own. What SGVue leaves out for now: the `.schedule.json` export and
-// import (a file written or read outside the two sanctioned writers — phase 4 brings them back
-// behind a native Save / Open dialog), and the one-time adoption of ifcTable's older key.
+// cap are ifcTable's own. What SGVue leaves out: the one-time adoption of ifcTable's older key.
+// The `.schedule.json` export and import, left out in phase 2, came back in phase 4 behind a
+// native Save / Open dialog.
 // The key is SGVue's own, under the `sgvue.schedules.` prefix the Schedules window keeps to.
 
 import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def';
@@ -20,9 +20,10 @@ export const CAP = 100;
 /** What the caller says when a write was refused, and why. */
 export const FULL_MESSAGE = `Saved templates are full (${CAP}). Delete one to make room.`;
 export const STORAGE_MESSAGE = 'Could not save — storage is unavailable or full.';
+export const DELETE_STORAGE_MESSAGE = 'Could not delete — storage is unavailable or full.';
 
 /** Would a save that may replace `own` have to add an entry to a list already at the cap? */
-export function isFull(own: string | null = null, entries = listSaved()): boolean {
+export function isFull(own: string | null = null, entries: readonly Pick<SavedEntry, 'name'>[] = listSaved()): boolean {
   return entries.length >= CAP && !(own !== null && entries.some((e) => e.name === own));
 }
 
@@ -213,6 +214,7 @@ export function duplicateSchedule(name: string): string | null {
   return write(entries) ? fresh : null;
 }
 
-export function deleteSchedule(name: string): void {
-  write(listSaved().filter((e) => e.name !== name));
+/** False when storage (or a project's list) refused the write: then nothing was deleted. */
+export function deleteSchedule(name: string): boolean {
+  return write(listSaved().filter((e) => e.name !== name));
 }

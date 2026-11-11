@@ -148,7 +148,7 @@ function run(action: LibAction, value?: string) {
       focusAfterPaint('[data-act="library-search"]');
       lib.libSet({ libraryQuery: '' });
       break;
-    case 'close': update({ overlay: null, libraryDraft: null }); break;
+    case 'close': update({ overlay: null, libraryDraft: null }, 'panes'); break;
     case 'swallow': break;
   }
 }

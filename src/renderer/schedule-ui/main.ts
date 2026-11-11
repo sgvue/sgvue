@@ -269,7 +269,10 @@ function paint(scope: RenderScope) {
   // A closed library wants no preview: drop one still waiting to run.
   if (state.overlay !== 'library') cancelPreview();
   if (ms > 120) console.warn(`[schedules] schedule took ${ms.toFixed(0)}ms`);
-  queueCurrent();
+  // A 'panes' paint changed neither the definition nor the rows, so there is nothing new to
+  // tell the main window — and `postCurrent` would re-run the engine during a preview. Whatever
+  // changes the definition paints the table, and that paint queues.
+  if (table) queueCurrent();
 }
 
 // A repaint asked for mid-press waits for the release (pressGate.ts).
@@ -393,8 +396,9 @@ function projectSchedules(saved: PortSavedEntry[] | null, open: unknown): void {
     const sent = SavedListShape.safeParse(entries);
     if (sent.success) port?.postMessage({ type: 'projectSaved', saved: entries });
   });
-  // A repaint either way, so the library's Mine shows the list it now has.
-  if (!(open && showProjectSchedule(open)) && (was || saved)) render();
+  // A repaint either way, so the library's Mine shows the list it now has — 'panes', since the
+  // saved list is not the schedule on screen and no table row can change with it.
+  if (!(open && showProjectSchedule(open)) && (was || saved)) render('panes');
 }
 
 /**
@@ -642,7 +646,7 @@ function menuTargets(res: ScheduleResult, row: number | null): number[] {
 
 /**
  * "Colour 3D by this column": the column's displayed values over every matching element —
- * `colourColumn`, which Ask SGVue's `color_by_schedule_column` runs too (2026-09-28).
+ * `colourColumn`, which Ask Vee's `color_by_schedule_column` runs too (2026-09-28).
  */
 function colourByColumn(defcol: number): void {
   const { store, def } = state;
@@ -654,7 +658,7 @@ function colourByColumn(defcol: number): void {
 }
 
 /**
- * Ask SGVue's `export_schedule` (2026-09-28): the Export menu's own action for that entry, or
+ * Ask Vee's `export_schedule` (2026-09-28): the Export menu's own action for that entry, or
  * the menu's reason not to. The answer goes back at once — the tool never waits on the dialog.
  */
 function exportFromChat(format: ExportFormat, n: number): void {

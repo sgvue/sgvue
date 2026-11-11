@@ -204,7 +204,7 @@ export const planRotationRad = (s: Pick<ShellState, 'planRotationDeg'>): number 
 /** No base point: every field blank, never a zero. */
 const NO_COORDS: CoordState = { E: null, N: null, Z: null, angle: null }
 
-/** Where the context menu wants to open. The menu itself is Phase 4. `:892`. */
+/** Where the context menu (`app/ContextMenu.tsx`) wants to open. `:892`. */
 export interface CtxState {
   x: number
   y: number
@@ -287,8 +287,9 @@ export interface ChatMessage {
   settled?: { how: 'applied' | 'deleted' | 'cleared' | 'cancelled'; at: number; label: string }
   revertedAt?: number
   /**
-   * 2026-10-01 — what the turn's thinking trace leaves on its reply (`ai/trace-facts.ts`): the
-   * status beside the name (`checked 86 walls · 7s`), the rows under the answer, and whether
+   * 2026-10-01 — what the turn's thinking trace leaves on its reply (`ai/trace-facts.ts`): its
+   * status (`checked 86 walls · 7s` — since 2026-11-08 only the folded line of an older reply),
+   * the rows under the answer, the folded line and its steps, and whether
    * the reply keeps the trace bubble's full width. Absent on a message no turn produced — the
    * boot audit — which is how the panel tells the two apart.
    */
@@ -358,7 +359,7 @@ export interface ShellState {
   byId: ReadonlyMap<number, FederatedElement>
   propKeys: readonly string[]
   loaded: readonly string[]
-  /** The sample library. Empty unless real sample files exist — BUILD_PLAN pitfall 25. */
+  /** The sample library: main's recents list (`model/boot.ts`), empty until a file was opened. */
   library: readonly LibraryFile[]
   /**
    * Whole metres the geometry pipeline subtracted from every placement so the scene sits near
@@ -461,8 +462,9 @@ export interface ShellState {
    */
   hlColor: string
   /**
-   * `:850`. Phase 9 owns the panel; `askAbout` already opens it and writes the composer's
-   * pre-fill, which is what the context menu's "Ask about this" is.
+   * `:850`. Whether the Ask Vee window is open (a window of its own since 2026-11-07); `askAbout`
+   * opens it and writes the composer's pre-fill, which is what the context menu's "Ask about
+   * this" is.
    */
   chatOpen: boolean
   chatInput: string
@@ -666,7 +668,7 @@ export interface ShellState {
    * line (phase 4 — until then it called the API this app always refuses, and copied nothing).
    */
   copyTable: (table: ChatTable) => Promise<boolean>
-  /** `SGVue.dc.html:1650` — open the assistant with the designed pre-fill. Panel: Phase 9. */
+  /** `SGVue.dc.html:1650` — open the assistant, the Ask Vee window, with the designed pre-fill. */
   askAbout: (ids: readonly number[]) => void
   setChatOpen: (open: boolean) => void
   setChatInput: (text: string) => void

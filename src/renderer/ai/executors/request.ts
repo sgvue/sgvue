@@ -129,10 +129,10 @@ function askOpenRecent(input: Record<string, unknown>, ctx: ToolContext): ToolOu
   }
   if (hits.length > 1) {
     // Two folders, one file name. A label cannot say which without saying where, so neither is
-    // proposed: the user opens the one they mean from the library themselves.
+    // proposed: the user opens the one they mean with the upload button themselves.
     return {
       forModel: {
-        message: `${hits.length} recent files are called "${said}", in different folders, and a request cannot tell them apart. Nothing was asked — the user can open the one they mean from the sidebar’s library.`,
+        message: `${hits.length} recent files are called "${said}", in different folders, and a request cannot tell them apart. Nothing was asked — the user can open the one they mean with the sidebar’s upload button.`,
         recentFiles: names
       }
     }

@@ -12,7 +12,7 @@
  *               `ObjectType` and `Level` — which elements the question is about.
  *   **Check**   its *check rules*: every other rule, a property — what is asked of them.
  *
- * A call with no rule says what it is doing in the busy row's own words (`TOOL_STAGE`), and the
+ * A call with no rule says what it is doing in its tool's `TOOL_STAGE` phrase, and the
  * matrix does not change. Since 2026-10-02 those words can depend on the call (`toolPhrase`):
  * clearing the selection and undoing are not what their tools' one phrase says.
  *
@@ -102,7 +102,7 @@ export function classNoun(entity: string): string {
 export const countText = group
 
 /**
- * `totalling quantities` → `Totalling quantities`: a note step, in the busy row's own words.
+ * `totalling quantities` → `Totalling quantities`: a note step, in its tool's `TOOL_STAGE` phrase.
  * `input` is the call's own (2026-10-02): two tools do things their one phrase would misstate —
  * `select_elements` clearing the selection, `apply_visibility` undoing — and `toolPhrase` reads
  * the input for those. Without one, it is the tool's phrase.
@@ -116,7 +116,7 @@ export function noteFor(tool: string, input?: Readonly<Record<string, unknown>> 
 const upToTwo = (names: readonly string[], counted: string): string =>
   names.length <= 2 ? names.join(', ') : `${names.length} ${counted}`
 
-/** One scope rule's value as the ticker words it: the value, with its operator when not `=`. */
+/** One scope rule's value as the diary words it: the value, with its operator when not `=`. */
 function scopeValue(r: Rule): string {
   if (r.op === ABSENT_OP) return `no ${r.prop}`
   const v = String(r.val)
@@ -359,7 +359,8 @@ export interface ChatTrace {
 }
 
 /**
- * The status a finished turn rolls to, beside the name.
+ * The status a finished turn keeps (`ChatTrace.status`) — since 2026-11-08 shown only as the
+ * folded line of a reply written before then.
  *
  *   a Check step ran          `checked {scope count} {scope noun} · {s}s`
  *   only a Filter step ran    `found {count} {noun} · {s}s`

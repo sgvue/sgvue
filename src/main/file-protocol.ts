@@ -158,7 +158,7 @@ export function mint(path: string): string | null {
   return `${SCHEME}://t/${token}`
 }
 
-/** For the smoke test and for `dispose`: how many unspent tokens are outstanding. */
+/** For the unit tests: how many unspent tokens are outstanding. */
 export const pendingTokens = (): number => tokens.size
 
 const deny = (): Response => new Response(null, { status: 403 })

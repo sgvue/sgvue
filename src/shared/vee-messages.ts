@@ -278,7 +278,7 @@ export const VeeTraceEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('begin'), at: finite, read: ReadFacts }).strict(),
   z.object({ type: z.literal('tool_start'), at: finite }).strict(),
   z.object({ type: z.literal('tool_exec'), at: finite, facts: ToolFacts }).strict(),
-  z.object({ type: z.literal('done'), at: finite, words: count, table: z.boolean() }).strict(),
+  z.object({ type: z.literal('done'), at: finite, table: z.boolean() }).strict(),
   z.object({ type: z.literal('fail') }).strict()
 ])
 
@@ -290,7 +290,6 @@ export const VeeTimeline = z
     tool: finite.nullable(),
     calls: z.array(z.object({ at: finite, facts: ToolFacts }).strict()).max(VEE_MAX_CALLS),
     answer: finite.nullable(),
-    words: count,
     table: z.boolean()
   })
   .strict()

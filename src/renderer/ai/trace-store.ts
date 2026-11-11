@@ -24,7 +24,6 @@
  * the wall clock (`traceEpoch`, `shiftChange`).
  */
 import type { Federation } from '../../shared/federate'
-import { wordCount } from './blocks'
 import { traceReduce, traceSummary, type Timeline, type TraceEvent } from './trace'
 import { readFacts, toolFacts, type ChatTrace } from './trace-facts'
 import { isTerm, vocabularyFor } from './terms'
@@ -117,9 +116,9 @@ export function traceToolExec(
  * `done`: the answer is here. Returns what the reply keeps of its trace — or `null` when there
  * was no turn to answer.
  */
-export function traceDone(reply: string, table: boolean): ChatTrace | null {
+export function traceDone(_reply: string, table: boolean): ChatTrace | null {
   if (!state.timeline || state.timeline.answer !== null) return null
-  feed({ type: 'done', at: traceNow(), words: wordCount(reply), table })
+  feed({ type: 'done', at: traceNow(), table })
   return state.timeline ? traceSummary(state.timeline) : null
 }
 

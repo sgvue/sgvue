@@ -3,8 +3,8 @@
  * `:1391`, `:1406`, …), reduced to the part that does not need the arguments.
  *
  * The design showed these in its busy row. Since 2026-10-01 that row is the assistant's live
- * reply (the owner's "Ask Vee" handoff, `ai/trace.ts`), and a phrase is what the reply's ticker
- * says — capitalised, with no count — for an executed tool whose input carries no rule: a
+ * reply (the owner's "Ask Vee" handoff, `ai/trace.ts`), and a phrase is what a step of the
+ * reply's diary says (its ticker until 2026-11-08) — capitalised, with no count — for an executed tool whose input carries no rule: a
  * **note** step (`noteFor`, `ai/trace-facts.ts`). A tool with rules says what it filters and
  * what it checks instead.
  *
@@ -20,7 +20,7 @@
  * thing, nor are listing markups and zooming to one — as has `manage_filters`' `update`, which
  * rearranges nothing.
  *
- * Phase 3, the consent gate: a call that only **asks** says that it is asking — the ticker must
+ * Phase 3, the consent gate: a call that only **asks** says that it is asking — the diary must
  * not read "deleting a viewpoint" over a request the user has yet to answer. `request_user_action`
  * has a phrase for each thing it asks, and so have the three gated operations.
  *

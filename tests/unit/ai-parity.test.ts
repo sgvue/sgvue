@@ -368,7 +368,8 @@ describe('apply_visibility — undo and redo', () => {
 
   it('is the action bar’s own step: the same state, the same stacks', async () => {
     await isolateWalls()
-    await run('set_storeys', { visible: ['L2'] })
+    // Two storeys (2026-11-11): `set_storeys` is under the 5 % scope guard; L2 alone after isolating walls would be held.
+    await run('set_storeys', { visible: ['L2', 'L3'] })
     await run('apply_visibility', { action: 'undo' })
     const byTool = { vis: visibleIds(), depth: historyDepth(), storeyVis: st().storeyVis }
 
@@ -376,7 +377,7 @@ describe('apply_visibility — undo and redo', () => {
     st().commitModels(full)
     Object.assign(turn, newTurnState())
     await isolateWalls()
-    await run('set_storeys', { visible: ['L2'] })
+    await run('set_storeys', { visible: ['L2', 'L3'] })
     st().step(true) // ⌘Z
     expect({ vis: visibleIds(), depth: historyDepth(), storeyVis: st().storeyVis }).toEqual(byTool)
     expect(byTool.depth).toEqual({ undo: 1, redo: 1 })

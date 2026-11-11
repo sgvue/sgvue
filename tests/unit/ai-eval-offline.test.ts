@@ -2,7 +2,7 @@
  * The assistant's eval suite, offline: the oracle scores 100 % and the null agent 0 %, on every
  * push (2026-11-07, core protection #11).
  *
- * `scripts/ai-eval.cjs` grades the assistant on 85 cases (80 scorable today) with pure graders (`eval/graders.cjs`)
+ * `scripts/ai-eval.cjs` grades the assistant on 87 cases, all scored, with pure graders (`eval/graders.cjs`)
  * and has two offline modes that make no request: `--dry-run`, the **oracle**, replays each case's
  * ideal tool sequence and reply and must score 100 % — the proof that the tools, the graders and
  * the ground truth agree about what "right" means — and `--null`, an agent that does nothing,
@@ -53,6 +53,7 @@ import { federate, type Federation } from '../../src/shared/federate'
 import { readoutCoords, toMap } from '../../src/shared/georef'
 import { RULES, TOOLS } from '../../src/shared/tool-schemas'
 import { runToolOnce, runTurnOnce } from '../../src/renderer/ai/bridge'
+import { traceFail } from '../../src/renderer/ai/trace-store'
 import { HOSTILE_OPTIONS } from '../../src/renderer/dev/hostile'
 import { MESSY_OPTIONS } from '../../src/renderer/dev/messy'
 import { attachScheduleStandIn, detachScheduleStandIn, scheduleStandInState } from '../../src/renderer/dev/schedules-standin'
@@ -74,7 +75,7 @@ interface Kase extends Json {
   fixture: 'mock' | 'mock-hostile' | 'mock-messy'
   prompt: string
   requires?: string[]
-  setup?: { tool: string; input?: Json }[]
+  setup?: { tool: string; input?: Json; apply?: boolean }[]
   applyPending?: boolean
   harness?: { schedules?: boolean }
   turns?: Json[]
@@ -255,7 +256,18 @@ function choose(value: string): boolean {
 
 async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
   open(kase.fixture, !!kase.harness?.schedules)
-  for (const step of kase.setup || []) await runToolOnce(step.tool, step.input || {})
+  for (const step of kase.setup || []) {
+    if (!step.apply) {
+      await runToolOnce(step.tool, step.input || {})
+      continue
+    }
+    // `apply: true` — the user's own step, so a row the scope guard held is applied by its Apply
+    // button, as the window's runner does; the setup's reply is then cleared, as `chat.reset` does.
+    const { index } = await runTurnOnce('(setup)', [{ name: step.tool, input: step.input || {} }])
+    if (st().chatMsgs[index]?.pending) st().applyPending(index)
+    traceFail()
+    useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatIfcsg: 'unknown', chatIfcsgAsked: false, chatIfcsgHeadsUp: null, chatEpoch: st().chatEpoch + 1 })
+  }
   const truth = await O.collectTruth(kase, {
     sql: (statement) => fed.query(statement),
     tool: (name, input) => runToolOnce(name, input)

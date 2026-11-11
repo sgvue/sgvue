@@ -15,7 +15,7 @@ import { withModelColumn } from '../../schedule/schedule/columns';
 import type { ModelStore } from '../../schedule/ifc/store';
 import type { ScheduleDef } from '../../schedule/schedule/def';
 import { PRESETS, scheduleFromPreset, type Preset } from '../../schedule/schedule/presets';
-import { FULL_MESSAGE, isFull, listSaved, uniqueName } from './schedules';
+import { FULL_MESSAGE, isFull, listSaved, uniqueName, type SavedEntry } from './schedules';
 import type { AppState } from './state';
 
 export type Section = 'mine' | 'general' | 'ifcsg';
@@ -166,13 +166,18 @@ export function revealFolds(folds: string[], t: Pick<Tpl, 'section'>, absent: bo
   return next;
 }
 
-/** The live note under "Save current": what pressing Enter would do. */
-export function saveNote(text: string, savedName: string | null): { note: string; error: boolean } {
+/**
+ * The live note under "Save current": what pressing Enter would do. `saved` is the saved list —
+ * the library passes the one it has just read for this paint, so a keystroke reads storage once.
+ */
+export function saveNote(
+  text: string, savedName: string | null, saved: readonly Pick<SavedEntry, 'name'>[] = listSaved(),
+): { note: string; error: boolean } {
   const name = text.trim();
-  const names = listSaved().map((s) => s.name);
+  const names = saved.map((s) => s.name);
   if (!name) return { note: 'A name is needed', error: true };
   if (name === savedName && names.includes(name)) return { note: 'Replaces the saved one you loaded', error: false };
-  if (isFull(null)) return { note: FULL_MESSAGE, error: true };
+  if (isFull(null, saved)) return { note: FULL_MESSAGE, error: true };
   if (names.includes(name)) return { note: `Name taken — saves as “${uniqueName(name, names)}”`, error: false };
   return { note: 'Enter to save · Esc to cancel', error: false };
 }

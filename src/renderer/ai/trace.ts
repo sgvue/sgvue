@@ -41,7 +41,7 @@
  * **The cues, from real events.** Send is `chatBegin`. Think is Send + 1 s. Read is the turn's
  * first `tool_start`, not before Think + 0.4 s. Each later step starts when its data exists and
  * the step before it has had its designed time (Read 1.8 s, Filter 1.6 s, Check 2.4 s, a note
- * 0.6 s); calls that pile up behind a step are not replayed one by one — the ticker moves on to
+ * 0.6 s); calls that pile up behind a step are not replayed one by one — the diary moves on to
  * the latest. Answer is `done`.
  *
  * **The answer is never delayed by animation.** Whatever is queued or in flight when `done`
@@ -157,7 +157,7 @@ export const partStagger = (n: number): number =>
 
 /** The bubble's own padding — the existing reply bubble's `8px 11px`. */
 export const PAD_X = 11
-/** `:156` — the trace's bubble while it ran: ticker plus matrix. The matrix's band ends here. */
+/** `:156` — the handoff's trace bubble while it ran: ticker plus matrix. The matrix's band ends here. */
 export const H_THINK = J(78)
 /** `:44`, `:166` — the beam starts and ends this far outside the matrix. */
 export const BEAM_PAD = J(6)
@@ -189,8 +189,6 @@ export interface Timeline {
   calls: readonly TraceCall[]
   /** Answer — when `done` arrived. `null` while the turn runs. */
   answer: number | null
-  /** The reply's words, for the reveal. */
-  words: number
   /** The turn produced a table, so its answer carries no rows. */
   table: boolean
 }
@@ -199,7 +197,7 @@ export type TraceEvent =
   | { type: 'begin'; at: number; read: ReadFacts }
   | { type: 'tool_start'; at: number }
   | { type: 'tool_exec'; at: number; facts: ToolFacts }
-  | { type: 'done'; at: number; words: number; table: boolean }
+  | { type: 'done'; at: number; table: boolean }
   | { type: 'fail' }
 
 /**
@@ -209,7 +207,7 @@ export type TraceEvent =
  */
 export function traceReduce(tl: Timeline | null, ev: TraceEvent): Timeline | null {
   if (ev.type === 'begin') {
-    return { send: ev.at, read: ev.read, tool: null, calls: [], answer: null, words: 0, table: false }
+    return { send: ev.at, read: ev.read, tool: null, calls: [], answer: null, table: false }
   }
   if (ev.type === 'fail') return null
   if (!tl || tl.answer !== null) return tl
@@ -221,7 +219,7 @@ export function traceReduce(tl: Timeline | null, ev: TraceEvent): Timeline | nul
       return { ...tl, tool: tl.tool ?? at, calls: [...tl.calls, { at, facts: ev.facts }] }
     }
     case 'done':
-      return { ...tl, answer: Math.max(ev.at, tl.send), words: ev.words, table: ev.table }
+      return { ...tl, answer: Math.max(ev.at, tl.send), table: ev.table }
   }
 }
 
@@ -229,7 +227,7 @@ export function traceReduce(tl: Timeline | null, ev: TraceEvent): Timeline | nul
 
 export type StepKind = 'read' | 'filter' | 'check' | 'note'
 
-/** One thing the ticker says, and when it starts saying it. */
+/** One step of the diary, and when it starts. */
 export interface TraceStep {
   kind: StepKind
   at: number
@@ -242,7 +240,7 @@ export interface TraceCues {
   think: number
   /** Read, or `null`: no tool has started — or the answer came before Read could. */
   read: number | null
-  /** The steps the ticker shows, in order. One still to come has an `at` in the future. */
+  /** The steps the diary shows, in order. One still to come has an `at` in the future. */
   steps: TraceStep[]
   answer: number | null
   /** The turn's last rule-bearing call — where the answer's rows and status come from — or −1. */
@@ -277,7 +275,7 @@ export function traceCues(tl: Timeline): TraceCues {
       let free = at + STEP_S.read
       for (let i = 0; i < tl.calls.length; ) {
         const start = Math.max(tl.calls[i].at, free)
-        // Everything whose data exists by then has piled up behind the step before: the ticker
+        // Everything whose data exists by then has piled up behind the step before: the diary
         // can honestly show only the latest of them.
         let j = i
         while (j + 1 < tl.calls.length && tl.calls[j + 1].at <= start) j++
@@ -317,7 +315,7 @@ export function answerRows(tl: Timeline): TraceRowData[] {
   return !rules || tl.table || !rules.matched.length ? [] : capRows(rules.rows)
 }
 
-/** The status the turn rolls to. `''` while it runs. */
+/** The status the turn keeps (`ChatTrace.status`). `''` while it runs. */
 export const traceStatus = (tl: Timeline): string =>
   tl.answer === null ? '' : statusText(lastRules(tl), tl.answer - tl.send)
 
@@ -423,8 +421,6 @@ export interface TraceFrame {
   /** The diary's header while the turn runs: `Thinking`, its shimmer (0…1 or `null`) and the seconds since Send. */
   thinking: { shimmer: number | null; seconds: number }
   bubble: {
-    /** The turn opened the trace's bubble — the diary. */
-    wide: boolean
     /** The diary's fade in at Read. */
     opacity: number
   }
@@ -711,7 +707,7 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
     sprite: { state, scale: hexIn, opacity: clamp(hexIn, 0, 1) },
     dots,
     thinking: { shimmer, seconds: Math.max(0, Math.floor((answered ? A! : T) - tl.send)) },
-    bubble: { wide, opacity: clamp(bIn * 1.6, 0, 1) },
+    bubble: { opacity: clamp(bIn * 1.6, 0, 1) },
     steps: diary,
     cells,
     beam

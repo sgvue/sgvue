@@ -20,15 +20,14 @@
  * space after it, a header row with no separator under it, a lone pipe — **prints as written**,
  * and nothing is ever HTML.
  *
- * **Linear in the reply's length**, like the marks: it runs on the answer path (`done` counts the
- * reply's pieces before the reply is committed, `wordCount` below), and the quote's flattening
- * (`plainText`) runs where a reply is quoted. One pass over the lines; a line is looked at a fixed
+ * **Linear in the reply's length**, like the marks: it runs on the answer path, where a reply is
+ * drawn, and the quote's flattening (`plainText`) runs where a reply is quoted. One pass over the lines; a line is looked at a fixed
  * number of times — as a paragraph, an item, a table's header or its separator — and every test
  * of it is a scan of that line, never a pattern that can backtrack over it; and nothing done for
  * one block reads the blocks before it, so tens of thousands of blocks cost what one long one
  * does.
  */
-import { markWords, splitMarks } from './marks'
+import { splitMarks } from './marks'
 
 /** How a table's column is aligned: by its separator's colons, else right for numbers. */
 export type Align = 'left' | 'center' | 'right'
@@ -182,22 +181,6 @@ export function parseBlocks(text: string): Block[] {
 
 /** Whether the reply holds a table — the one block that sets its bubble's width. */
 export const hasTable = (text: string): boolean => parseBlocks(text).some((b) => b.kind === 'table')
-
-/**
- * How many words a reply has, as the handoff's reveal counted them: each word of a paragraph or
- * of a list item (`markWords`), each list marker, and each table — whole. It is the timeline's
- * `words` (`ai/trace-store.ts`), which still crosses the Vee port; since 2026-11-08 nothing is
- * revealed word by word, so nothing animates by it.
- */
-export function wordCount(text: string): number {
-  let n = 0
-  for (const block of parseBlocks(text)) {
-    if (block.kind === 'table') n += 1
-    else if (block.kind === 'p') for (const line of block.lines) n += markWords(line).length
-    else for (const item of block.items) n += 1 + item.reduce((k, line) => k + markWords(line).length, 0)
-  }
-  return n
-}
 
 /** A list item's or a cell's text with a full stop or semicolon at its end taken off, for joining. */
 const clause = (s: string): string => s.replace(/[.;]$/, '')

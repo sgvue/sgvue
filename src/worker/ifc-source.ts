@@ -136,7 +136,6 @@ export interface ReadOnlyIfcSource {
   idsWithType(modelID: number, typeCode: number, includeInherited?: boolean): number[]
   /** How many STEP lines the file has. */
   lineCount(modelID: number): number
-  expressIdFromGuid(modelID: number, guid: string): number | undefined
 
   /**
    * Every product's placements, one product at a time. `IfcSpace` and `IfcOpeningElement`
@@ -340,15 +339,6 @@ export async function createReadOnlyIfcSource(
     },
 
     coordinationMatrix: (modelID) => [...api.GetCoordinationMatrix(modelID)],
-
-    expressIdFromGuid: (modelID, guid) => {
-      try {
-        const id = api.GetExpressIdFromGuid(modelID, guid)
-        return typeof id === 'number' ? id : undefined
-      } catch {
-        return undefined
-      }
-    },
 
     sealedWriteApi
   }

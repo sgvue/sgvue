@@ -33,7 +33,7 @@ first `npm test` does — or at once with `node node_modules/electron/install.js
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | `tsc` over the Node side and the web side |
-| `npm run lint` | ESLint over `src/**/*.{ts,tsx}`, with type information (`eslint.config.mjs`) |
+| `npm run lint` | ESLint over `src/**/*.{ts,tsx}` and `tests/**/*.{ts,tsx}`, with type information (`eslint.config.mjs`) |
 | `npm test` | The unit tests and the read-only guard (vitest). No Electron window and no GPU; the tests make no network call — only the first run may download Electron's binary, once (above) |
 | `npm run build` | Type-check, then build main, preload and renderer into `out/` |
 | `npm run test:e2e` | The Electron end-to-end suite (Playwright), through its guard. Needs a GPU with WebGL2 |
@@ -62,7 +62,8 @@ code; do not run the same thing again.
 ## Tests, and what CI runs
 
 - `npm run typecheck`, `npm run lint` and `npm test` must pass. CI runs `npm ci`,
-  `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` on Windows, macOS and
+  `npm run privacy`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run eval:offline` and
+  `npm run build` on Windows, macOS and
   Ubuntu for every pull request and every push to `main`.
 - Tests that need a real model skip themselves without one (`samples/` is git-ignored), and the
   packaged-archive test skips without a `dist/`.
@@ -86,8 +87,10 @@ code; do not run the same thing again.
 There is no IFC write path, no "save model", and no tool — for the user or for the assistant —
 that edits a name, a property, a classification or geometry. `src/shared/readonly-list.ts`
 holds the forbidden names, and `tests/readonly-guard.test.ts` fails the build if one appears.
-Only three modules write to disk: `src/main/settings.ts`, `src/main/sessions.ts` and
-`src/main/exports.ts`, the last only to a path the user picked in the native Save dialog.
+Only four modules write to disk: `src/main/settings.ts`, `src/main/sessions.ts`,
+`src/main/exports.ts`, only to a path the user picked in the native Save dialog, and
+`src/main/projects.ts`, only the `.sgvue` project file, to a path the user picked in its Save
+dialog or to the project file this run opened or saved.
 
 ### The design is the specification
 

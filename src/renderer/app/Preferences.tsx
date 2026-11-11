@@ -11,7 +11,9 @@
  * browser dialog.
  *
  * **The key field is write-only.** It shows whether a key is stored, never the key: main
- * encrypts it with `safeStorage` and the renderer is told `hasKey` and nothing more.
+ * encrypts it with `safeStorage` and the renderer is told only whether one is stored (`hasKey`)
+ * or set in main's environment (`envKey`), and whether the OS can encrypt
+ * (`keyStorageAvailable`) — never the key.
  */
 import { useEffect, useId, useRef, useState } from 'react'
 import type { SettingsView } from '../../shared/ipc-contract'
@@ -21,6 +23,7 @@ import { useShell } from '../state/shell'
 import { trapTab, useDialogFocus } from './focus'
 import { s } from './css'
 import { Cross } from './icons'
+import { modelToSave } from './model-draft'
 
 const LABEL =
   'font:600 11px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)'
@@ -47,9 +50,13 @@ export default function Preferences({
    */
   const setSettings = (v: SettingsView): void => {
     setView(v)
+    // The Model field's draft follows what main holds — on open and after every save.
+    setModelDraft(v.model)
     useShell.getState().setHasKey(v.hasKey || v.envKey)
   }
   const [key, setKey] = useState('')
+  /** Preferences › Model is a draft, saved once on Enter or blur (`modelToSave`), never per keystroke. */
+  const [modelDraft, setModelDraft] = useState('')
   const [note, setNote] = useState('')
   const [showData, setShowData] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -69,6 +76,12 @@ export default function Preferences({
 
   const patch = (p: Parameters<Window['sgvue']['setSettings']>[0]): void => {
     void api()?.setSettings(p).then(setSettings)
+  }
+
+  const saveModel = (): void => {
+    const model = modelToSave(modelDraft, settings?.model ?? '')
+    if (model === null) setModelDraft(settings?.model ?? '')
+    else patch({ model })
   }
 
   const saveKey = (): void => {
@@ -181,8 +194,12 @@ export default function Preferences({
           <label style={s('display:flex;flex-direction:column;gap:4px')}>
             <span style={s(LABEL)}>Model</span>
             <input
-              value={settings?.model ?? ''}
-              onChange={(e) => patch({ model: e.target.value })}
+              value={modelDraft}
+              onChange={(e) => setModelDraft(e.target.value)}
+              onBlur={saveModel}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveModel()
+              }}
               className="fv-field"
               style={s(FIELD)}
             />

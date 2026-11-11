@@ -4,14 +4,11 @@
  * `**bold**` and `` `code` `` become pieces a component renders as elements; nothing else is read
  * as markup, nothing is rendered as HTML, and a mark with no partner prints as it was written.
  *
- * It runs on the answer path — `done` counts the reply's words before the reply is committed —
- * so it also has to be linear in the reply's length, whatever the reply holds.
+ * It runs on the answer path, where a reply is rendered, so it also has to be linear in the
+ * reply's length, whatever the reply holds.
  */
 import { describe, expect, it } from 'vitest'
-import { markWords, splitMarks } from '../../src/renderer/ai/marks'
-// 2026-10-08: the reveal's count moved to the blocks (`ai/blocks.ts`); for a reply of one line
-// it is still that line's words, which is what these cases count.
-import { wordCount } from '../../src/renderer/ai/blocks'
+import { splitMarks } from '../../src/renderer/ai/marks'
 
 const flat = (text: string): string => splitMarks(text).map((p) => (p.mark ? `<${p.mark}:${p.text}>` : p.text)).join('')
 
@@ -82,43 +79,6 @@ describe('the inline marks', () => {
   })
 })
 
-describe('the words of a reply', () => {
-  it('splits at white space, keeping a word’s pieces together', () => {
-    expect(markWords('**9 of 86 walls** have no Fire Rating. All 9 are in `SB_ARC_R25`.')).toEqual([
-      [{ text: '9', mark: 'b' }],
-      [{ text: 'of', mark: 'b' }],
-      [{ text: '86', mark: 'b' }],
-      [{ text: 'walls', mark: 'b' }],
-      [{ text: 'have', mark: '' }],
-      [{ text: 'no', mark: '' }],
-      [{ text: 'Fire', mark: '' }],
-      [{ text: 'Rating.', mark: '' }],
-      [{ text: 'All', mark: '' }],
-      [{ text: '9', mark: '' }],
-      [{ text: 'are', mark: '' }],
-      [{ text: 'in', mark: '' }],
-      // The mono name and its full stop are one word: nothing may break between them.
-      [{ text: 'SB_ARC_R25', mark: 'm' }, { text: '.', mark: '' }]
-    ])
-    // Thirteen words, as the handoff's `ANSWER` has.
-    expect(wordCount('**9 of 86 walls** have no Fire Rating. All 9 are in `SB_ARC_R25`.')).toBe(13)
-  })
-
-  it('treats any run of white space as one gap, and none as no words', () => {
-    expect(markWords('  two\n\nwords \t ').map((w) => w.map((p) => p.text).join(''))).toEqual(['two', 'words'])
-    expect(markWords('')).toEqual([])
-    expect(markWords('   ')).toEqual([])
-    expect(wordCount('Done.')).toBe(1)
-  })
-
-  it('keeps a word that starts plain and ends bold as one word', () => {
-    expect(markWords('(**12**) walls')).toEqual([
-      [{ text: '(', mark: '' }, { text: '12', mark: 'b' }, { text: ')', mark: '' }],
-      [{ text: 'walls', mark: '' }]
-    ])
-  })
-})
-
 describe('a long reply', () => {
   /*
    * Every wall-clock bound here is 1 000 ms, where the titles say what the work takes. What the
@@ -144,10 +104,6 @@ describe('a long reply', () => {
     const [pieces, ms] = timed(() => splitMarks(text))
     expect(pieces).toEqual([{ text, mark: '' }])
     expect(ms).toBeLessThan(1000)
-    // What `done` runs before it commits the reply, and what the bubble runs to render it.
-    const [count, countMs] = timed(() => wordCount(text))
-    expect(count).toBe(50_000)
-    expect(countMs).toBeLessThan(1000)
     // The other shape that walked every later mark: openings followed by white space.
     const spaced = '** '.repeat(66_667)
     const [bare, spacedMs] = timed(() => splitMarks(spaced))
@@ -166,7 +122,6 @@ describe('a long reply', () => {
     const [alone, aloneMs] = timed(() => splitMarks(open))
     expect(alone).toEqual([{ text: open, mark: '' }])
     expect(aloneMs).toBeLessThan(1000)
-    expect(timed(() => wordCount(open))[1]).toBeLessThan(1000)
   })
 
   it('is as quick on a long reply that is marked properly', () => {
@@ -181,6 +136,5 @@ describe('a long reply', () => {
       { text: ' ', mark: '' }
     ])
     expect(ms).toBeLessThan(1000)
-    expect(wordCount(text)).toBe(60_000)
   })
 })

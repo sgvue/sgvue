@@ -3,7 +3,8 @@
  * the owner's decisions B, C and D). What is held here, without a window:
  *
  *   · the heads-up: observed over **the elements a call touched**, never the whole model
- *     (decision C); the last rule-bearing call's one observation is the reply's; `objectTypeOnly`
+ *     (decision C); the reply's one observation is the first of the highest kind its rule-bearing
+ *     calls made (since 2026-11-09; the last call's before); `objectTypeOnly`
  *     only after the user said yes to IFC+SG (decision B); an ObjectType is a sub-type only as one
  *     upper-case token; file text can neither make one nor be parsed inside one;
  *   · IFC terms: coloured exactly when a code span is a name the loaded models carry, case for
@@ -224,7 +225,7 @@ describe('the heads-up: observed over the elements the call touched, never the w
     expect(text(c)).toMatch(/gets? a colour of (its|their) own in the legend\.$/)
   })
 
-  it('is the last rule-bearing call’s, set by `executeTool` and told to the model; a refused call is not observed', async () => {
+  it('is each rule-bearing call’s own, set by `executeTool` and told to the model; a refused call is not observed', async () => {
     open(mock)
     const dash = await runToolWithUi('query_elements', { rules: [entity('IfcDoor'), { prop: 'fire rating', op: 'absent', val: '' }] })
     // The model's spelling, "fire rating", is the file's own key by the time it is observed.

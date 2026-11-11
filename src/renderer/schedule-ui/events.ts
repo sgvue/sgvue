@@ -194,7 +194,7 @@ function wireExports(root: HTMLElement) {
     const box = el.getBoundingClientRect();
     const saved = listSaved().length;
     openMenu(box.left, box.bottom + 4, [
-      // `EXPORT_ACTIONS` is also what Ask SGVue's `export_schedule` runs (2026-09-28).
+      // `EXPORT_ACTIONS` is also what Ask Vee's `export_schedule` runs (2026-09-28).
       { label: 'Excel (.xlsx)', run: () => void EXPORT_ACTIONS.xlsx() },
       { label: 'CSV', run: () => void EXPORT_ACTIONS.csv() },
       { label: 'All saved schedules (.xlsx)', disabled: !saved, run: () => void EXPORT_ACTIONS.all_saved() },
@@ -209,7 +209,8 @@ function wireExports(root: HTMLElement) {
 // ---------------------------------------------------------------- shell
 
 function wireShell(root: HTMLElement) {
-  onClick(root, '[data-act="rail-toggle"]', () => update({ railOpen: !state.railOpen }));
+  // 'panes': the rail is not the schedule, so the table and its engine run are left alone.
+  onClick(root, '[data-act="rail-toggle"]', () => update({ railOpen: !state.railOpen }, 'panes'));
 
   // ---- rail ----
   liveState(root, '[data-act="rail-query"]', 'railQuery');
@@ -448,14 +449,15 @@ function wireHistory(root: HTMLElement) {
 function wireOverlays(root: HTMLElement) {
   // The calculated-value editor: from a calculated column's "Edit formula", the view bar's
   // "N formulas to fix" chip, the picker's "+ Calculated value" and the syntax guide's way
-  // back. The modal replaces the popover.
-  onClick(root, '[data-act="open-calc"]', () => { closePopover(); update({ overlay: 'calc' }); });
+  // back. The modal replaces the popover. Opening or closing a modal changes no row, so every
+  // one of them repaints 'panes' — everything but the table.
+  onClick(root, '[data-act="open-calc"]', () => { closePopover(); update({ overlay: 'calc' }, 'panes'); });
   // The formula syntax guide, which ifcTable served as a page of its own (`/formula.html`).
-  onClick(root, '[data-act="open-formula"]', () => update({ overlay: 'formula' }));
+  onClick(root, '[data-act="open-formula"]', () => update({ overlay: 'formula' }, 'panes'));
   // Its section links scroll the guide; an in-page anchor would be a navigation.
   onClick(root, '[data-act="formula-jump"]', (el) =>
     root.querySelector(`#help-${CSS.escape(el.dataset.v ?? '')}`)?.scrollIntoView({ block: 'start' }));
-  onClick(root, '[data-act="close-overlay"]', () => update({ overlay: null, libraryDraft: null }));
+  onClick(root, '[data-act="close-overlay"]', () => update({ overlay: null, libraryDraft: null }, 'panes'));
   // Clicking the dimmed surround closes; clicking anywhere inside the card must not.
   // Both ends of the gesture have to land there, not just the release. When a press and a
   // release happen on different elements the browser fires `click` on their nearest common
@@ -468,7 +470,7 @@ function wireOverlays(root: HTMLElement) {
     pressOnBackdrop = t?.closest('[data-act="overlay-backdrop"]') === t;
   });
   onClick(root, '[data-act="overlay-backdrop"]', (el, ev) => {
-    if (pressOnBackdrop && ev.target === el) update({ overlay: null, libraryDraft: null });
+    if (pressOnBackdrop && ev.target === el) update({ overlay: null, libraryDraft: null }, 'panes');
   });
   // One Escape handler, in the order things sit on top of each other: an overlay first,
   // then a column selection — the other thing that outstays its welcome. The window's own
@@ -478,8 +480,8 @@ function wireOverlays(root: HTMLElement) {
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || dialogOpen() || state.overlay === 'library') return;
     // The syntax guide is opened from the calculated-value editor, so Escape goes back there.
-    if (state.overlay === 'formula') { update({ overlay: 'calc' }); return; }
-    if (state.overlay) { update({ overlay: null }); return; }
+    if (state.overlay === 'formula') { update({ overlay: 'calc' }, 'panes'); return; }
+    if (state.overlay) { update({ overlay: null }, 'panes'); return; }
     // 'all', for the same reason as the two selection branches in wireShell: clearing the
     // marks also disables the header's Equal width button.
     if (state.selectedCols.length) update({ selectedCols: [] });
@@ -505,8 +507,9 @@ function wireColumns(root: HTMLElement) {
     // Same currency, same deadline: a last-clicked column to the RIGHT of the removed one
     // names its neighbour once the list closes up.
     if (state.selectedColumn !== null && state.selectedColumn > i) state.selectedColumn -= 1;
+    // Set before the one repaint, not by a second update() after it.
+    if (wasEditing) state.selectedColumn = null;
     updateDef((def) => act.removeColumn(def, i));
-    if (wasEditing) update({ selectedColumn: null });
   });
 
   onChange(root, '[data-act="remap"]', (el) => {
@@ -526,8 +529,9 @@ function wireFilter(root: HTMLElement) {
     const i = idx(el);
     // Positions shift down, so a rule's popover would now describe its neighbour.
     if (openChip()?.kind === 'filter') closePopover();
+    // The preview goes in the same paint as the removal: one engine run, not two.
+    state.removedBy = null;
     updateDef((def) => act.removeFilterRule(def, i));
-    if (state.removedBy !== null) update({ removedBy: null });
   });
   // A segmented pair, not a select — data-v carries which side was clicked. The view bar's
   // and / or join between two chips sends the other value through the same act.
@@ -661,10 +665,11 @@ function wireFormat(root: HTMLElement) {
   // combination the presets exist to stop anyone choosing by accident.
   onClick(root, '[data-act="cond-add"]', (el) => updateDef((def) => act.addConditionalRule(def, at(el))));
   onClick(root, '[data-act="cond-remove"]', (el) => {
-    updateDef((def) => act.removeConditionalRule(def, at(el), idx(el)));
     // Every rule after the removed one moved down a slot, so the preview would now be of a
-    // different rule. Dropped wholesale, exactly as filter-remove drops removedBy.
-    if (state.litBy !== null) update({ litBy: null });
+    // different rule. Dropped wholesale, exactly as filter-remove drops removedBy — in the same
+    // paint as the removal.
+    state.litBy = null;
+    updateDef((def) => act.removeConditionalRule(def, at(el), idx(el)));
   });
   const setRule = (def: ScheduleDef, el: HTMLElement, patch: Partial<CondRule>) =>
     act.updateConditionalRule(def, at(el), idx(el), patch);
@@ -722,8 +727,8 @@ function wireViewBar(root: HTMLElement) {
     paintPopover();
   });
   // "+ Filter" and "+ Sort / group" pick a field and land in that rule's or level's own
-  // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. Both adds are
-  // no-ops at the cap.
+  // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. At the cap both
+  // say so and add nothing.
   onClick(root, '[data-act="vb-add"]', (el) => addFrom(el.dataset.v ?? '', el.dataset.id ?? ''));
   wirePicker(root);
 }
@@ -733,7 +738,10 @@ function addFrom(kind: string, id: string) {
   const f = fieldFromKey(id);
   if (!f) return;
   if (kind === 'filter') {
-    if (state.def.filters.length >= MAX_FILTERS) return;
+    if (state.def.filters.length >= MAX_FILTERS) {
+      flash(`${MAX_FILTERS} filter rules is the most a schedule holds.`, true);
+      return;
+    }
     openChipPopover('filter', state.def.filters.length);
     updateDef((def) => {
       const next = act.addFilterRule(def);
@@ -741,7 +749,10 @@ function addFrom(kind: string, id: string) {
     });
     return;
   }
-  if (state.def.sort.length >= MAX_SORT_LEVELS) return;
+  if (state.def.sort.length >= MAX_SORT_LEVELS) {
+    flash(`${MAX_SORT_LEVELS} sort levels is the most a schedule holds — remove one first.`, true);
+    return;
+  }
   openChipPopover('sort', state.def.sort.length);
   updateDef((def) => {
     const next = act.addSortLevel(def);
@@ -810,8 +821,9 @@ function wirePicker(root: HTMLElement) {
   // the same flow as that modal's own "Add formula".
   onClick(root, '[data-act="pick-calc"]', () => {
     closePopover();
+    // The modal opens in the same paint as the new formula.
+    state.overlay = 'calc';
     updateDef((def) => act.addCalculated(def, 'formula'));
-    update({ overlay: 'calc' });
   });
   // "/" (when not typing) or Ctrl+K anywhere opens the picker at its chip.
   window.addEventListener('keydown', (e) => {

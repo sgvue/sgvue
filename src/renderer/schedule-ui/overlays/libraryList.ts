@@ -74,9 +74,10 @@ function row(state: AppState, store: ModelStore, t: Tpl, absent: boolean, sel: b
     <span class="nm"><b>${marked(t.name, q)}</b>${filt}${badgeOf(state, t)}</span>${cells}</div>`;
 }
 
-function savingRow(state: AppState): string {
+function savingRow(state: AppState, view: LibraryView): string {
   const text = state.libraryDraft?.text ?? '';
-  const { note, error } = saveNote(text, state.savedName);
+  // Mine as this paint read it (`templates`), not a second read of storage.
+  const { note, error } = saveNote(text, state.savedName, view.all.filter((t) => t.src === 'mine'));
   const shown = state.libraryDraft?.error || note;
   return `<div class="lib-row saving">
     <span class="nm">${ICON.save}<input type="text" class="lib-name-in" data-act="library-save-name"
@@ -103,7 +104,7 @@ export function listBody(state: AppState, store: ModelStore, view: LibraryView):
     } else if (it.type === 'empty') {
       html += '<div class="lib-empty">Nothing saved yet. <button class="link" data-act="library-save-empty">Save the schedule on screen</button></div>';
     } else if (it.type === 'saving') {
-      html += savingRow(state);
+      html += savingRow(state, view);
     } else if (it.type === 'absent') {
       html += `<button class="lib-sub hv-step${it.open ? '' : ' shut'}" data-act="library-absent" data-section="${it.id}"
         aria-expanded="${it.open}"><span class="tw">${ICON.caretDown}</span>Not in this model<span class="n">${it.n}</span></button>`;

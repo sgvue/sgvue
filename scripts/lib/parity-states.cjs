@@ -450,7 +450,7 @@ const COLOR_STATES = {
 }
 
 /**
- * Phase 8 — the landing page, the upload rows, the Resume card, the warning banner, the share
+ * Phase 8 — the landing page, the upload rows, the warning banner, the share
  * link's flash and the sidebar's own upload rows. Identical text in both scripts.
  * (`library-popover` was retired on 2026-11-08 with the sidebar's `library` control, by the
  * owner's request.)

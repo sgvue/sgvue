@@ -4,19 +4,16 @@
  * read as markup and nothing is ever rendered as HTML**. A mark with no partner prints as it was
  * written.
  *
- * **Linear in the text's length.** This runs on the answer path — once when `done` arrives, to
- * count the words, and once to render them — so an opening mark looks at exactly one candidate
- * for its partner, the next mark of its kind: one search an opening, whatever the reply holds.
+ * **Linear in the text's length.** This runs on the answer path, where a reply is rendered, so an
+ * opening mark looks at exactly one candidate for its partner, the next mark of its kind: one
+ * search an opening, whatever the reply holds.
  *
  *   `**9 of 86 walls** have no Fire Rating.`   → bold `9 of 86 walls`, then plain text
  *   `` All 9 are in `SB_ARC_R25`. ``            → plain, mono `SB_ARC_R25`, plain `.`
  *
- * `markWords` is the same text as the words the reveal fades in one by one: a word is what stands
- * between two runs of white space, and may be made of pieces (a bold word and its full stop).
- *
  * 2026-10-08: the marks are read inside each line of a block — a paragraph's, a list item's, a
- * table's cell (`ai/blocks.ts`) — and the reveal's count of pieces moved there with the blocks
- * (`wordCount`).
+ * table's cell (`ai/blocks.ts`). The word-by-word reveal's `markWords` and `wordCount` went
+ * with the reveal (removed 2026-11-11).
  */
 
 /** How a piece is set: plain, bold (weight 600) or the mono face. */
@@ -81,23 +78,4 @@ export function splitMarks(text: string, inside: Mark = ''): MarkPiece[] {
   }
   flush()
   return out
-}
-
-/** The text as words, each a list of pieces; white space separates them and is not kept. */
-export function markWords(text: string): MarkPiece[][] {
-  const words: MarkPiece[][] = []
-  let open: MarkPiece[] | null = null
-  for (const piece of splitMarks(text)) {
-    piece.text.split(/(\s+)/).forEach((part, i) => {
-      // Odd parts are the white space between words.
-      if (i % 2) {
-        open = null
-        return
-      }
-      if (!part) return
-      if (!open) words.push((open = []))
-      open.push({ text: part, mark: piece.mark })
-    })
-  }
-  return words
 }

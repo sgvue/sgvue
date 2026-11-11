@@ -526,7 +526,8 @@ export const get_element: Executor = (input, ctx) => {
       systems: e.systems,
       decomposition: e.decomposition,
       /**
-       * Project-frame metres, Z-up — the frame the scene is drawn in, offset not subtracted —
+       * World metres, Z-up — the file's own coordinates, the frame the scene is drawn in since
+       * 2026-11-07, offset not subtracted —
        * with its size, its centre and, where the file georeferences, the centre's map
        * coordinates. `null` throughout when the element has no geometry.
        */
@@ -1009,7 +1010,7 @@ export const get_model_info: Executor = (input, ctx) => {
           trueNorth: meta.georef.trueNorth ?? null,
           epsetName: meta.georef.epsetName ?? null,
           /**
-           * The map coordinates of this model's project frame's origin and the total rotation
+           * The map coordinates of this model's own origin (its file coordinates' zero) and the total rotation
            * from project north to true north, as the file declares them. The Coordinate-system
            * card shows one model's (`get_view_state`'s `basePoint.model`); no model is placed
            * by it — every model is drawn at its own file coordinates.

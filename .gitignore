@@ -43,6 +43,7 @@ out-baseline/
 .claude/wip/
 .claude/worktrees/
 .claude/settings.local.json
+.claude/launch.json
 # Not redistributed, because their licence was never recorded (2026-10-05): the design tool's
 # runtime and starter files (design-reference/README.md) and the eval's HTML report builder
 # (docs/AI_EVAL.md). A maintainer who has them may keep them in place; they are never committed.

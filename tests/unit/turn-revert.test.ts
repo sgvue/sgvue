@@ -1243,12 +1243,10 @@ describe('a change the scope guard held, applied later, joins the reply’s reve
       ['apply_visibility', { action: 'isolate', rules: [is('IfcEntity', 'IfcStair')] }]
     ])
     expect(st().chatMsgs[at].pending?.label).toContain('3 of 412')
-    expect(chatRow(st().chatMsgs[at], at).hasPending).toBe(true)
     st().revertTurn(at)
     expect(st().grids).toBe(grids)
     // The row is gone with the reply's changes…
     expect(st().chatMsgs[at].pending).toBeNull()
-    expect(chatRow(st().chatMsgs[at], at).hasPending).toBe(false)
     // …so there is nothing to apply, and the reply stays as the design leaves a reverted one.
     const depth = historyDepth()
     st().applyPending(at)

@@ -50,8 +50,6 @@ export interface PartState {
   dispose(): void
 }
 
-const rowsFor = (texels: number): number => Math.max(INITIAL_ROWS, Math.ceil(texels / PART_TEX_WIDTH))
-
 export function createPartState(): PartState {
   let rows = INITIAL_ROWS
   let data = new Float32Array(PART_TEX_WIDTH * rows * 4)
@@ -138,5 +136,3 @@ export const texelOf = (part: number): { col: number; row: number } => ({
   col: part % PART_TEX_WIDTH,
   row: Math.floor(part / PART_TEX_WIDTH)
 })
-
-export { rowsFor as partStateRowsFor }

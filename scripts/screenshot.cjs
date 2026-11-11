@@ -2,10 +2,10 @@
  * Dev utility — NOT application code. Loads the built renderer exactly as production does,
  * drives it through a list of named states, and writes a PNG per state.
  *
- *   npm run build && npx electron scripts/screenshot.cjs
+ *   npm run build && node scripts/safe-run.cjs screenshot.cjs
  *   SGVUE_STATES=iso,plan,north,section-C,highlight,activate,isolate \
  *   SGVUE_HASH=mock SGVUE_OUT=tests/parity/phase2a/app SGVUE_SIZE=1440x900 \
- *   npx electron scripts/screenshot.cjs
+ *   node scripts/safe-run.cjs screenshot.cjs
  *
  * Environment:
  *   SGVUE_URL      http(s) URL to load instead of the built file (a dev server, say)

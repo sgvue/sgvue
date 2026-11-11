@@ -357,14 +357,14 @@ export const ManageMessage = z
  */
 export const MAX_SAVED_LIST_CHARS = 16 * 1024 * 1024
 
+/** The longest saved setup name the port carries: a definition's own name bound (`DefShape`). */
+export const SAVED_NAME_MAX = 1000
+
 /**
  * One saved setup, as the window's Templates library holds it in Mine (`SavedEntry`): its name — the identity,
  * the user's own text — its definition and when it was saved. `.strict()`; the definition is
  * `DefShape`'s, and then `parseScheduleDef`'s on receipt.
  */
-/** The longest saved setup name the port carries: a definition's own name bound (`DefShape`). */
-export const SAVED_NAME_MAX = 1000
-
 export const SavedEntryShape = z
   .object({ name: z.string().min(1).max(SAVED_NAME_MAX), def: DefShape, savedAt: z.string().max(64) })
   .strict()
