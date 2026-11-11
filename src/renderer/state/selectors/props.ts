@@ -22,6 +22,7 @@
 import { DASH, fixed2, fixed3, fmtV } from '../../../shared/fmt'
 import type { FederatedElement, Federation } from '../../../shared/federate'
 import { readoutCoords, toMap } from '../../../shared/georef'
+import { turnXY } from '../../../shared/plan-rotation'
 import { areaIn, areaUnit, coordIn, formatLength, volumeIn, volumeUnit } from '../../../shared/units'
 import type { CoordState, Units } from '../shell'
 
@@ -174,13 +175,19 @@ export function relRows(
  * 2026-10-09: every row the app computes follows the display unit (`shared/units.ts`) — the
  * box's size and its base / top as lengths, the footprint and the box volume in m² / m³ or
  * ft² / ft³, the centroid as a coordinate. `mm` is what the rows always printed.
+ *
+ * 2026-11-11: `box` is the **plan-frame** box (`viewer.elementPlanBox`) — the scene turned by −ρ
+ * about its origin — and `rho` that turn, radians. The sizes and base / top read the box as it
+ * is; the centroid is its centre turned back by +ρ, then put back into the file's coordinates.
+ * With `rho` 0 the box is the scene's and every row is what it always was.
  */
 export function geoRows(
   box: BoxLike | null,
   solids: number,
   coords: CoordState,
   offset: Vec3,
-  units: Units = 'mm'
+  units: Units = 'mm',
+  rho = 0
 ): GeoRow[] {
   if (!box) return []
   const [ox, oy, oz] = offset
@@ -188,6 +195,11 @@ export function geoRows(
   const mx = { x: box.max.x + ox, y: box.max.y + oy, z: box.max.z + oz }
   const sz = { x: mx.x - mn.x, y: mx.y - mn.y, z: mx.z - mn.z }
   const c = { x: (mn.x + mx.x) / 2, y: (mn.y + mx.y) / 2, z: (mn.z + mx.z) / 2 }
+  if (rho !== 0) {
+    const [x, y] = turnXY([(box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2], rho)
+    c.x = x + ox
+    c.y = y + oy
+  }
   // `shared/georef.ts`'s `toMap` is the design's own L409 expression, shared with the spot
   // coordinate labels so the two readouts cannot drift. Since 2026-11-07 the scene is the files'
   // own world coordinates, so the centroid is printed as those (`readoutCoords`) — and as the
@@ -214,8 +226,13 @@ export interface SelectionInput {
   federation: Federation
   /** The last element clicked — the design's `selEl` (`:1834`). */
   element: FederatedElement | null
-  /** `viewer.elementBox(id)`, scene coordinates. `null` before geometry has landed. */
+  /**
+   * `viewer.elementPlanBox(id)`'s box — the plan frame, which is the scene's own while `rho` is
+   * 0. `null` before geometry has landed.
+   */
   box: BoxLike | null
+  /** The plan rotation the box was taken in, radians (`viewer.elementPlanBox`); 0 when omitted. */
+  rho?: number
   solids: number
   coords: CoordState
   offset: Vec3
@@ -245,7 +262,7 @@ export function selectionCard(input: SelectionInput): SelectionCard | null {
     psetCount: Object.keys(element.psets).length + Object.keys(element.qto).length,
     noPsets: psets.length === 0,
     relRows: relRows(federation.elements, element),
-    geoRows: geoRows(input.box, input.solids, input.coords, input.offset, input.units)
+    geoRows: geoRows(input.box, input.solids, input.coords, input.offset, input.units, input.rho)
   }
 }
 

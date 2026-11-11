@@ -47,6 +47,13 @@ interface Session {
   loads: Map<string, LoadHandle>
   geometries: Map<string, GeometryHandle>
   raws: Map<number, { resolve(line: RawLine | null): void; reject(error: Error): void }>
+  /**
+   * 2026-11-11 — the outcome of the newest `offset: null` geometry request still unsettled: the
+   * offset its stream chose; when it failed, what it was sent with (an offset an earlier stream
+   * chose, or `null`), or — never sent — its own predecessor's outcome. `null` here when there
+   * is none.
+   */
+  chooser: Promise<FederationOffset | null> | null
 }
 
 export class ParseWorkerBridge {
@@ -63,7 +70,8 @@ export class ParseWorkerBridge {
       worker,
       loads: new Map(),
       geometries: new Map(),
-      raws: new Map()
+      raws: new Map(),
+      chooser: null
     }
     worker.onmessage = (event: MessageEvent<ParseResponse>) => this.receive(session, event.data)
     worker.onerror = (event) => this.failAll(session, new Error(event.message || 'parse worker failed'))
@@ -189,6 +197,21 @@ export class ParseWorkerBridge {
    *
    * The model must already have been parsed by this bridge — the worker streams from the
    * model it still holds open, so nothing is re-read.
+   *
+   * 2026-11-11 — **`null` requests are serialised among themselves, per worker**, so two models
+   * can never each choose an offset. The worker is one thread taking its messages in order, so
+   * with two files loading at once it can run `parse A, parse B, geometry A, geometry B`: "B
+   * parsed" reaches the renderer before "A's geometry done", and B used to be asked with `null`
+   * while A was still choosing — B then chose an offset of its own and was drawn shifted against
+   * A, which the viewer never re-bases. Now a `null` request made while an earlier one of this
+   * worker is unsettled waits for it, and is sent with that one's outcome: the offset its stream
+   * chose; if it failed, what it was itself sent with; if it failed before it was sent, its own
+   * predecessor's outcome. So once any stream of the chain has chosen an offset, every later
+   * request of it is sent with that offset, and a request is sent `null` — choosing itself — only
+   * while no stream before it has chosen one. With no earlier `null` request unsettled it
+   * is sent at once as `null`; a request with an offset is always sent at once. A waiting request
+   * is registered at once — so a second request for its key, `cancel()` and a worker error reject
+   * it as before — and only its message waits; it is never posted to a worker that has gone.
    */
   geometry(
     modelKey: string,
@@ -199,10 +222,35 @@ export class ParseWorkerBridge {
     if (session.geometries.has(modelKey)) {
       return Promise.reject(new Error(`already streaming geometry for "${modelKey}"`))
     }
-    return new Promise<GeometrySummary>((resolve, reject) => {
-      session.geometries.set(modelKey, { resolve, reject, onChunk })
-      this.send(session, { type: 'geometry', modelKey, offset })
+    const before = offset === null ? session.chooser : null
+    /** What this request was posted with; `undefined` while it is held. */
+    let sentWith: FederationOffset | null | undefined = before ? undefined : offset
+    const result = new Promise<GeometrySummary>((resolve, reject) => {
+      const handle: GeometryHandle = { resolve, reject, onChunk }
+      session.geometries.set(modelKey, handle)
+      if (!before) {
+        this.send(session, { type: 'geometry', modelKey, offset })
+        return
+      }
+      void before.then((chosen) => {
+        // Cancelled, failed with the worker, or answered by an error while it waited: not sent.
+        if (this.session !== session || session.geometries.get(modelKey) !== handle) return
+        sentWith = chosen
+        this.send(session, { type: 'geometry', modelKey, offset: chosen })
+      })
     })
+    if (offset === null) {
+      const outcome: Promise<FederationOffset | null> = result.then(
+        (summary) => summary.offset,
+        // Failed: pass on what it was sent with — or, never sent, what it was waiting for.
+        () => (sentWith === undefined ? (before ?? null) : sentWith)
+      )
+      session.chooser = outcome
+      void outcome.then(() => {
+        if (session.chooser === outcome) session.chooser = null
+      })
+    }
+    return result
   }
 
   /** One raw STEP line with its references resolved a single level. */

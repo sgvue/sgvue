@@ -199,6 +199,49 @@ function planBoxOf(
   return box
 }
 
+/**
+ * One element's box in the plan frame: its own parts' vertices — each part's index range in its
+ * slot — turned by −ρ about the scene's origin, as `planBoxOf` turns the building's. Empty when
+ * the element has no vertex.
+ */
+function elementPlanBoxOf(store: BatchStore, rec: ElementRecord, rho: number): Box3 {
+  const c = Math.cos(-rho)
+  const s = Math.sin(-rho)
+  let x0 = Infinity
+  let y0 = Infinity
+  let z0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  let z1 = -Infinity
+  for (let p = 0; p < rec.slotOf.length; p++) {
+    const slot = store.slots[rec.slotOf[p]]
+    if (!slot || slot.removed) continue
+    const pos = slot.geometry.getAttribute('position')?.array as ArrayLike<number> | undefined
+    const index = slot.geometry.getIndex()?.array as ArrayLike<number> | undefined
+    if (!pos || !index) continue
+    const local = rec.partOf[p] - slot.firstPart
+    const start = slot.partRange[local * 2]
+    const end = start + slot.partRange[local * 2 + 1]
+    for (let i = start; i < end; i++) {
+      const v = index[i]
+      const x = pos[v * 3]
+      const y = pos[v * 3 + 1]
+      const px = x * c - y * s
+      const py = x * s + y * c
+      const z = pos[v * 3 + 2]
+      if (px < x0) x0 = px
+      if (px > x1) x1 = px
+      if (py < y0) y0 = py
+      if (py > y1) y1 = py
+      if (z < z0) z0 = z
+      if (z > z1) z1 = z
+    }
+  }
+  const box = new Box3()
+  if (x0 <= x1) box.set(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1))
+  return box
+}
+
 export interface ModelMeta {
   offset?: readonly [number, number, number]
   grids?: readonly {
@@ -311,6 +354,14 @@ export interface Viewer {
   frameExtents(): void
   elementIds(): number[]
   elementBox(id: number): Box3 | null
+  /**
+   * The element's box in the **plan frame** — the scene turned by −ρ about its origin, Z
+   * unchanged — and ρ in radians. While ρ is 0 it is `elementBox(id)` exactly; otherwise it is
+   * taken from the element's own vertices, so a wall square with a turned building gets its own
+   * extents and not the world-axis box round it. `null` for an element with no geometry. The
+   * selection dimensions and the property card's geometry rows read it.
+   */
+  elementPlanBox(id: number): { box: Box3; rho: number } | null
   solidCount(id: number): number
   isVisible(id: number): boolean
   setTheme(t: ThemeName): void
@@ -524,7 +575,26 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
   let frameScale = sceneScale(frameBox)
   /** True while the building box left the site out — `frameBox` is not the whole box. */
   let frameIsBuilding = false
+  /**
+   * Each element's plan-frame box, for `elementPlanBox`, taken once per element while ρ is not 0:
+   * the selection dimensions are re-drawn on every visibility change, and walking thousands of
+   * selected elements' vertices each time would be the cost. Emptied whenever ρ or the model set
+   * changes (`refreshPlanBox` runs for both) — ids are reused by slot — and when a stream fails.
+   */
+  const planBoxes = new Map<number, Box3>()
+  function elementPlanBox(id: number): { box: Box3; rho: number } | null {
+    const rec = store.elements.get(id)
+    if (!rec) return null
+    if (planRho === 0) return { box: rec.bbox, rho: 0 }
+    let box = planBoxes.get(id)
+    if (!box) {
+      box = elementPlanBoxOf(store, rec, planRho)
+      planBoxes.set(id, box)
+    }
+    return box.isEmpty() ? null : { box, rho: planRho }
+  }
   const refreshPlanBox = (): void => {
+    planBoxes.clear()
     if (planRho === 0) {
       planBox.copy(frameBox)
       fitFrame.copy(frameBox)
@@ -882,6 +952,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     grids: () => grids,
     storeys: () => storeys,
     elementBox: (id) => store.elements.get(id)?.bbox ?? null,
+    elementPlanBox,
     isVisible: (id) => !!store.elements.get(id)?.visible,
     ray: (origin, dir, far, near) => picker.ray(origin, dir, far, near),
     offset: () => offset,
@@ -1397,6 +1468,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     } catch (err) {
       const dropped = store.removeModel(label)
       edges.removeModel(label)
+      planBoxes.clear()
       // As `forget` does: the ids are the slot's, so a later model on it must not inherit a cache.
       snapper.invalidate(dropped)
       if (!store.elements.size) partState.reset()
@@ -1533,6 +1605,7 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
     batch,
     elementIds: () => [...store.elements.keys()],
     elementBox: (id) => store.elements.get(id)?.bbox ?? null,
+    elementPlanBox,
     solidCount: (id) => store.elements.get(id)?.solidCount ?? 0,
     isVisible: (id) => !!store.elements.get(id)?.visible,
 
@@ -1631,6 +1704,8 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       cube?.setPlanRotation(rho)
       rig.setPlanRotation(rho)
       annotations.rebuild()
+      // The selection dimensions stand in the plan frame, which has just turned.
+      annotations.drawDims()
       if (named) {
         cam.goal.theta += turn
         cam.cur.theta += turn

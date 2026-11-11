@@ -188,6 +188,11 @@ export interface AnnotationHost {
   /** `elev` is the scene height the ring is drawn at; `authored` is what the tag prints. */
   storeys(): readonly { name: string; elev: number; authored: number }[]
   elementBox(id: number): Box3 | null
+  /**
+   * The element's box in the plan frame and ρ (`Viewer.elementPlanBox`), which the selection
+   * dimensions are drawn from. A host without it draws them from `elementBox` at ρ = 0.
+   */
+  elementPlanBox?(id: number): { box: Box3; rho: number } | null
   isVisible(id: number): boolean
   /** Nearest hit along a world ray, section-clipped — `picking.ts`. */
   ray(
@@ -935,15 +940,24 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     dimLabels = []
   }
 
-  /** L440–483. */
+  /**
+   * L440–483 — in the plan frame (2026-11-07's plan rotation, ρ): the selected elements' plan
+   * boxes are unioned, the box, the runs, their ticks and the label anchors are laid out there
+   * with the design's own arithmetic, and every point is turned by +ρ back into the scene. At
+   * ρ = 0 no point is turned, so it is the design's drawing exactly.
+   */
   function drawDims(): void {
     clearDims()
     if (!dimOn || !dimIds.length) return
     let min: Vector3 | null = null
     let max: Vector3 | null = null
+    let rho = 0
     for (const id of dimIds) {
-      const b = host.elementBox(id)
-      if (!b || !host.isVisible(id)) continue
+      if (!host.isVisible(id)) continue
+      const plan = host.elementPlanBox ? host.elementPlanBox(id) : null
+      const b = host.elementPlanBox ? plan?.box : host.elementBox(id)
+      if (!b) continue
+      if (plan) rho = plan.rho
       if (!min || !max) {
         min = b.min.clone()
         max = b.max.clone()
@@ -958,10 +972,16 @@ export function createAnnotations(host: AnnotationHost): Annotations {
     const size = new Vector3().subVectors(mx, mn)
     const off = dimOffset(size.x, size.y, size.z)
     const t = off * DIM_TICK_FRACTION
+    /** A plan-frame point (or direction) back into the scene: turned by +ρ about the origin, Z as it is. */
+    const toScene = (v: Vector3): Vector3 => {
+      if (rho === 0) return v
+      const [x, y] = turnXY([v.x, v.y], rho)
+      return v.set(x, y, v.z)
+    }
 
     // The box, as the reference's `Box3Helper` draws it: the twelve edges of the AABB.
     const corner = (i: number): Vector3 =>
-      new Vector3(i & 1 ? mx.x : mn.x, i & 2 ? mx.y : mn.y, i & 4 ? mx.z : mn.z)
+      toScene(new Vector3(i & 1 ? mx.x : mn.x, i & 2 ? mx.y : mn.y, i & 4 ? mx.z : mn.z))
     const BOX_EDGES = [0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 3, 7, 2, 6]
     dimGroup.add(
       new LineSegments(
@@ -994,6 +1014,13 @@ export function createAnnotations(host: AnnotationHost): Annotations {
         dirs: DIM_RUN_DIRS.z
       }
     ]
+    // Laid out in the plan frame; drawn in the scene. A tick is a direction, so it turns as the
+    // run does, and a run's tick ends and label anchor are then where the turned run puts them.
+    for (const r of runs) {
+      toScene(r.a)
+      toScene(r.b)
+      toScene(r.tick)
+    }
 
     // L456: obstacles grow as labels are placed, so a later run never lands on an earlier one.
     const taken: DimRect[] = [...dimAvoid]
