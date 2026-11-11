@@ -117,13 +117,16 @@ test('the context menu is a menu, traps focus, and gives it back on Escape', asy
   const menu = page.locator('[role="menu"]')
   await expect(menu).toBeVisible()
   const items = menu.locator('[role="menuitem"]')
-  await expect(items).toHaveCount(12)
+  // 2026-11-11 (the owner: "Yes, by type"): `tiny.ifc`'s walls have neither a type nor an
+  // ObjectType, so the three "similar · …" items are not drawn — nine items, where there were
+  // twelve with `Hide similar · ` and nothing after it.
+  await expect(items).toHaveCount(9)
   // Focus went to the first item, and it is the only tabbable one.
   expect(await focused(page)).toMatch(/^menuitem:Hide/)
   await expect(menu.locator('[role="menuitem"][tabindex="0"]')).toHaveCount(1)
 
   await page.keyboard.press('ArrowDown')
-  expect(await focused(page)).toMatch(/^menuitem:Hide similar ·/)
+  expect(await focused(page)).toMatch(/^menuitem:Hide similar entity ·/)
   await page.keyboard.press('End')
   expect(await focused(page)).toMatch(/^menuitem:Zoom extents/)
   // Tab cannot leave the menu.

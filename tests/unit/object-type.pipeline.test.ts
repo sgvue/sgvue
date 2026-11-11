@@ -160,7 +160,11 @@ for (const file of FILES) {
           expect(same.v, at(w)).toBe(sameOt(w).length.toLocaleString('en-US'))
         })
 
-        it('the context menu: "Select similar" is the same ObjectType', () => {
+        // 2026-11-11, the owner: *"Yes, by type"* — this case first pinned "similar" to the same
+        // ObjectType, which on an element with none took every element with none. "Similar" is
+        // the same type's Name, the element's own ObjectType only when it has no type, and with
+        // neither there is no such item. Still IfcOpenShell's raw readings on the expected side.
+        it('the context menu: "Select similar" is the same type, else the same ObjectType, else absent', () => {
           const e = el(w)
           const items = ctxItems({
             elements,
@@ -169,9 +173,17 @@ for (const file of FILES) {
             selIds: [e.id],
             hidden: {}
           })
-          const similar = items.find((i) => i.label.startsWith('Select similar ·'))!
-          expect(similar.action.kind).toBe('select')
-          expect(guidsOf((similar.action as { ids: number[] }).ids), at(w)).toEqual(sameOt(w))
+          const key = (x: Identity): string => x.typeName || x.objectType
+          const similar = items.find((i) => i.label.startsWith('Select similar ·'))
+          if (!key(w)) {
+            expect(similar, at(w)).toBeUndefined()
+            return
+          }
+          expect(similar!.label, at(w)).toBe(`Select similar · ${key(w)}`)
+          expect(similar!.action.kind).toBe('select')
+          expect(guidsOf((similar!.action as { ids: number[] }).ids), at(w)).toEqual(
+            wants.filter((x) => key(x) === key(w)).map((x) => x.guid).sort()
+          )
         })
 
         it('the tree: the row\'s meta and a search read the occurrence\'s ObjectType', () => {

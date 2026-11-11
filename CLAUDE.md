@@ -1190,6 +1190,17 @@ Anything not on this list is a defect.
   focused by themselves; only the user's click answers it. **New controls:** the quick replies.
   Styled by `.vm` classes only; no inline string changed. Not yet seen in a window.)*
 
+- **2026-11-11 — the right-click menu's "similar · …" items go by the element's type, and are not
+  drawn for an element with neither a type nor an ObjectType.** Asked *"Should right-click
+  'similar' match by the type name first, as other viewers do?"*, the owner: *"Yes, by type"*.
+  `Hide similar · X`, `Isolate similar · X` and `Select similar · X` (`SGVue.dc.html:1898–1921`)
+  keep their copy, order, keys and handlers; `X` and what they take is the type object's Name, the
+  element's own ObjectType only when it has no type. With neither, the three items are absent —
+  the design's mock never reaches that state — and the rule above `Select similar` stands above
+  `Zoom to`. The mock has no type objects, so there every label and action is the design's. The
+  property card's "Same ObjectType" row is unchanged and literal. **No new element, no new
+  control.** Not yet seen in a window.
+
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
 2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's
@@ -1528,7 +1539,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 
 - 2026-11-09 — **version 1.5.0 ships the Ask Vee messaging work beside the Schedules work, in one installer** (the owner: *"Fold into 1.5.0"*): 1.5.0 was prepared on main and never published; `CHANGELOG.md`'s `[Unreleased]` is folded into its section and `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently and Known limits; the installers are built by `release.yml` from the tag, Windows first and the macOS disk images after the owner's Mac test.
 
-- 2026-11-11 — **ObjectType is the occurrence's own attribute, as written; the type object's Name is `typeName`** (owner-reported: *"I open in other BIM Viewer, see different thing"*): `objectType` is never the type's Name, and with none the tile is empty, as the design's is; "Same ObjectType" and the menu's "similar" are literal, so with none they take every element with none; Schedules' Family / Type split `typeName || objectType`, SQL `type_object` and `get_relationships`' `typeObject` read `typeName`, `isSiteLike` tests `typeName || objectType` (framing unchanged); **the oracle script records IfcOpenShell's raw readings only** — an app rule is named in the test's `APP_RULES`, `KNOWN_DIFFERENCES` stays empty, and every element of every committed fixture is compared (`tests/fixtures/identities.json`, `object-type.pipeline.test.ts`).
+- 2026-11-11 — **ObjectType is the occurrence's own attribute, as written; the type object's Name is `typeName`** (owner-reported: *"I open in other BIM Viewer, see different thing"*): `objectType` is never the type's Name, and with none the tile is empty, as the design's is; the card's "Same ObjectType" row is literal; the right-click "similar · …" items go by the type's Name, by ObjectType only for an element with no type, and are not drawn for an element with neither (`similarKey`, the owner: *"Yes, by type"*); Schedules' Family / Type split `typeName || objectType`, SQL `type_object` and `get_relationships`' `typeObject` read `typeName`, `isSiteLike` tests `typeName || objectType` (framing unchanged); **the oracle script records IfcOpenShell's raw readings only** — an app rule is named in the test's `APP_RULES`, `KNOWN_DIFFERENCES` stays empty, and every element of every committed fixture is compared (`tests/fixtures/identities.json`, `object-type.pipeline.test.ts`).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

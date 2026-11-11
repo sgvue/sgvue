@@ -16,9 +16,10 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   What works differently: an element with no ObjectType of its own now has an empty ObjectType
   tile, and its tree row no longer carries the type's name; a saved filter, filter set or project
   rule on ObjectType that named a type's name now matches only elements whose own ObjectType is
-  that text; the tree search no longer finds an element by its type's name; and "Same
-  ObjectType" and the right-click "similar" items, on an element with no ObjectType, take every
-  element with no ObjectType.
+  that text; the tree search no longer finds an element by its type's name; and the
+  property card's "Same ObjectType" row, on an element with no ObjectType, counts every element
+  with none. The right-click "similar" items go by the element's type, as before, by its
+  ObjectType when it has no type, and are left out for an element with neither.
 
 ## [1.5.0] - 2026-11-08
 
