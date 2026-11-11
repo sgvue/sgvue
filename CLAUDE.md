@@ -1563,6 +1563,19 @@ is the history, and `docs/SYSTEM_SPEC.md` §11 is what is still owed before a pu
 
 ---
 
+## Ownership (trial, review on 2026-11-25)
+
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
+
+- Applies to Build tasks only, not Fix or Ship.
+- Tidy only inside files the task already touches. The fidelity contract above and the Rules below still win.
+- Never change what the owner sees or how an existing feature behaves unless the task says so.
+- List every extra change in the Build Report.
+- Reviewer: tidying inside touched files is allowed. An unrequested change in what the owner sees or how a feature behaves is BLOCKING, and so is any extra change the Build Report did not list.
+- Trial: if reviews flag unrequested behaviour changes more than twice before 2026-11-25, remove this section.
+
+---
+
 ## Rules
 
 - **Viewer only. Never write model data.** No IFC write path, no "save model", no tool that
