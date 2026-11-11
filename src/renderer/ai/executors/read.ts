@@ -32,7 +32,8 @@ import {
 import { visFn, type Rule } from '../../../shared/rules'
 import { SQL_RESULT_MAX_CHARS } from '../../../shared/sql-guard'
 import { measureKind, unitLabel, type UnitKind } from '../../../shared/units'
-import type { ShellState } from '../../state/shell'
+import { getViewer, type ShellState } from '../../state/shell'
+import { planFrameOf, type PlanFrame } from '../../model/plan-boxes'
 import type { Georeference, SpatialNode, Units } from '../../../shared/model-index.types'
 import {
   METRICS,
@@ -157,6 +158,51 @@ function boxReport(
     boxCentreMap: toMap(readoutCoords(s.coords), centre[0], centre[1], centre[2]),
     boxMethod:
       'axis-aligned bounding box in the file’s own world coordinates — the union of the element’s placed part boxes, not solid geometry'
+  }
+}
+
+/**
+ * 2026-11-11 — the frame the box tools read: the world while the plan is not turned, else the
+ * plan frame, square with the building, through the viewer's own `elementPlanBox` — the box the
+ * property card shows (`model/plan-boxes.ts`).
+ */
+const planFrame = (s: ShellState): PlanFrame => planFrameOf(s.planRotationDeg, s.offset, getViewer())
+
+/** The plan frame's words, for the four box tools' `method` and sentences. */
+const PLAN_BOXES =
+  'axis-aligned bounding boxes square with the building — the plan frame, the world axes turned by planRotationDeg about Z — taken from each element’s own vertices (from its world box’s corners, which is larger, where the 3D view has none)'
+
+/**
+ * 2026-11-11 — `get_element`'s plan-frame box, beside the world box `boxReport` gives: nothing at
+ * all while the plan is not turned. Its size is along the building's own axes, the property
+ * card's numbers; its centre is turned back into world metres, so it reads beside
+ * `boxCentreMetres` and goes through the same `toMap`.
+ */
+function planBoxReport(s: ShellState, frame: PlanFrame, e: FederatedElement): Record<string, unknown> {
+  if (frame.frame === 'world') return {}
+  const b = frame.box(e)
+  if (!b) {
+    return {
+      planBoxSizeMetres: null,
+      planBoxVolumeM3: null,
+      planBoxCentreMetres: null,
+      planBoxCentreMap: null,
+      planRotationDeg: frame.rotationDeg
+    }
+  }
+  const size = { x: b[3] - b[0], y: b[4] - b[1], z: b[5] - b[2] }
+  const rho = (frame.rotationDeg * Math.PI) / 180
+  const u = (b[0] + b[3]) / 2
+  const v = (b[1] + b[4]) / 2
+  const centre = { x: u * Math.cos(rho) - v * Math.sin(rho), y: u * Math.sin(rho) + v * Math.cos(rho), z: (b[2] + b[5]) / 2 }
+  return {
+    planBoxSizeMetres: size,
+    planBoxVolumeM3: size.x * size.y * size.z,
+    planBoxCentreMetres: centre,
+    planBoxCentreMap: toMap(readoutCoords(s.coords), centre.x, centre.y, centre.z),
+    planRotationDeg: frame.rotationDeg,
+    planBoxMethod:
+      'axis-aligned box square with the building (the plan frame: the world axes turned by planRotationDeg about Z), from the element’s own vertices (from its world box’s corners, which is larger, where the 3D view has none) — the box the property card shows, and the size to state; not solid geometry. Its centre is in world metres.'
   }
 }
 
@@ -342,19 +388,23 @@ export const clash_check: Executor = (input, ctx) => {
   }
   if (modelA === modelB) return { forModel: { message: 'Pick two different models.' } }
 
+  const frame = planFrame(s)
+  const plan = frame.frame === 'plan'
   const { pairs, capped: wasCapped } = clashPairs(
     s.federation.elements,
     visFn(s),
     modelA,
     modelB,
-    tolerance
+    tolerance,
+    frame.box
   )
   if (!pairs.length) {
     return {
       forModel: {
-        message: `No bounding-box interference between ${modelA} and ${modelB} ${toleranceText(tolerance)}.`,
+        message: `No bounding-box interference between ${modelA} and ${modelB} ${toleranceText(tolerance)}${plan ? ', with the boxes square with the building' : ''}.`,
         candidates: 0,
-        tolerance
+        tolerance,
+        ...(plan ? { frame: 'plan', planRotationDeg: frame.rotationDeg } : {})
       }
     }
   }
@@ -364,13 +414,15 @@ export const clash_check: Executor = (input, ctx) => {
       message: `${pairs.length} bbox interference candidates between ${modelA} and ${modelB} ${toleranceText(tolerance)}${wasCapped ? ' (test capped)' : ''}. Largest: ${pairs
         .slice(0, 3)
         .map((p) => `${p.a.name} × ${p.b.name} (${p.vol.toFixed(3)} m³)`)
-        .join('; ')}. These are candidates for review, not confirmed solid clashes.`,
+        .join('; ')}.${plan ? ' Boxes square with the building.' : ''} These are candidates for review, not confirmed solid clashes.`,
       candidates: pairs.length,
       tolerance,
       capped: wasCapped,
-      method:
-        'axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — candidates for review',
-      frame: 'world',
+      method: plan
+        ? `${PLAN_BOXES}, not solid geometry — candidates for review`
+        : 'axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — candidates for review',
+      frame: frame.frame,
+      ...(plan ? { planRotationDeg: frame.rotationDeg } : {}),
       pairs: rows.map((p) => ({
         a: { id: p.a.id, name: p.a.name, type: p.a.type },
         b: { id: p.b.id, name: p.b.name, type: p.b.type },
@@ -488,6 +540,8 @@ export const get_element: Executor = (input, ctx) => {
             boxCentreMetres: null,
             boxCentreMap: null
           }),
+      // 2026-11-11 — beside it, while the building is turned, the box square with it.
+      ...planBoxReport(s, planFrame(s), e),
       /**
        * The tessellated parts the geometry stream produced for this element — the number the
        * property card's Geometry row shows — and what that is, because "solids" could be read
@@ -1161,8 +1215,13 @@ export const measure_between: Executor = (input, ctx) => {
       }
     }
   }
-  const [ax0, ay0, az0, ax1, ay1, az1] = a.bbox
-  const [bx0, by0, bz0, bx1, by1, bz1] = b.bbox
+  // 2026-11-11 — square with the building while it is turned; the world boxes otherwise.
+  const frame = planFrame(s)
+  const plan = frame.frame === 'plan'
+  const aBox = frame.box(a)!
+  const bBox = frame.box(b)!
+  const [ax0, ay0, az0, ax1, ay1, az1] = aBox
+  const [bx0, by0, bz0, bx1, by1, bz1] = bBox
   const ca = [(ax0 + ax1) / 2, (ay0 + ay1) / 2, (az0 + az1) / 2]
   const cb = [(bx0 + bx1) / 2, (by0 + by1) / 2, (bz0 + bz1) / 2]
   const centre = Math.hypot(cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2])
@@ -1176,21 +1235,26 @@ export const measure_between: Executor = (input, ctx) => {
   const clearance = Math.hypot(...gap.map((g) => Math.max(g, 0)))
   return {
     forModel: {
-      message: `${a.name} and ${b.name}: ${centre.toFixed(3)} m centre to centre, ${overlaps ? 'bounding boxes overlap' : `${clearance.toFixed(3)} m between bounding boxes`}. Bounding-box arithmetic, not solid geometry.`,
+      message: `${a.name} and ${b.name}: ${centre.toFixed(3)} m centre to centre, ${overlaps ? 'bounding boxes overlap' : `${clearance.toFixed(3)} m between bounding boxes`}. ${plan ? 'Bounding-box arithmetic on boxes square with the building, not solid geometry.' : 'Bounding-box arithmetic, not solid geometry.'}`,
       a: brief(a),
       b: brief(b),
       centreToCentreMetres: centre,
       boxGapMetres: { x: gap[0], y: gap[1], z: gap[2] },
       boxClearanceMetres: overlaps ? 0 : clearance,
       boxesOverlap: overlaps,
-      /** Both boxes are world metres, Z-up — the files' own coordinates, origin to origin. */
-      frame: 'world',
+      /**
+       * Both boxes are world metres, Z-up — the files' own coordinates, origin to origin — or,
+       * while the building is turned, plan coordinates: the world turned by −planRotationDeg.
+       */
+      frame: frame.frame,
       // Said in structure as well as in the sentence, because the number is not a
       // surface-to-surface distance and a reader of the JSON alone must not take it for one.
-      method:
-        'axis-aligned bounding boxes in the files’ own world coordinates — the union of each element’s placed part boxes, not solid geometry',
-      aBoxMetres: a.bbox,
-      bBoxMetres: b.bbox
+      method: plan
+        ? `${PLAN_BOXES}, not solid geometry`
+        : 'axis-aligned bounding boxes in the files’ own world coordinates — the union of each element’s placed part boxes, not solid geometry',
+      aBoxMetres: aBox,
+      bBoxMetres: bBox,
+      ...(plan ? { planRotationDeg: frame.rotationDeg } : {})
     }
   }
 }
@@ -1203,8 +1267,8 @@ export const measure_between: Executor = (input, ctx) => {
  * it — dominated the answer with no way to exclude it but another `WHERE`.
  *
  * It is box arithmetic and says so in the same words `measure_between` uses, because it is the
- * same arithmetic: the gap between two axis-aligned boxes in world coordinates, never a
- * surface-to-surface distance.
+ * same arithmetic: the gap between two axis-aligned boxes — in world coordinates, or square with
+ * the building while it is turned (2026-11-11) — never a surface-to-surface distance.
  */
 export const find_nearby: Executor = (input, ctx) => {
   const s = ctx.state()
@@ -1241,13 +1305,17 @@ export const find_nearby: Executor = (input, ctx) => {
   const pool = s.federation.elements.filter(
     (e) => visible(e) && (withSpaces || e.type !== 'IfcSpace')
   )
-  const found = nearbyElements(pool, boxed, distance)
+  const frame = planFrame(s)
+  const plan = frame.frame === 'plan'
+  const found = nearbyElements(pool, boxed, distance, frame.box)
   const { items, total, truncated } = capped(found, limit)
 
   const noun = boxed.length === 1 ? boxed[0].name : `${boxed.length} elements`
   const head = `${total} element${total === 1 ? '' : 's'} within ${distance} m of ${noun}` +
     (withSpaces ? '' : ', IfcSpace excluded') +
-    `. Axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — neighbours to check, not contacts.` +
+    (plan
+      ? `. Axis-aligned bounding boxes square with the building, not solid geometry — neighbours to check, not contacts.`
+      : `. Axis-aligned bounding boxes in the files’ own world coordinates, not solid geometry — neighbours to check, not contacts.`) +
     (truncated ? ` The ${items.length} nearest are listed.` : '') +
     (missing.length ? ` ${missing.length} of the ids given are not in the loaded federation.` : '') +
     (noBox.length ? ` ${noBox.length} of them carry no geometry and were skipped.` : '')
@@ -1271,9 +1339,11 @@ export const find_nearby: Executor = (input, ctx) => {
         gapMetres: n.gap,
         of: n.of
       })),
-      frame: 'world',
-      method:
-        'axis-aligned bounding boxes in the files’ own world coordinates — the union of each element’s placed part boxes, not solid geometry. A gap of 0 means the boxes touch or overlap.'
+      frame: frame.frame,
+      ...(plan ? { planRotationDeg: frame.rotationDeg } : {}),
+      method: plan
+        ? `${PLAN_BOXES}, not solid geometry. A gap of 0 means the boxes touch or overlap.`
+        : 'axis-aligned bounding boxes in the files’ own world coordinates — the union of each element’s placed part boxes, not solid geometry. A gap of 0 means the boxes touch or overlap.'
     },
     ui: { chips: items.length ? [{ label: `${total} within ${distance} m`, ids: items.map((n) => n.el.id) }] : [] }
   }

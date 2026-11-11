@@ -446,6 +446,11 @@ export interface IfcElement {
    * AABB, so a part rotated about anything but `+Z` reports a box at least as large as the
    * exact one — every consumer states that it is box arithmetic.
    *
+   * It is the world box the SQL `bbox` table and the assistant's box tools report. While the plan
+   * is turned (2026-11-11) those tools, the SQL `plan_box` table and the property card measure
+   * the box square with the building instead (`viewer.elementPlanBox`,
+   * `renderer/model/plan-boxes.ts`), which falls back to this one's corners.
+   *
    * Absent when the element has no geometry. Never a placeholder.
    */
   bbox?: readonly [number, number, number, number, number, number]

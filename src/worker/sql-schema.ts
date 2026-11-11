@@ -1,5 +1,5 @@
 /**
- * The model database: the federation's index, as twelve SQLite tables.
+ * The model database: the federation's index, as fourteen SQLite tables.
  *
  * It exists so the assistant can answer questions that no fixed tool signature covers —
  * "which fire doors on L3 have no FRL", "count walls by type and storey" — with an
@@ -24,6 +24,12 @@ import type { PropValue } from '../shared/model-index.types'
 export interface SqlPayload {
   models: readonly FederatedModel[]
   elements: readonly FederatedElement[]
+  /**
+   * 2026-11-11 — each boxed element's box square with the building, in plan coordinates (the
+   * world turned by −`rotationDeg` about Z, `renderer/model/plan-boxes.ts`): six numbers an id,
+   * in `ids` order. Absent while the plan is not turned — `plan_box` is then `bbox` itself.
+   */
+  planBoxes?: { rotationDeg: number; ids: Float64Array; boxes: Float64Array }
 }
 
 /**
@@ -166,6 +172,22 @@ CREATE TABLE bbox (
   min_x REAL, min_y REAL, min_z REAL,
   max_x REAL, max_y REAL, max_z REAL
 );
+
+-- The same box SQUARE WITH THE BUILDING, one row per element that has a bbox row, same columns,
+-- METRES, Z-up. x and y are the building's own axes: the world axes turned by
+-- plan_frame.rotation_deg about Z, so these coordinates are comparable only with other plan_box
+-- rows. Use it for lengths, widths, footprints and distances between elements; keep bbox for
+-- positions. With rotation_deg 0 the two tables are equal. Taken from the element's own vertices,
+-- as the property card's box is (from its bbox corners, which is larger, where the 3D view has
+-- none) — still box arithmetic, not solid geometry.
+CREATE TABLE plan_box (
+  element INTEGER PRIMARY KEY,
+  min_x REAL, min_y REAL, min_z REAL,
+  max_x REAL, max_y REAL, max_z REAL
+);
+
+-- Exactly one row: the turn, degrees anticlockwise, plan_box was taken at.
+CREATE TABLE plan_frame (rotation_deg REAL);
 
 CREATE INDEX element_model ON element(model);
 CREATE INDEX element_type ON element(type);
@@ -401,6 +423,20 @@ function fill(db: Database, payload: SqlPayload, prepare: (sql: string) => State
       bboxStmt.run([element.id, ...element.bbox])
     }
   }
+
+  // 2026-11-11 — after every other table, so none of their rows moves.
+  const planBoxStmt = prepare(
+    'INSERT INTO plan_box (element, min_x, min_y, min_z, max_x, max_y, max_z) VALUES (?,?,?,?,?,?,?)'
+  )
+  const plan = payload.planBoxes
+  if (plan) {
+    for (let i = 0; i < plan.ids.length; i++) {
+      planBoxStmt.run([plan.ids[i], ...plan.boxes.subarray(i * 6, i * 6 + 6)])
+    }
+  } else {
+    for (const element of payload.elements) if (element.bbox) planBoxStmt.run([element.id, ...element.bbox])
+  }
+  db.run('INSERT INTO plan_frame (rotation_deg) VALUES (?)', [plan?.rotationDeg ?? 0])
 
   db.run('COMMIT')
 }

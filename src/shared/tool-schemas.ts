@@ -447,7 +447,7 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     name: 'clash_check',
     kind: 'read',
     description:
-      'Bounding-box interference candidates between two loaded models, swept over every currently visible element of each. Read-only. modelA and modelB must both be loaded and different. tolerance is metres of allowed overlap before a pair counts; it defaults to 0, where boxes that only touch count too, and the result states the tolerance it used. This is an axis-aligned box test in the files’ own world coordinates, not solid geometry, so it over-reports for anything rotated or diagonal — always describe the results as candidates for review, never as clashes. At most 25 pairs come back, largest overlap first.',
+      'Bounding-box interference candidates between two loaded models, swept over every currently visible element of each. Read-only. modelA and modelB must both be loaded and different. tolerance is metres of allowed overlap before a pair counts; it defaults to 0, where boxes that only touch count too, and the result states the tolerance it used. This is an axis-aligned box test, not solid geometry: in the files’ own world coordinates, or — on a building turned in its file’s coordinates — with the boxes taken square with the building, along its own axes (the plan frame); a turned result states frame "plan" and planRotationDeg. It over-reports for anything rotated or diagonal against the building’s axes — always describe the results as candidates for review, never as clashes. At most 25 pairs come back, largest overlap first.',
     input_schema: obj(
       {
         modelA: { type: 'string' },
@@ -711,7 +711,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'get_element',
     kind: 'read',
     description:
-      'The full record of one element: attributes, every property set and quantity set as authored, materials, classifications, systems, decomposition, type object, bounding box and provenance. Pass either the numeric id or the IFC GlobalId. Read-only.',
+      'The full record of one element: attributes, every property set and quantity set as authored, materials, classifications, systems, decomposition, type object, bounding box and provenance. The bounding box is in world coordinates; on a building turned in its file’s coordinates the record also gives the box square with the building, along its own axes (the plan frame), with planRotationDeg — planBoxSizeMetres, when present, is the size to state: it is what the property card shows. Pass either the numeric id or the IFC GlobalId. Read-only.',
     input_schema: obj({
       id: { type: 'number', description: 'Federation element id, as chips and tables report it' },
       guid: { type: 'string', description: 'IfcRoot.GlobalId, 22 characters' }
@@ -846,7 +846,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'measure_between',
     kind: 'read',
     description:
-      'Distance between two elements, in metres: centre to centre, the gap between their bounding boxes per axis, and whether the boxes overlap. Bounding-box arithmetic, not solid geometry. Read-only.',
+      'Distance between two elements, in metres: centre to centre, the gap between their bounding boxes per axis, and whether the boxes overlap. Bounding-box arithmetic, not solid geometry. On a building turned in its file’s coordinates the boxes are taken square with the building, along its own axes (the plan frame); a turned result states frame "plan" and planRotationDeg. Read-only.',
     input_schema: obj(
       {
         a: { type: 'number', description: 'First element id' },
@@ -866,7 +866,7 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
     name: 'find_nearby',
     kind: 'read',
     description:
-      'Every element whose bounding box comes within a distance of one element’s box, or of a short list of them, nearest first. Read-only. distance is metres and 0 means "touching or overlapping". This is axis-aligned box arithmetic in the files’ own world coordinates, not solid geometry — exactly what measure_between reports — so describe the results as neighbours to check, not as contacts. IfcSpace is left out unless spaces:true, because a space overlaps everything inside it. The elements asked about are never their own neighbours.',
+      'Every element whose bounding box comes within a distance of one element’s box, or of a short list of them, nearest first. Read-only. distance is metres and 0 means "touching or overlapping". This is axis-aligned box arithmetic, not solid geometry — exactly what measure_between reports: in the files’ own world coordinates, or, on a building turned in its file’s coordinates, with the boxes square with the building (the plan frame); a turned result states frame "plan" and planRotationDeg — so describe the results as neighbours to check, not as contacts. IfcSpace is left out unless spaces:true, because a space overlaps everything inside it. The elements asked about are never their own neighbours.',
     input_schema: obj(
       {
         id: { type: 'number', description: 'Federation element id to search around' },

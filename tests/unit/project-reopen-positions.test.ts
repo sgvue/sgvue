@@ -318,7 +318,9 @@ const ALLOWED_VIEWER_CALLS = new Set<string>([
   'setModelColors', 'setClassColors', 'setCutColors', 'setPickable', 'setSections', 'setGrids',
   'setLevels', 'setShadows', 'setSnap', 'setUnits', 'setCoords', 'setDims', 'setGroundGrid',
   // The markups: cleared, and a project's own put back where the file says.
-  'clearMeasures', 'clearSpots', 'elementIds', 'placeMeasure', 'placeSpot'
+  'clearMeasures', 'clearSpots', 'elementIds', 'placeMeasure', 'placeSpot',
+  // A read: the element's box in the plan frame, for the SQL `plan_box` table — it moves nothing.
+  'elementPlanBox'
 ])
 
 /* ────────────────────────────── where things are drawn ────────────────────────────── */
@@ -744,5 +746,378 @@ describe('three models opened together, the middle one’s geometry failing', ()
     }
     expect.soft(off, log.handled.join(', ')).toEqual([])
     expect.soft(drawnModels.has('STR')).toBe(false)
+  })
+})
+
+describe('the federation emptied while other models are prepared against its offset', () => {
+  /**
+   * 2026-11-11, review round 2 — checks only. `resetBoot()` (`removeModel`, `undoBatch`, when the
+   * federation becomes empty) hands the offset back (`offset = null`) even while another model has
+   * already asked for its geometry against that offset and has not joined yet. The next model to
+   * be parsed is then asked with `null`, chooses an offset of its own, and the two join one batch
+   * on two origins. Both tests drive it through the real pipeline: `openPaths`, the project's
+   * Locate…, the `federation` controller, the real bridge and `streamGeometry`.
+   *
+   * Timeline both pin (the worker is one thread, FIFO; parse 2 s, geometry 0.4 s):
+   *   1. parse STR is handled; MEP's parse is posted behind it;
+   *   2. parse STR ends → parse MEP is handled at once; "STR parsed" reaches the renderer, which
+   *      posts geometry STR **with the boot model's offset** — queued behind parse MEP;
+   *   3. **here** the federation's only model leaves (an unload, or its boot join failing);
+   *   4. parse MEP ends; "MEP parsed" reaches the renderer before geometry STR is done, and MEP's
+   *      geometry is posted with the offset the controller holds now.
+   */
+  const MEP: ModelSpec = {
+    name: 'MEP',
+    guidPrefix: '3',
+    boxes: [
+      { name: 'MEP duct', at: [20000, 25000, 6000], size: [5000, 600, 400] },
+      { name: 'MEP riser', at: [26000, 25000, 0], size: [500, 500, 6000] }
+    ]
+  }
+  const ALL = { ARC: SPECS.ARC, STR: SPECS.STR, MEP } as const
+  type Three = keyof typeof ALL
+  const THREE = Object.keys(ALL) as Three[]
+  const bytes3 = Object.fromEntries(THREE.map((k) => [k, new TextEncoder().encode(boxModel(ALL[k]))])) as Record<Three, Uint8Array>
+  const path3 = (k: Three): string => `/projects/synthetic/review/models/${k}.ifc`
+  const key3 = (path: string): Three => THREE.find((k) => path3(k) === path)!
+  const picked3 = (k: Three): { path: string; name: string; size: number } => ({ path: path3(k), name: `${k}.ifc`, size: bytes3[k].length })
+
+  /** Every request the renderer posted to the worker, in order — handled or still queued. */
+  let posted: () => ParseRequest[] = () => []
+  /** Start `posted()` afresh — after a fresh window, so a saved project's own loads are not read. */
+  let forgetPosted: () => void = () => undefined
+  const geometryPosted = (key: string): (ParseRequest & { type: 'geometry' }) | undefined =>
+    posted().find((r): r is ParseRequest & { type: 'geometry' } => r.type === 'geometry' && r.modelKey === key)
+
+  /** Each element of these models: exactly its file's corners, within 1 mm, and nothing else. */
+  function cornersOff(keys: readonly Three[]): string[] {
+    const now = drawnWorld()
+    const ids = idsByName()
+    const out: string[] = []
+    for (const key of keys) {
+      for (const b of ALL[key].boxes) {
+        const pts = now.get(ids.get(b.name) ?? '')
+        if (!pts) {
+          out.push(`${b.name}: not drawn`)
+          continue
+        }
+        const corners = boxCorners(b)
+        for (const c of corners) if (!pts.some((p) => dist(p, c) <= TOL_M)) out.push(`${b.name}: no drawn vertex at its corner ${fmt(c)}`)
+        const stray = pts.filter((p) => !corners.some((c) => dist(p, c) <= TOL_M))
+        if (stray.length) out.push(`${b.name}: ${stray.length} drawn vertices on none of its corners, e.g. ${fmt(stray[0])} — centre drawn ${fmt(centreOf(pts))}, the file's ${fmt(boxCentre(b))}`)
+      }
+    }
+    return out
+  }
+
+  /** The one-offset rule over every model in the scene, the store's offset the reference. */
+  function oneOffset(): string[] {
+    const store = useShell.getState().offset
+    const inScene = new Set(drawnModels.keys())
+    const out: string[] = []
+    for (const g of log.geometry) {
+      if (!inScene.has(g.modelKey) || !g.summary) continue
+      if (JSON.stringify(g.summary.offset) !== JSON.stringify(store))
+        out.push(`${g.modelKey} streamed against offset ${JSON.stringify(g.summary.offset)} (asked for ${JSON.stringify(g.offset)}); the store's is ${JSON.stringify(store)}`)
+    }
+    for (const [key, m] of drawnModels) {
+      if (JSON.stringify(m.offset) !== JSON.stringify(store)) out.push(`${key} handed to the viewer with meta.offset ${JSON.stringify(m.offset)}; the store's is ${JSON.stringify(store)}`)
+    }
+    return out
+  }
+
+  /** The offset each file chooses streamed alone — the fixture's precondition, checked. */
+  function soloOffset(k: Three): FederationOffset {
+    const id = ifc.openFromBuffer(bytes3[k])
+    try {
+      return streamGeometry(ifc, id, { modelKey: k, offset: null, onChunk: () => undefined }).offset
+    } finally {
+      ifc.close(id)
+    }
+  }
+
+  const s = (): ReturnType<typeof useShell.getState> => useShell.getState()
+  const realAddModel = viewerImpl.addModel
+
+  beforeEach(() => {
+    const w = window as unknown as { sgvue: Record<string, unknown> }
+    w.sgvue.admitPaths = async (paths: string[]) => ({ files: paths.map((p) => picked3(key3(p))), refused: [] })
+    vi.stubGlobal('fetch', async (url: string) => {
+      const key = key3(decodeURIComponent(url.replace('sgvue-file://t/', '')))
+      const blob = new Blob([bytes3[key] as BlobPart])
+      blobBytes.set(blob, bytes3[key])
+      return { ok: true, status: 200, blob: async () => blob }
+    })
+    const spy = vi.spyOn(FakeParseWorker.prototype, 'postMessage')
+    posted = () => spy.mock.calls.map(([r]) => r)
+    forgetPosted = () => spy.mockClear()
+  })
+  afterEach(() => {
+    viewerImpl.addModel = realAddModel
+  })
+
+  it('the fixture: ARC, STR and MEP each choose a different whole-metre offset alone', () => {
+    const [a, b, c] = THREE.map(soloOffset)
+    expect(new Set([a, b, c].map((o) => JSON.stringify(o))).size).toBe(3)
+  })
+
+  it('1. the open model unloaded after STR asked for its geometry and before MEP parsed: STR and MEP on one offset, each where its file puts it', async () => {
+    await openPaths([path3('ARC')])
+    await until('ARC to boot', () => s().booted && s().ready && loadedKeys().join() === 'ARC')
+    const arcOffset = [...s().offset]
+    await openPaths([path3('STR'), path3('MEP')])
+    await until('STR’s geometry request to be posted', () => geometryPosted('STR') !== undefined)
+
+    // The moment, pinned from what the worker and the renderer have done:
+    //   · STR's geometry was asked for with ARC's offset — and is still queued in the worker;
+    //   · MEP's parse holds the worker, so "MEP parsed" has not reached the renderer;
+    //   · MEP has not asked for its geometry.
+    expect(geometryPosted('STR')?.offset).toEqual(arcOffset)
+    expect(log.handled.at(-1)).toBe('parse MEP')
+    expect(log.handled.includes('geometry STR')).toBe(false)
+    expect(geometryPosted('MEP')).toBeUndefined()
+    expect(loadedKeys()).toEqual(['ARC'])
+
+    // The sidebar's unload strip calls exactly this (`Sidebar.tsx`, `onDelete`).
+    await federation.removeModel('ARC')
+    expect(geometryPosted('MEP')).toBeUndefined()
+
+    await until('STR and MEP to load', () => s().booted && s().ready && loadedKeys().join() === 'MEP,STR')
+    expect.soft(oneOffset(), `requests as the worker took them: ${log.handled.join(', ')}`).toEqual([])
+    expect.soft(cornersOff(['STR', 'MEP']), log.handled.join(', ')).toEqual([])
+    expect.soft(drawnModels.has('ARC')).toBe(false)
+    expect.soft([...new Set(viewerCalls)].filter((c) => !ALLOWED_VIEWER_CALLS.has(c)).sort()).toEqual([])
+  })
+
+  it('2. a project’s boot join failing after a located STR asked for its geometry and before a located MEP parsed: STR and MEP on one offset, each where its file puts it', async () => {
+    // A project of the three, saved from a federation loaded one at a time.
+    for (const [i, k] of THREE.entries()) {
+      await openPaths([path3(k)])
+      await until(`${k} to load`, () => settled(THREE.slice(0, i + 1)))
+    }
+    const file = save()
+    freshWindow()
+    forgetPosted()
+
+    // ARC's join into the scene fails — the viewer's own `addModel` rejecting, which it does when
+    // a model cannot be streamed in (it then takes itself out). Rejected at the moment pinned below.
+    let failArc: (() => void) | null = null
+    viewerImpl.addModel = ((key: string, ...rest: never[]) => {
+      if (key !== 'ARC') return (realAddModel as (...a: unknown[]) => unknown)(key, ...rest)
+      return new Promise<void>((_, reject) => {
+        failArc = () => reject(new Error('the scene could not take ARC'))
+      })
+    }) as (...args: never[]) => unknown
+
+    // Reopened with STR and MEP missing: ARC boots alone, and its join hangs.
+    await openProjectMessage({
+      ok: true,
+      name: 'review',
+      text: JSON.stringify(file),
+      models: file.models.map((m) => {
+        const k = m.name.replace(/\.ifc$/, '') as Three
+        return { id: m.id, file: k === 'ARC' ? picked3(k) : null, refused: null }
+      })
+    })
+    await until('ARC’s boot join to start', () => failArc !== null)
+    const arcOffset = [...s().offset]
+    expect(s().booted).toBe(false)
+
+    // Locate… STR, then MEP, while ARC's join is under way: they join what is loading.
+    const idOf = (k: Three): string => file.models.find((m) => m.name === `${k}.ifc`)!.id
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(idOf('STR'))
+    await vi.advanceTimersByTimeAsync(300)
+    locateAnswer = { file: picked3('MEP'), refused: null }
+    await locateModel(idOf('MEP'))
+    await until('STR’s geometry request to be posted', () => geometryPosted('STR') !== undefined)
+
+    // The moment: STR asked with ARC's offset (still queued), MEP still parsing, ARC not joined.
+    expect(geometryPosted('STR')?.offset).toEqual(arcOffset)
+    expect(log.handled.at(-1), log.handled.join(', ')).toBe('parse MEP')
+    expect(log.handled.includes('geometry STR')).toBe(false)
+    expect(geometryPosted('MEP')).toBeUndefined()
+    expect(loadedKeys()).toEqual([])
+
+    failArc!()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(geometryPosted('MEP')).toBeUndefined()
+    expect(drawnModels.has('ARC')).toBe(false)
+
+    await until('STR and MEP to load', () => s().booted && s().ready && loadedKeys().join() === 'MEP,STR')
+    expect.soft(oneOffset(), `requests as the worker took them: ${log.handled.join(', ')}`).toEqual([])
+    expect.soft(cornersOff(['STR', 'MEP']), log.handled.join(', ')).toEqual([])
+    expect.soft([...new Set(viewerCalls)].filter((c) => !ALLOWED_VIEWER_CALLS.has(c)).sort()).toEqual([])
+  })
+
+  it('3. a project’s boot refused after it committed (no geometry) while a located STR waits prepared: STR and a later-located MEP on one offset, each where its file puts it', async () => {
+    /**
+     * 2026-11-11, deep review: `join()`'s catch in `upload-pipeline.ts` handled a boot that
+     * committed and was then refused (`the model contains no geometry`) with `fed.resetUnshown()`,
+     * which nulls the offset and drops every ticket while the pipeline's own `pending` keeps a
+     * located model prepared against that offset. The next located model was then asked with
+     * `null`, chose its own, and the two booted together on two origins.
+     *
+     * ARC's file has no elements, so its stream reports offset [0, 0, 0] and STR is streamed
+     * against that: Float32 at the synthetic site's coordinates is then the "mesh-less first
+     * model" precision limit, recorded separately. Measured worst vertex error here: 0.948 mm,
+     * so the file's 1 mm bar still holds. The one-offset assertions are exact; the defect was
+     * kilometres (MEP 26.5 km off). (At a zero origin Float32's half-step here is about 0.49 mm in
+     * E and 0.98 mm in N — up to about 1.09 mm together — so if a box or the site is ever changed
+     * in `synthetic-boxes.ts` and this bar is missed by a fraction of a millimetre with one
+     * offset still asserted, it is that floor and not this defect.)
+     */
+    const TOL_ZERO_ORIGIN_M = TOL_M
+    const realArc = bytes3.ARC
+    const realCost = { ...COST_MS }
+    try {
+      for (const [i, k] of THREE.entries()) {
+        await openPaths([path3(k)])
+        await until(`${k} to load`, () => settled(THREE.slice(0, i + 1)))
+      }
+      const file = save()
+      freshWindow()
+      forgetPosted()
+      // ARC's file on disk has since become one with no elements; a parse cheaper than the hold.
+      bytes3.ARC = new TextEncoder().encode(boxModel({ name: 'ARC', guidPrefix: '1', boxes: [] }))
+      COST_MS.parse = 100
+      COST_MS.geometry = 50
+      await openProjectMessage({
+        ok: true,
+        name: 'review',
+        text: JSON.stringify(file),
+        models: file.models.map((m) => {
+          const k = m.name.replace(/\.ifc$/, '') as Three
+          return { id: m.id, file: k === 'ARC' ? picked3(k) : null, refused: null }
+        })
+      })
+      // ARC's row ticks: its 1 100 ms hold begins.
+      await until('ARC’s row to be done', () => s().uploads.some((u) => u.name === 'ARC.ifc' && u.done))
+      expect(s().booted).toBe(false)
+      const idOf = (k: Three): string => file.models.find((m) => m.name === `${k}.ifc`)!.id
+
+      // Inside the hold, Locate… STR: it parses and streams against ARC's offset.
+      locateAnswer = { file: picked3('STR'), refused: null }
+      await locateModel(idOf('STR'))
+      await until('STR’s geometry to be streamed', () => log.geometry.some((g) => g.modelKey === 'STR' && g.summary !== null))
+      const arcOffset = log.geometry.find((g) => g.modelKey === 'ARC')?.summary?.offset
+      expect(arcOffset).toEqual([0, 0, 0])
+      expect(geometryPosted('STR')?.offset).toEqual(arcOffset)
+      expect(s().initErr).not.toMatch(/no geometry/)
+      expect(drawnModels.has('STR')).toBe(false)
+
+      // The hold ends; the commit is refused.
+      await until('the boot to be refused', () => /no geometry/.test(s().initErr), 5000)
+      expect(drawnModels.has('STR')).toBe(false)
+      expect(log.handled.includes('parse MEP')).toBe(false)
+      const handledAtRefusal = log.handled.length
+
+      // Locate… MEP afterwards.
+      locateAnswer = { file: picked3('MEP'), refused: null }
+      await locateModel(idOf('MEP'))
+      await until('MEP’s parse to start', () => log.handled.includes('parse MEP'))
+      expect(log.handled.indexOf('parse MEP')).toBeGreaterThanOrEqual(handledAtRefusal)
+
+      await until('STR and MEP to be in the scene', () => drawnModels.has('STR') && drawnModels.has('MEP') && s().booted && s().ready, 30_000)
+      expect.soft(oneOffset(), `requests as the worker took them: ${log.handled.join(', ')}`).toEqual([])
+      const streamed = log.geometry.filter((g) => g.summary && (g.modelKey === 'STR' || g.modelKey === 'MEP'))
+      expect.soft(new Set(streamed.map((g) => JSON.stringify(g.summary!.offset))).size, JSON.stringify(streamed.map((g) => [g.modelKey, g.offset, g.summary!.offset]))).toBe(1)
+
+      // Every element of STR and MEP has exactly its file's corners, within the zero-origin bar.
+      const now = drawnWorld()
+      const ids = idsByName()
+      const off: string[] = []
+      let worst = 0
+      for (const key of ['STR', 'MEP'] as const) {
+        for (const b of ALL[key].boxes) {
+          const pts = now.get(ids.get(b.name) ?? '')
+          if (!pts) {
+            off.push(`${b.name}: not drawn`)
+            continue
+          }
+          const corners = boxCorners(b)
+          for (const c of corners) {
+            const d = Math.min(...pts.map((p) => dist(p, c)))
+            worst = Math.max(worst, d)
+            if (d > TOL_ZERO_ORIGIN_M) off.push(`${b.name}: nearest drawn vertex ${(d * 1000).toFixed(1)} mm from its corner ${fmt(c)} — centre drawn ${fmt(centreOf(pts))}, the file's ${fmt(boxCentre(b))}`)
+          }
+          for (const p of pts) worst = Math.max(worst, Math.min(...corners.map((c) => dist(p, c))))
+        }
+      }
+      process.stdout.write(`[no-geometry boot] worst vertex error ${(worst * 1000).toFixed(3)} mm\n`)
+      expect.soft(off, log.handled.join(', ')).toEqual([])
+      expect.soft(worst).toBeLessThanOrEqual(TOL_ZERO_ORIGIN_M)
+      expect.soft(drawnModels.has('ARC')).toBe(false)
+      expect.soft([...new Set(viewerCalls)].filter((c) => !ALLOWED_VIEWER_CALLS.has(c)).sort()).toEqual([])
+    } finally {
+      bytes3.ARC = realArc
+      Object.assign(COST_MS, realCost)
+    }
+  })
+})
+
+describe('the offset handed back when nobody stands with it', () => {
+  /**
+   * The guard on the fix above: once everything is unloaded and nothing is preparing or prepared
+   * and waiting, the next model is asked with `offset: null` and chooses its own — the offset is
+   * not kept for ever. Both models are far apart, so a kept offset would be a different one.
+   */
+  function soloOffset(key: Key): FederationOffset {
+    const id = ifc.openFromBuffer(BYTES[key])
+    try {
+      return streamGeometry(ifc, id, { modelKey: key, offset: null, onChunk: () => undefined }).offset
+    } finally {
+      ifc.close(id)
+    }
+  }
+  function cornersOff(key: Key): string[] {
+    const now = drawnWorld()
+    const ids = idsByName()
+    const out: string[] = []
+    for (const b of SPECS[key].boxes) {
+      const pts = now.get(ids.get(b.name) ?? '')
+      if (!pts) {
+        out.push(`${b.name}: not drawn`)
+        continue
+      }
+      const corners = boxCorners(b)
+      for (const c of corners) if (!pts.some((p) => dist(p, c) <= TOL_M)) out.push(`${b.name}: no drawn vertex at its corner ${fmt(c)}`)
+      const stray = pts.filter((p) => !corners.some((c) => dist(p, c) <= TOL_M))
+      if (stray.length) out.push(`${b.name}: ${stray.length} drawn vertices on none of its corners, e.g. ${fmt(stray[0])}`)
+    }
+    return out
+  }
+  const s = (): ReturnType<typeof useShell.getState> => useShell.getState()
+
+  it('3a. ARC open and unloaded, then STR opened alone: STR is asked with null and chooses its own offset', async () => {
+    await openPaths([pathOf('ARC')])
+    await until('ARC to boot', () => s().booted && s().ready && loadedKeys().join() === 'ARC')
+    await federation.removeModel('ARC')
+    expect(loadedKeys()).toEqual([])
+    log.geometry.length = 0
+    await openPaths([pathOf('STR')])
+    await until('STR to boot alone', () => s().booted && s().ready && loadedKeys().join() === 'STR')
+    expect(log.geometry.map((g) => [g.modelKey, g.offset])).toEqual([['STR', null]])
+    expect(log.geometry[0].summary?.offset).toEqual(soloOffset('STR'))
+    expect(s().offset).toEqual(soloOffset('STR'))
+    expect(cornersOff('STR')).toEqual([])
+  })
+
+  it('3b. a project’s only model unloaded, then a missing one located (no fresh start): it is asked with null and chooses its own offset', async () => {
+    await loadOneByOne(['ARC', 'STR'])
+    const file = save()
+    freshWindow()
+    await reopen(file, ['STR'])
+    await until('ARC to boot alone', () => settled(['ARC']))
+    await federation.removeModel('ARC')
+    expect(loadedKeys()).toEqual([])
+    log.geometry.length = 0
+    locateAnswer = { file: picked('STR'), refused: null }
+    await locateModel(file.models.find((m) => m.name === 'STR.ifc')!.id)
+    await until('STR to be located and boot', () => s().booted && s().ready && loadedKeys().join() === 'STR')
+    expect(log.geometry.map((g) => [g.modelKey, g.offset])).toEqual([['STR', null]])
+    expect(log.geometry[0].summary?.offset).toEqual(soloOffset('STR'))
+    expect(s().offset).toEqual(soloOffset('STR'))
+    expect(cornersOff('STR')).toEqual([])
   })
 })

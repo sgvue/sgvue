@@ -28,6 +28,7 @@ import type { SessionFile } from '../../shared/session-codec'
 import { planRotationOf, useShell, setModelFiles, setViewer } from '../state/shell'
 import type { ModelMeta, Viewer } from '../viewer/viewer-core'
 import { elementBoxes } from './element-boxes'
+import { planBoxRows, planFrameOf } from './plan-boxes'
 import { deepFreeze } from './store'
 import { SqlBridge, type SqlQueryResult } from './sql-bridge'
 import { ParseWorkerBridge, type ParseProgress } from './worker-bridge'
@@ -116,6 +117,19 @@ interface Preparing {
   done: boolean
   /** The boot choice (`bootEpoch`) it was streamed under, or `null` before its stream. */
   epoch: number | null
+  /** Its place among the models on their way to joining (`onTheWay`), from its geometry request. */
+  ticket: Ticket | null
+}
+
+/**
+ * 2026-11-11 — one model streamed against the federation offset that has not joined yet: from its
+ * geometry request until its `prepare` fails, its item is consumed by `addBatch`, or it is
+ * `forget`-ten. `item` is set once it is prepared; `joining` while an `addBatch` holds it.
+ */
+interface Ticket {
+  key: string
+  item?: BatchItem
+  joining?: boolean
 }
 
 /**
@@ -164,8 +178,19 @@ export class FederationController {
    * nuance: a model later refused for its part ids may already have handed its offset to a model
    * that was waiting; it is only a whole-metre origin, and nothing seen depends on which model
    * set it.
+   *
+   * 2026-11-11 (later) — **it is handed back (`null`) only when the federation is empty and no
+   * model streamed against it is still on its way to joining** (`onTheWay`, `releaseOffset`).
+   * Emptying the federation — an unload, a boot join that failed — used to hand it back at once,
+   * while another model had already asked for its geometry against it; the next model was then
+   * asked with `null`, chose its own, and the two joined one batch on two origins. A model is on
+   * its way from its geometry request (read with this field, in the same tick) until its
+   * `prepare` fails, its item has been through `addBatch` — whatever the outcome — or it is
+   * `forget`-ten; `resetUnshown` and `dispose` drop them all. A model the pipeline drops without
+   * telling this side can only keep the offset for longer, never place a model wrongly.
    */
   private offset: FederationOffset | null = null
+  private readonly onTheWay = new Set<Ticket>()
   /**
    * 2026-10-09 — the unit assignment of the first model *prepared* — the boot model: the display
    * unit the app starts in (`shared/units.ts`, `displayUnitOf`). Since 2026-11-07 it is the one
@@ -249,6 +274,19 @@ export class FederationController {
    * the landing page replaced this load with a newer pick while it waited (`resetUnshown`).
    */
   async addBatch(items: readonly BatchItem[], reveal?: Promise<unknown>): Promise<boolean> {
+    // 2026-11-11 — every item of the batch stays on its way until the batch is over, so a boot
+    // that fails and empties the federation (`undoBatch` → `resetBoot`) keeps the offset while
+    // they are, and hands it back once they are gone with nothing loaded.
+    const tickets = [...this.onTheWay].filter((t) => t.item && items.includes(t.item))
+    for (const t of tickets) t.joining = true
+    try {
+      return await this.joinBatch(items, reveal)
+    } finally {
+      this.release(...tickets)
+    }
+  }
+
+  private async joinBatch(items: readonly BatchItem[], reveal?: Promise<unknown>): Promise<boolean> {
     if (!this.viewer || !items.length) return false
     const gen = this.gen
     const boot = this.federation.models.length === 0
@@ -363,9 +401,12 @@ export class FederationController {
     }
   }
 
-  /** Nothing is loaded: the next model to boot chooses the offset and the display unit afresh. */
+  /**
+   * Nothing is loaded: the next model to boot chooses the display unit afresh — and the offset,
+   * unless a model streamed against it is still on its way (2026-11-11, `releaseOffset`).
+   */
   private resetBoot(): void {
-    this.offset = null
+    this.releaseOffset()
     this.bootUnits = null
     this.bootChosen = false
     this.bootEpoch++
@@ -383,10 +424,22 @@ export class FederationController {
     if (preparing.epoch !== this.bootEpoch) return
     this.bootUsers--
     if (this.bootUsers > 0 || this.federation.models.length) return
-    this.offset = null
+    this.releaseOffset()
     this.bootUnits = null
     this.bootChosen = false
     this.bootEpoch++
+  }
+
+  /** 2026-11-11 — the offset goes back only with nothing loaded and nobody on the way (`offset`). */
+  private releaseOffset(): void {
+    if (!this.onTheWay.size && !this.federation.models.length) this.offset = null
+  }
+
+  /** These models are no longer on their way; the last of them may hand the offset back. */
+  private release(...tickets: Ticket[]): void {
+    let left = false
+    for (const t of tickets) left = this.onTheWay.delete(t) || left
+    if (left) this.releaseOffset()
   }
 
   /**
@@ -499,6 +552,8 @@ export class FederationController {
    */
   forget(modelKey: string): void {
     this.parse.close(modelKey)
+    // 2026-11-11 — and it is no longer on its way: the prepared item of that key no batch holds.
+    for (const t of this.onTheWay) if (t.key === modelKey && t.item && !t.joining) return this.release(t)
   }
 
   /**
@@ -507,7 +562,9 @@ export class FederationController {
    * the tick hold — and terminate the parse worker, so the next pick starts from nothing and
    * none of the replaced load's offset, unit, keys or coordinates carries over. Called only
    * while nothing is booted, or while the demo building is what is on screen (refactor pass 2,
-   * P9); after boot a new file joins the federation instead.
+   * P9); after boot a new file joins the federation instead. A caller must also drop the
+   * pipeline's own pending items (`disposeUploads`): one left there was prepared against the
+   * offset this nulls (2026-11-11).
    */
   resetUnshown(): void {
     this.gen++
@@ -516,6 +573,7 @@ export class FederationController {
     this.files.clear()
     this.indexes.length = 0
     this.federation = EMPTY_FEDERATION
+    this.onTheWay.clear()
     this.offset = null
     this.bootUnits = null
     this.bootChosen = false
@@ -541,11 +599,12 @@ export class FederationController {
   async prepare(file: PreparedFile, onStage: (index: number) => void): Promise<BatchItem> {
     const gen = this.gen
     const modelKey = file.key ?? modelKeyOf(file.name)
-    const parsed: Preparing = { done: false, epoch: null }
+    const parsed: Preparing = { done: false, epoch: null, ticket: null }
     try {
       return await this.parseInto(file, modelKey, gen, onStage, parsed)
     } catch (err) {
       if (parsed.done && gen === this.gen) this.parse.close(modelKey)
+      if (parsed.ticket) this.release(parsed.ticket)
       if (gen === this.gen) this.handBack(parsed)
       throw err
     }
@@ -588,7 +647,10 @@ export class FederationController {
     const chunks: GeometryChunk[] = []
     // `null` while no model has set the offset yet. If another model's geometry is still
     // streaming with `null`, the bridge holds this request and sends it with the offset that
-    // stream chose — so `summary.offset` below is the federation's one offset either way.
+    // stream chose — so `summary.offset` below is the federation's one offset either way. From
+    // this request the model is on its way, so the offset is not handed back under it (2026-11-11).
+    parsed.ticket = { key: modelKey }
+    this.onTheWay.add(parsed.ticket)
     const summary = await this.parse.geometry(modelKey, this.offset, (chunk) => chunks.push(chunk))
     if (gen !== this.gen) throw replaced()
     // A product drawn but not indexed (a site's own terrain, an annotation) is numbered too.
@@ -601,7 +663,7 @@ export class FederationController {
      * them either, because it has no index. So both are taken off the parts that have just
      * landed, in one pass, and written onto the index **before** it is frozen into the store
      * below — the same place and the same shape the mock adapter fills its own. Every consumer
-     * of `bbox` — `clash_check`, `measure_between`, `get_element` and the SQL `bbox` table —
+     * of `bbox` — the SQL `bbox` table, and the box tools' world box and plan-frame fallback —
      * therefore needs no second path. (The property card is not one of them: it reads
      * `viewer.elementPlanBox()` — since 2026-11-11 the box in the plan frame, `viewer.elementBox()`
      * itself while the plan is not turned — and `viewer.solidCount()`, taken from the same
@@ -633,12 +695,14 @@ export class FederationController {
         `${n(index.elements.length)} elements · ${index.schema} · ` +
         `${summary.chunks} geometry chunks · sha-256 ${index.sha256.slice(0, 12)}`
     )
-    return {
+    const item: BatchItem = {
       index,
       chunks,
       offset: summary.offset,
       file: { key: modelKey, path: file.path, name: file.name, sha256: index.sha256, size: file.blob.size }
     }
+    parsed.ticket.item = item
+    return item
   }
 
   /**
@@ -658,9 +722,14 @@ export class FederationController {
   }
 
   private buildSql(): Promise<{ elements: number; ms: number }> {
+    // 2026-11-11 — `plan_box`, square with the building at the plan rotation of the federation
+    // being sent, through the viewer's own `elementPlanBox` (`plan-boxes.ts`), against the store's
+    // offset — the one the assistant's box tools read, so the table and the tools cannot differ.
+    const frame = planFrameOf(planRotationOf(this.federation), useShell.getState().offset, this.viewer)
     return this.sql.build({
       models: this.federation.models,
-      elements: this.federation.elements
+      elements: this.federation.elements,
+      planBoxes: planBoxRows(frame, this.federation.elements)
     })
   }
 
@@ -672,6 +741,7 @@ export class FederationController {
     this.files.clear()
     this.indexes.length = 0
     this.federation = EMPTY_FEDERATION
+    this.onTheWay.clear()
     this.offset = null
     this.bootUnits = null
     this.bootChosen = false
