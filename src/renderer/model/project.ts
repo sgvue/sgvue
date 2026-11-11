@@ -112,7 +112,7 @@ import { getViewer, useShell, type ShellState } from '../state/shell'
 import { api } from '../api'
 import { afterPaint, federation as fed } from './federation-store'
 import { onProjectSchedules, openSchedule, projectSchedules, setProjectSchedules } from './schedule-link'
-import { addError, inOpenDialog, locateFile, onFreshStart, openProjectFiles, startOver } from './upload-pipeline'
+import { addError, inOpenDialog, locateFile, locateOver, onFreshStart, openProjectFiles, startOver } from './upload-pipeline'
 
 /** A loaded model's file, as the project records it (`federation.projectFiles()`). */
 export type ProjectFileInfo = SessionFile & { size?: number }
@@ -608,6 +608,20 @@ const project = {
 /** 2026-11-08 (phase 4) — models picked with Locate… that have not joined yet: id → admitted path. */
 const locating = new Map<string, string>()
 
+/**
+ * 2026-11-12 — a located model whose load ended without it — its parse failed, its join (or the
+ * batch it shared) failed, or the project's own failed boot unloaded it — is no longer being
+ * located: the pipeline queued its file, nothing holds it now (`locateOver`) and it is not open.
+ * Its entry goes, so a second Locate… of that file is taken rather than refused as "already open".
+ * A pick the pipeline never queued ("Replace model?" cancelled) is released by `locateModel` itself.
+ */
+function releaseDead(): void {
+  const open = new Set(fed.projectFiles().map((f) => f.path))
+  for (const [id, path] of locating) {
+    if (!open.has(path) && locateOver(path)) locating.delete(id)
+  }
+}
+
 /** The opened project's models that are not open, carried into every save (`buildProject`). */
 let carried: Carried | null = null
 
@@ -893,15 +907,18 @@ export async function locateModel(id: string): Promise<void> {
   // A file that is already one of the open models, or already being located for another: loading it
   // again would show one file twice. Nothing loads; the row says why, and Locate… stays.
   const path = answer.file.path
+  releaseDead()
   if (fed.projectFiles().some((f) => f.path === path) || [...locating.values()].includes(path)) {
     addError(answer.file.name, LOCATE_ALREADY_OPEN)
     return
   }
   const key = modelKeyOf(m.name)
-  locating.set(id, answer.file.path)
+  locating.set(id, path)
   // The project's own model: never given a D12 colour as a newcomer when it joins.
   project.known.add(key)
-  await locateFile(answer.file, { key, name: m.name }, { order: [answer.file.path], then: restoreLocated })
+  const queued = await locateFile(answer.file, { key, name: m.name }, { order: [path], then: restoreLocated })
+  // Nothing was queued ("Replace model?" cancelled): this pick is not being located any more.
+  if (!queued && locating.get(id) === path) locating.delete(id)
 }
 
 /**

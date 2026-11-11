@@ -30,6 +30,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   restored. It now reads as loading until its own models are in and what it saved is back. Two
   safeguards came with it: a load that fails after it was replaced no longer closes a model of
   the newer load, and no longer puts its error over it.
+- **Locate… can be tried again after a located model failed to open.** When a file picked with
+  Locate… did not end up open — it could not be read, it failed to join, the project's own models
+  failed to open and took it down with them, or "Replace model?" was cancelled — picking that
+  same file again was refused as "already open in this project" until the project was reopened.
+  It is now taken, and the model opens as the project's own, with what the project saved for it.
+  A file that really is open, or is still loading, is refused as before.
 - **The selection dimension fits a building that is turned in its file's coordinates.** The box
   and its three dimensions are square with the grids again and read the element's own length,
   width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.

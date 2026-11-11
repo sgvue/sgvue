@@ -62,6 +62,9 @@ import { memoryStorage, resetShell } from './stub-viewer'
 import { MC } from '../../src/shared/colors'
 import { projectCarried } from '../../src/renderer/model/project'
 import type { ProjectRef } from '../../src/shared/project-file'
+// 2026-11-11 — for the Locate… retry checks at the end of this file.
+import { LOCATE_ALREADY_OPEN } from '../../src/renderer/model/project'
+import { modelKeyOf } from '../../src/shared/federate'
 
 /** 1 mm, in the metres the contract speaks. */
 const TOL_M = 1e-3
@@ -1660,5 +1663,346 @@ describe('a second project opened while the first project’s models are still l
     ])
     expect(loadedKeys()).toEqual([])
     expect([...(projectCarried()?.ids ?? [])].sort()).toEqual(file.models.map((m) => m.id).sort())
+  })
+})
+
+describe('Locate… a second time after a located model did not end up loaded', () => {
+  /**
+   * 2026-11-12 — checks only. `locateModel` records the pick (`locating`) before it loads it, and
+   * the record goes only once the model has joined and been restored, or the project is closed or
+   * reopened. When the located model does not end up loaded, a second Locate… of the same file is
+   * expected to be taken — the model loads into the project as that model and is restored by
+   * GlobalId — not refused with `already open in this project`. Each way below reaches a located
+   * model that did not load, checks what stands before the retry, then locates the same file again.
+   * G1 and G2 are guards: a file that really is open, or really is being located, is still refused.
+   */
+  const MEP: ModelSpec = {
+    name: 'MEP',
+    guidPrefix: '3',
+    boxes: [
+      { name: 'MEP duct', at: [20000, 25000, 6000], size: [5000, 600, 400] },
+      { name: 'MEP riser', at: [26000, 25000, 0], size: [500, 500, 6000] }
+    ]
+  }
+  const ALL = { ARC: SPECS.ARC, STR: SPECS.STR, MEP } as const
+  type Three = keyof typeof ALL
+  const THREE = Object.keys(ALL) as Three[]
+  const bytes3 = Object.fromEntries(THREE.map((k) => [k, new TextEncoder().encode(boxModel(ALL[k]))])) as Record<Three, Uint8Array>
+  const path3 = (k: Three): string => `/projects/synthetic/review/models/${k}.ifc`
+  /** A second copy of STR's file, elsewhere on disk: same name, so the same model key. */
+  const OTHER_STR = '/projects/synthetic/review/other/STR.ifc'
+  const key3 = (path: string): Three => (path === OTHER_STR ? 'STR' : THREE.find((k) => path3(k) === path)!)
+  const picked3 = (k: Three): { path: string; name: string; size: number } => ({ path: path3(k), name: `${k}.ifc`, size: bytes3[k].length })
+
+  /** Paths whose bytes the worker cannot read: its parse posts an error, as a real failed parse does. */
+  const unreadable = new Set<string>()
+  /** Model keys whose next `addModel` is refused by the scene, once each. */
+  const refuseAddOnce = new Set<string>()
+  let replaceAnswer = true
+  let replaceAsked: string[] = []
+
+  const s = (): ReturnType<typeof useShell.getState> => useShell.getState()
+  const realAddModel = viewerImpl.addModel
+
+  beforeEach(() => {
+    const w = window as unknown as { sgvue: Record<string, unknown> }
+    w.sgvue.admitPaths = async (paths: string[]) => ({
+      files: paths.map((p) => ({ path: p, name: `${key3(p)}.ifc`, size: bytes3[key3(p)].length })),
+      refused: []
+    })
+    replaceAnswer = true
+    replaceAsked = []
+    w.sgvue.confirmReplace = async (name: string) => {
+      replaceAsked.push(name)
+      return replaceAnswer
+    }
+    vi.stubGlobal('fetch', async (url: string) => {
+      const path = decodeURIComponent(url.replace('sgvue-file://t/', ''))
+      const key = key3(path)
+      const blob = new Blob([bytes3[key] as BlobPart])
+      if (!unreadable.has(path)) blobBytes.set(blob, bytes3[key])
+      return { ok: true, status: 200, blob: async () => blob }
+    })
+    viewerImpl.addModel = ((key: string, ...rest: never[]) => {
+      if (refuseAddOnce.delete(key)) return Promise.reject(new Error(`the scene could not take ${key}`))
+      return (realAddModel as (...a: unknown[]) => unknown)(key, ...rest)
+    }) as (...args: never[]) => unknown
+  })
+  afterEach(() => {
+    viewerImpl.addModel = realAddModel
+    unreadable.clear()
+    refuseAddOnce.clear()
+  })
+
+  const hiddenGuids = (key: Three): string[] =>
+    Object.keys(s().hidden)
+      .map((id) => s().byId.get(Number(id)))
+      .filter((e) => e?.model === key)
+      .map((e) => e!.guid)
+      .sort()
+  const refsOf = (refs: readonly ProjectRef[], id: string): string => JSON.stringify(refs.filter(([m]) => m === id))
+  const alreadyRows = (): number => s().uploads.filter((u) => u.error && u.stage === LOCATE_ALREADY_OPEN).length
+  const locateRows = (id: string): number => s().uploads.filter((u) => u.locate === id).length
+
+  interface Saved {
+    file: ProjectFile
+    idOf: (k: Three) => string
+    strHidden: string[]
+  }
+
+  /** The three loaded one at a time, one STR element hidden, saved; then a fresh window. */
+  async function savedProject(): Promise<Saved> {
+    for (const [i, k] of THREE.entries()) {
+      await openPaths([path3(k)])
+      await until(`${k} to load`, () => settled(THREE.slice(0, i + 1)))
+    }
+    const str = s().federation.elements.find((e) => e.model === 'STR' && e.guid)!
+    s().hide([str.id])
+    const strHidden = hiddenGuids('STR')
+    expect(strHidden).toEqual([str.guid])
+    const file = save()
+    const idOf = (k: Three): string => file.models.find((m) => m.name === `${k}.ifc`)!.id
+    expect(JSON.parse(refsOf(file.visibility.hidden, idOf('STR')))).toHaveLength(1)
+    freshWindow()
+    return { file, idOf, strHidden }
+  }
+
+  /** Reopened with only ARC admitted: STR and MEP get their Locate… rows. */
+  async function reopenArcOnly(file: ProjectFile): Promise<void> {
+    await openProjectMessage({
+      ok: true,
+      name: 'review',
+      text: JSON.stringify(file),
+      models: file.models.map((m) => {
+        const k = m.name.replace(/\.ifc$/, '') as Three
+        return { id: m.id, file: k === 'ARC' ? picked3(k) : null, refused: null }
+      })
+    })
+  }
+
+  async function arcBooted(saved: Saved): Promise<void> {
+    await reopenArcOnly(saved.file)
+    await until('ARC to boot alone, the project settled', () => settled(['ARC']))
+    expect(locateRows(saved.idOf('STR'))).toBe(1)
+    expect(locateRows(saved.idOf('MEP'))).toBe(1)
+  }
+
+  let snapN3 = 2000
+  /** What a save would write now, re-read — without telling the project it was saved. */
+  function wouldSave(): ProjectFile | null {
+    const snap = snapshotFor(++snapN3)
+    if (!snap.text) return null
+    const read = readProject(snap.text)
+    return read.ok ? read.project : null
+  }
+
+  /** Before the retry: STR's Locate… row stands, STR is carried, and (where given) a save still writes it. */
+  function strStillMissing(saved: Saved, canSave: boolean): void {
+    const id = saved.idOf('STR')
+    expect.soft(locateRows(id), 'STR’s Locate… row, before the second Locate…').toBe(1)
+    expect.soft(projectCarried()?.ids ?? [], 'projectCarried().ids, before the second Locate…').toContain(id)
+    if (!canSave) return
+    const p = wouldSave()
+    expect.soft(p, 'a save before the second Locate…').not.toBeNull()
+    if (p) {
+      expect.soft(p.models.map((m) => `${m.id} ${m.name}`), 'the models in that save').toContain(`${id} STR.ifc`)
+      expect.soft(refsOf(p.visibility.hidden, id), 'STR’s hidden element in that save').toBe(refsOf(saved.file.visibility.hidden, id))
+    }
+  }
+
+  /**
+   * The second Locate… of STR's own file: taken, and STR loads into the project as its STR model,
+   * restored by GlobalId. The first assertion is the refusal itself.
+   */
+  async function secondLocateLoadsStr(saved: Saved): Promise<void> {
+    const id = saved.idOf('STR')
+    const name = saved.file.models.find((m) => m.id === id)!.name
+    const before = alreadyRows()
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(id)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(alreadyRows(), `the second Locate… of STR.ifc was refused with "${LOCATE_ALREADY_OPEN}"`).toBe(before)
+
+    await until('STR to load into the project and be restored', () => loadedKeys().includes(modelKeyOf(name)) && s().ready && !projectStatus().loading, 30_000)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect.soft(alreadyRows(), 'no "already open" row afterwards').toBe(before)
+    expect.soft(loadedKeys(), 'the loaded models').toContain(modelKeyOf(name))
+    expect.soft(s().uploadNames[modelKeyOf(name)], 'STR’s model named as the project names it').toBe(name)
+    expect.soft(hiddenGuids('STR'), 'STR’s hidden element, restored by GlobalId').toEqual(saved.strHidden)
+    expect.soft(locateRows(id), 'STR’s Locate… row afterwards').toBe(0)
+    expect.soft(projectCarried()?.ids ?? [], 'projectCarried().ids afterwards').not.toContain(id)
+    const p = wouldSave()
+    expect.soft(p, 'a save afterwards').not.toBeNull()
+    if (p) {
+      expect.soft(p.models.filter((m) => m.name === name).map((m) => m.id), 'STR’s entry in that save, by the project’s id').toEqual([id])
+      expect.soft(refsOf(p.visibility.hidden, id), 'STR’s hidden element in that save').toBe(refsOf(saved.file.visibility.hidden, id))
+    }
+  }
+
+  it('1a. the located file fails to parse: a second Locate… of the same file loads it as the project’s STR', async () => {
+    const saved = await savedProject()
+    await arcBooted(saved)
+    unreadable.add(path3('STR'))
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('STR’s parse to fail into an error row', () => s().uploads.some((u) => u.name === 'STR.ifc' && u.error && !u.locate), 10_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(loadedKeys()).toEqual(['ARC'])
+    strStillMissing(saved, true)
+
+    unreadable.clear()
+    await secondLocateLoadsStr(saved)
+  })
+
+  it('1b. the located file parses and its join after boot fails: a second Locate… of the same file loads it as the project’s STR', async () => {
+    const saved = await savedProject()
+    await arcBooted(saved)
+    refuseAddOnce.add('STR')
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('STR’s join to fail into an error row', () => s().uploads.some((u) => u.name === 'STR.ifc' && u.error && !u.locate), 10_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(refuseAddOnce.has('STR')).toBe(false)
+    expect(loadedKeys()).toEqual(['ARC'])
+    strStillMissing(saved, true)
+
+    await secondLocateLoadsStr(saved)
+  })
+
+  it('2. located into the project’s own batch, which fails to join: a second Locate… of the same file loads it as the project’s STR', async () => {
+    const saved = await savedProject()
+    refuseAddOnce.add('ARC')
+    await reopenArcOnly(saved.file)
+    // ARC's parse holds the worker for 2 s; STR is located well inside it and joins ARC's batch.
+    await vi.advanceTimersByTimeAsync(300)
+    expect(s().booted).toBe(false)
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('the shared batch to fail and the project to settle', () => !refuseAddOnce.has('ARC') && !projectStatus().loading && !s().booted && s().initErr !== '', 30_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    // STR was in that batch: its geometry was streamed, and it is not loaded.
+    expect(log.geometry.some((g) => g.modelKey === 'STR' && g.summary !== null), log.handled.join(', ')).toBe(true)
+    expect(loadedKeys()).toEqual([])
+    strStillMissing(saved, false)
+
+    await secondLocateLoadsStr(saved)
+  })
+
+  it('3. located and joined, then the project’s own boot join fails and unloads it: a second Locate… of the same file loads it as the project’s STR', async () => {
+    const saved = await savedProject()
+    let failArc: (() => void) | null = null
+    viewerImpl.addModel = ((key: string, ...rest: never[]) => {
+      if (key !== 'ARC' || failArc) return (realAddModel as (...a: unknown[]) => unknown)(key, ...rest)
+      return new Promise<void>((_, reject) => {
+        failArc = () => reject(new Error('the scene could not take ARC'))
+      })
+    }) as (...args: never[]) => unknown
+    await reopenArcOnly(saved.file)
+    await until('ARC’s boot join to start', () => failArc !== null)
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('the located STR to join', () => loadedKeys().join() === 'STR' && s().booted, 30_000)
+    expect(projectStatus().loading).toBe(true)
+
+    failArc!()
+    await until('the boot to fail, STR unloaded, the project settled', () => loadedKeys().length === 0 && !s().booted && !projectStatus().loading, 30_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(drawnModels.has('STR')).toBe(false)
+    strStillMissing(saved, false)
+
+    await secondLocateLoadsStr(saved)
+  })
+
+  it('4. after boot, a Locate… whose model key is taken, its "Replace model?" cancelled: a second Locate… of the same file loads it as the project’s STR', async () => {
+    const saved = await savedProject()
+    await arcBooted(saved)
+    // Another file of the same name, opened by the user, takes STR's model key.
+    await openPaths([OTHER_STR])
+    await until('the other STR.ifc to join', () => loadedKeys().join() === 'ARC,STR' && s().ready, 30_000)
+    expect(replaceAsked).toEqual([])
+    replaceAnswer = false
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(replaceAsked, 'the "Replace model?" question').toEqual(['STR.ifc'])
+    expect(alreadyRows()).toBe(0)
+    // A save here is checked for STR's entry only: with the other STR.ifc open under STR's key, what
+    // it writes for STR's model is that file's, which is not what this check is about.
+    strStillMissing(saved, false)
+    expect.soft(wouldSave()?.models.map((m) => `${m.id} ${m.name}`) ?? [], 'the models in a save before the second Locate…').toContain(`${saved.idOf('STR')} STR.ifc`)
+
+    replaceAnswer = true
+    await secondLocateLoadsStr(saved)
+    expect.soft(federation.projectFiles().filter((f) => f.key === 'STR').map((f) => f.path), 'STR’s file afterwards').toEqual([path3('STR')])
+  })
+
+  it('G1. guard — a file that is one of the project’s loaded models, picked for a missing one, is refused and nothing loads', async () => {
+    const saved = await savedProject()
+    await arcBooted(saved)
+    locateAnswer = { file: picked3('ARC'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(alreadyRows()).toBe(1)
+    expect(loadedKeys()).toEqual(['ARC'])
+    expect(log.handled.filter((h) => h.startsWith('parse'))).toEqual(['parse ARC'])
+    expect(locateRows(saved.idOf('STR'))).toBe(1)
+    expect(projectCarried()?.ids ?? []).toContain(saved.idOf('STR'))
+  })
+
+  it('G2. guard — a file still being located, picked again for another missing model, is refused; the first locate completes and is restored', async () => {
+    const saved = await savedProject()
+    await arcBooted(saved)
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    // STR's parse holds the worker for 2 s: the second pick of its file comes while it is located.
+    await vi.advanceTimersByTimeAsync(300)
+    expect(loadedKeys()).toEqual(['ARC'])
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('MEP'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(alreadyRows()).toBe(1)
+
+    await until('STR to be located and restored', () => settled(['ARC', 'STR']) && locateRows(saved.idOf('STR')) === 0, 30_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(alreadyRows()).toBe(1)
+    expect(log.handled.filter((h) => h === 'parse STR')).toHaveLength(1)
+    expect(hiddenGuids('STR')).toEqual(saved.strHidden)
+    expect(locateRows(saved.idOf('MEP'))).toBe(1)
+    expect([...(projectCarried()?.ids ?? [])]).toEqual([saved.idOf('MEP')])
+  })
+
+  it('G3. guard — STR located and joined while the project’s own boot loads, MEP located meanwhile, then the boot succeeds: the project’s restore folds both in', async () => {
+    const saved = await savedProject()
+    let joinArc: (() => void) | null = null
+    viewerImpl.addModel = ((key: string, ...rest: never[]) => {
+      const real = (): unknown => (realAddModel as (...a: unknown[]) => unknown)(key, ...rest)
+      if (key !== 'ARC' || joinArc) return real()
+      return new Promise<void>((resolve) => {
+        joinArc = () => void (real() as Promise<void>).then(resolve)
+      })
+    }) as (...args: never[]) => unknown
+    await reopenArcOnly(saved.file)
+    await until('ARC’s boot join to start', () => joinArc !== null)
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('the located STR to join', () => loadedKeys().join() === 'STR' && s().booted, 30_000)
+    // STR has joined and is not restored yet: the project is still loading.
+    expect(projectStatus().loading).toBe(true)
+    expect(locateRows(saved.idOf('STR'))).toBe(1)
+
+    // This Locate… runs while STR is joined but not yet restored.
+    locateAnswer = { file: picked3('MEP'), refused: null }
+    await locateModel(saved.idOf('MEP'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(alreadyRows()).toBe(0)
+
+    joinArc!()
+    await until('ARC, STR and MEP loaded, the project settled', () => settled(['ARC', 'STR', 'MEP']), 30_000)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect.soft([...(projectCarried()?.ids ?? [])], 'projectCarried().ids').toEqual([])
+    expect.soft(locateRows(saved.idOf('STR')), 'STR’s Locate… row').toBe(0)
+    expect.soft(locateRows(saved.idOf('MEP')), 'MEP’s Locate… row').toBe(0)
+    expect.soft(loadedKeys(), 'the loaded models').toEqual(['ARC', 'MEP', 'STR'])
+    expect.soft(alreadyRows(), 'no "already open" row').toBe(0)
   })
 })
