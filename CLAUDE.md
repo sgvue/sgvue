@@ -1251,8 +1251,18 @@ Anything not on this list is a defect.
   designed, and the landing page's first load never shows it. **Reduced motion:** every state a
   still, no glint, and each piece removed at the end of its hold with no fade. **With no load in
   flight both pieces are absent and every element and style string is what it was.** It reads the
-  store's upload rows alone, starts no frame loop and never wakes the 3D view. Not yet seen in a
-  window. The numbers are in `docs/DECISIONS.md`.
+  store's upload rows alone, starts no frame loop and never wakes the 3D view. **Seen in a window** (2026-11-12, `tests/e2e/fed-trace.spec.ts`, the built app, a model added
+  with the sidebar's `upload` six times): the line is 2 px, 5 px inside the stage's top, left and
+  right at every size tried; the caption is 27 px tall, its foot 14 px above the stage's, and
+  258.62 px wide reading `high-first.ifc · reading file · 1/5`; every load showed `1/5` … `5/5`
+  in order, never together with the centre badge, ended on `+N elements` with N the status
+  bar's own growth, and both pieces were then removed. Neither piece met the toolbar, the view
+  cube, the status bar, the Ask pill, a tool hint, the reset pill or the property card, nor took
+  the pointer — at the default window, in both themes, at a stage 520 px wide (the caption
+  centred above the bars) and with the hint, the pill and the card all showing (the caption
+  above the pill). The first load showed nothing; an archive with no `.ifc` ended on `could not
+  open — see Models`; under reduced motion no glint was drawn. The numbers are in
+  `docs/DECISIONS.md`.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
