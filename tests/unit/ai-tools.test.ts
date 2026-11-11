@@ -137,7 +137,7 @@ describe('the design’s fifteen tools', () => {
     // 2026-11-08 (the live baseline's F1): the design's sentences, verbatim, then one added — when
     // to use it rather than make_schedule (the owner: "tabulate" answers in the chat).
     expect(toolByName('summarize_elements')!.description).toBe(
-      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so keep your own reply to one sentence. ' +
+      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so do not repeat its rows in your reply. ' +
         'Use it whenever the user asks to tabulate, count or total elements by a group in the chat — by type, by level, by any property value, "show me a table" — rather than make_schedule, which is for when they ask for a schedule or want it in the Schedules window. ' +
         // The live eval after stage 2 (tab-slab-area): what each group returns, so one call answers.
         'Each group comes back with its area, volume and length totals in the file’s own unit (units) and how many of its elements carried each (areaFrom, volumeFrom, lengthFrom), so "total area per storey, in what unit, and does it cover every element" is one call; a group with noValue:true is the elements that carry no value for groupBy at all.'

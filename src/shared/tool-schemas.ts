@@ -416,7 +416,7 @@ const DESIGN_TOOLS: readonly ToolSpec[] = [
     name: 'summarize_elements',
     kind: 'read',
     description:
-      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so keep your own reply to one sentence. ' +
+      'Group the matching elements and total their quantities. Read-only. Renders as a table for the user, so do not repeat its rows in your reply. ' +
       // 2026-11-08 (the live baseline's F1): the owner — "tabulate" or "show me a table" answers
       // in the chat; a schedule only when the user asks for one.
       'Use it whenever the user asks to tabulate, count or total elements by a group in the chat — by type, by level, by any property value, "show me a table" — rather than make_schedule, which is for when they ask for a schedule or want it in the Schedules window. ' +

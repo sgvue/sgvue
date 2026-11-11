@@ -116,7 +116,7 @@ export function tableCsv(table: ChatTable, unit: DisplayUnit = 'mm'): string {
     `${csvCell(table.groupBy)},count,quantity`,
     ...table.rows.map(
       (r) =>
-        `"${defuse(r.k).replace(/"/g, '""')}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : ''}`
+        `"${defuse(r.k).replace(/"/g, '""')}",${r.n},${r.area ? r.area.toFixed(2) : r.vol != null ? volumeIn(r.vol, unit).toFixed(4) : r.volume ? r.volume.toFixed(3) : ''}`
     )
   ].join('\n')
 }

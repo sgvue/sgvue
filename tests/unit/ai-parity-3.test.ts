@@ -644,7 +644,7 @@ describe('request_user_action open_recent — by name, from the app’s own list
     st().setLibrary(libraryOf([...RECENTS, { path: 'E:\\Other\\Tower A.ifc', name: 'Tower A.ifc' }]))
     const body = await run('request_user_action', { action: 'open_recent', recent: 'Tower A.ifc' })
     expect(body.message).toBe(
-      '2 recent files are called "Tower A.ifc", in different folders, and a request cannot tell them apart. Nothing was asked — the user can open the one they mean from the sidebar’s library.'
+      '2 recent files are called "Tower A.ifc", in different folders, and a request cannot tell them apart. Nothing was asked — the user can open the one they mean with the sidebar’s upload button.'
     )
     expect(turn.pending).toBeNull()
     expect(JSON.stringify(body)).not.toMatch(LOCATION)

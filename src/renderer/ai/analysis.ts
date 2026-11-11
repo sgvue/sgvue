@@ -366,9 +366,8 @@ export function clashPairs(
       return true
     })
   }
-  if (capped) return { pairs, capped: true }
   pairs.sort((p, q) => q.vol - p.vol)
-  return { pairs, capped: false }
+  return { pairs, capped }
 }
 
 /* ────────────────────────────── proximity ────────────────────────────── */
