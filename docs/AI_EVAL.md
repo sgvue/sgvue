@@ -1,7 +1,7 @@
 # The assistant, evaluated
 
 `docs/AI_REVIEW.md` audited the assistant once, by hand, on one model. This is the thing that
-can be run again: **eighty-five questions a reviewer would actually type** — all of them
+can be run again: **eighty-seven questions a reviewer would actually type** — all of them
 scorable since stage 2 of the Ask Vee redesign landed (2026-11-08) — each answered through the real
 gateway, the real tools and the real store (one turn, or since 2026-11-08 a short conversation),
 each graded by a pure function against ground truth computed at the moment of grading.
@@ -149,7 +149,7 @@ interrupted pass continues where it stopped. Delete the variant directory to sta
 
 ## The cases
 
-Eighty-five — the count `tests/unit/ai-eval-offline.test.ts` holds the file to — every one of
+Eighty-seven — the count `tests/unit/ai-eval-offline.test.ts` holds the file to — every one of
 them scorable since stage 2 of the Ask Vee redesign landed on 2026-11-08 (*The Ask Vee cases*,
 below); until then five waited for it. The section said "sixty-six" from 2026-10-02 until 2026-11-08, one more than
 the file held after `op-base-point` went on 2026-10-08. Five of the first thirty-six were written against
@@ -445,9 +445,9 @@ federation is not turned, so every truth is unchanged and `npm run eval:offline`
 
 ### Run counts, the pilot and the estimate (2026-11-08)
 
-The owner's cheaper plan. **The twenty tagged cases run three times in a live pass, every other
+The owner's cheaper plan. **The twenty-seven tagged cases run three times in a live pass, every other
 case once** — `TRIPLE_RUN_IDS` in `cases.cjs`: the fifteen Ask Vee cases that can be scored,
-the five stage-2 ones (n/a until then), and five older cases a single run says least about —
+the five stage-2 ones (n/a until then), the two follow-up cases of 2026-11-09, and five older cases a single run says least about —
 `op-scope-guard`, `op-act-on-found-ids`, `op-undo-held`, `res-gated-delete`, `ana-firerating`.
 They are listed there rather than tagged, so the older cases stay as they were. `--reps=N` sets
 one count for every case instead.
@@ -853,8 +853,8 @@ Stated here rather than discovered later:
   (`turns`, above): a follow-up that adds a column, an undo of the turn before, "and hide the
   windows on it too" — and two more for stage 2. Longer conversations, and a follow-up whose
   reply has to remember a number rather than a view, are still not measured.
-- **It has error bars only where they were bought.** The twenty tagged cases run three times
-  (*Run counts*), every other case once. At 80 scored cases a pass-rate's noise floor is roughly
+- **It has error bars only where they were bought.** The twenty-seven tagged cases run three times
+  (*Run counts*), every other case once. At 87 scored cases a pass-rate's noise floor is roughly
   ±11 points (`1/√n`); before acting on a difference smaller than that, raise `--reps` or add
   cases. A tagged case's three runs say whether it is reliable, not only whether it passed.
 - **The Schedules window is a stand-in.** Its answers are the real window's rules, rebuilt; its

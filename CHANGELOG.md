@@ -382,6 +382,7 @@ assistant, and the accessibility, performance and packaging pass. It was not pub
 releases page.
 
 [Unreleased]: https://github.com/sgvue/sgvue/commits/main
+[1.5.0]: https://github.com/sgvue/releases/releases/tag/v1.5.0
 [1.4.0]: https://github.com/sgvue/releases/releases/tag/v1.4.0
 [1.3.0]: https://github.com/sgvue/releases/releases/tag/v1.3.0
 [1.2.0]: https://github.com/sgvue/releases/releases/tag/v1.2.0

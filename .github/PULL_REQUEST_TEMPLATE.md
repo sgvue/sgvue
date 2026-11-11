@@ -8,7 +8,7 @@
 
 ## Checklist
 
-- [ ] `npm run typecheck` and `npm test` pass.
+- [ ] `npm run typecheck`, `npm run lint`, `npm test` and `npm run privacy` pass.
 - [ ] Electron was only ever started through the guards (`npm run test:e2e`, `node scripts/safe-run.cjs`, `node scripts/safe-app.cjs`) — never `npm run dev` or a bare `npx electron`. If this changes the interface or the renderer, I ran `npm run test:e2e` and say so above.
 - [ ] No real project data anywhere — no IFC model, coordinates, project, element or storey names, or GlobalIds from a real project, in code, tests, documents, screenshots or commit messages.
 - [ ] Viewer only: nothing here writes model data, and `tests/readonly-guard.test.ts` passes.
