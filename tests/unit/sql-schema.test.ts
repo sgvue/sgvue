@@ -80,6 +80,8 @@ describe('sql schema — what got in', () => {
       'element',
       'material',
       'model',
+      'plan_box',
+      'plan_frame',
       'property',
       'pset',
       'quantity',

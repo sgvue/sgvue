@@ -28,6 +28,7 @@ import type { SessionFile } from '../../shared/session-codec'
 import { planRotationOf, useShell, setModelFiles, setViewer } from '../state/shell'
 import type { ModelMeta, Viewer } from '../viewer/viewer-core'
 import { elementBoxes } from './element-boxes'
+import { planBoxRows, planFrameOf } from './plan-boxes'
 import { deepFreeze } from './store'
 import { SqlBridge, type SqlQueryResult } from './sql-bridge'
 import { ParseWorkerBridge, type ParseProgress } from './worker-bridge'
@@ -601,7 +602,7 @@ export class FederationController {
      * them either, because it has no index. So both are taken off the parts that have just
      * landed, in one pass, and written onto the index **before** it is frozen into the store
      * below — the same place and the same shape the mock adapter fills its own. Every consumer
-     * of `bbox` — `clash_check`, `measure_between`, `get_element` and the SQL `bbox` table —
+     * of `bbox` — the SQL `bbox` table, and the box tools' world box and plan-frame fallback —
      * therefore needs no second path. (The property card is not one of them: it reads
      * `viewer.elementPlanBox()` — since 2026-11-11 the box in the plan frame, `viewer.elementBox()`
      * itself while the plan is not turned — and `viewer.solidCount()`, taken from the same
@@ -658,9 +659,14 @@ export class FederationController {
   }
 
   private buildSql(): Promise<{ elements: number; ms: number }> {
+    // 2026-11-11 — `plan_box`, square with the building at the plan rotation of the federation
+    // being sent, through the viewer's own `elementPlanBox` (`plan-boxes.ts`), against the store's
+    // offset — the one the assistant's box tools read, so the table and the tools cannot differ.
+    const frame = planFrameOf(planRotationOf(this.federation), useShell.getState().offset, this.viewer)
     return this.sql.build({
       models: this.federation.models,
-      elements: this.federation.elements
+      elements: this.federation.elements,
+      planBoxes: planBoxRows(frame, this.federation.elements)
     })
   }
 

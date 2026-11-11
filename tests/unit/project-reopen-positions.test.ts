@@ -318,7 +318,9 @@ const ALLOWED_VIEWER_CALLS = new Set<string>([
   'setModelColors', 'setClassColors', 'setCutColors', 'setPickable', 'setSections', 'setGrids',
   'setLevels', 'setShadows', 'setSnap', 'setUnits', 'setCoords', 'setDims', 'setGroundGrid',
   // The markups: cleared, and a project's own put back where the file says.
-  'clearMeasures', 'clearSpots', 'elementIds', 'placeMeasure', 'placeSpot'
+  'clearMeasures', 'clearSpots', 'elementIds', 'placeMeasure', 'placeSpot',
+  // A read: the element's box in the plan frame, for the SQL `plan_box` table — it moves nothing.
+  'elementPlanBox'
 ])
 
 /* ────────────────────────────── where things are drawn ────────────────────────────── */
