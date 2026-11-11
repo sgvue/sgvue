@@ -179,6 +179,8 @@ let epoch = 0
  */
 interface Claim {
   superseded: boolean
+  /** 2026-11-12 — the chosen file's path (`''` when a dropped file could not be named), for `locateOver`. */
+  path: string
   rowId?: string
   /** The parsed model, once it waits in `pending`. */
   item?: BatchItem
@@ -192,14 +194,37 @@ const claims = new Map<string, Claim>()
 /** A key that is on screen, joining, parsing, or queued. */
 const busy = (key: string): boolean => fed.isOpen(key) || claims.has(key)
 
-function claim(key: string): { mine: Claim; prior: Promise<void> } {
+function claim(key: string, path: string): { mine: Claim; prior: Promise<void> } {
   const old = claims.get(key)
   if (old) supersede(key, old)
   let settle = (): void => {}
   const settled = new Promise<void>((done) => (settle = done))
-  const mine: Claim = { superseded: false, settled, settle }
+  const mine: Claim = { superseded: false, path, settled, settle }
   claims.set(key, mine)
   return { mine, prior: old?.settled ?? Promise.resolve() }
+}
+
+/**
+ * 2026-11-12 — the paths of files located into a project (`locateFile`) that the pipeline queued.
+ * With `claims`, it tells a located load that is over from one still on its way in (`locateOver`).
+ * A path leaves it when the same file is located again, before anything awaits. It is **not**
+ * cleared by `disposeUploads`: a torn-down load is over too (its claim went with it), and it runs
+ * only where the project closes or reopens (forgetting what it located) or the window is torn down.
+ * It only ever holds paths the user located in this run.
+ */
+const located = new Set<string>()
+
+/**
+ * 2026-11-12 — whether the located file at `path` was queued and its load has ended without it:
+ * no claim holds it any more — not queued, parsing, waiting to join or joining. A claim leaves the
+ * map when its parse fails, once its batch has joined or been refused, when a newer pick of its
+ * key takes it over, and on `disposeUploads`. Whether it ended **open** is the caller's to ask
+ * (`model/project.ts`, `releaseDead`). A file this pipeline never saw queued is never over.
+ */
+export function locateOver(path: string): boolean {
+  if (!located.has(path)) return false
+  for (const c of claims.values()) if (c.path === path) return false
+  return true
 }
 
 function supersede(key: string, old: Claim): void {
@@ -276,7 +301,7 @@ export function queue(files: readonly ChosenFile[]): number {
   })
   const keys = keysFor(valid, busy)
   valid.forEach((f, i) => {
-    const { mine, prior } = claim(keys[i])
+    const { mine, prior } = claim(keys[i], f.path)
     const at = n++ * up.STAGGER_MS
     const timer = setTimeout(() => {
       staggered.delete(timer)
@@ -831,7 +856,12 @@ export async function locateFile(
   as: { key: string; name: string },
   after: AfterJoin
 ): Promise<boolean> {
-  return (await begin([{ ...chosenOf(file), as }], undefined, after, true)) > 0
+  // 2026-11-12 — a fresh attempt is not over, also while "Replace model?" is up: cleared before
+  // `begin` awaits anything, and marked again only once the pipeline has queued it.
+  located.delete(file.path)
+  const queued = (await begin([{ ...chosenOf(file), as }], undefined, after, true)) > 0
+  if (queued) located.add(file.path)
+  return queued
 }
 
 /**

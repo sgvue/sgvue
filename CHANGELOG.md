@@ -24,6 +24,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   reading as loading: the Locate… rows stayed beside models that were open, what the project had
   saved for them (hidden elements, colours) was not put back, and Save Project refused. The
   project now finishes loading, and the located models get what it saved for them.
+- **Locate… can be tried again after a located model failed to open.** When a file picked with
+  Locate… did not end up open — it could not be read, it failed to join, the project's own models
+  failed to open and took it down with them, or "Replace model?" was cancelled — picking that
+  same file again was refused as "already open in this project" until the project was reopened.
+  It is now taken, and the model opens as the project's own, with what the project saved for it.
+  A file that really is open, or is still loading, is refused as before.
 - **The selection dimension fits a building that is turned in its file's coordinates.** The box
   and its three dimensions are square with the grids again and read the element's own length,
   width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.
