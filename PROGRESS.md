@@ -12,6 +12,15 @@
 
 The owner, testing 1.5.0: *"The Object Type property are not wrong. I open in other BIM Viewer, see different thing. Please ensure this do no happen again."* `index-builder.ts` showed the type object's `Name` as ObjectType whenever an element had a named type; `objectType` is now the occurrence's own attribute as written and `typeName` (new) the type's Name — Schedules' Family / Type, SQL `type_object` and the assistant's `typeObject` read that. The oracle had the app's rule written into its truth, so it could not see the defect: `expected-from-ifcopenshell.py` now records raw readings only, `tests/fixtures/identities.json` holds every element of every committed fixture, and `APP_RULES` / an empty `KNOWN_DIFFERENCES` in `index-builder.fixture.test.ts` name anything that is not plain equality. New: `scripts/make-objecttype-fixtures.py`, `tests/fixtures/objecttype/`, `object-type.pipeline.test.ts`, a fourth fuzz invariant. Against IfcOpenShell on three real Revit exports: 6 685 / 5 667 / 1 241 differing elements before, 0 / 0 / 0 after. Checks green: typecheck, lint, vitest, privacy, build. The owner on right-click "similar": *"Yes, by type"* — the type's Name, ObjectType only with no type, no item with neither (`similarKey`). **Owed:** a window look at the empty tile and at the menu on an element with neither; the samples-only unit-assignment check fails on one real model (predates this); `name` falling back to `LongName` awaits the owner's word. Not pushed, not in 1.5.0's built installers.
 
+## 2026-11-09 — SGVue 1.5.0 published
+
+**Did.** `release.yml` built the three installers from the tag `v1.5.0` (`d6d22f4`); each file's SHA-256 and
+build-provenance attestation were verified, and both Mac apps carry the Chromium and Electron licence files. All
+three were published together on `sgvue/releases` (the owner: *"All three now"*) with their SHA-256, and it is the
+latest release: the update check's endpoint answers `v1.5.0`, and `?v=1.5.0` on the site reads "You're up to
+date". The notes now give the download sizes and the Mac installed sizes, measured from the disk images; the
+Windows installed size is 1.4.0's, not re-measured. `docs/SYSTEM_SPEC.md` §3 records the release.
+
 ## 2026-11-09 — 1.5.0 now includes Ask Vee: notes folded, installers built locally
 
 The owner: *"Fold into 1.5.0"*. `CHANGELOG.md`'s `[Unreleased]` folded into 1.5.0; `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently (including that a deliberate Opus 5 choice is moved once too) and Known limits. Checks green: typecheck, lint, vitest 4 218 passed, privacy. Local builds, unrun, ad-hoc signed (Mac) and unsigned (Windows):
