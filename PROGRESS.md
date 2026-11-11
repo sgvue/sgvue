@@ -4,6 +4,10 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-12 — a federating indicator for a model added to an open view (the owner's pick "B")
+
+The owner: *"create a new simple yet cool techy loading animation when model view is federating the new upload model."* **Before:** a model added to an open viewer showed progress only in the sidebar's upload row; the 3D view showed nothing, then the plain centre badge "Rebuilding federation…" for the last second. **Prototype first** (`prototypes/federating-animation/`, git-ignored): three variants and a "Today" comparison at the real window size; the owner picked *"B"* — Edge trace. **Built:** a 2 px five-segment line along the 3D view's top edge, one segment per real stage, and a caption in the bottom row's centre (`name · stage · n/5`, then a tick and `+N elements`, or `could not open — see Models`). Both read only the store's upload rows (`shared/fed-trace.ts`, pure; `model/fed-trace-store.ts`); `upload-pipeline.ts` is untouched. They replace "Rebuilding federation…" for these loads only and are gone 900 / 1 600 + 220 ms after the end; no frame loop, nothing reaches the viewer; the first load from the home page is unchanged. Normal lane: checks first (`tests/unit/fed-trace.test.ts`), builder, reviewer. **Not seen in a window:** both themes, the 760–900 px layouts, the caption beside a tool hint and the reset pill, and reduced motion are owed to a guarded run.
+
 ## 2026-11-11 — the repo audit's fixes: decisions 6 to 10, and the sure list
 
 A read-only audit of the whole repository listed 80 sure fixes and 55 decisions for the owner; the owner approved decisions 6 to 10 (*"fix all the audit decisions 6 to 10"*) and then the sure list. All of it is on the branch `claude/repo-audit-48da55`, each change written against a check that failed first, reviewed, and committed apart; nothing is pushed or merged.

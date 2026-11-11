@@ -1,11 +1,20 @@
-/** The loading badge — `SGVue.dc.html:717–719`. Shown while `ready` is false. */
+/**
+ * The loading badge — `SGVue.dc.html:717–719`. Shown while `ready` is false.
+ *
+ * 2026-11-12 — not while the federating indicator is up (`app/FedTrace.tsx`, the owner's pick
+ * "B"): for a load into an open viewer the line and the caption replace `Rebuilding federation…`.
+ * The boot's messages and a removal with no load in flight are as designed.
+ */
+import { useSyncExternalStore } from 'react'
+import { fedTraceState, onFedTrace } from '../model/fed-trace-store'
 import { useShell } from '../state/shell'
 import { s } from './css'
 
 export default function LoadingBadge(): React.JSX.Element | null {
   const ready = useShell((st) => st.ready)
   const loadMsg = useShell((st) => st.loadMsg)
-  if (ready) return null
+  const fed = useSyncExternalStore(onFedTrace, fedTraceState, fedTraceState)
+  if (ready || fed.phase !== 'idle') return null
   return (
     <div
       style={s(
