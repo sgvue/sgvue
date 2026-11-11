@@ -26,7 +26,7 @@ import {
   DELETE_STORAGE_MESSAGE, deleteSchedule, duplicateSchedule, isFull, refusal, renameSchedule, saveSchedule, STORAGE_MESSAGE,
   type SavedEntry,
 } from './schedules';
-import { render, state, update, type AppState } from './state';
+import { state, update, type AppState } from './state';
 
 /** One step back or forward: the keys, the header's two buttons and a request from chat. */
 export function stepHistory(wantRedo: boolean): boolean {
@@ -152,8 +152,8 @@ export function renameSaved(
     state.def.name = next;
     restate(state.def);
     update({ savedName: next, ...also });
-  } else if (Object.keys(also).length) update(also);
-  else render();
+    // Not the setup on screen: only the library's list changed, so the table is left as it is.
+  } else update(also, 'panes');
   flash(`Renamed to “${next}”.`);
   return result;
 }
@@ -161,14 +161,17 @@ export function renameSaved(
 /**
  * Copy a saved setup under a free name — the library's Duplicate. The copy's name, `'full'` at
  * the cap (v1.5.0, phase 3: refused, nothing is dropped to make room), or null when storage
- * refused the write.
+ * refused the write. `also` may be worked out from the copy's name, so the library can follow
+ * it in the same paint. A copy is never the schedule on screen, so the table is left as it is.
  */
-export function duplicateSaved(name: string, also: Partial<AppState> = {}): string | 'full' | null {
+export function duplicateSaved(
+  name: string, also: Partial<AppState> | ((copy: string) => Partial<AppState>) = {},
+): string | 'full' | null {
   const full = isFull();
   const copy = full ? null : duplicateSchedule(name);
   if (!copy) { flash(refusal(), true); return full ? 'full' : null; }
   flash(`Duplicated to Mine as “${copy}”.`);
-  if (Object.keys(also).length) update(also); else render();
+  update(typeof also === 'function' ? also(copy) : also, 'panes');
   return copy;
 }
 
@@ -186,8 +189,8 @@ export function askDeleteSaved(name: string, how?: ConfirmHow): void {
     flash(`Deleted “${name}”.`);
     // The setup it pointed at is gone; the marker must not outlive it.
     if (state.savedName === name) update({ savedName: null, ...sel });
-    else if (sel) update(sel);
-    else render();
+    // Not the setup on screen: only the library's list changed, so the table is left as it is.
+    else update(sel ?? {}, 'panes');
   };
   // Everything else in this app can be undone; storage cannot, so this one asks first.
   void confirmDialog(`Delete the saved template “${name}”? This cannot be undone.`, 'Delete', true, how)

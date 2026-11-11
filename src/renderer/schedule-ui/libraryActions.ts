@@ -65,11 +65,12 @@ export function openLibrary(key: string | null = currentKey(state), save = false
   if (popoverId()) closePopover();
   focusAfterPaint(save ? '[data-act="library-save-name"]' : SEARCH, save);
   scrollAfterPaint();
+  // 'panes': opening the library changes no row of the table behind it.
   update({
     overlay: 'library', libraryQuery: '', librarySel: key,
     libraryFolds: shown(key ? tplOf(key) : undefined),
     libraryDraft: save ? { kind: 'save', target: null, text: state.def.name, error: '' } : null,
-  });
+  }, 'panes');
 }
 
 /** The inline Save row, at the top of Mine. */
@@ -193,14 +194,14 @@ export function duplicate(t: Tpl | null | undefined) {
   focusAfterPaint('[data-act="library-rename"]', true);
   scrollAfterPaint();
   if (t.src === 'mine') {
-    // A refused copy said so in its own toast.
-    const copy = duplicateSaved(t.name);
-    if (copy && copy !== 'full') libSet(after(copy));
+    // A refused copy said so in its own toast; a copy is drawn with its name open, in one paint.
+    duplicateSaved(t.name, after);
     return;
   }
   const name = saveSchedule(t.def, null);
   if (!name) { flash(refusal(), true); return; }
-  update(after(name));
+  // A new entry in Mine, never the schedule on screen: the table is left as it is.
+  update(after(name), 'panes');
   flash(`Duplicated to Mine as “${name}”.`);
 }
 

@@ -23,7 +23,7 @@ export const STORAGE_MESSAGE = 'Could not save — storage is unavailable or ful
 export const DELETE_STORAGE_MESSAGE = 'Could not delete — storage is unavailable or full.';
 
 /** Would a save that may replace `own` have to add an entry to a list already at the cap? */
-export function isFull(own: string | null = null, entries = listSaved()): boolean {
+export function isFull(own: string | null = null, entries: readonly Pick<SavedEntry, 'name'>[] = listSaved()): boolean {
   return entries.length >= CAP && !(own !== null && entries.some((e) => e.name === own));
 }
 
