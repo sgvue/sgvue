@@ -257,6 +257,13 @@ export function selectionCard(input: SelectionInput): SelectionCard | null {
 export const fullText = (text: string): string | undefined =>
   text && text !== DASH ? text : undefined
 
+/**
+ * What an identity tile draws (2026-11-11 — the owner: *"show a dash on the empty tile"*): the
+ * value as written, or the design's em dash when the file carries none. Display only — the card's
+ * values, the tooltip and every matcher keep the empty string.
+ */
+export const tileText = (value: string): string => (value === '' ? DASH : value)
+
 /** `Properties`, or `3 selected · showing last`. `:1989`. */
 export const selTitle = (selCount: number): string =>
   selCount > 1 ? `${selCount} selected · showing last` : 'Properties'

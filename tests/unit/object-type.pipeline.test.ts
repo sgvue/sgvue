@@ -153,7 +153,7 @@ for (const file of FILES) {
             coords: { E: null, N: null, Z: null, angle: null },
             offset: [0, 0, 0]
           })!
-          // `''` leaves the tile empty, as the design's `{{ sel.objectType }}` does — never a substitute.
+          // `''` stays `''` here; the tile draws the em dash for it (`tileText`, 2026-11-11) — never a substitute.
           expect(card.objectType, at(w)).toBe(w.objectType)
           const same = card.relRows.find((r) => r.k === 'Same ObjectType')!
           expect(guidsOf(same.ids), at(w)).toEqual(sameOt(w))
