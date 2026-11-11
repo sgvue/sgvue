@@ -674,6 +674,13 @@ running SQL against the model database or one read-only tool through the same ex
 assistant uses. Nothing is a number somebody measured once, which is what lets the same case be
 correct on another model.
 
+**A setup step may click Apply** (2026-11-11). A case's `setup` runs tool calls to set its scene, and
+a step may carry `apply: true`: when that call is held behind the pending row, the runner clicks
+Apply as a user would, in the live runner (`scripts/ai-eval.cjs`) and the offline one
+(`tests/unit/ai-eval-offline.test.ts`) alike. It exists because `set_storeys` came under the 5 %
+scope guard that day: `op-undo-held` sets its scene by showing the roof alone (5 of 412), which
+is now held. A step without it never applies anything. The live runner's branch has not been run.
+
 ### What the first live baseline changed in the graders (2026-11-08)
 
 Each only where the reply was honest and a check misread it — never to hide a fault:

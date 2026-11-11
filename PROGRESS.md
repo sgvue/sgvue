@@ -4,6 +4,18 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-11 — the repo audit's fixes: decisions 6 to 10, and the sure list
+
+A read-only audit of the whole repository listed 80 sure fixes and 55 decisions for the owner; the owner approved decisions 6 to 10 (*"fix all the audit decisions 6 to 10"*) and then the sure list. All of it is on the branch `claude/repo-audit-48da55`, each change written against a check that failed first, reviewed, and committed apart; nothing is pushed or merged.
+
+**Decisions 6 to 10.** Ask Vee: showing only some storeys is under the 5 % scope guard like every other way of hiding; a clash list cut short is still in order; a placed spot is quoted in the unit on screen; `copy csv` writes volumes; two messages reworded. Six small visible things: Preferences' Model box saves once, the Spatial-structure card names the file's own coordinate system, Schedules says when a limit or storage refused. Schedules redraws its table only for what can change it. The schedule engine reads `.5` and `1e3`, yes/no filters, a class named twice and an unknown operator correctly. Code only its tests used is removed.
+
+**The sure list.** The assistant's model database stays read-only after it is built (sql.js's export had switched one of three safeguards off); a schedule file cannot name `constructor` as a field; dead code removed, the audit's 41 rows of stale comments and 17 rows of document facts corrected (one comment row skipped: its file is another session's); `.claude/launch.json` ignored.
+
+**Corrections to the audit itself.** Two "dead" items are live (`moveItem`'s re-export, `data-act="col-handle"`), the georef "leftovers" are called by live code, and the first check for an empty yes/no filter was wrong — the window stores nothing until the user picks, so an unfilled filter reads as it always has.
+
+**Owed.** Nothing here was seen in a window: the e2e specs and the live eval were not run. Open for the owner, in `docs/DECISIONS.md`'s rows of this date: the yes/no dropdown that shows "true" while the chip reads "equals No", and three more places where a crafted schedule file can name built-in JavaScript words.
+
 ## 2026-11-11 — Ask Vee's box tools and SQL read a turned building square with it (option A)
 
 Asked whether Vee's box answers should be square with the building as the selection dimension and the card now are, the owner: *"Yes, option A"*. **Measured first** on the synthetic reference model and the demo building turned −43.4103°: a 6.0 × 0.1 m wall's world box is 4.4 × 4.2 m; clash candidates ARC × STR 251 where the unturned building gives 80, ARC × MEP 30 where it gives 0; `find_nearby` lists about 20 % too long; side-by-side gaps under-read by a median 0.7–1.7 m. **Built:** `model/plan-boxes.ts` hands `clash_check`, `find_nearby`, `measure_between` and `get_element` the box `Viewer.elementPlanBox` gives the card; SQL gains `plan_box` and `plan_frame`; `IfcElement.bbox`, the `bbox` table, the project file and markup placing are unchanged, and with the plan rotation at 0 every result is byte for byte what it was (golden files). Risky lane: checks first by a separate run, builder, `reviewer-deep` PASS. Headless: typecheck, lint, the whole unit suite, `eval:offline`, privacy. **Owed:** a live re-run of `ana-clash`, `ana-proximity`, `ana-tallest`, `op-place-spot`, `op-place-measure` (wording changed, truths did not; paid and windowed, the owner's yes); the plan-box gather timed on a model of several million triangles in the guarded benchmark. Exact surface-to-surface clash tests are a separate piece, with the parked clash review.
