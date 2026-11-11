@@ -1212,6 +1212,13 @@ Anything not on this list is a defect.
   element, so its captures are unchanged. **No new element, no new control, no style string
   changed.** **Measured** in a window on `reference.ifc`: the ObjectType tile is 142 × 43.75 px
   with a written value and with the dash.
+- **2026-11-11 — the Spatial-structure card's site line names the file's own coordinate system.**
+  Found by the repo audit (its decision 7) and approved by the owner in these words: *"fix all
+  the audit decisions 6 to 10"*. The design's site row ends in the literal `(SVY21)` whatever
+  the file says. It now shows the CRS the Coordinate-system card's chip shows, as `(name)`, and
+  no parenthesis when the file declares none; the design's mock, which passes no CRS, still
+  reads `(SVY21)`. Same span, same style string. **No new element, no new control.** Not yet
+  seen in a window.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
@@ -1558,6 +1565,12 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-11 — **ObjectType is the occurrence's own attribute, as written; the type object's Name is `typeName`** (owner-reported: *"I open in other BIM Viewer, see different thing"*): `objectType` is never the type's Name, and with none the tile shows the em dash (`tileText`; the owner: *"show a dash on the empty tile"*); the card's "Same ObjectType" row is literal; the right-click "similar · …" items go by the type's Name, by ObjectType only for an element with no type, and are not drawn for an element with neither (`similarKey`, the owner: *"Yes, by type"*); Schedules' Family / Type split `typeName || objectType`, SQL `type_object` and `get_relationships`' `typeObject` read `typeName`, `isSiteLike` tests `typeName || objectType` (framing unchanged); **the oracle script records IfcOpenShell's raw readings only** — an app rule is named in the test's `APP_RULES`, `KNOWN_DIFFERENCES` stays empty, and every element of every committed fixture is compared (`tests/fixtures/identities.json`, `object-type.pipeline.test.ts`).
 
 - 2026-11-11 — **the assistant's box tools and the SQL index read a turned building square with it** (owner-approved, "option A"): `model/plan-boxes.ts` `planFrameOf` / `planBoxRows` take each box through `Viewer.elementPlanBox` — the card's rule, no second vertex walk — plus the store's offset turned by −ρ, a larger footprint-corner fallback where the viewer has none, and `bbox` itself at ρ = 0, where every result is byte for byte what it was; `clash_check`, `find_nearby`, `measure_between` and `get_element` (`planBox…`) say `frame: 'plan'` and `planRotationDeg`; SQL gains `plan_box` and `plan_frame`, rebuilt with the index; `IfcElement.bbox`, the `bbox` table and markup placing are unchanged.
+- 2026-11-11 — **`set_storeys` is under the scope guard and compares first**, as `set_models` is: blank refused, under 5 % held as `{ storeyVis }`, bringing storeys back exempt; an eval setup step may carry `apply: true`.
+- 2026-11-11 — **`summarize_elements` no longer asks for a one-sentence reply** ("do not repeat its rows"); a capped `clash_check` is sorted; a placed spot is quoted in the display unit; `tableCsv` writes volumes.
+- 2026-11-11 — **Preferences' Model box saves a draft on Enter or blur** (`modelToSave`); the Spatial-structure card's CRS is the file's (`SpatialInput.crs`); Schedules says when a cap or storage refused.
+- 2026-11-11 — **Schedules call sites that cannot change the table repaint `'panes'`**, and a double repaint is one; selecting a column still repaints the table.
+- 2026-11-11 — **the schedule engine's number-as-text pattern is unambiguous (`WHOLE_NUMBER`), a yes/no filter reads `boolOfText`, an unfilled one reads "false" as before, a class is listed once, and an unknown operator's rule is dropped on load** (`OPS`, `isOp`).
+- 2026-11-11 — **`exportDatabase` sets `PRAGMA query_only` again after sql.js's export**, which resets it; **a schedule's core key and font name are own keys** (`Object.hasOwn`).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
