@@ -127,8 +127,9 @@ function tokenize(src: string): Tok[] {
       const word = m[0];
       i += word.length;
       // a name directly followed by "(" is a function call
+      // 2026-11-12: own keys only, so `constructor(` or `__proto__(` is an unknown name.
       const rest = src.slice(i).trimStart();
-      if (rest.startsWith('(') && FNS[word.toLowerCase()]) out.push({ t: 'fn', v: word.toLowerCase() });
+      if (rest.startsWith('(') && Object.hasOwn(FNS, word.toLowerCase())) out.push({ t: 'fn', v: word.toLowerCase() });
       else out.push({ t: 'name', v: word });
       continue;
     }
@@ -228,7 +229,7 @@ export function compile(src: string, result: CalcResult = 'number'): (vars: Vars
       const spec = FNS[tok.v];
       const n = (tok as Tok & { argc?: number }).argc ?? 1;
       if (!spec.args.includes(n)) {
-        throw new FormulaError(ARITY_ADVICE[tok.v]
+        throw new FormulaError((Object.hasOwn(ARITY_ADVICE, tok.v) ? ARITY_ADVICE[tok.v] : undefined)
           ?? `${tok.v}() takes ${spec.args.join(' or ')} arguments, got ${n}`);
       }
       if (depth < n) throw new FormulaError(`${tok.v}() is missing an argument`);
@@ -404,7 +405,7 @@ export function dimensionOf(src: string, kindByName: Map<string, string>): DimRe
       const n = (tok as Tok & { argc?: number }).argc ?? 1;
       const args = st.splice(-n, n);
       // Predicates answer yes/no, so the result is a plain count whatever went in.
-      if (FNS[tok.v]?.text || /^(len)$/.test(tok.v)) { st.push(ZERO); continue; }
+      if ((Object.hasOwn(FNS, tok.v) && FNS[tok.v].text) || /^(len)$/.test(tok.v)) { st.push(ZERO); continue; }
       if (tok.v === 'sqrt') {
         const a = args[0];
         if (typeof a === 'string') { st.push('unknown'); continue; }

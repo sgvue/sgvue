@@ -79,7 +79,8 @@ export function toDisplay(value: number, kind: UnitKind | undefined, display?: s
   if (!kind || kind === 'none' || kind === 'count') return value;
   const table = UNITS[kind];
   const unit = display || DEFAULT_UNIT[kind];
-  const factor = table?.[unit];
+  // 2026-11-12: own keys only, so `toString` or `__proto__` is an unknown unit.
+  const factor = table && Object.hasOwn(table, unit) ? table[unit] : undefined;
   return factor ? value / factor : value;
 }
 
@@ -88,7 +89,8 @@ export function fromDisplay(value: number, kind: UnitKind | undefined, display?:
   if (!kind || kind === 'none' || kind === 'count') return value;
   const table = UNITS[kind];
   const unit = display || DEFAULT_UNIT[kind];
-  const factor = table?.[unit];
+  // 2026-11-12: own keys only, as in toDisplay.
+  const factor = table && Object.hasOwn(table, unit) ? table[unit] : undefined;
   return factor ? value * factor : value;
 }
 
