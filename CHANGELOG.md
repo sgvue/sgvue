@@ -19,6 +19,11 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   failed to open while models brought in with Locate… were loading, one of them kept the old
   scene origin and the next took a new one, so the two could be drawn tens of metres apart. They
   now share one origin.
+- **A project whose own models fail to open no longer stays stuck loading.** When the models a
+  project could find failed to open and others were then brought in with Locate…, the project kept
+  reading as loading: the Locate… rows stayed beside models that were open, what the project had
+  saved for them (hidden elements, colours) was not put back, and Save Project refused. The
+  project now finishes loading, and the located models get what it saved for them.
 - **The selection dimension fits a building that is turned in its file's coordinates.** The box
   and its three dimensions are square with the grids again and read the element's own length,
   width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.
