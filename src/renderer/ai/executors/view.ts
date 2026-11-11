@@ -85,7 +85,6 @@ import { planePatch } from '../../state/selectors/section'
 import { getViewer, peekHistory, planRotationRad, restoredVis, useShell } from '../../state/shell'
 import type { ShellState } from '../../state/shell'
 import {
-  CHIP_CAP,
   COLOR_GROUP_CAP,
   COLOR_HEAD,
   askApply,
@@ -1774,9 +1773,6 @@ export const set_models: Executor = (input, ctx) => {
   }
 }
 
-/** Kept beside the chip caps so the panel and the executors cannot drift. */
-export { CHIP_CAP }
-
 export const VIEW_EXECUTORS: Record<string, Executor> = {
   set_filter_stack,
   manage_filters,
@@ -1792,8 +1788,4 @@ export const VIEW_EXECUTORS: Record<string, Executor> = {
   set_models
 }
 
-/** Reused by `read.ts`'s `get_view_state`, so both report the same numbers. */
-export { visibleCount, groupCounts }
-
-/** The outcome shape, re-exported so `index.ts` has one import. */
-export type { ToolOutcome }
+export { groupCounts }

@@ -20,8 +20,6 @@
  *              the same declarations as plain `:hover` rules
  */
 
-:root { --col-tint: color-mix(in srgb, var(--accent) 7%, transparent); }
-
 [hidden] { display: none !important; }
 
 .app { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
@@ -37,18 +35,16 @@
 }
 .btn:hover:not(:disabled) { background: var(--step-bg); color: var(--ink); }
 /* The chat panel's send button: sel-bg with the accent edge, accent under the pointer. */
-.btn.primary, button.tint { background: var(--sel-bg); color: var(--sel-ink); border: 1px solid var(--accent); }
-.btn.primary:hover:not(:disabled), button.tint:hover:not(:disabled) { background: var(--accent); color: var(--ground); }
+.btn.primary { background: var(--sel-bg); color: var(--sel-ink); border: 1px solid var(--accent); }
+.btn.primary:hover:not(:disabled) { background: var(--accent); color: var(--ground); }
 .btn.danger { color: var(--warn-ink); border-color: var(--warn-line); }
 button:disabled { opacity: .45; cursor: default; }
-button.tint { width: 100%; font: 600 12.5px/1 var(--sans); padding: 9px 12px; border-radius: 8px; text-align: center; }
 /* The filter card's "+ add filter step": an add is a link-coloured line, not a box. */
 button.dashed {
   align-self: flex-start; display: block; font: 500 12px/1 var(--sans); color: var(--accent-ink);
   padding: 6px 0;
 }
 button.dashed:disabled { color: var(--faint); opacity: 1; }
-button.dashed .dim { color: var(--faint); }
 button.link {
   font: 500 11.5px/1 var(--sans); color: var(--accent-ink); padding: 0 0 0 6px;
 }
@@ -60,7 +56,6 @@ button.quiet:hover:not(:disabled) { background: var(--step-bg); color: var(--ink
   width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center;
   border-radius: 6px; color: var(--muted);
 }
-.icon-btn.small { width: 24px; height: 24px; color: var(--faint); }
 .icon-btn > svg { display: block; flex: none; }
 .icon-btn.on { background: var(--sel-bg); color: var(--sel-ink); }
 .icon-btn:disabled { opacity: .35; }
@@ -103,17 +98,14 @@ label.lbl { display: block; font: 600 11px/1 var(--sans); letter-spacing: .06em;
 .sub { font: 400 11.5px/1.45 var(--sans); color: var(--muted); }
 .hint { font: 400 12px/1.45 var(--sans); color: var(--muted); text-wrap: pretty; }
 .opt-title { font: 500 13px/1.35 var(--sans); color: var(--ink); }
-.dim { color: var(--faint); font-weight: 400; }
 .tip-error { color: var(--warn-ink); }
 .empty-note { margin: auto; padding: 40px 10px; font: 400 13px/1.5 var(--sans); color: var(--muted); text-align: center; }
 
 /* ── layout helpers (ifcTable's, unchanged) ───────────────────────────── */
 .row { display: flex; gap: 6px; align-items: center; }
 .row > * { min-width: 0; }
-.row.wide { gap: 8px; }
 .row.ends { justify-content: space-between; }
 .row.top { align-items: flex-start; }
-.row.bottom { align-items: flex-end; }
 .row > .lbl { margin-bottom: 0; }
 .stack { display: flex; flex-direction: column; gap: 8px; }
 .stack.tight { gap: 2px; }
@@ -183,8 +175,6 @@ button.toggle:hover, label.toggle:hover { border-color: var(--accent); }
 .seg-btn:last-child { border-right: none; }
 .seg-btn:hover { background: var(--step-bg); }
 .seg-btn.on { background: var(--sel-bg); color: var(--sel-ink); }
-.seg.mini { flex: none; }
-.seg.mini .seg-btn { flex: none; padding: 6px 8px; }
 
 /* ── header ───────────────────────────────────────────────────────────── */
 .hdr {
@@ -445,7 +435,6 @@ button.mi {
   font: 400 13px/1.3 var(--sans); color: var(--ink); padding: 7px 10px; border-radius: 6px;
 }
 button.mi.on { color: var(--accent-ink); font-weight: 600; }
-button.mi.danger { color: var(--warn-ink); }
 .mi .tail { margin-left: auto; font: 400 11.5px/1 var(--mono); color: var(--faint); }
 button.fold, button.pop-back {
   display: flex; align-items: center; gap: 6px; border-radius: 6px; padding: 6px 10px;

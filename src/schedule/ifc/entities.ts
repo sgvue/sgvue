@@ -30,16 +30,6 @@ export const CANONICAL_ENTITIES: readonly string[] = [
   'IfcFastener', 'IfcVibrationIsolator', 'IfcBearing', 'IfcCourse', 'IfcEarthworksFill',
 ];
 
-const CANONICAL: Record<string, string> = {};
-CANONICAL_ENTITIES.forEach((n) => { CANONICAL[n.toUpperCase()] = n; });
-
-export function normalizeEntity(upper: string): string {
-  const hit = CANONICAL[upper];
-  if (hit) return hit;
-  if (!upper.startsWith('IFC')) return upper;
-  return 'Ifc' + upper.slice(3).charAt(0) + upper.slice(4).toLowerCase();
-}
-
 // Coarse discipline inference, used when the model carries no discipline tag.
 const STR = new Set(['IfcColumn', 'IfcBeam', 'IfcMember', 'IfcPlate', 'IfcSlab', 'IfcFooting',
   'IfcPile', 'IfcReinforcingBar', 'IfcReinforcingMesh', 'IfcTendon', 'IfcTendonAnchor',

@@ -34,9 +34,6 @@ export function scrollAfterPaint(newSelection = false) {
   paneTop ||= newSelection;
 }
 
-/** Whether a focus is waiting for the next paint — main.ts then leaves the overlay's focus alone. */
-export const focusWaiting = () => focusSel !== null;
-
 export function afterPaintLibrary() {
   if (focusSel) {
     const el = document.querySelector<HTMLElement>(focusSel);

@@ -111,13 +111,6 @@
   color: var(--accent-ink) !important;
 }
 
-/* L432 the chat panel's resize corner — the design's one custom-property hover: the stroke
- * reads `var(--grab, var(--border-strong))`, so setting `--grab` on the 34 px hit area is what
- * turns both of its borders accent. */
-.hv-grab:hover {
-  --grab: var(--accent) !important;
-}
-
 /* Not in the design — 2026-09-24, the owner's resizable sidebar sections: a drag handle's
  * 1 px line is transparent at rest and accent under the pointer. */
 .hv-split:hover > span {

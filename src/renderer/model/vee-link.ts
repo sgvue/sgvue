@@ -552,9 +552,6 @@ export function connect(next: MessagePort | null): void {
   }
 }
 
-/** Tests only: whether a port is held. */
-export const veeConnected = (): boolean => port !== null
-
 /** Listen for the port, and open and close the window as the panel opens and closes. Called once. */
 export function installVeeLink(): void {
   window.addEventListener('message', (event: MessageEvent) => {

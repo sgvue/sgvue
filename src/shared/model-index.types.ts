@@ -13,22 +13,6 @@
  *     `measures` names the IFC measure type so `shared/units.ts` can convert for display.
  */
 
-/* ────────────────────────────── immutability ────────────────────────────── */
-
-/**
- * Recursive `readonly`. Typed arrays and buffers pass through untouched — freezing them
- * is meaningless (the elements stay writable) and mapping over them destroys the type.
- */
-export type DeepReadonly<T> = T extends ArrayBuffer | ArrayBufferView
-  ? T
-  : T extends Function
-    ? T
-    : T extends (infer R)[]
-      ? readonly DeepReadonly<R>[]
-      : T extends object
-        ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-        : T
-
 /* ────────────────────────────── primitives ────────────────────────────── */
 
 /** A property value exactly as the file authored it. Lists stay lists. */
@@ -516,6 +500,3 @@ export interface ModelIndexMeta {
 export interface ModelIndex extends ModelIndexMeta {
   elements: readonly IfcElement[]
 }
-
-/** What the renderer stores: the same thing, frozen. */
-export type FrozenModelIndex = DeepReadonly<ModelIndex>

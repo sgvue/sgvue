@@ -59,9 +59,6 @@ import { totalmem } from 'node:os'
 import { app, type WebContents } from 'electron'
 import { GPU_GUARD_CHANNEL, type GpuGuardTrip } from '../shared/gpu-guard-channel'
 
-export { GPU_GUARD_CHANNEL }
-export type { GpuGuardTrip }
-
 /** The lowest the ceiling ever goes, in megabytes — a small machine's whole budget. */
 export const GPU_FLOOR_MB = 3072
 /** The share of installed RAM a big machine is allowed to hand the GPU helper. */
