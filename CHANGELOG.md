@@ -38,6 +38,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   property card's "Same ObjectType" row, on an element with no ObjectType, counts every element
   with none. The right-click "similar" items go by the element's type, as before, by its
   ObjectType when it has no type, and are left out for an element with neither.
+- **Ask Vee measures a turned building square with it.** On a building turned in its file's
+  coordinates, clash candidates, nearby elements, the distance between two elements and an
+  element's size are taken along the building's own axes — the size the property card shows —
+  where a wall used to read as a box several metres wide and walls a metre apart "overlapped".
+  The model database gains a `plan_box` table beside `bbox`. Nothing changes for a building that
+  is not turned.
 
 ## [1.5.0] - 2026-11-08
 

@@ -712,6 +712,12 @@ scene-space and are unaffected. A session, a share link and a saved viewpoint ca
 `frameKey(frame)` beside their camera, and a payload from another frame restores everything
 except the camera, framing the extents instead.
 
+*(2026-11-11: on a building turned in its files' coordinates, `clash_check`, `find_nearby`,
+`measure_between` and `get_element`'s `planBox…` keys take each element's box square with the
+building — the plan frame, through `Viewer.elementPlanBox`, the property card's box — and say
+`frame: 'plan'` and `planRotationDeg`; the SQL index has `plan_box` and `plan_frame` beside
+`bbox`. `docs/DECISIONS.md`, 2026-11-11.)*
+
 **One box per element, and it is where the two halves of the model meet.** The parse and the
 geometry are two worker requests (the index is usable while the geometry is still streaming),
 so neither one can fill `IfcElement.bbox` on its own: the parse has no geometry and the
