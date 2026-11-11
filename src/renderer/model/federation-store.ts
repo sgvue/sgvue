@@ -152,6 +152,18 @@ export class FederationController {
    * whole metres and only keeps float32 vertices near zero — since 2026-11-07 every model is
    * drawn at its own world coordinates (origin to origin), so which model set it changes nothing
    * that is seen.
+   *
+   * 2026-11-11 — "every later model is streamed against it" holds even when several files load
+   * at once. The parse worker is one thread, so with two files in flight "B parsed" can reach
+   * this side before "A's geometry done", and B used to be asked with `null` here and chose an
+   * offset of its own — drawn shifted against A. The bridge now holds a `null` request while an
+   * earlier one is unsettled and sends it with that one's outcome (`worker-bridge.ts`
+   * `geometry`): the offset its stream chose, or — if it failed — what it was itself sent with,
+   * so once any model has chosen an offset no later one in the chain is sent `null`. B's summary
+   * carries A's offset and this field is set to the same one. The one
+   * nuance: a model later refused for its part ids may already have handed its offset to a model
+   * that was waiting; it is only a whole-metre origin, and nothing seen depends on which model
+   * set it.
    */
   private offset: FederationOffset | null = null
   /**
@@ -574,6 +586,9 @@ export class FederationController {
     this.bootUsers++
     parsed.epoch = this.bootEpoch
     const chunks: GeometryChunk[] = []
+    // `null` while no model has set the offset yet. If another model's geometry is still
+    // streaming with `null`, the bridge holds this request and sends it with the offset that
+    // stream chose — so `summary.offset` below is the federation's one offset either way.
     const summary = await this.parse.geometry(modelKey, this.offset, (chunk) => chunks.push(chunk))
     if (gen !== this.gen) throw replaced()
     // A product drawn but not indexed (a site's own terrain, an annotation) is numbered too.
@@ -588,9 +603,10 @@ export class FederationController {
      * below — the same place and the same shape the mock adapter fills its own. Every consumer
      * of `bbox` — `clash_check`, `measure_between`, `get_element` and the SQL `bbox` table —
      * therefore needs no second path. (The property card is not one of them: it reads
-     * `viewer.elementBox()` and `viewer.solidCount()`, the same two numbers taken from the same
-     * parts on the renderer's side, and `scripts/shell-sanity.cjs`'s `boxes` block checks the
-     * two against each other on a real model.)
+     * `viewer.elementPlanBox()` — since 2026-11-11 the box in the plan frame, `viewer.elementBox()`
+     * itself while the plan is not turned — and `viewer.solidCount()`, taken from the same
+     * parts on the renderer's side; `scripts/shell-sanity.cjs`'s `boxes` block checks
+     * `viewer.elementBox()` and the solid count against these on a real model.)
      *
      * An element with no geometry keeps neither — never a zero count and never a placeholder
      * box, which is what those consumers already test for.

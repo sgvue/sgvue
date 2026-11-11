@@ -62,6 +62,7 @@ function element(patch: Partial<FederatedElement>): FederatedElement {
     predefinedType: 'NOTDEFINED',
     effectivePredefinedType: patch.predefinedType ?? 'NOTDEFINED',
     objectType: '',
+    typeName: '',
     typeGuid: '',
     storey: 'L1',
     material: '',

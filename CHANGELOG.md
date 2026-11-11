@@ -8,6 +8,27 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+### Fixed
+
+- **A project reopens with its models where their files put them.** When two or more models were
+  loading at the same moment — which opening a `.sgvue` always does — each could take its own
+  scene origin, so the models were drawn metres apart and coordinates read wrong. Every model now
+  shares the one origin. Nothing is aligned automatically: a model whose file puts it in the wrong
+  place is still shown there.
+- **The selection dimension fits a building that is turned in its file's coordinates.** The box
+  and its three dimensions are square with the grids again and read the element's own length,
+  width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.
+- **ObjectType shows the element's own ObjectType**, as other BIM viewers and IfcOpenShell do.
+  It used to show the name of the element's type (a Revit "Family:Type") whenever the element
+  had one. The type's name is still in the Schedules window's Family and Type columns.
+  What works differently: an element with no ObjectType of its own now has an empty ObjectType
+  tile, and its tree row no longer carries the type's name; a saved filter, filter set or project
+  rule on ObjectType that named a type's name now matches only elements whose own ObjectType is
+  that text; the tree search no longer finds an element by its type's name; and the
+  property card's "Same ObjectType" row, on an element with no ObjectType, counts every element
+  with none. The right-click "similar" items go by the element's type, as before, by its
+  ObjectType when it has no type, and are left out for an element with neither.
+
 ## [1.5.0] - 2026-11-08
 
 ### Added

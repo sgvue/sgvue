@@ -7,7 +7,7 @@
           "class": "IfcWall",
           "expected": {
             "effectivePredefinedType": "STANDARD",
-            "objectType": "Generic 200",
+            "objectType": "",
             "predefinedType": "STANDARD"
           },
           "get_predefined_type": "STANDARD",
@@ -42,7 +42,7 @@
           "class": "IfcWall",
           "expected": {
             "effectivePredefinedType": "Retaining wall",
-            "objectType": "Retaining 400",
+            "objectType": "",
             "predefinedType": "USERDEFINED"
           },
           "get_predefined_type": "Retaining wall",
@@ -77,7 +77,7 @@
           "class": "IfcBeam",
           "expected": {
             "effectivePredefinedType": "",
-            "objectType": "Beam 300",
+            "objectType": "",
             "predefinedType": "NOTDEFINED"
           },
           "get_predefined_type": null,
@@ -127,7 +127,7 @@
           "class": "IfcSlab",
           "expected": {
             "effectivePredefinedType": "ROOF",
-            "objectType": "Roof 250",
+            "objectType": "",
             "predefinedType": "ROOF"
           },
           "get_predefined_type": "ROOF",
@@ -272,7 +272,7 @@
           "class": "IfcWall",
           "expected": {
             "effectivePredefinedType": "SHEAR",
-            "objectType": "Shear wall 300",
+            "objectType": "",
             "predefinedType": "SHEAR"
           },
           "get_predefined_type": "SHEAR",
@@ -292,7 +292,7 @@
           "class": "IfcBeam",
           "expected": {
             "effectivePredefinedType": "JOIST",
-            "objectType": "Joist 200",
+            "objectType": "",
             "predefinedType": "JOIST"
           },
           "get_predefined_type": "JOIST",
@@ -312,7 +312,7 @@
           "class": "IfcSlab",
           "expected": {
             "effectivePredefinedType": "Raft slab",
-            "objectType": "Raft 600",
+            "objectType": "",
             "predefinedType": "USERDEFINED"
           },
           "get_predefined_type": "Raft slab",
@@ -332,7 +332,7 @@
           "class": "IfcSlab",
           "expected": {
             "effectivePredefinedType": "Ramp slab",
-            "objectType": "Ramp 250",
+            "objectType": "Ramp slab",
             "predefinedType": "USERDEFINED"
           },
           "get_predefined_type": "Ramp slab",
@@ -352,7 +352,7 @@
           "class": "IfcWall",
           "expected": {
             "effectivePredefinedType": "PARTITIONING",
-            "objectType": "Partition 100",
+            "objectType": "Curved wall",
             "predefinedType": "USERDEFINED"
           },
           "get_predefined_type": "PARTITIONING",
@@ -372,7 +372,7 @@
           "class": "IfcBeam",
           "expected": {
             "effectivePredefinedType": "BEAM",
-            "objectType": "Beam 400",
+            "objectType": "",
             "predefinedType": "BEAM"
           },
           "get_predefined_type": "BEAM",
@@ -392,7 +392,7 @@
           "class": "IfcColumn",
           "expected": {
             "effectivePredefinedType": "COLUMN",
-            "objectType": "Type label",
+            "objectType": "Occurrence label",
             "predefinedType": "COLUMN"
           },
           "get_predefined_type": "COLUMN",

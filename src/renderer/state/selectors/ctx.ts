@@ -52,16 +52,27 @@ export function ctxTargets(input: CtxInput): number[] {
   return selIds.includes(ctxId!) && selIds.length > 1 ? [...selIds] : [ctxId!]
 }
 
+/**
+ * What "similar" goes by (2026-11-11 — the owner: *"Yes, by type"*): the type object's `Name`,
+ * as Revit's "Select All Instances" and other viewers' "same type" do; the element's own
+ * `ObjectType` only when it has no type; `''` for an element with neither, which is similar to
+ * nothing. The design's mock has no type objects, so there it is the design's `objectType`.
+ */
+export const similarKey = (e: { typeName: string; objectType: string }): string =>
+  e.typeName || e.objectType
+
 export function ctxItems(input: CtxInput): CtxItem[] {
   const { elements, byId, ctxId, hidden } = input
   const ctxEl = ctxId != null ? byId.get(ctxId) : undefined
   const tgtIds = ctxTargets(input)
   const tgt = tgtIds.map((id) => byId.get(id)).filter(Boolean) as FederatedElement[]
   const nT = tgt.length
-  const types = [...new Set(tgt.map((e) => e.objectType))]
+  const types = [...new Set(tgt.map(similarKey))].filter(Boolean)
+  // An element with neither a type nor an ObjectType gets no "similar · …" item (2026-11-11).
+  const sim = <T>(item: T): T[] => (types.length ? [item] : [])
   const ents = [...new Set(tgt.map((e) => e.type))]
   const simType = (): number[] =>
-    elements.filter((e) => types.includes(e.objectType)).map((e) => e.id)
+    elements.filter((e) => types.includes(similarKey(e))).map((e) => e.id)
   const simEnt = (): number[] => elements.filter((e) => ents.includes(e.type)).map((e) => e.id)
   const shortEnts = shortList(ents.map((t) => t.replace(/^Ifc/, '')))
   const nSuffix = nT > 1 ? ` (${nT})` : ''
@@ -70,12 +81,12 @@ export function ctxItems(input: CtxInput): CtxItem[] {
     ...(ctxEl
       ? [
           { label: `Hide${nSuffix}`, key: 'H', top: '0', action: { kind: 'hide', ids: tgtIds } },
-          {
+          ...sim({
             label: `Hide similar · ${shortList(types)}`,
             key: '',
             top: '0',
             action: { kind: 'hide', ids: simType() }
-          },
+          }),
           {
             label: `Hide similar entity · ${shortEnts}`,
             key: '',
@@ -88,26 +99,32 @@ export function ctxItems(input: CtxInput): CtxItem[] {
             top: '1px solid var(--border)',
             action: { kind: 'isolate', ids: tgtIds }
           },
-          {
+          ...sim({
             label: `Isolate similar · ${shortList(types)}`,
             key: '',
             top: '0',
             action: { kind: 'isolate', ids: simType() }
-          },
+          }),
           {
             label: `Isolate similar entity · ${shortEnts}`,
             key: '',
             top: '0',
             action: { kind: 'isolate', ids: simEnt() }
           },
-          {
+          ...sim({
             label: `Select similar · ${shortList(types)}`,
             key: '',
             top: '1px solid var(--border)',
             // Selecting what you cannot see is the one case the design guards. `:1914`.
             action: { kind: 'select', ids: simType().filter((id) => !hidden[id]) }
+          }),
+          // Without "Select similar" the group's rule stands above its next item.
+          {
+            label: 'Zoom to',
+            key: 'F',
+            top: types.length ? '0' : '1px solid var(--border)',
+            action: { kind: 'zoomTo', ids: tgtIds }
           },
-          { label: 'Zoom to', key: 'F', top: '0', action: { kind: 'zoomTo', ids: tgtIds } },
           {
             label: 'Properties',
             key: '',

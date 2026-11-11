@@ -32,7 +32,14 @@ export const SITE_CLASSES: ReadonlySet<string> = new Set([
  */
 export const SITE_PROXY_NAME = /topograph|toposolid|\bsite\b/i
 
-export function isSiteLike(e: { type: string; name?: string; objectType?: string }): boolean {
+export function isSiteLike(e: {
+  type: string
+  name?: string
+  objectType?: string
+  typeName?: string
+}): boolean {
   if (SITE_CLASSES.has(e.type)) return true
-  return e.type === 'IfcBuildingElementProxy' && SITE_PROXY_NAME.test(`${e.name ?? ''} ${e.objectType ?? ''}`)
+  // The type's Name first, as this has always read (2026-11-11: `objectType` is the occurrence's now).
+  const label = e.typeName || e.objectType || ''
+  return e.type === 'IfcBuildingElementProxy' && SITE_PROXY_NAME.test(`${e.name ?? ''} ${label}`)
 }

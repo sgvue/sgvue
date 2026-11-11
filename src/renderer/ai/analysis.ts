@@ -162,7 +162,7 @@ export function auditModel(
   push(
     'No ObjectType',
     elements.filter((e) => !e.objectType).map((e) => e.id),
-    'No type family assigned'
+    'ObjectType attribute not set'
   )
   push('No material', elements.filter((e) => !e.material).map((e) => e.id), 'Material not stated')
   push(

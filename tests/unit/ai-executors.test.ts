@@ -306,7 +306,12 @@ describe('the additional read tools', () => {
     const wall = full.elements.find((e) => e.type === 'IfcWall')!
     const body = await run('get_relationships', { id: wall.id })
     expect((body.containedIn as { storey: string }).storey).toBe(wall.storey)
-    expect((body.typeObject as { name: string }).name).toBe(wall.objectType)
+    // 2026-11-11: this line read `typeObject.name === wall.objectType` — the old rule, where the
+    // type's Name stood in the ObjectType field. The design's mock has no type objects, so there
+    // is none to name; a real type's Name is checked against IfcOpenShell in
+    // `object-type.pipeline.test.ts`.
+    expect(wall.objectType).not.toBe('')
+    expect(body.typeObject).toBeNull()
     expect(body).toHaveProperty('decomposition')
   })
 

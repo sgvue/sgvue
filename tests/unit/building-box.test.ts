@@ -47,6 +47,14 @@ describe('isSiteLike — which elements are left out of the building box', () =>
 
   it('tolerates missing name and type', () => {
     expect(isSiteLike({ type: 'IfcBuildingElementProxy' })).toBe(false)
+    // 2026-11-11: `objectType` is the occurrence's own attribute now, so the type's Name — which
+    // this has always tested first — arrives as `typeName`. What is framed must not change.
+    expect(
+      isSiteLike({ type: 'IfcBuildingElementProxy', name: 'Mass 1', objectType: 'SUBTYPE_CODE', typeName: 'Toposolid:Grass' })
+    ).toBe(true)
+    expect(
+      isSiteLike({ type: 'IfcBuildingElementProxy', name: 'Mass 1', objectType: 'Topography', typeName: 'Family A:Type 1' })
+    ).toBe(false)
     expect(isSiteLike({ type: 'IfcGeographicElement' })).toBe(true)
   })
 })
