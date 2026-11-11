@@ -45,6 +45,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   same file again was refused as "already open in this project" until the project was reopened.
   It is now taken, and the model opens as the project's own, with what the project saved for it.
   A file that really is open, or is still loading, is refused as before.
+- **Saving a project no longer swaps a missing model for another file of the same name.** With a
+  project open and one of its models missing, opening a different file of the same name (say
+  another `STR.ifc`) and saving wrote that other file in the missing model's place and dropped what
+  the project had stored for it (its hidden elements, its viewpoints' entries). The missing model
+  is now saved exactly as the project had it, and the other file is saved as a model of its own.
+  Locate… still brings the real file back as the project's model.
 - **The selection dimension fits a building that is turned in its file's coordinates.** The box
   and its three dimensions are square with the grids again and read the element's own length,
   width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.

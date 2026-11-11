@@ -42,6 +42,8 @@ import {
 import { resetShell, stubViewer } from './stub-viewer'
 import { disposeUploads, showRefused } from '../../src/renderer/model/upload-pipeline'
 import { TOO_LARGE } from '../../src/shared/upload'
+import { carryForward, projectOf } from '../../src/shared/project-file'
+import { projectContextOf, projectSourceOf } from '../../src/renderer/model/project'
 
 const KEYS = ['ARC', 'STR', 'SIT', 'MEP'] as const
 const st = (): ShellState => useShell.getState()
@@ -564,5 +566,128 @@ describe('a project never stays "loading"', () => {
     boot(KEYS)
     // The store holds the mock's models, and no file stands behind any of them: the demo's case.
     expect(snapshotFor(4)).toMatchObject({ text: null, reason: 'no-files' })
+  })
+})
+
+/* ────────── a loaded model the project did not bind, under a carried model's key ────────── */
+
+describe('a carried model and an unbound loaded model of the same key: nothing is merged by key', () => {
+  /** Another file named STR.ifc, elsewhere on disk: same model key, a different file. */
+  const OTHER_STR: ProjectFileInfo = {
+    key: 'STR',
+    path: '/projects/synthetic/review/other/STR.ifc',
+    name: 'STR.ifc',
+    sha256: 'f'.repeat(64),
+    size: 2000,
+    slot: 1
+  }
+
+  /**
+   * The setup of the "STR missing" case above: saved with ARC and STR open (STR coloured, its eye
+   * off, two of its elements hidden, a `Model` rule naming it, a viewpoint hiding one of its
+   * elements and its eye), then reopened with STR (m2) missing. `live` is what is loaded at the
+   * reopen; only ARC is bound to the project.
+   */
+  function openedWithStrMissing(live: readonly string[]): { original: ProjectFile; m2: ProjectFile['models'][number]; carried: Carried } {
+    boot(['ARC', 'STR'])
+    const strIds = idsWhere((e) => e.model === 'STR')
+    st().hide([...strIds.slice(0, 2), ...idsWhere((e) => e.model === 'ARC').slice(0, 1)])
+    st().setModelColor('STR', MC[3])
+    st().toggleModel('STR')
+    st().addStep('hide', [{ prop: 'Model', op: '=', val: 'STR' }])
+    useShell.setState({
+      views: [
+        {
+          id: 7,
+          name: 'Cores',
+          sub: '3D',
+          cam: null,
+          hidden: { [strIds[2]]: true },
+          storeyVis: {},
+          modelVis: { STR: false },
+          stack: [],
+          active: null,
+          grids: true,
+          levels: true,
+          frame: 'identity',
+          idStride: 1_000_000_000
+        }
+      ]
+    })
+    const original = readOrThrow(projectText(buildProject(inputs(['ARC', 'STR']), 'then', 'test').project))
+    const m2 = original.models.find((m) => m.name === 'STR.ifc')!
+    expect(m2.id).toBe('m2')
+
+    boot(live)
+    const f = st().federation
+    const plan = restorePlanOf(original, { models: f.models, elements: f.elements }, {
+      bind: new Map([['m1', 'ARC']]),
+      offset: st().offset
+    })
+    expect(plan.missing).toEqual(['m2'])
+    applyProjectRestore(plan)
+    useShell.setState({ views: plan.state.views })
+    return { original, m2, carried: { file: original, ids: plan.missing } }
+  }
+
+  const ofId = (refs: readonly (readonly [string, string])[], id: string): string => JSON.stringify(refs.filter(([m]) => m === id))
+  const arcOnlyIds = (): Map<string, string> => new Map([['ARC', 'm1']])
+
+  it('a. the other STR.ifc, opened as an ordinary pick, is saved as a model of its own; m2 and its references are written as the file had them', () => {
+    const { original, m2, carried } = openedWithStrMissing(['ARC', 'STR'])
+    // One of the other file's elements hidden on screen.
+    const otherEl = st().byId.get(idsWhere((e) => e.model === 'STR')[5])!
+    st().hide([otherEl.id])
+
+    const i: SnapshotInputs = { ...inputs(['ARC']), files: [...filesOf(['ARC']), OTHER_STR], ids: arcOnlyIds() }
+    const text = projectText(buildProject(i, 'now', 'test', carried).project)
+    const saved = readOrThrow(text)
+
+    expect.soft(JSON.stringify(saved.models.find((m) => m.id === 'm2')), 'm2 written exactly as the opened file had it').toBe(JSON.stringify(m2))
+    expect.soft(ofId(saved.visibility.hidden, 'm2'), 'm2’s hidden references').toBe(ofId(original.visibility.hidden, 'm2'))
+    expect.soft(ofId(saved.viewpoints[0]?.hidden ?? [], 'm2'), 'm2’s references in the viewpoint').toBe(ofId(original.viewpoints[0].hidden, 'm2'))
+    expect.soft(saved.viewpoints[0]?.modelVis.m2, 'm2’s eye in the viewpoint').toBe(original.viewpoints[0].modelVis.m2)
+    const others = saved.models.filter((m) => m.name === 'STR.ifc' && m.id !== 'm2')
+    expect.soft(others.map((m) => [m.absPath, m.sha256]), 'the other STR.ifc, one model of its own').toEqual([[OTHER_STR.path, OTHER_STR.sha256]])
+    const otherId = others[0]?.id
+    expect.soft(otherId, 'the other STR.ifc’s id').not.toBe('m2')
+    expect.soft(
+      saved.visibility.hidden.filter(([, g]) => g === otherEl.guid).map(([m]) => m),
+      'the element hidden on screen, written under the other file’s id'
+    ).toContain(otherId)
+    expect.soft(ofId(saved.visibility.hidden, 'm2'), 'nothing of the other file written under m2').not.toContain(`"${otherEl.guid}"`)
+    const ids = saved.models.map((m) => m.id)
+    expect.soft(new Set(ids).size, `model ids unique: ${ids.join(', ')}`).toBe(ids.length)
+  })
+
+  it('b. guard — the loaded STR is the project’s m2 (bound): one m2, the live file’s path, no duplicate', () => {
+    const { original } = openedWithStrMissing(['ARC', 'STR'])
+    const carried: Carried = { file: original, ids: [] }
+    const i: SnapshotInputs = { ...inputs(['ARC']), files: [...filesOf(['ARC']), OTHER_STR], ids: new Map([['ARC', 'm1'], ['STR', 'm2']]) }
+    const saved = readOrThrow(projectText(buildProject(i, 'now', 'test', carried).project))
+    expect(saved.models.filter((m) => m.name === 'STR.ifc').map((m) => [m.id, m.absPath])).toEqual([['m2', OTHER_STR.path]])
+    expect(saved.models.map((m) => m.id)).toEqual(['m1', 'm2'])
+  })
+
+  it('c. guard — m2 still carried while the loaded STR is bound to m2: m2 written once, ids unique', () => {
+    const { original } = openedWithStrMissing(['ARC', 'STR'])
+    const carried: Carried = { file: original, ids: ['m2'] }
+    const i: SnapshotInputs = { ...inputs(['ARC']), files: [...filesOf(['ARC']), OTHER_STR], ids: new Map([['ARC', 'm1'], ['STR', 'm2']]) }
+    const saved = readOrThrow(projectText(buildProject(i, 'now', 'test', carried).project))
+    const ids = saved.models.map((m) => m.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.filter((id) => id === 'm2')).toHaveLength(1)
+  })
+
+  it('d. guard — with no key collision, a save is byte for byte the composition the writer makes today', () => {
+    const { original, carried } = openedWithStrMissing(['ARC'])
+    st().toggleGrids()
+    st().hide(idsWhere((e) => e.model === 'ARC').slice(1, 3))
+    const i = inputs(['ARC'])
+    const built = projectText(buildProject(i, 'now', 'test', carried).project)
+    // Written out by hand from the shared functions: m2 carried by its key, then carried forward.
+    const ctx = { ...projectContextOf(i.state, i.files, 'now', 'test', i.ids), carried: [{ id: 'm2', key: 'STR' }] }
+    const hand = carryForward(projectOf(projectSourceOf(i), ctx).project, original, ['m2'], carried.views)
+    expect(built).toBe(projectText(hand))
   })
 })

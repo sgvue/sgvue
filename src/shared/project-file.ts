@@ -719,7 +719,8 @@ export interface ProjectContext {
    * changed), by their id in that file and the model key a restore gave them (`modelKeyOf` of the
    * file's name). Their ids are kept free, so `carryForward` can put their entries back under the
    * same id, and a rule, an eye or `active` that names one of those keys is written as that id —
-   * the tag the file had. A key that is now loaded is the loaded model's.
+   * the tag the file had. A key that is now loaded is the loaded model's on screen (2026-11-12:
+   * the carried entry is still written, under its own id, unless a loaded model is bound to it).
    */
   carried?: readonly { id: string; key: string }[]
 }

@@ -281,15 +281,16 @@ export interface Carried {
 /**
  * The project, as `projectOf` builds it, from a snapshot of the inputs — with the opened file's
  * models that are not open carried forward (`carried`), so a save never drops a model, or a
- * reference to one of its elements, only because its file could not be found. A carried model
- * whose key is open again is the open one's.
+ * reference to one of its elements, only because its file could not be found. 2026-11-12 — a
+ * carried model is a loaded one's only when that loaded model is bound to its id; a loaded file
+ * that only shares its key is written as a model of its own.
  */
 export function buildProject(i: SnapshotInputs, savedAt: string, savedBy: string, carried?: Carried | null): ProjectWrite {
   const loaded = new Set(i.state.federation.models.map((m) => m.meta.modelKey))
+  const boundIds = new Set([...(i.ids ?? [])].filter(([key]) => loaded.has(key)).map(([, id]) => id))
   const keep = (carried?.file.models ?? [])
-    .filter((m) => carried!.ids.includes(m.id))
+    .filter((m) => carried!.ids.includes(m.id) && !boundIds.has(m.id))
     .map((m) => ({ id: m.id, key: modelKeyOf(m.name) }))
-    .filter((c) => !loaded.has(c.key))
   const ctx = { ...projectContextOf(i.state, i.files, savedAt, savedBy, i.ids), carried: keep }
   const built = projectOf(projectSourceOf(i), ctx)
   if (!carried) return built
