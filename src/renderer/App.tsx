@@ -58,6 +58,7 @@ import Preferences from './app/Preferences'
 import CoordsCard from './app/CoordsCard'
 import FilterCard from './app/FilterCard'
 import Landing from './app/Landing'
+import { FedTraceLine } from './app/FedTrace'
 import LoadingBadge from './app/LoadingBadge'
 import MarkupsCard from './app/MarkupsCard'
 import ProjectCard from './app/ProjectCard'
@@ -721,6 +722,9 @@ export default function App(): React.JSX.Element {
             do, so the tab order ends: action bar, reset, Ask. */}
         <BottomRow />
         <LoadingBadge />
+        {/* 2026-11-12 — the federating indicator's line, along the stage's top edge while a model
+            picked after boot loads and joins; absent otherwise. Its caption is in the bottom row. */}
+        <FedTraceLine />
       </main>
 
       {/* `:833` — a child of the root box, not of the stage: a tree row opens it too. */}

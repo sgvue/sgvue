@@ -1,0 +1,8 @@
+/*
+ * 2026-11-12 — the federating indicator's line (`app/FedTrace.tsx`, the owner's pick "B") enters
+ * over 220 ms by opacity alone. The design's keyframes (`styles/design.css`, pinned) all move as
+ * they fade — `fadein` 3 px, `ifcrise` 8 px — which on a 2 px line 5 px from the stage's top edge
+ * reads as a jump, so this is the one new rule. The design's reduced-motion rule (`design.css:6`)
+ * applies to it as to every animation.
+ */
+@keyframes fedfade{from{opacity:0}to{opacity:1}}

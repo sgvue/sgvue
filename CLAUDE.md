@@ -1213,10 +1213,44 @@ Anything not on this list is a defect.
   changed.** **Measured** in a window on `reference.ifc`: the ObjectType tile is 142 × 43.75 px
   with a written value and with the dash.
 
+- **2026-11-12 — a model picked after boot shows a federating indicator: a line along the stage's
+  top edge and a caption in the bottom row.** Asked for by the owner in these words: *"create a
+  new simple yet cool techy loading animation when model view is federating the new upload
+  model."* Of three clickable prototypes (pixel chip, edge trace, scan frame) the owner chose
+  *"B"* — Edge trace. Until now a model added to an open viewer showed its progress only in the
+  sidebar's upload row, and the 3D view nothing but the centre badge during the join. **Two new
+  elements, no new control**, DOM and CSS only (`app/FedTrace.tsx`). **The line**
+  (`data-role="fedline"`): a child of the stage, 2 px high, `top:5px;left:5px;right:5px`,
+  z-index 14, `aria-hidden`, no pointer events — clear of the visibility frame (3 px + 1 px), the
+  toolbar (12 px) and the view cube (8 px). Five equal segments 2 px apart, one per stage of
+  `STAGES`: pending `--border`; the current one a `--border-strong` track carrying the design's
+  `ifcsweep` glint (25 % wide, 1.3 s), on that segment only and only while its stage runs; a
+  finished one's `--accent` fill grows over 260 ms. It enters over 220 ms by opacity alone
+  (`fedfade`, the one new keyframe, `styles/fed-trace.css`). Joined: every fill `--ok-ink`.
+  Failed: the current segment `--warn-ink`, still. **The caption** (`data-role="fedcaption"`,
+  `role="status"`): the top piece of the bottom row's centre zone, above the reset pill and the
+  hint, in the status bar's own card, no pointer events. Loading: `<file> · <stage> · n/5`, the
+  stage in the design's words; with two or more files in flight `N models` and the stage of the
+  one furthest behind; a row that reads `ready` is `federating · 5/5`. Joined: the upload row's
+  tick at 14 px and `+N elements` (`+1 element`) in `--ok-ink` — N how much the federation grew
+  over the batch, grouped with thin spaces — or `joined` with no number when it did not grow (a
+  replacement), plus ` · N could not open` in `--warn-ink` when some files of the batch failed.
+  All failed: `could not open — see Models` in `--warn-ink`. Only the file name shrinks (22
+  characters at most, then an ellipsis). **Only what the app knows:** never a percentage, never
+  a count while parsing. **Timings:** joined holds 900 ms and failed 1 600 ms, then both pieces
+  fade over 220 ms and are removed from the DOM; a cancel fades at once; a new pick during a
+  hold or the fade restarts it. **It replaces the design's centre badge `Rebuilding federation…`
+  only while it is up**; the boot's messages and a removal with no load in flight are as
+  designed, and the landing page's first load never shows it. **Reduced motion:** every state a
+  still, no glint, and each piece removed at the end of its hold with no fade. **With no load in
+  flight both pieces are absent and every element and style string is what it was.** It reads the
+  store's upload rows alone, starts no frame loop and never wakes the 3D view. Not yet seen in a
+  window. The numbers are in `docs/DECISIONS.md`.
+
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
-2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's
-and 2026-11-07's.
+2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's,
+2026-11-07's and 2026-11-12's.
 
 ### No visible additions
 
@@ -1558,6 +1592,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-11 — **ObjectType is the occurrence's own attribute, as written; the type object's Name is `typeName`** (owner-reported: *"I open in other BIM Viewer, see different thing"*): `objectType` is never the type's Name, and with none the tile shows the em dash (`tileText`; the owner: *"show a dash on the empty tile"*); the card's "Same ObjectType" row is literal; the right-click "similar · …" items go by the type's Name, by ObjectType only for an element with no type, and are not drawn for an element with neither (`similarKey`, the owner: *"Yes, by type"*); Schedules' Family / Type split `typeName || objectType`, SQL `type_object` and `get_relationships`' `typeObject` read `typeName`, `isSiteLike` tests `typeName || objectType` (framing unchanged); **the oracle script records IfcOpenShell's raw readings only** — an app rule is named in the test's `APP_RULES`, `KNOWN_DIFFERENCES` stays empty, and every element of every committed fixture is compared (`tests/fixtures/identities.json`, `object-type.pipeline.test.ts`).
 
 - 2026-11-11 — **the assistant's box tools and the SQL index read a turned building square with it** (owner-approved, "option A"): `model/plan-boxes.ts` `planFrameOf` / `planBoxRows` take each box through `Viewer.elementPlanBox` — the card's rule, no second vertex walk — plus the store's offset turned by −ρ, a larger footprint-corner fallback where the viewer has none, and `bbox` itself at ρ = 0, where every result is byte for byte what it was; `clash_check`, `find_nearby`, `measure_between` and `get_element` (`planBox…`) say `frame: 'plan'` and `planRotationDeg`; SQL gains `plan_box` and `plan_frame`, rebuilt with the index; `IfcElement.bbox`, the `bbox` table and markup placing are unchanged.
+
+- 2026-11-12 — **the federating indicator (the owner's pick "B") is read off the store alone** (`shared/fed-trace.ts` pure — `fedStep`, `fedHoldMs`, `fedExpire`, `fedView`; `model/fed-trace-store.ts` outside the shell store, like `ai/trace-store.ts`): a row is tracked only if first seen while `booted` and not an error row, in flight until it leaves `uploads` done (joined), turns `error` (failed) or leaves undone (cancelled), and the batch ends when none is in flight; its only timers are a hold (900 / 1 600 ms) or an exit (220 ms), never a frame loop or an interval, and nothing reaches `viewer/`; `upload-pipeline.ts` is untouched. `BottomRow` draws the caption itself and `fit()` counts it with the name cut to `CAPTION_NAME_MIN` (40 px); `LoadingBadge` is `null` while it is up.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

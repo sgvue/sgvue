@@ -49,6 +49,15 @@ export const BOTTOM_GAP = 10
  */
 export const HINT_MIN = 200
 
+/**
+ * 2026-11-12 — the least of its file name the federating caption keeps (`app/FedTrace.tsx`), in
+ * CSS pixels: about six characters of its 11 px mono. The name is the part of the caption that
+ * shrinks; `BottomRow`'s `fit` counts the caption as its width with the name cut to this, so the
+ * centre goes above the bars before the caption would be cut further, and a short name is never
+ * cut at all.
+ */
+export const CAPTION_NAME_MIN = 40
+
 /** Where the bottom row's centre zone stands. */
 export type CentrePlace = 'empty' | 'between' | 'above'
 

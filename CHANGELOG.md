@@ -8,6 +8,15 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+### Added
+
+- **Adding a model to an open view shows its progress in the 3D view.** A thin line along the top
+  edge of the 3D view fills in five steps as the file is read, parsed, built, indexed and joined,
+  and a small caption at the bottom names the file and the step (`Tower B.ifc · building geometry
+  · 3/5`). When it has joined, the caption says how many elements it added, or that a file could
+  not be opened; then both fade away. It takes the place of the "Rebuilding federation…" badge
+  for these loads. Nothing changes for the first model opened from the home page.
+
 ### Fixed
 
 - **A project reopens with its models where their files put them.** When two or more models were

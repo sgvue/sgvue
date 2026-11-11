@@ -46,11 +46,13 @@ import { useShallow } from 'zustand/react/shallow'
 import {
   BOTTOM_GAP,
   browFrom,
+  CAPTION_NAME_MIN,
   centrePlace,
   HINT_MIN,
   type CentrePlace
 } from '../state/selectors/lanes'
 import { ChatPill } from './ChatPill'
+import { FedCaption, useFedView } from './FedTrace'
 import HintBar from './HintBar'
 import StatusBar, { ActionBar } from './StatusBar'
 import { ResetPill } from './VisibilityFrame'
@@ -62,10 +64,24 @@ import { s } from './css'
  */
 const CENTRE_KEYS = pick('federation', 'hidden', 'storeyVis', 'stack', 'visibleCount', 'hint', 'tool')
 
+/**
+ * A centre piece's width for `centrePlace`. The federating caption's name may shrink, so the
+ * caption counts as its width with the name cut to `CAPTION_NAME_MIN` (a shorter name as it is);
+ * every other piece — the reset pill, which does not shrink — counts as its width.
+ */
+function captionFloor(piece: HTMLElement): number {
+  const name = piece.dataset.role === 'fedcaption' ? piece.querySelector<HTMLElement>('[data-role="fedname"]') : null
+  return name ? piece.offsetWidth - Math.max(0, name.offsetWidth - CAPTION_NAME_MIN) : piece.offsetWidth
+}
+
 export default function BottomRow(): React.JSX.Element {
   const row = useRef<HTMLDivElement>(null)
   const [place, setPlace] = useState<CentrePlace>('empty')
   useShell(useShallow(CENTRE_KEYS))
+  // 2026-11-12 — the federating caption is the centre zone's third piece. Its state is not the
+  // shell store's, so the row reads it here and draws it itself: it appears, changes text and
+  // goes in the row's own commit, and the row measures again before the paint.
+  const fed = useFedView()
 
   const fit = (): void => {
     const node = row.current
@@ -73,7 +89,7 @@ export default function BottomRow(): React.JSX.Element {
     const [left, centre, right] = [...node.children] as HTMLElement[]
     let need = 0
     for (const piece of [...centre.children] as HTMLElement[]) {
-      need = Math.max(need, piece.dataset.role === 'hintbar' ? HINT_MIN : piece.offsetWidth)
+      need = Math.max(need, piece.dataset.role === 'hintbar' ? HINT_MIN : captionFloor(piece))
     }
     setPlace(centrePlace(node.clientWidth, left.offsetWidth, right.offsetWidth, need))
     // The lane: how far the centre zone's top stands above the stage's foot. Read off the
@@ -131,6 +147,9 @@ export default function BottomRow(): React.JSX.Element {
       >
         <HintBar />
         <ResetPill />
+        {/* 2026-11-12 — above the pill (`column-reverse`), aligned as it is. A new batch is a new
+            element, so it enters again. */}
+        {fed && <FedCaption key={fed.batch} view={fed} />}
       </div>
       <div
         style={s(
