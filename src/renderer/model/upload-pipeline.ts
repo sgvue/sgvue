@@ -902,8 +902,9 @@ export async function openDemo(): Promise<void> {
 }
 
 /**
- * The recents list as the designed library: same pills, same popover, same "open all N" copy
- * (fidelity contract, allowed deviations). The swatch is the design's own model palette by
+ * The recents list as the designed library: same pills, same "open all N" copy (fidelity
+ * contract, allowed deviations; the sidebar's library popover is not in the port since
+ * 2026-11-08). The swatch is the design's own model palette by
  * position, skipping its grey, so two pills never share a colour.
  */
 export function libraryOf(
