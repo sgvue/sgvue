@@ -2005,4 +2005,74 @@ describe('Locate… a second time after a located model did not end up loaded', 
     expect.soft(loadedKeys(), 'the loaded models').toEqual(['ARC', 'MEP', 'STR'])
     expect.soft(alreadyRows(), 'no "already open" row').toBe(0)
   })
+
+  /*
+   * 2026-11-12 — checks only. The other STR.ifc opened as an ordinary pick while the project's
+   * STR (m2) is missing joins under the same model key, but it is not the project's model: a save
+   * writes m2 exactly as the opened file had it, with its references, and the other file as a
+   * model of its own under another id. Nothing is merged by key.
+   */
+  /** ARC booted with STR missing, then the other STR.ifc opened by the user and joined. */
+  async function otherStrJoined(saved: Saved): Promise<void> {
+    await arcBooted(saved)
+    await openPaths([OTHER_STR])
+    await until('the other STR.ifc to join', () => loadedKeys().join() === 'ARC,STR' && s().ready, 30_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(replaceAsked).toEqual([])
+  }
+
+  it('S1. the other STR.ifc joined while STR is missing: a save writes m2 as the file had it, and the other file as a model of its own', async () => {
+    const saved = await savedProject()
+    await otherStrJoined(saved)
+    const id = saved.idOf('STR')
+    const m2 = saved.file.models.find((m) => m.id === id)!
+    // One of the other file's elements hidden on screen, not the one the project hides.
+    const otherEl = s().federation.elements.find((e) => e.model === 'STR' && e.guid && !saved.strHidden.includes(e.guid))!
+    s().hide([otherEl.id])
+
+    expect.soft(projectCarried()?.ids ?? [], 'projectCarried().ids').toContain(id)
+    expect.soft(locateRows(id), 'STR’s Locate… row').toBe(1)
+    const p = wouldSave()
+    expect(p, 'a save').not.toBeNull()
+    if (!p) return
+    expect.soft(JSON.stringify(p.models.find((m) => m.id === id)), 'm2 written exactly as the opened file had it').toBe(JSON.stringify(m2))
+    expect.soft(refsOf(p.visibility.hidden, id), 'm2’s hidden element').toBe(refsOf(saved.file.visibility.hidden, id))
+    const others = p.models.filter((m) => m.name === 'STR.ifc' && m.id !== id)
+    expect.soft(others.map((m) => m.absPath), 'the other STR.ifc, one model of its own').toEqual([OTHER_STR])
+    const otherId = others[0]?.id
+    expect.soft(
+      p.visibility.hidden.filter(([, g]) => g === otherEl.guid).map(([m]) => m),
+      'the element hidden on screen, under the other file’s id'
+    ).toEqual(otherId ? [otherId] : ['(no separate model)'])
+    const ids = p.models.map((m) => m.id)
+    expect.soft(new Set(ids).size, `model ids unique: ${ids.join(', ')}`).toBe(ids.length)
+  })
+
+  it('S2. then STR located (Replace model? yes): one STR.ifc in the save, m2, at its real path, its hidden element restored; nothing left of the other file', async () => {
+    const saved = await savedProject()
+    await otherStrJoined(saved)
+    const id = saved.idOf('STR')
+    replaceAnswer = true
+    await secondLocateLoadsStr(saved)
+    expect.soft(replaceAsked, 'the "Replace model?" question').toEqual(['STR.ifc'])
+    expect.soft(hiddenGuids('STR'), 'STR’s hidden element on screen').toEqual(saved.strHidden)
+    const p = wouldSave()
+    expect(p, 'a save').not.toBeNull()
+    if (!p) return
+    expect.soft(p.models.filter((m) => m.name === 'STR.ifc').map((m) => [m.id, m.absPath]), 'the STR.ifc models in the save').toEqual([[id, path3('STR')]])
+    expect.soft(p.models.filter((m) => m.absPath === OTHER_STR), 'the other STR.ifc in the save').toEqual([])
+    expect.soft(refsOf(p.visibility.hidden, id), 'm2’s hidden element in the save').toBe(refsOf(saved.file.visibility.hidden, id))
+  })
+
+  it('S3. guard — STR just missing, nothing else opened: a save writes m2 and its references as the file had them', async () => {
+    const saved = await savedProject()
+    await arcBooted(saved)
+    const id = saved.idOf('STR')
+    const p = wouldSave()
+    expect(p, 'a save').not.toBeNull()
+    if (!p) return
+    expect(JSON.stringify(p.models.find((m) => m.id === id))).toBe(JSON.stringify(saved.file.models.find((m) => m.id === id)))
+    expect(refsOf(p.visibility.hidden, id)).toBe(refsOf(saved.file.visibility.hidden, id))
+    expect(p.models.filter((m) => m.name === 'STR.ifc')).toHaveLength(1)
+  })
 })
