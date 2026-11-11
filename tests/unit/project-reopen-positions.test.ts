@@ -1417,3 +1417,248 @@ describe('the project’s own boot failing while a model located into it is on i
     expect(drawnModels.size).toBe(0)
   })
 })
+
+describe('a second project opened while the first project’s models are still loading', () => {
+  /**
+   * 2026-11-11 — checks only. File › Open Project… while another project's batch is still joining
+   * (its `join` held inside `viewer.addModel`): `openProjectMessage` takes the fresh start
+   * (`startOver`: `disposeUploads` bumps the pipeline's `epoch`, `resetUnshown` bumps the
+   * federation's `gen` and terminates the worker) and queues the second project's models. Three
+   * faults this pins, each on today's code:
+   *
+   *   1. the second project reads `{ open: true, loading: false }` at once — `installProject`'s
+   *      store subscriber sees the first project's ticked rows during `startOver` (`sawRows`) and
+   *      then none (`uploads: []`) while nothing is booted, and settles before any model loaded;
+   *   2. when the first project's held join then fails, its `undoBatch` closes the failed key in
+   *      the **new** worker (`parse.close`), under the second project's model of the same key, and
+   *      empties boot state (`resetBoot`) the second load is relying on — that model's geometry
+   *      then fails with `no open model "<key>" — parse it first`;
+   *   3. `join()`'s catch calls `bootFailed` for the stale load with no `epoch` check: its banner
+   *      goes over the newer load and `booted` goes false.
+   *
+   * The same saved file is opened twice, so both projects have the same model keys. The first
+   * project's join is held only for the calls made before the second open; the second's go through.
+   * Its failure is released at three moments: during the second project's first parse (A), after
+   * that model asked for its geometry and before it joined (B), and after the second project has
+   * joined (C). D is the guard: a project whose every file fails, nothing else in flight.
+   */
+  const s = (): ReturnType<typeof useShell.getState> => useShell.getState()
+  const realAddModel = viewerImpl.addModel
+
+  let posted: () => ParseRequest[] = () => []
+  let forgetPosted: () => void = () => undefined
+  const geometryPosted = (key: string): boolean => posted().some((r) => r.type === 'geometry' && r.modelKey === key)
+
+  beforeEach(() => {
+    const spy = vi.spyOn(FakeParseWorker.prototype, 'postMessage')
+    posted = () => spy.mock.calls.map(([r]) => r)
+    forgetPosted = () => spy.mockClear()
+  })
+  afterEach(() => {
+    viewerImpl.addModel = realAddModel
+  })
+
+  /** Each element of these models: exactly its file's corners, within 1 mm. */
+  function cornersOff(keys: readonly Key[]): string[] {
+    const now = drawnWorld()
+    const ids = idsByName()
+    const out: string[] = []
+    for (const key of keys) {
+      for (const b of SPECS[key].boxes) {
+        const pts = now.get(ids.get(b.name) ?? '')
+        if (!pts) {
+          out.push(`${b.name}: not drawn`)
+          continue
+        }
+        const corners = boxCorners(b)
+        for (const c of corners) {
+          const d = Math.min(...pts.map((p) => dist(p, c)))
+          if (d > TOL_M) out.push(`${b.name}: nearest drawn vertex ${(d * 1000).toFixed(1)} mm from its corner ${fmt(c)}`)
+        }
+      }
+    }
+    return out
+  }
+
+  /** Every model in the scene streamed against, and handed, the store's one offset. */
+  function oneOffset(): string[] {
+    const store = useShell.getState().offset
+    const inScene = new Set(drawnModels.keys())
+    const out: string[] = []
+    for (const g of log.geometry) {
+      if (!inScene.has(g.modelKey) || !g.summary) continue
+      if (JSON.stringify(g.summary.offset) !== JSON.stringify(store)) out.push(`${g.modelKey} streamed against ${JSON.stringify(g.summary.offset)}; the store's is ${JSON.stringify(store)}`)
+    }
+    for (const [key, m] of drawnModels) if (JSON.stringify(m.offset) !== JSON.stringify(store)) out.push(`${key} handed ${JSON.stringify(m.offset)}; the store's is ${JSON.stringify(store)}`)
+    return out
+  }
+
+  const hiddenGuids = (key: Key): string[] =>
+    Object.keys(s().hidden)
+      .map((id) => s().byId.get(Number(id)))
+      .filter((e) => e?.model === key)
+      .map((e) => e!.guid)
+      .sort()
+
+  interface Saved {
+    file: ProjectFile
+    strHidden: string[]
+  }
+
+  /** ARC and STR loaded one at a time; one STR element hidden and ARC coloured by the user; saved; a fresh window. */
+  async function savedProject(): Promise<Saved> {
+    await loadOneByOne(['ARC', 'STR'])
+    const str = s().federation.elements.find((e) => e.model === 'STR' && e.guid)!
+    s().hide([str.id])
+    s().setModelColor('ARC', MC[4])
+    const strHidden = hiddenGuids('STR')
+    expect(strHidden).toEqual([str.guid])
+    const file = save()
+    freshWindow()
+    forgetPosted()
+    return { file, strHidden }
+  }
+
+  type Moment = 'A' | 'B' | 'C'
+
+  let snapN3 = 5000
+  /** Every sample where the second project did not read as open and loading, and its snapshot as `loading`. */
+  function sampler(): { take: (when: string) => void; seen: string[] } {
+    const seen: string[] = []
+    return {
+      seen,
+      take: (when) => {
+        const status = projectStatus()
+        const reason = snapshotFor(++snapN3).reason
+        if (status.open && status.loading && reason === 'loading') return
+        if (seen.length < 6) seen.push(`${when}: projectStatus ${JSON.stringify(status)}, snapshotFor(n).reason ${String(reason)}`)
+      }
+    }
+  }
+
+  async function run(moment: Moment): Promise<void> {
+    const saved = await savedProject()
+
+    // Project 1: every `addModel` made before the second open is held, then failed when asked.
+    let holding = true
+    let failFirst: (() => void) | null = null
+    const FIRST_FAILURE = 'the scene could not take the first project’s model'
+    viewerImpl.addModel = ((...args: never[]) => {
+      if (!holding) return (realAddModel as (...a: unknown[]) => unknown)(...args)
+      return new Promise<void>((_, reject) => {
+        failFirst = () => reject(new Error(FIRST_FAILURE))
+      })
+    }) as (...args: never[]) => unknown
+    await reopen(saved.file)
+    await until('the first project’s join to start', () => failFirst !== null)
+    expect(s().booted).toBe(false)
+
+    // Project 2: the same file, opened while project 1's join is held.
+    holding = false
+    forgetPosted()
+    const mark = log.handled.length
+    // The one-offset check reads the second project's streams only.
+    log.geometry.length = 0
+    const handledSince = (): string[] => log.handled.slice(mark)
+    await reopen(saved.file)
+    const during = sampler()
+    during.take('right after the second openProjectMessage resolved')
+
+    // Sample every 50 ms of fake time until `done()`; never past the second project's commit.
+    const sampleUntil = async (what: string, done: () => boolean, maxMs = 20_000): Promise<boolean> => {
+      for (let t = 0; t < maxMs; t += 50) {
+        if (done()) return true
+        if (!s().booted) during.take(`${what}, t+${t} ms`)
+        await vi.advanceTimersByTimeAsync(50)
+      }
+      return done()
+    }
+
+    let reached: boolean
+    if (moment === 'A') {
+      // The second project's ARC is parsing in the new worker; nothing of it has asked for geometry.
+      reached = await sampleUntil('before A', () => handledSince().includes('parse ARC'))
+      await vi.advanceTimersByTimeAsync(300)
+      during.take('at A')
+      expect(geometryPosted('ARC'), handledSince().join(', ')).toBe(false)
+    } else if (moment === 'B') {
+      // Its ARC has parsed and asked for its geometry (queued behind STR's parse), and has not joined.
+      reached = await sampleUntil('before B', () => geometryPosted('ARC'))
+      during.take('at B')
+      expect(handledSince().includes('geometry ARC'), handledSince().join(', ')).toBe(false)
+      expect(loadedKeys()).toEqual([])
+    } else {
+      // Every model of the second project has joined, and its restore has had time to run.
+      reached = await sampleUntil('before C', () => s().booted && loadedKeys().join() === 'ARC,STR', 30_000)
+      await vi.advanceTimersByTimeAsync(2000)
+    }
+    expect(reached, `moment ${moment} reached; handled since the second open: ${handledSince().join(', ')}`).toBe(true)
+
+    // The first project's held join fails now.
+    failFirst!()
+    await sampleUntil('after the first project’s failure', () => s().booted, 20_000)
+    // Time enough that "not yet" is not the reason.
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    // a. While the second project's models loaded, it read as loading, and Save answered `loading`.
+    expect.soft(during.seen, 'samples while the second project’s models loaded').toEqual([])
+
+    // b. Every model of the second project loaded and drawn, on the store's one offset, where its file puts it.
+    expect.soft(loadedKeys(), `loaded models; handled since the second open: ${handledSince().join(', ')}`).toEqual(['ARC', 'STR'])
+    expect.soft([...drawnModels.keys()].sort(), 'drawn models').toEqual(['ARC', 'STR'])
+    expect.soft(oneOffset(), handledSince().join(', ')).toEqual([])
+    expect.soft(cornersOff(KEYS), handledSince().join(', ')).toEqual([])
+    expect.soft(s().uploads.filter((u) => u.error).map((u) => `${u.name}: ${u.stage}`), 'error rows').toEqual([])
+    expect.soft(s().uploads.filter((u) => /parse it first/.test(u.stage)).map((u) => `${u.name}: ${u.stage}`), 'rows saying "parse it first"').toEqual([])
+    expect.soft(s().initErr, 'the landing page’s banner').toBe('')
+    expect.soft(s().initErr.includes(FIRST_FAILURE), 'the first project’s failure in the banner').toBe(false)
+    expect.soft(s().booted, 'booted').toBe(true)
+    expect.soft(s().ready, 'ready').toBe(true)
+
+    // c. The second project settled, with its stored state restored, nothing carried, Save working.
+    expect.soft(projectStatus(), 'projectStatus() at the end').toEqual({ open: true, loading: false })
+    expect.soft(hiddenGuids('STR'), 'STR’s hidden element, restored by GlobalId').toEqual(saved.strHidden)
+    expect.soft(s().modelColors.ARC, 'ARC’s user colour, restored').toBe(MC[4])
+    expect.soft([...(projectCarried()?.ids ?? [])], 'projectCarried().ids').toEqual([])
+    const snap = snapshotFor(++snapN3)
+    expect.soft(snap.reason, 'snapshotFor(n).reason at the end').toBeNull()
+    if (snap.text) {
+      const read = readProject(snap.text)
+      expect.soft(read.ok).toBe(true)
+      if (read.ok) expect.soft(read.project.models.map((m) => m.name).sort(), 'the models in the save').toEqual(saved.file.models.map((m) => m.name).sort())
+    }
+  }
+
+  it('A. the first project’s join fails while the second project’s first model is parsing: the second loads whole, on one offset, restored, with no banner', async () => {
+    await run('A')
+  })
+
+  it('B. the first project’s join fails after the second project’s ARC asked for its geometry and before it joined: the second loads whole, on one offset, restored, with no banner', async () => {
+    await run('B')
+  })
+
+  it('C. the first project’s join fails after the second project has joined: the second stays booted, restored, with no banner', async () => {
+    await run('C')
+  })
+
+  it('D. guard — a project whose every file fails to load, nothing else in flight, settles on the landing page with a banner and an error row per model', async () => {
+    await loadOneByOne(['ARC', 'STR'])
+    const file = save()
+    freshWindow()
+    // Every file the project names fails to be read.
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 404, blob: async () => new Blob([]) }))
+    await reopen(file)
+    expect(projectStatus()).toEqual({ open: true, loading: true })
+    await until('every row to fail', () => s().uploads.length === 2 && s().uploads.every((u) => u.error), 20_000)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(projectStatus()).toEqual({ open: true, loading: false })
+    expect(s().booted).toBe(false)
+    expect(s().initErr).toMatch(/^Could not open that model — could not read the file \(404\)\.$/)
+    expect(s().uploads.map((u) => [u.name, u.error, u.stage]).sort()).toEqual([
+      ['ARC.ifc', true, 'could not read the file (404)'],
+      ['STR.ifc', true, 'could not read the file (404)']
+    ])
+    expect(loadedKeys()).toEqual([])
+    expect([...(projectCarried()?.ids ?? [])].sort()).toEqual(file.models.map((m) => m.id).sort())
+  })
+})

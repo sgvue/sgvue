@@ -1571,6 +1571,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-11 — **Schedules call sites that cannot change the table repaint `'panes'`**, and a double repaint is one; selecting a column still repaints the table.
 - 2026-11-11 — **the schedule engine's number-as-text pattern is unambiguous (`WHOLE_NUMBER`), a yes/no filter reads `boolOfText`, an unfilled one reads "false" as before, a class is listed once, and an unknown operator's rule is dropped on load** (`OPS`, `isOp`).
 - 2026-11-11 — **`exportDatabase` sets `PRAGMA query_only` again after sql.js's export**, which resets it; **a schedule's core key and font name are own keys** (`Object.hasOwn`).
+- 2026-11-11 — **a load that was replaced fails in silence**: a project's own fresh start is not its files failing (`startingOver` around `startOver()`, `model/project.ts`, which the store subscriber's loading branch ignores — a second project opened over a loading one used to read as loaded at once); a stale batch's failed join undoes nothing and resolves `false` (`joinBatch`, `model/federation-store.ts`), so it closes no model of the newer load; `join()`'s `bootFailed` runs only for the current load (`mine === epoch`, `model/upload-pipeline.ts`). The fallback for a project whose every file fails is unchanged.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 

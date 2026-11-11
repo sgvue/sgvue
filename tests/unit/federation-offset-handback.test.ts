@@ -155,3 +155,49 @@ describe('a model forgotten while its boot batch is joining keeps the offset', (
     await joining
   })
 })
+
+describe('a batch replaced while it joins, whose join then fails, has nothing to undo', () => {
+  /**
+   * 2026-11-11 — `joinBatch`: `resetUnshown` (a newer pick on the landing page, or a second
+   * project's fresh start) already took everything of the batch out. Its failure afterwards
+   * resolves `false`, as the other stale exits do, and closes nothing in the newer load's worker —
+   * where a model of the same key may be open — nor touches the newer load's boot state.
+   */
+  let failJoin: (e: Error) => void = () => {}
+  beforeEach(() => {
+    const held = new Promise<void>((_ok, no) => (failJoin = no))
+    held.catch(() => {})
+    fed.attach(
+      stubViewer({
+        addModel: async (key: string) => {
+          if (key === 'A') await held
+        },
+        removeModel: () => [],
+        debug: () => ({}),
+        elementIds: () => []
+      })
+    )
+  })
+
+  it('resolves false, posts no close, and leaves the newer boot’s offset', async () => {
+    fakeParse()
+    const closed: string[] = []
+    const parse = (fed as unknown as { parse: { close: (k: string) => void } }).parse
+    parse.close = (k: string) => void closed.push(k)
+    const a = await fed.prepare(pick('A'), () => {})
+    const joining = fed.addBatch([a])
+    await Promise.resolve()
+    fed.resetUnshown()
+    // The newer load: a model of the same key, booted on an offset of its own.
+    const n = await fed.prepare(pick('A'), () => {})
+    expect(await fed.addBatch([{ ...n, index: { ...n.index, modelKey: 'N' } }])).toBe(true)
+    const { useShell } = await import('../../src/renderer/state/shell')
+    const offsetN = useShell.getState().offset
+    closed.length = 0
+    failJoin(new Error('the scene could not take A'))
+    expect(await joining).toBe(false)
+    expect(closed).toEqual([])
+    expect(useShell.getState().offset).toEqual(offsetN)
+    expect(fed.current.models.map((m) => m.meta.modelKey)).toEqual(['N'])
+  })
+})

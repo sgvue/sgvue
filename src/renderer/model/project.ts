@@ -1050,6 +1050,12 @@ export const projectCarried = (): Carried | null => carried
 /** Whether a project is open, and whether its models are still loading — for the tests. */
 export const projectStatus = (): { open: boolean; loading: boolean } => ({ open: project.open, loading: project.loading })
 
+/**
+ * 2026-11-11 — true while the project's own fresh start clears what was open: the old load's
+ * rows leaving then are not this project's, and must not read as its every file failing.
+ */
+let startingOver = false
+
 /** Main read a project (or refused one): replace what is open with it. */
 export async function openProjectMessage(msg: ProjectOpened): Promise<void> {
   if (!msg.ok) return refuse(msg.name, msg.message)
@@ -1066,7 +1072,12 @@ export async function openProjectMessage(msg: ProjectOpened): Promise<void> {
   project.bound = new Map()
   locating.clear()
   snapshots.clear()
-  startOver()
+  startingOver = true
+  try {
+    startOver()
+  } finally {
+    startingOver = false
+  }
   useShell.setState({ assignedColors: {} })
   // Its lists are the app's from now on — before any model has loaded, so a federation change
   // never reads the building's `localStorage` list over them — and every model of the file is
@@ -1142,6 +1153,7 @@ export function installProject(): () => void {
       for (const id of [...carried.views.keys()]) if (!live.has(id)) carried.views.delete(id)
     }
     if (project.loading) {
+      if (startingOver) return
       // Every one of the project's files failed to load: no batch joined, so no restore will
       // run. The landing page is back with the rows saying why, and that is the project as opened.
       const inFlight = s.uploads.some((u) => !u.error)

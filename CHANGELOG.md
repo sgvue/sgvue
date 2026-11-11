@@ -24,6 +24,12 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   reading as loading: the Locate… rows stayed beside models that were open, what the project had
   saved for them (hidden elements, colours) was not put back, and Save Project refused. The
   project now finishes loading, and the located models get what it saved for them.
+- **A project opened while another is still loading waits for its own models.** The second
+  project read as loaded before any of its models were: until they were in, it could show as
+  changed, Save Project answered that no model was open, and Locate… acted on a project not yet
+  restored. It now reads as loading until its own models are in and what it saved is back. Two
+  safeguards came with it: a load that fails after it was replaced no longer closes a model of
+  the newer load, and no longer puts its error over it.
 - **The selection dimension fits a building that is turned in its file's coordinates.** The box
   and its three dimensions are square with the grids again and read the element's own length,
   width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.

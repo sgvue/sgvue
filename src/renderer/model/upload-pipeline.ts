@@ -508,7 +508,8 @@ async function join(hold: Promise<unknown>): Promise<void> {
     // `resetUnshown` would hand the offset back under it (the next one choosing its own, kilometres
     // off) and cancel the worker under it. `removeModel` keeps the offset while one is on its way.
     if (mine === epoch) for (const m of [...fed.current.models]) await fed.removeModel(m.meta.modelKey)
-    bootFailed(err)
+    // 2026-11-11 — a load replaced meanwhile fails in silence: its banner would stand over the newer one.
+    if (mine === epoch) bootFailed(err)
     // 2026-11-11 — `then` will not run: whoever queued the batch (a project) is told, so it is not
     // left loading. Not for a load that was replaced or torn down meanwhile.
     if (mine === epoch) await runFailed(afterJoin)
