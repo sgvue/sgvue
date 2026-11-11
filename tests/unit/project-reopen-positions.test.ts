@@ -58,6 +58,10 @@ import type { ProjectLocated, ProjectModelFile } from '../../src/shared/ipc-cont
 import type { Viewer } from '../../src/renderer/viewer/viewer-core'
 import { boxCentre, boxCorners, boxModel, type BoxSpec, type ModelSpec } from './synthetic-boxes'
 import { memoryStorage, resetShell } from './stub-viewer'
+// 2026-11-11 — for the project-state checks at the end of this file.
+import { MC } from '../../src/shared/colors'
+import { projectCarried } from '../../src/renderer/model/project'
+import type { ProjectRef } from '../../src/shared/project-file'
 
 /** 1 mm, in the metres the contract speaks. */
 const TOL_M = 1e-3
@@ -1117,5 +1121,297 @@ describe('the offset handed back when nobody stands with it', () => {
     expect(log.geometry[0].summary?.offset).toEqual(soloOffset('STR'))
     expect(s().offset).toEqual(soloOffset('STR'))
     expect(cornersOff('STR')).toEqual([])
+  })
+})
+
+describe('the project’s own boot failing while a model located into it is on its way: the project still settles', () => {
+  /**
+   * 2026-11-11 — checks only. `openProjectMessage` queues the project's own models with
+   * `then: restore(…)`, and `join` (`upload-pipeline.ts`) runs that `then` only after the batch has
+   * joined. When the boot batch fails — its join throws, or it commits and is refused for `the
+   * model contains no geometry` — `then` never runs; the only fallback is `installProject`'s store
+   * subscriber, which settles only while no row is in flight and the viewer is not booted. A model
+   * located meanwhile is a row in flight, and then boots the viewer, so the project never settles:
+   * `loading` stays `true`, the Locate… rows stay for loaded models, `restoreLocated` keeps
+   * returning early, and Save answers `loading`.
+   *
+   * Every case below drives the sequence of the describe above (cases 2 and 3) through the real
+   * pipeline and project code, then asserts the **project's** end state, given 10 s of fake time
+   * so "not yet" cannot be the reason. A, B and C pin the defect; D is the guard — nothing
+   * located, the landing page as it is today.
+   */
+  const MEP: ModelSpec = {
+    name: 'MEP',
+    guidPrefix: '3',
+    boxes: [
+      { name: 'MEP duct', at: [20000, 25000, 6000], size: [5000, 600, 400] },
+      { name: 'MEP riser', at: [26000, 25000, 0], size: [500, 500, 6000] }
+    ]
+  }
+  const ALL = { ARC: SPECS.ARC, STR: SPECS.STR, MEP } as const
+  type Three = keyof typeof ALL
+  const THREE = Object.keys(ALL) as Three[]
+  const bytes3 = Object.fromEntries(THREE.map((k) => [k, new TextEncoder().encode(boxModel(ALL[k]))])) as Record<Three, Uint8Array>
+  const path3 = (k: Three): string => `/projects/synthetic/review/models/${k}.ifc`
+  const key3 = (path: string): Three => THREE.find((k) => path3(k) === path)!
+  const picked3 = (k: Three): { path: string; name: string; size: number } => ({ path: path3(k), name: `${k}.ifc`, size: bytes3[k].length })
+  const EMPTY_ARC = new TextEncoder().encode(boxModel({ name: 'ARC', guidPrefix: '1', boxes: [] }))
+
+  let posted: () => ParseRequest[] = () => []
+  let forgetPosted: () => void = () => undefined
+  const geometryPosted = (key: string): (ParseRequest & { type: 'geometry' }) | undefined =>
+    posted().find((r): r is ParseRequest & { type: 'geometry' } => r.type === 'geometry' && r.modelKey === key)
+  /** A fetch of STR's file held until released (case C), else answered at once. */
+  let holdStrFetch: Promise<void> | null = null
+
+  const s = (): ReturnType<typeof useShell.getState> => useShell.getState()
+  const realAddModel = viewerImpl.addModel
+  const realArc = bytes3.ARC
+  const realCost = { ...COST_MS }
+
+  beforeEach(() => {
+    const w = window as unknown as { sgvue: Record<string, unknown> }
+    w.sgvue.admitPaths = async (paths: string[]) => ({ files: paths.map((p) => picked3(key3(p))), refused: [] })
+    vi.stubGlobal('fetch', async (url: string) => {
+      const key = key3(decodeURIComponent(url.replace('sgvue-file://t/', '')))
+      if (key === 'STR' && holdStrFetch) await holdStrFetch
+      const blob = new Blob([bytes3[key] as BlobPart])
+      blobBytes.set(blob, bytes3[key])
+      return { ok: true, status: 200, blob: async () => blob }
+    })
+    const spy = vi.spyOn(FakeParseWorker.prototype, 'postMessage')
+    posted = () => spy.mock.calls.map(([r]) => r)
+    forgetPosted = () => spy.mockClear()
+  })
+  afterEach(() => {
+    viewerImpl.addModel = realAddModel
+    bytes3.ARC = realArc
+    Object.assign(COST_MS, realCost)
+    holdStrFetch = null
+  })
+
+  /** Each element of these models: exactly its file's corners, within 1 mm. */
+  function cornersOff(keys: readonly Three[]): string[] {
+    const now = drawnWorld()
+    const ids = idsByName()
+    const out: string[] = []
+    for (const key of keys) {
+      for (const b of ALL[key].boxes) {
+        const pts = now.get(ids.get(b.name) ?? '')
+        if (!pts) {
+          out.push(`${b.name}: not drawn`)
+          continue
+        }
+        const corners = boxCorners(b)
+        for (const c of corners) {
+          const d = Math.min(...pts.map((p) => dist(p, c)))
+          if (d > TOL_M) out.push(`${b.name}: nearest drawn vertex ${(d * 1000).toFixed(1)} mm from its corner ${fmt(c)}`)
+        }
+      }
+    }
+    return out
+  }
+
+  /** Every model in the scene streamed against, and handed, the store's one offset. */
+  function oneOffset(): string[] {
+    const store = useShell.getState().offset
+    const inScene = new Set(drawnModels.keys())
+    const out: string[] = []
+    for (const g of log.geometry) {
+      if (!inScene.has(g.modelKey) || !g.summary) continue
+      if (JSON.stringify(g.summary.offset) !== JSON.stringify(store)) out.push(`${g.modelKey} streamed against ${JSON.stringify(g.summary.offset)}; the store's is ${JSON.stringify(store)}`)
+    }
+    for (const [key, m] of drawnModels) if (JSON.stringify(m.offset) !== JSON.stringify(store)) out.push(`${key} handed ${JSON.stringify(m.offset)}; the store's is ${JSON.stringify(store)}`)
+    return out
+  }
+
+  const hiddenGuids = (key: Three): string[] =>
+    Object.keys(s().hidden)
+      .map((id) => s().byId.get(Number(id)))
+      .filter((e) => e?.model === key)
+      .map((e) => e!.guid)
+      .sort()
+  const refsOf = (refs: readonly ProjectRef[], id: string): string => JSON.stringify(refs.filter(([m]) => m === id))
+
+  interface Saved {
+    file: ProjectFile
+    idOf: (k: Three) => string
+    /** STR's one hidden element, by GlobalId. */
+    strHidden: string[]
+  }
+
+  /**
+   * The three loaded one at a time; one STR element hidden and MEP coloured by the user, through
+   * the store's own actions; saved; then a fresh window.
+   */
+  async function savedProject(): Promise<Saved> {
+    for (const [i, k] of THREE.entries()) {
+      await openPaths([path3(k)])
+      await until(`${k} to load`, () => settled(THREE.slice(0, i + 1)))
+    }
+    const str = s().federation.elements.find((e) => e.model === 'STR' && e.guid)!
+    s().hide([str.id])
+    s().setModelColor('MEP', MC[4])
+    const strHidden = hiddenGuids('STR')
+    expect(strHidden).toEqual([str.guid])
+    const file = save()
+    const idOf = (k: Three): string => file.models.find((m) => m.name === `${k}.ifc`)!.id
+    expect(JSON.parse(refsOf(file.visibility.hidden, idOf('STR')))).toHaveLength(1)
+    freshWindow()
+    forgetPosted()
+    return { file, idOf, strHidden }
+  }
+
+  /** Reopened with only ARC admitted: STR and MEP get their Locate… rows. */
+  async function reopenArcOnly(file: ProjectFile): Promise<void> {
+    await openProjectMessage({
+      ok: true,
+      name: 'review',
+      text: JSON.stringify(file),
+      models: file.models.map((m) => {
+        const k = m.name.replace(/\.ifc$/, '') as Three
+        return { id: m.id, file: k === 'ARC' ? picked3(k) : null, refused: null }
+      })
+    })
+  }
+
+  let snapN2 = 1000
+  /**
+   * The project's end state, after the located models are in the scene: settled, the located
+   * models' rows gone (the missing ones' kept), the saved state of the located models restored,
+   * and Save answering a project that still lists all three, the failed ARC carried.
+   */
+  async function projectEndState(saved: Saved, located: readonly Three[], missing: readonly Three[]): Promise<void> {
+    // Time enough that "not yet" is not the reason.
+    await vi.advanceTimersByTimeAsync(10_000)
+    const { file, idOf, strHidden } = saved
+
+    // 1. The load is over.
+    expect.soft(projectStatus(), 'projectStatus() after the located models joined').toEqual({ open: true, loading: false })
+
+    // 2. No Locate… and no error row for a model that is loaded; a still-missing one keeps its Locate….
+    for (const k of located) {
+      expect.soft(s().uploads.filter((u) => u.locate === idOf(k)).map((u) => [u.name, u.stage]), `${k}'s Locate… rows`).toEqual([])
+      expect.soft(s().uploads.filter((u) => u.name === `${k}.ifc` && u.error).map((u) => u.stage), `${k}'s error rows`).toEqual([])
+    }
+    for (const k of missing) expect.soft(s().uploads.filter((u) => u.locate === idOf(k)).length, `${k}'s Locate… row`).toBe(1)
+
+    // 3. What the project stored of the located models is back, by GlobalId.
+    if (located.includes('STR')) expect.soft(hiddenGuids('STR'), 'STR’s hidden element, restored by GlobalId').toEqual(strHidden)
+    if (located.includes('MEP')) expect.soft(s().modelColors.MEP, 'MEP’s user colour, restored').toBe(MC[4])
+
+    // What is carried: ARC (failed) and every model still missing — never a located one.
+    expect.soft([...(projectCarried()?.ids ?? [])].sort(), 'projectCarried().ids').toEqual((['ARC', ...missing] as Three[]).map(idOf).sort())
+
+    // 4. Save works again and loses nothing.
+    const snap = snapshotFor(++snapN2)
+    expect.soft(snap.reason, 'snapshotFor(n).reason').not.toBe('loading')
+    expect.soft(snap.text, 'snapshotFor(n).text').not.toBeNull()
+    if (snap.text) {
+      const read = readProject(snap.text)
+      expect.soft(read.ok).toBe(true)
+      if (read.ok) {
+        // Every model the file had, none lost and none added — in any order: a save writes the loaded
+        // models first and the carried ones after them (`carryForward`), which is not this check's rule.
+        const entries = (p: typeof file): string[] => p.models.map((m) => `${m.id} ${m.name}`).sort()
+        expect.soft(entries(read.project), 'the models in the save').toEqual(entries(file))
+        expect.soft(refsOf(read.project.visibility.hidden, idOf('STR')), 'STR’s hidden element in the save').toBe(refsOf(file.visibility.hidden, idOf('STR')))
+      }
+    }
+
+    // 5. Positions still right: one offset, every located element where its file puts it.
+    expect.soft(oneOffset(), log.handled.join(', ')).toEqual([])
+    expect.soft(cornersOff(located), log.handled.join(', ')).toEqual([])
+    expect.soft(drawnModels.has('ARC')).toBe(false)
+  }
+
+  it('A. the boot join throws while a located STR is in flight, then MEP is located: the project settles onto STR and MEP', async () => {
+    const saved = await savedProject()
+    let failArc: (() => void) | null = null
+    viewerImpl.addModel = ((key: string, ...rest: never[]) => {
+      if (key !== 'ARC') return (realAddModel as (...a: unknown[]) => unknown)(key, ...rest)
+      return new Promise<void>((_, reject) => {
+        failArc = () => reject(new Error('the scene could not take ARC'))
+      })
+    }) as (...args: never[]) => unknown
+
+    await reopenArcOnly(saved.file)
+    await until('ARC’s boot join to start', () => failArc !== null)
+    expect(s().booted).toBe(false)
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await vi.advanceTimersByTimeAsync(300)
+    locateAnswer = { file: picked3('MEP'), refused: null }
+    await locateModel(saved.idOf('MEP'))
+    await until('STR’s geometry request to be posted', () => geometryPosted('STR') !== undefined)
+    // The moment: STR in flight, MEP parsing, ARC not joined.
+    expect(log.handled.at(-1), log.handled.join(', ')).toBe('parse MEP')
+    expect(loadedKeys()).toEqual([])
+
+    failArc!()
+    await until('STR and MEP to load', () => s().booted && s().ready && loadedKeys().join() === 'MEP,STR')
+    await projectEndState(saved, ['STR', 'MEP'], [])
+  })
+
+  it('B. the boot refused for no geometry while a located STR waits prepared, then MEP is located: the project settles onto STR and MEP', async () => {
+    const saved = await savedProject()
+    bytes3.ARC = EMPTY_ARC
+    COST_MS.parse = 100
+    COST_MS.geometry = 50
+    await reopenArcOnly(saved.file)
+    await until('ARC’s row to be done', () => s().uploads.some((u) => u.name === 'ARC.ifc' && u.done))
+    expect(s().booted).toBe(false)
+
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('STR’s geometry to be streamed', () => log.geometry.some((g) => g.modelKey === 'STR' && g.summary !== null))
+    expect(drawnModels.has('STR')).toBe(false)
+    await until('the boot to be refused', () => /no geometry/.test(s().initErr), 5000)
+    expect(drawnModels.has('STR')).toBe(false)
+
+    locateAnswer = { file: picked3('MEP'), refused: null }
+    await locateModel(saved.idOf('MEP'))
+    await until('STR and MEP to be in the scene', () => drawnModels.has('STR') && drawnModels.has('MEP') && s().booted && s().ready, 30_000)
+    await projectEndState(saved, ['STR', 'MEP'], [])
+  })
+
+  it('C. the boot refused for no geometry while a located STR is still parsing: STR boots alone, the project settles onto it, MEP stays missing', async () => {
+    const saved = await savedProject()
+    bytes3.ARC = EMPTY_ARC
+    COST_MS.parse = 100
+    COST_MS.geometry = 50
+    await reopenArcOnly(saved.file)
+    await until('ARC’s row to be done', () => s().uploads.some((u) => u.name === 'ARC.ifc' && u.done))
+    expect(s().booted).toBe(false)
+
+    // Inside ARC's 1 100 ms hold, Locate… STR — whose parse holds the worker for 4 s, past the refusal.
+    COST_MS.parse = 4000
+    locateAnswer = { file: picked3('STR'), refused: null }
+    await locateModel(saved.idOf('STR'))
+    await until('the boot to be refused', () => /no geometry/.test(s().initErr), 5000)
+    // The moment: STR's parse is under way in the worker and has not reached the renderer.
+    expect(log.handled.at(-1), log.handled.join(', ')).toBe('parse STR')
+    expect(geometryPosted('STR')).toBeUndefined()
+    expect(s().uploads.some((u) => u.name === 'STR.ifc' && !u.error && !u.done)).toBe(true)
+
+    await until('STR to boot alone', () => drawnModels.has('STR') && s().booted && s().ready && loadedKeys().join() === 'STR', 30_000)
+    await projectEndState(saved, ['STR'], ['MEP'])
+  })
+
+  it('D. guard — the boot refused for no geometry with nothing located: the project settles on the landing page, its Locate… rows and carried models as they are', async () => {
+    const saved = await savedProject()
+    bytes3.ARC = EMPTY_ARC
+    COST_MS.parse = 100
+    COST_MS.geometry = 50
+    await reopenArcOnly(saved.file)
+    await until('the boot to be refused', () => /no geometry/.test(s().initErr), 10_000)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(projectStatus()).toEqual({ open: true, loading: false })
+    expect(s().booted).toBe(false)
+    expect(s().initErr).toMatch(/no geometry/)
+    for (const k of ['STR', 'MEP'] as const) expect(s().uploads.filter((u) => u.locate === saved.idOf(k)).length, `${k}'s Locate… row`).toBe(1)
+    expect([...(projectCarried()?.ids ?? [])].sort()).toEqual(THREE.map(saved.idOf).sort())
+    expect(loadedKeys()).toEqual([])
+    expect(drawnModels.size).toBe(0)
   })
 })

@@ -142,3 +142,87 @@ describe('chainAfter — a located model’s restore behind the project’s, in 
     expect(calls).toEqual(['project', 'located'])
   })
 })
+
+describe('AfterJoin.failed — a batch that fails to join says so to whoever queued it', () => {
+  /**
+   * 2026-11-11 — `then` runs only once a batch has joined; when the join fails, `failed` is called
+   * instead, once the federation is in its final state, and only for the load that is still the
+   * current one (`epoch`): a load torn down or replaced meanwhile calls nothing.
+   */
+  const ARC = { path: '/projects/synthetic/models/ARC.ifc', name: 'ARC.ifc', size: 10 }
+  let rejectJoin: (err: Error) => void = () => undefined
+
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(federation, 'isOpen').mockReturnValue(false)
+    vi.mocked(federation.prepare).mockImplementation(async (f) => {
+      keys.push(f.key!)
+      return { index: mockModelIndex(f.key!), chunks: [], offset: [0, 0, 0], file: { key: f.key!, path: f.path, name: f.name, sha256: 'a'.repeat(64) } }
+    })
+    vi.spyOn(federation, 'addBatch').mockImplementation(
+      () => new Promise<boolean>((_, reject) => (rejectJoin = reject))
+    )
+  })
+
+  const joinStarted = async (): Promise<void> => {
+    for (let i = 0; i < 100 && !vi.mocked(federation.addBatch).mock.calls.length; i++) await vi.advanceTimersByTimeAsync(500)
+    expect(federation.addBatch).toHaveBeenCalledTimes(1)
+  }
+
+  it('a boot that fails: `failed` runs once, after the landing page is back, and `then` never', async () => {
+    useShell.setState({ ...INITIAL, uploads: [], booted: false })
+    const calls: string[] = []
+    await openProjectFiles([ARC], [], {
+      order: [ARC.path],
+      then: async () => void calls.push('then'),
+      failed: () => void calls.push(`failed booted=${useShell.getState().booted} err=${/scene/.test(useShell.getState().initErr)}`)
+    })
+    await joinStarted()
+    rejectJoin(new Error('the scene could not take ARC'))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toEqual(['failed booted=false err=true'])
+  })
+
+  it('after boot: `failed` runs once, after the rows say what went wrong', async () => {
+    useShell.setState({ ...INITIAL, uploads: [], booted: true })
+    const calls: string[] = []
+    await locateFile(FILE, AS, {
+      order: [FILE.path],
+      then: async () => void calls.push('then'),
+      failed: () => void calls.push(`failed rows=${JSON.stringify(useShell.getState().uploads.map((u) => [u.name, u.error]))}`)
+    })
+    await joinStarted()
+    rejectJoin(new Error('the scene could not take STR'))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toEqual(['failed rows=[["STR moved.ifc",true]]'])
+  })
+
+  it('chained: both `failed` run, the first’s throwing stops neither the second nor the pipeline', async () => {
+    useShell.setState({ ...INITIAL, uploads: [], booted: false })
+    const calls: string[] = []
+    await openProjectFiles([ARC], [], {
+      order: [ARC.path],
+      then: async () => void calls.push('project then'),
+      failed: () => {
+        calls.push('project failed')
+        throw new Error('settling failed')
+      }
+    })
+    await locateFile(FILE, AS, { order: [FILE.path], then: async () => void calls.push('located then'), failed: () => void calls.push('located failed') })
+    await joinStarted()
+    rejectJoin(new Error('the scene could not take ARC'))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toEqual(['project failed', 'located failed'])
+  })
+
+  it('a load torn down while its batch was joining: its `failed` is never called', async () => {
+    useShell.setState({ ...INITIAL, uploads: [], booted: false })
+    const calls: string[] = []
+    await openProjectFiles([ARC], [], { order: [ARC.path], then: async () => void calls.push('then'), failed: () => void calls.push('failed') })
+    await joinStarted()
+    disposeUploads()
+    rejectJoin(new Error('the scene could not take ARC'))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toEqual([])
+  })
+})
