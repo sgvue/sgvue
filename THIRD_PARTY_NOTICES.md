@@ -19,7 +19,7 @@ The IFC parser (`web-ifc-api.js` in the parse worker, and `web-ifc.wasm`) is web
 
 ### SQLite — public domain
 
-The query worker's `sql-wasm.wasm` (sql.js 1.15.1, MIT) is compiled from SQLite 3.54.0, which is in the public domain: https://www.sqlite.org/copyright.html.
+The query worker's `sql-wasm.wasm` (sql.js 1.15.2, MIT) is compiled from SQLite 3.54.0, which is in the public domain: https://www.sqlite.org/copyright.html.
 
 ### IBM Plex
 
@@ -124,7 +124,7 @@ The IBM Plex Sans, Mono and Serif fonts (`@fontsource` packages) are licensed un
 | scheduler | 0.28.0 | MIT | app.asar: out (bundled JavaScript) | 5 |  |
 | sha.js | 2.4.12 | MIT AND BSD-3-Clause | exceljs's browser build | 22 | the registry's latest on 2026-10-05; the build records no version |
 | spdlog | f355b3d58f70 | MIT | web-ifc.wasm | 19 | https://github.com/gabime/spdlog at that commit |
-| sql.js | 1.15.1 | MIT | app.asar: out (bundled JavaScript) | 20 | sql-wasm.wasm ships unpacked beside the archive; it contains SQLite (public domain, see above) |
+| sql.js | 1.15.2 | MIT | app.asar: out (bundled JavaScript) | 20 | sql-wasm.wasm ships unpacked beside the archive; it contains SQLite (public domain, see above) |
 | standardwebhooks | 1.1.1 | MIT | app.asar: node_modules | 5 | no licence file in the package: the standard MIT text is given |
 | stduuid | 3afe7193facd | MIT | web-ifc.wasm | 5 | https://github.com/mariusbancila/stduuid at that commit |
 | stream-browserify | 3.0.0 | MIT | exceljs's browser build | 5 | the registry's latest on 2026-10-05; the build records no version |
@@ -140,7 +140,7 @@ The IBM Plex Sans, Mono and Serif fonts (`@fontsource` packages) are licensed un
 | web-ifc | 0.0.77 | MPL-2.0 | app.asar: out (bundled JavaScript) | 24 | used unmodified; web-ifc.wasm ships unpacked beside the archive; source: https://github.com/ThatOpen/engine_web-ifc/tree/0.77 |
 | xmlchars | 2.2.0 | MIT | exceljs's browser build | 5 | the copy installed here; the one in the build may be another version |
 | zod | 4.6.7 | MIT | app.asar: node_modules; app.asar: out (bundled JavaScript) | 5 |  |
-| zustand | 5.0.16 | MIT | app.asar: out (bundled JavaScript) | 5 |  |
+| zustand | 5.1.0 | MIT | app.asar: out (bundled JavaScript) | 5 |  |
 
 ## Licence texts
 
@@ -582,7 +582,7 @@ xmlchars 2.2.0 — LICENSE
     Copyright Louis-Dominique Dubeau and contributors to xmlchars
 zod 4.6.7 — LICENSE
     Copyright (c) 2025 Colin McDonnell
-zustand 5.0.16 — LICENSE
+zustand 5.1.0 — LICENSE
     Copyright (c) 2019 Paul Henschel
 ```
 
@@ -1195,7 +1195,7 @@ and users must comply to its license: https://raw.githubusercontent.com/fmtlib/f
 Applies to:
 
 ```text
-sql.js 1.15.1 — LICENSE
+sql.js 1.15.2 — LICENSE
     Copyright (c) 2017 sql.js authors (see AUTHORS)
     Copyright 2017 Ryusei Yamaguchi
 ```
