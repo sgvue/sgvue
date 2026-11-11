@@ -7,8 +7,8 @@
 //
 // Ported from ifcTable's `schedule/actions.ts` and `schedule/actions/` (Yong Yen, 2026-11-05 on)
 // for SGVue v1.5.0, phase 1 of the ifcTable update — the engine half only. The Schedules
-// window's own handlers (`renderer/schedule-ui/events.ts`) still edit the definition in place
-// until phase 2 rebuilds them on these; the assistant's `make_schedule` builds a whole
+// window's own handlers (`renderer/schedule-ui/events.ts`) edit the definition through these
+// since phase 2; the assistant's `make_schedule` builds a whole
 // definition at once and keeps its own rules (`schedule/assistant.ts`).
 
 export { canMove, fieldKey, moveItem, newId } from './actions/edit';

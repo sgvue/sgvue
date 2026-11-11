@@ -1612,7 +1612,8 @@ describe('the case set', () => {
     expect(byId.get('op-undo-held').expect.view).toMatchObject({ pending: true, pendingKind: 'undo' })
 
     for (const c of CASES) {
-      // One request a turn, in every oracle; and a setup step never asks — nobody is there to click.
+      // One request a turn, in every oracle; and a setup step is never a gated call — at most a
+      // change the scope guard held, which an `apply: true` step applies (ai-eval-offline.test.ts).
       const gated = c.oracle.calls.map((x: { name: string; input: Record<string, unknown> }) => gateOf(x.name, x.input)).filter(Boolean)
       expect([c.id, gated.length <= 1]).toEqual([c.id, true])
       for (const step of c.setup || []) expect([c.id, step.tool, gateOf(step.tool, step.input)]).toEqual([c.id, step.tool, null])

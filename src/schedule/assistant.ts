@@ -495,7 +495,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
   }
   const dress = (col: Column, spec: AskColumn): void => {
     // Asked for, so shown: "add Width to this" on a hidden Width column brings it back —
-    // unless the call itself says hidden, which is the Format tab's own switch.
+    // unless the call itself says hidden, which is the column menu's own switch.
     if (spec.hidden) col.hidden = true
     else delete col.hidden
     if (spec.heading !== undefined) {
@@ -607,7 +607,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
     }
   }
 
-  // ── a column's format: the Format tab's unit and decimals, where it offers them ──
+  // ── a column's format: the column menu's unit and decimals, where it offers them ──
   for (const { spec, col } of placed) {
     if (spec.unit === undefined && spec.decimals === undefined) continue
     const heading = headingOf(col, def)

@@ -1,6 +1,6 @@
 // Column widths, dragged by the right edge of a heading.
 //
-// The gesture is motion state, the same rule as resize.ts and dnd.ts: every move writes the
+// The gesture is motion state, the same rule as dnd.ts: every move writes the
 // inline --colw-<n> custom properties on the <table> and nothing else. tableView emits one
 // CSS rule per column pointing at those variables, so the whole table re-lays-out from a
 // variable write — no update(), no render(). A repaint mid-drag would rebuild the <th> under
@@ -9,7 +9,7 @@
 
 import { clamp } from './dom';
 
-/** Hot zone at the right edge of a heading. Narrow: the rest of the th still opens Format. */
+/** Hot zone at the right edge of a heading. Narrow: the rest of the th still opens the column menu. */
 const EDGE = 6;
 /**
  * The one range a column width may be set to. This module owns it because the drag is the
@@ -56,8 +56,8 @@ const defIndexOf = (th: HTMLElement) => Number(th.dataset.defcol);
 
 /**
  * The click that follows this gesture belongs to the resizer. Without this the header's own
- * click handler opens Column formatting — which repaints, tearing out the very heading a
- * double-click is about to measure. Capture on window, so it lands before the delegated
+ * click handler opens the column menu — a popover over the very heading a double-click is
+ * about to measure. Capture on window, so it lands before the delegated
  * handler on #app; removed on the next task, because a click is dispatched in the same turn
  * as the pointerup that precedes it and a timer always lands after that.
  */

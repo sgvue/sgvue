@@ -55,7 +55,7 @@ export function defaultDecimals(kind: UnitKind, system: UnitSystem = 'metric'): 
 }
 
 /**
- * The range a decimal count may hold, in the file that owns decimals. The Format tab's box
+ * The range a decimal count may hold, in the file that owns decimals. The column menu's box
  * carries these as its min/max, the import parser clamps to them, and this module clamps on
  * the way out; when they were separate literals a widened range in one of them would have
  * been a `toFixed` RangeError in the other.
@@ -102,7 +102,7 @@ export function fromDisplay(value: number, kind: UnitKind | undefined, display?:
  * ifcTable's `storeNum` of 2026-11-05 ("number filters store a number or nothing"), ported for
  * SGVue v1.5.0 and moved here from `schedule-ui/panels/shared.ts`, which re-exports it, so the
  * filter controls of phase 2 and the engine's tests read one copy. With the number inputs the
- * Filter tab has today it reads exactly what the old one read: a valid number, or ''.
+ * filter popovers have today it reads exactly what the old one read: a valid number, or ''.
  */
 export function storeNum(raw: string, kind: UnitKind, system?: UnitSystem): number | undefined {
   const unit = defaultUnit(kind, system);

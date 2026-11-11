@@ -1,8 +1,8 @@
 // Saved schedule definitions: a named list in this window's localStorage — ported from
 // ifcTable's `ui/schedules.ts` (2026-09-25, phase 2). The save rule, the numbering and the
-// cap are ifcTable's own. What SGVue leaves out for now: the `.schedule.json` export and
-// import (a file written or read outside the two sanctioned writers — phase 4 brings them back
-// behind a native Save / Open dialog), and the one-time adoption of ifcTable's older key.
+// cap are ifcTable's own. What SGVue leaves out: the one-time adoption of ifcTable's older key.
+// The `.schedule.json` export and import, left out in phase 2, came back in phase 4 behind a
+// native Save / Open dialog.
 // The key is SGVue's own, under the `sgvue.schedules.` prefix the Schedules window keeps to.
 
 import { parseScheduleDef, type ScheduleDef } from '../../schedule/schedule/def';

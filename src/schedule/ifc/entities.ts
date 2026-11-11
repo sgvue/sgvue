@@ -1,11 +1,10 @@
-// web-ifc reports entity names in upper case ("IFCWALLSTANDARDCASE"). This restores
-// canonical IFC casing for display and template matching. Common names map exactly;
-// unknown names fall back to a naive re-case.
+// IFC class names in their canonical casing, and a coarse discipline guess from them
+// (`disciplineForEntity`, for the Schedules adapter and rail).
 // Lifted from ALpha BIM Viewer/src/shared/ifc-entities.ts.
 
 export type Discipline = 'ARC' | 'STR' | 'MEP' | 'OTHER';
 
-/** Every IFC class this app knows by name. Read-only — the lookup below is built from it. */
+/** Every IFC class this app knows by name. Read-only; the templates are held to it (`presets.test.ts`). */
 export const CANONICAL_ENTITIES: readonly string[] = [
   'IfcWall', 'IfcWallStandardCase', 'IfcColumn', 'IfcBeam', 'IfcMember', 'IfcPlate', 'IfcSlab',
   'IfcDoor', 'IfcWindow', 'IfcSpace', 'IfcRailing', 'IfcStair', 'IfcStairFlight', 'IfcRamp',

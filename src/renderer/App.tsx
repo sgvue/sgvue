@@ -316,7 +316,7 @@ async function installDevTools(viewer: Viewer): Promise<void> {
     // would split them.
     /**
      * Phase 7. The design gives colour-by-property no manual control — only the assistant's
-     * `color_by_property` tool sets it (`SGVue.dc.html:1547`), which is Phase 9 — so the
+     * `color_by_property` tool sets it (`SGVue.dc.html:1547`) — so the
      * parity harness reaches the store action here, exactly as it reaches the prototype's own
      * `colorBy` on the other side. The legend's rows and its × are designed controls and are
      * clicked through the DOM on both sides.
@@ -471,10 +471,9 @@ async function installDevTools(viewer: Viewer): Promise<void> {
     toolUi: (name: string, input: unknown) => runToolWithUi(name, input),
     /**
      * Phase 9a. `scripts/ai-acceptance.cjs` sends the design's four acceptance prompts
-     * through the **real** turn — the same `sendChat` the composer will call in 9b — and
-     * reads back what the tools actually did. It is the only way to exercise the gateway
-     * end to end before the panel exists, and it runs only when a key is already in the
-     * environment.
+     * through the **real** turn — the same `sendChat` the composer calls — and reads back
+     * what the tools actually did. It exercises the gateway end to end without the Ask Vee
+     * window, and it runs only when a key is already in the environment.
      */
     chat: {
       send: (text: string) => sendChat(text),
@@ -526,7 +525,7 @@ async function installDevTools(viewer: Viewer): Promise<void> {
       dismiss: (index: number) => shell().dismissPending(index),
       revert: (index: number) => shell().revertTurn(index),
       /**
-       * Phase 9b's parity states. A transcript, a busy row and a reply strip cannot be
+       * Phase 9b's parity states. A transcript, a running turn and a reply strip cannot be
        * produced without an API key, so both sides are driven through their **own** state —
        * this on ours, the logic instance's `setState` on the prototype's, exactly as Phase 7
        * drove `colorBy` and Phase 8 drove the upload rows. Every other control in those

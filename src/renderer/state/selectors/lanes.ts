@@ -87,10 +87,10 @@ export const browFrom = (centreTop: number): number =>
   centreTop <= ROW_ROOM ? 0 : Math.ceil(centreTop + ROW_CLEAR - ROW_ROOM)
 
 /**
- * `--brow` on the stage, declared like `--rlane` and `--abar`: the chat panel's `bottom` and
- * `max-height`, its resize clamp and the property card's `max-height` take it, so each stops
- * above a centre zone that is taller than one line instead of covering it. With `0px` every
- * one of those lengths is the design's own.
+ * `--brow` on the stage, declared like `--rlane` and `--abar`: the property card's `max-height`
+ * takes it, so the card stops above a centre zone that is taller than one line instead of
+ * covering it (the chat panel took it too, until it became a window on 2026-11-07). With `0px`
+ * that length is the design's own.
  */
 export const brow = (lane: number): string => `${lane}px`
 

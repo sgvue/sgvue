@@ -133,18 +133,6 @@ export interface ViewerCallbacks {
 export type Tool = 'select' | 'measure' | 'spot'
 
 /**
- * Grids and storeys in the file's own **world** coordinates; `offset` is what puts them in the
- * scene.
- *
- * The caller has already put both through the model's own frame — the same transform the
- * geometry went through in the worker (`renderer/model/federation-store.ts`'s `metaOf`) — so
- * everything here is square with the building, and all that is left is the offset.
- *
- * A grid is its two plan endpoints, not the design's `{ axis, v }`: a real `IfcGridAxis` is a
- * curve and the reference model's grid runs at ~43° in the file's own world coordinates
- * (`shared/annotate.ts`).
- */
-/**
  * 2026-11-07 — the building box in the plan frame: every vertex of every slot but the site's
  * (`buildingOnly`), turned by −ρ about the scene's origin. One pass over the merged buffers, run
  * only while ρ is not 0, when a model joins or leaves and when ρ changes.
@@ -242,6 +230,17 @@ function elementPlanBoxOf(store: BatchStore, rec: ElementRecord, rho: number): B
   return box
 }
 
+/**
+ * Grids and storeys in the file's own **world** coordinates; `offset` is what puts them in the
+ * scene.
+ *
+ * They reach here untouched (`renderer/model/federation-store.ts`'s `metaOf`): since 2026-11-07
+ * the world frame is the one the geometry is drawn in too, so all that is left is the offset.
+ *
+ * A grid is its two plan endpoints, not the design's `{ axis, v }`: a real `IfcGridAxis` is a
+ * curve and the reference model's grid runs at ~43° in the file's own world coordinates
+ * (`shared/annotate.ts`).
+ */
 export interface ModelMeta {
   offset?: readonly [number, number, number]
   grids?: readonly {

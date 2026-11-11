@@ -38,7 +38,7 @@ export function fieldFromKey(key: string): FieldRef | null {
 
 // `statOf`, `typeOf` and `kindOf` moved to the engine's `columns.ts` in phase 4 of the
 // assistant's parity work (2026-10-02), with `kindsByHeading`: the assistant's `make_schedule`
-// decides a column's unit and decimals by the rule the Format tab offers them by.
+// decides a column's unit and decimals by the rule the column menu offers them by.
 export { kindOf, kindsByHeading, statOf, typeOf };
 
 /** The column whose heading was last clicked — column 0 when none has been. Equal width

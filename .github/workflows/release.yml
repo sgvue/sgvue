@@ -101,7 +101,7 @@ jobs:
       - run: npm run lint
       # The unit tests download Electron's binary on first use (one test imports `electron`).
       - run: npm test
-      # Electron 44.3.0 has no install script, so `npm ci` leaves node_modules/electron/dist/
+      # Electron 44.10.0 has no install script, so `npm ci` leaves node_modules/electron/dist/
       # without Electron — and electron-builder.yml copies Electron's LICENSE and
       # LICENSES.chromium.html into each app from there. electron-builder packs its own download
       # of Electron, so nothing else in the build changes.

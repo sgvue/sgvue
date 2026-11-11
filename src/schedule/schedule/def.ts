@@ -4,7 +4,7 @@
 import type { UnitKind } from '../ifc/types';
 import { isBodyFont } from './fonts';
 // The decimal range lives in the file that owns decimals; this parser clamps to the same
-// numbers the Format tab's box does, for the reason spelled out at clampDecimals.
+// numbers the column menu's box does, for the reason spelled out at clampDecimals.
 import { DECIMALS_MAX, DECIMALS_MIN } from './format';
 
 /** Core (non-property) fields. Mirrors ElemCore. */
@@ -57,7 +57,7 @@ const isOp = (v: unknown): v is Op => (OPS as readonly unknown[]).includes(v);
 
 /**
  * How a boolean may be spelled. ONE list: the type below, the import sanitiser and the
- * Format tab's dropdown all read it, and `format.ts`'s BOOL_TEXT is keyed over the union it
+ * column menu's dropdown all read it, and `format.ts`'s BOOL_TEXT is keyed over the union it
  * produces — so a fifth spelling is a single edit that the compiler then chases.
  * Yes/No first, because that is the default and the order the dropdown offers.
  */
@@ -241,8 +241,9 @@ export function fieldKey(f: FieldRef): string {
 
 /**
  * Ids only need to be unique inside one schedule. SGVue (2026-10-02): moved here from
- * `schedule-ui/panels/fieldsSection.ts`, which re-exports it — the editor's Add buttons and the
- * assistant's `make_schedule` both name a new calculated value with it.
+ * `schedule-ui/panels/fieldsSection.ts` (gone with the inspector in v1.5.0) — the calculated-value
+ * actions (`actions/calculated.ts`) and the assistant's `make_schedule` both name a new
+ * calculated value with it.
  */
 export function newId(prefix: string, existing: { id: string }[]): string {
   let n = existing.length + 1;

@@ -23,8 +23,8 @@
  * name only what the call passes changes: an omitted `offset`, `flip` or `cut` keeps what the
  * plane has.
  *
- * The ten after them are the plan's read-only additions (§4 Phase 9, §5): they make
- * "maximum read capability" true without adding a designed surface or a write path.
+ * The thirteen after them are read-only additions, most of them the plan's (§4 Phase 9, §5):
+ * they make "maximum read capability" true without adding a designed surface or a write path.
  *
  * The last four (2026-09-28) reach the Schedules window: `make_schedule` builds or changes the
  * schedule it shows, `get_schedule` reads it, `export_schedule` runs one entry of its Export
@@ -109,7 +109,7 @@
  *     tool or the laser meter, at a point that is named — an element's box, or a world
  *     point — and committed by the viewer's own function for that click.
  *
- * 37 tools. Deliberately left out (`docs/DECISIONS.md` has each reason): a schedule's column
+ * 38 tools (`ask_choice`, 2026-11-08, is the thirty-eighth). Deliberately left out (`docs/DECISIONS.md` has each reason): a schedule's column
  * widths, auto-fit and equal width, its appearance panel and print layout; dragging the
  * sidebar's and the panels' sizes; folding a property-card section; the chat panel's own
  * controls.
@@ -954,8 +954,8 @@ export const MAX_MODEL_KEYS = 200
 export const MAX_MODEL_KEY_CHARS = 300
 
 /**
- * The view tools the parity work adds — two in phase 1, two more in phase 2, one in phase 3 (the
- * header has the direction and the lists). A group of its own, because they are neither the
+ * The view tools the parity work adds — two in phase 1, two more in phase 2, one each in phases 3
+ * and 4 (the header has the direction and the lists). A group of its own, because they are neither the
  * design's nor read-only nor the Schedules window's — the catalogue test names each group's
  * members exactly.
  */

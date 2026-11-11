@@ -415,10 +415,3 @@ export const IconMoon = (): React.JSX.Element => (
     <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
   </Tool>
 )
-
-/* ────────────────────────────── the assistant (`:430–540`) ──────────────────────────────
- * The design's sparkle (`:435` beside the title, `:537` on the pill) is not here: since
- * 2026-10-01 both places carry Vee, the assistant's pixel mascot (`app/Vee.tsx`). Nor is the
- * busy row's brand mark (`:502`, a cube outline breathing while its V traces itself): the same
- * day the busy row became the assistant's live reply (`app/Trace.tsx`), and Vee is what moves. */
-

@@ -30,7 +30,7 @@ export interface Preset {
   id: string;
   name: string;
   /**
-   * Which gallery group this belongs to. Absent = general — the same forward-lenient shape
+   * Which Templates-library section this belongs to. Absent = general — the same forward-lenient shape
    * as `Calculated.result`: a template written before the key existed reads as the default.
    */
   section?: 'ifcsg';
@@ -190,7 +190,7 @@ export const PRESETS: Preset[] = [
   },
 
   // ---------- IFC-SG (Singapore CORENET X) ----------
-  // A separate gallery section, and the only templates that may filter. Girth and Height are
+  // A separate Templates-library section, and the only templates that may filter. Girth and Height are
   // IfcLengthMeasure in a real IFC-SG export, written in mm, so metres at 2 dp is what to
   // read them in; the rest are labels. Headings stay the IFC-SG property names — a friendlier
   // word here would stop matching what the submitter was told to fill in.
@@ -222,7 +222,7 @@ export function presetById(id: string): Preset | undefined {
 }
 
 // Suggested is derived from the category's hand-authored templates (ifcTable's decision of
-// 2026-11-05, ported for SGVue v1.5.0; the field picker that reads it arrives in phase 2).
+// 2026-11-05, ported for SGVue v1.5.0; the field picker reads it, `schedule-ui/pickerModel.ts`).
 /**
  * The field picker's "Suggested" list for a category: the fields the hand-authored templates
  * for its classes already ask for, in template order, each once. No list of its own to keep
@@ -274,9 +274,9 @@ function imperialise(col: Column): void {
  * same template with its units mapped on the CLONE, never on the constant.
  */
 export function scheduleFromPreset(p: Preset, system: UnitSystem = 'metric'): ScheduleDef {
-  // A deep copy: the format objects above are module constants, and the formatting
-  // controls edit a column's format in place. A rule is the same story — the Filter tab
-  // edits `def.filters[i]` where it stands.
+  // A deep copy: the format objects above are module constants, and a schedule must share no
+  // object with them — not a column's format, not a rule in `def.filters`. (Since v1.5.0
+  // every edit copies the definition first, `actions/edit.ts`.)
   const columns = structuredClone(p.columns);
   if (system === 'imperial') columns.forEach(imperialise);
   return {

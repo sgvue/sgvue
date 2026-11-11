@@ -54,9 +54,9 @@ describe('coordsCaption — the 2026-09-20 caption rule', () => {
 })
 
 /**
- * 2026-10-08 — the card, the CRS chips and `basePointSource` are read off the store's
- * `bootGeoref`, the declaration that defined the federation's frame; and the card is read-only, so
- * the four fields are always that declaration's base point. Whose they are is `file` or `none`.
+ * 2026-10-08 — the card, the CRS chips and `basePointSource` are read off the georeferencing the
+ * card shows (`georefSource` — since 2026-11-07 the loaded model with the most elements that
+ * states one); and the card is read-only, so the four fields are always that file's base point. Whose they are is `file` or `none`.
  */
 describe('basePointSource — the file’s, or none', () => {
   it('is the file’s when the georeferencing the card shows states one, else none', () => {

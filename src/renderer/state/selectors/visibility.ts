@@ -4,7 +4,7 @@
  * A Revit-style border round the viewport plus a pill that says how much is out of sight:
  * accent while a filter step drives the view, amber for hides made by hand. It belongs with
  * the hide affordances, which is why it lands with them in Phase 3 rather than with the filter
- * stack; the filter half of the label is written now and stays dormant until `stack` fills.
+ * stack; the filter half of the label counts what the filter stack's steps take out of view.
  *
  * Two design behaviours that read like bugs and are not:
  * · A model switched off with its eye does **not** count as hidden here. Only `hidden` and

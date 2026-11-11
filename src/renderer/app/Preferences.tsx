@@ -11,7 +11,9 @@
  * browser dialog.
  *
  * **The key field is write-only.** It shows whether a key is stored, never the key: main
- * encrypts it with `safeStorage` and the renderer is told `hasKey` and nothing more.
+ * encrypts it with `safeStorage` and the renderer is told only whether one is stored (`hasKey`)
+ * or set in main's environment (`envKey`), and whether the OS can encrypt
+ * (`keyStorageAvailable`) — never the key.
  */
 import { useEffect, useId, useRef, useState } from 'react'
 import type { SettingsView } from '../../shared/ipc-contract'

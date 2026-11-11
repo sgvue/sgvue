@@ -2,7 +2,7 @@
  * The assistant's eval suite, offline: the oracle scores 100 % and the null agent 0 %, on every
  * push (2026-11-07, core protection #11).
  *
- * `scripts/ai-eval.cjs` grades the assistant on 85 cases (80 scorable today) with pure graders (`eval/graders.cjs`)
+ * `scripts/ai-eval.cjs` grades the assistant on 87 cases, all scored, with pure graders (`eval/graders.cjs`)
  * and has two offline modes that make no request: `--dry-run`, the **oracle**, replays each case's
  * ideal tool sequence and reply and must score 100 % — the proof that the tools, the graders and
  * the ground truth agree about what "right" means — and `--null`, an agent that does nothing,

@@ -2,7 +2,7 @@
 // phase 2 of the Schedules window). Only this folder touches the DOM; `src/schedule/` never
 // does. What SGVue drops: the loading / error fields and the start screen they served (the
 // model comes from the main window), the theme (it follows the main window's) and the app
-// bar's export menu (phase 4 adds export).
+// bar's export menu (export came back in phase 4, as the header's Export button).
 //
 // ifcTable's two render scopes — 'all' rebuilds every pane, 'table' only the schedule and the
 // status line — plus SGVue's third, 'panes' (2026-09-25): everything BUT the schedule, for a

@@ -40,7 +40,7 @@ export function clampSection(
 /**
  * What a hand-sized rows wrapper gains: its height as the flex base, never grown, able to
  * shrink to `min` if the window later gets shorter, and scrolled inside when its content is
- * taller. Replaces the >6-storey tail on that wrapper; the other one is untouched.
+ * taller. Replaces the >6-storey tail on the STOREYS wrapper, the only one it sizes.
  */
 export const sizedTail = (h: number, min: number): string =>
   `;flex:0 1 ${h}px;min-height:${min}px;overflow:auto`

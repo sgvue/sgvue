@@ -194,7 +194,7 @@ function wireExports(root: HTMLElement) {
     const box = el.getBoundingClientRect();
     const saved = listSaved().length;
     openMenu(box.left, box.bottom + 4, [
-      // `EXPORT_ACTIONS` is also what Ask SGVue's `export_schedule` runs (2026-09-28).
+      // `EXPORT_ACTIONS` is also what Ask Vee's `export_schedule` runs (2026-09-28).
       { label: 'Excel (.xlsx)', run: () => void EXPORT_ACTIONS.xlsx() },
       { label: 'CSV', run: () => void EXPORT_ACTIONS.csv() },
       { label: 'All saved schedules (.xlsx)', disabled: !saved, run: () => void EXPORT_ACTIONS.all_saved() },

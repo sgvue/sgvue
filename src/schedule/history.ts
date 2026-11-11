@@ -128,7 +128,7 @@ export function redo(): ScheduleDef | null {
 }
 
 export const undoDepth = () => undoStack.length;
-/** Tests only: the app shows one depth, and it is the undo one. */
+/** The redo depth: the header's Redo button, its toast and `manage_schedules`' answer read it. */
 export const redoDepth = () => redoStack.length;
 
 /** Tests only: make the burst window deterministic. */

@@ -53,7 +53,7 @@ export const MAX_TOKENS = 64_000
  * One request's own timeout, and how many times the SDK may retry it.
  *
  * The SDK's defaults are ten minutes and two retries, which is thirty minutes of wall clock
- * for a turn this loop says lasts 120 seconds — and the panel has no stop control, by design.
+ * for a turn this loop says lasts 120 seconds.
  * Two attempts at 50 s fit inside `TURN_TIMEOUT_MS` with room for the tools; a unit test holds
  * that arithmetic. The deadline timer below is the backstop, not the plan.
  */

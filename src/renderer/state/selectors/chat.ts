@@ -1,21 +1,24 @@
 /**
  * The chat panel's pure pieces — `SGVue.dc.html:2015–2051` (the per-message view model, the
- * reply strip, the suggestion list) and `:1127–1136` (the resize clamp).
+ * reply strip, the suggestion list). (`:1127–1136`'s resize clamp went with the panel on
+ * 2026-11-07, when the chat became a window of its own.)
  *
  * The same split every other selector in this folder uses: the **decision** is a function of
  * data, so a bubble's corner radius, a quantity column, the CSV a table copies and the size a
  * drag settles on can all be tested without a DOM, a viewer or a model call.
  *
  * 2026-10-01: the assistant has a name of its own, **Vee** (`ASSISTANT`, `authorOf` — the
- * design's three `'SGVue'` literals in one place), and the resize clamp takes the bottom row's
+ * design's three `'SGVue'` literals in one place), and the resize clamp took the bottom row's
  * lane.
  *
  * The same day, the owner's "Ask Vee" handoff in full: **a user's row stands on the left**, as
  * the assistant's does, with the assistant's corner — the handoff's, and what makes the typed
  * line's lift from the composer a straight line (the design: on the right, `:2015`); a reply
- * that came from a turn carries what its thinking trace left (`ChatMessage.trace`: the status
- * beside the name, whether its bubble is the trace's full-width one, its rows); and the mascot
- * in front of the newest such reply is `done` (`veeStateOf`).
+ * that came from a turn carries what its thinking trace left (`ChatMessage.trace`: its status,
+ * whether its bubble is the trace's full-width one, its rows); and the mascot of the newest
+ * such reply is `done` (`veeStateOf`). Since 2026-11-08 the Ask Vee window draws `You` on the
+ * right, the mascot at the foot of a reply's group, and the status only as the folded line of
+ * a reply written before then.
  */
 import type { ChatPending, ChatTable, PendingAction } from '../../ai/executors/context'
 import { group } from '../../../shared/fmt'
@@ -206,7 +209,7 @@ export function viewRow(m: ChatMessageView, _i: number, unit: DisplayUnit = 'mm'
 }
 
 /**
- * The mascot in front of a reply that is not being written: **`done` while the reply is a
+ * The mascot at the foot of a reply that is not being written: **`done` while the reply is a
  * turn's and the newest message in the transcript**, `idle` otherwise — every older reply, and
  * the boot audit, which no turn produced. (The reply being written takes its state from the
  * trace; the header's sprite and the pill's are always `idle`.)

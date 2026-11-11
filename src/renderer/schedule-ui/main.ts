@@ -646,7 +646,7 @@ function menuTargets(res: ScheduleResult, row: number | null): number[] {
 
 /**
  * "Colour 3D by this column": the column's displayed values over every matching element —
- * `colourColumn`, which Ask SGVue's `color_by_schedule_column` runs too (2026-09-28).
+ * `colourColumn`, which Ask Vee's `color_by_schedule_column` runs too (2026-09-28).
  */
 function colourByColumn(defcol: number): void {
   const { store, def } = state;
@@ -658,7 +658,7 @@ function colourByColumn(defcol: number): void {
 }
 
 /**
- * Ask SGVue's `export_schedule` (2026-09-28): the Export menu's own action for that entry, or
+ * Ask Vee's `export_schedule` (2026-09-28): the Export menu's own action for that entry, or
  * the menu's reason not to. The answer goes back at once — the tool never waits on the dialog.
  */
 function exportFromChat(format: ExportFormat, n: number): void {

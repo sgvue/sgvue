@@ -371,12 +371,6 @@ export interface ProjectSnapshotRequest {
 }
 
 /**
- * `project:snapshot` — the page's answer: the project's text (`shared/project-file.ts`'s
- * `projectText`), or `null` when there is nothing to save; and a name for the Save dialog's
- * default, which main puts in a folder of its own choosing — never a path. Main reads the text
- * again with `readProject` before it writes a byte, so only a project file can be written.
- */
-/**
  * Why a snapshot has no text: no model open (`no-models` — then nothing is unsaved), the project's
  * models still loading, none of the open models has a file (the demo), too large, or it could not
  * be built. `null` beside a text.
@@ -384,6 +378,12 @@ export interface ProjectSnapshotRequest {
 export const ProjectNothing = z.enum(['no-models', 'loading', 'no-files', 'too-large', 'failed'])
 export type ProjectNothing = z.infer<typeof ProjectNothing>
 
+/**
+ * `project:snapshot` — the page's answer: the project's text (`shared/project-file.ts`'s
+ * `projectText`), or `null` when there is nothing to save; and a name for the Save dialog's
+ * default, which main puts in a folder of its own choosing — never a path. Main reads the text
+ * again with `readProject` before it writes a byte, so only a project file can be written.
+ */
 export const ProjectSnapshot = z
   .object({
     n: z.number().int().nonnegative(),

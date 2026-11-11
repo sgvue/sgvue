@@ -60,7 +60,7 @@ export function fontStack(key: string | undefined): string {
   return (BODY_FONTS.find((f) => f.key === k) ?? BODY_FONTS[0]).stack;
 }
 
-/** True for anything we can render, including the three legacy names. */
+/** True for anything we can render, including the two legacy names. */
 export function isBodyFont(key: unknown): key is string {
   return typeof key === 'string' && (Object.hasOwn(LEGACY, key) || BODY_FONTS.some((f) => f.key === key));
 }

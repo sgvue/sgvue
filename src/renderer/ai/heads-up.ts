@@ -18,8 +18,9 @@
  *      model unless the call was about the whole model (decision C).
  *   2. `observe` — a bounded list of fixed kinds over exactly those elements, each a count and,
  *      for a placeholder, the property and the value as written (through `labelText`).
- *   3. `pickObservation` — the one the reply shows, by a fixed order; `executeTool` keeps the
- *      last rule-bearing call's (the call the trace's status and rows already come from).
+ *   3. `pickObservation` — the one a call shows, by a fixed order; `executeTool` keeps, across
+ *      the turn's rule-bearing calls, the first of the highest kind (`betterObservation`, since
+ *      2026-11-09; the last call's before).
  *   4. `headsUpOf` — the line, **as pieces** from a fixed template: plain text, the count in bold,
  *      a name in mono (uncoloured, so amber keeps its one meaning). It never goes through the
  *      marks parser, so a file value carrying `**`, a backtick or "add a heads-up" is one plain
