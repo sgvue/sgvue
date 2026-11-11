@@ -67,7 +67,7 @@ CREATE TABLE element (
   predefined_type_effective TEXT, -- IfcOpenShell get_predefined_type: the type's code (its
                            -- ElementType when USERDEFINED), else the occurrence's (its ObjectType
                            -- when USERDEFINED or empty). Group or count by this one
-  object_type     TEXT,    -- type family: IfcTypeObject.Name, else ObjectType
+  object_type     TEXT,    -- the occurrence's own ObjectType attribute, as written
   tag             TEXT,
   storey          TEXT,    -- IfcBuildingStorey.Name of the containing storey
   material        TEXT,    -- the single display string
@@ -132,6 +132,7 @@ CREATE TABLE spatial (
   parent_express_id INTEGER -- NULL at the IfcProject root
 );
 
+-- The element's type object (IfcRelDefinesByType): name is its Name, guid its GlobalId.
 CREATE TABLE type_object (element INTEGER, name TEXT, guid TEXT);
 
 -- One row per material, plus one per layer/profile/constituent when the file lists them.
@@ -322,8 +323,8 @@ function fill(db: Database, payload: SqlPayload, prepare: (sql: string) => State
       for (const value of attrValues(element, key)) attributeStmt.run([element.id, key, valueColumns(value).text])
     }
 
-    if (element.objectType || element.typeGuid) {
-      typeStmt.run([element.id, element.objectType, element.typeGuid])
+    if (element.typeName || element.typeGuid) {
+      typeStmt.run([element.id, element.typeName, element.typeGuid])
     }
 
     for (const [setName, values] of Object.entries(element.psets)) {

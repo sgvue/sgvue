@@ -14,7 +14,8 @@ an `IfcWall` / `IfcBeam` that has no PredefinedType attribute at all beside an `
 
 `golden.json` is IfcOpenShell's reading of the files **as written** (they are re-opened), per
 element by GlobalId: the raw attributes, `ifcopenshell.util.element.get_predefined_type`, and
-the code-as-written rule computed here in Python from those raw attributes.
+the code-as-written rule computed here in Python from those raw attributes. `expected.objectType`
+is the occurrence's own `ObjectType` (2026-11-11; it was the type's Name first, the app's bug).
 
 Synthetic: no geometry, no project data, no coordinates — every element sits at its storey's
 origin. Deterministic: GlobalIds from a counter, a fixed header timestamp, no owner history, so
@@ -155,9 +156,9 @@ def golden(path: pathlib.Path) -> dict:
             "expected": {
                 "predefinedType": code_as_written(element, type_object),
                 "effectivePredefinedType": ifcopenshell.util.element.get_predefined_type(element) or "",
-                "objectType": (raw(type_object, "Name") if type_object is not None else None)
-                or raw(element, "ObjectType")
-                or "",
+                # The occurrence's own ObjectType, as written (2026-11-11). It was the type's Name
+                # before it — the app's rule, not IfcOpenShell's reading.
+                "objectType": raw(element, "ObjectType") or "",
             },
         }
     return {"schema": model.schema, "elements": out}

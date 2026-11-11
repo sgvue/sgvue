@@ -152,6 +152,12 @@ named so each trap can be traced to its original write-up.
   (`IfcElement.predefinedType` / `effectivePredefinedType`, IfcOpenShell's `get_predefined_type`);
   an IFC2X3 occurrence often has no PredefinedType, its type does. Replacing the code with the
   text put a user's ObjectType on the PredefinedType tile. — 2026-11-07
+- **Never show the type object's `Name` as ObjectType.** The occurrence's own `ObjectType`
+  attribute is ObjectType (`IfcElement.objectType`, as written); the `IfcRelDefinesByType`
+  type's `Name` is `typeName`. Falling back from one to the other put a Revit "Family:Type" on
+  the ObjectType tile where every other viewer shows the occurrence's code. And an oracle
+  script records IfcOpenShell's raw readings only — an app rule goes in the test's `APP_RULES`,
+  by name — or the truth inherits the defect it should catch. — 2026-11-11
 
 **Streaming, workers and progress**
 

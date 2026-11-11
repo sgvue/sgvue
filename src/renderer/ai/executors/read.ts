@@ -459,6 +459,8 @@ export const get_element: Executor = (input, ctx) => {
       predefinedType: e.predefinedType,
       ...effectivePdt(e),
       objectType: e.objectType,
+      // The type object's Name, which the assistant used to be given in `objectType` (2026-11-11).
+      typeName: e.typeName,
       typeGuid: e.typeGuid,
       storey: e.storey,
       material: e.material,
@@ -873,7 +875,7 @@ export const get_relationships: Executor = (input, ctx) => {
       id: e.id,
       model: e.model,
       containedIn: { storey: e.storey },
-      typeObject: e.objectType ? { name: e.objectType, guid: e.typeGuid || null } : null,
+      typeObject: e.typeName || e.typeGuid ? { name: e.typeName, guid: e.typeGuid || null } : null,
       materials: e.materials,
       classifications: e.classifications,
       systems: e.systems,

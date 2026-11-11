@@ -8,6 +8,18 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+### Fixed
+
+- **ObjectType shows the element's own ObjectType**, as other BIM viewers and IfcOpenShell do.
+  It used to show the name of the element's type (a Revit "Family:Type") whenever the element
+  had one. The type's name is still in the Schedules window's Family and Type columns.
+  What works differently: an element with no ObjectType of its own now has an empty ObjectType
+  tile, and its tree row no longer carries the type's name; a saved filter, filter set or project
+  rule on ObjectType that named a type's name now matches only elements whose own ObjectType is
+  that text; the tree search no longer finds an element by its type's name; and "Same
+  ObjectType" and the right-click "similar" items, on an element with no ObjectType, take every
+  element with no ObjectType.
+
 ## [1.5.0] - 2026-11-08
 
 ### Added

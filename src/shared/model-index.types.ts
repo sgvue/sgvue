@@ -390,8 +390,19 @@ export interface IfcElement {
    * `predefined_type_effective` read it; a `PredefinedType` rule matches either value.
    */
   effectivePredefinedType: string
-  /** Type family: `IfcTypeObject.Name`, falling back to the occurrence's `ObjectType`. */
+  /**
+   * The occurrence's own `ObjectType` attribute **exactly as written** (2026-11-11), `''` when
+   * unset — what IfcOpenShell and other BIM viewers show. Never the type object's `Name`,
+   * `ElementType` or anything else. The property card's tile, "Same ObjectType", the tree, rules,
+   * filters, colour-by, the assistant, SQL's `object_type` and Schedules' `ObjectType` read it.
+   */
   objectType: string
+  /**
+   * The `Name` of the type object assigned by `IfcRelDefinesByType` (2026-11-11), `''` when there
+   * is no type or it has no `Name`. Read by Schedules' Family / Type (`typeName || objectType`),
+   * SQL's `type_object.name`, `get_relationships`' `typeObject` and the site-framing heuristic.
+   */
+  typeName: string
   /** `IfcTypeObject.GlobalId`, when the element has a type object. */
   typeGuid: string
   /**

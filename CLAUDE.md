@@ -1528,6 +1528,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 
 - 2026-11-09 — **version 1.5.0 ships the Ask Vee messaging work beside the Schedules work, in one installer** (the owner: *"Fold into 1.5.0"*): 1.5.0 was prepared on main and never published; `CHANGELOG.md`'s `[Unreleased]` is folded into its section and `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently and Known limits; the installers are built by `release.yml` from the tag, Windows first and the macOS disk images after the owner's Mac test.
 
+- 2026-11-11 — **ObjectType is the occurrence's own attribute, as written; the type object's Name is `typeName`** (owner-reported: *"I open in other BIM Viewer, see different thing"*): `objectType` is never the type's Name, and with none the tile is empty, as the design's is; "Same ObjectType" and the menu's "similar" are literal, so with none they take every element with none; Schedules' Family / Type split `typeName || objectType`, SQL `type_object` and `get_relationships`' `typeObject` read `typeName`, `isSiteLike` tests `typeName || objectType` (framing unchanged); **the oracle script records IfcOpenShell's raw readings only** — an app rule is named in the test's `APP_RULES`, `KNOWN_DIFFERENCES` stays empty, and every element of every committed fixture is compared (`tests/fixtures/identities.json`, `object-type.pipeline.test.ts`).
+
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
 ---
@@ -1662,6 +1664,7 @@ One line each. **Read `docs/TRAPS.md` before touching `src/worker/` or
 - Storey `Elevation` is in the file's own length unit; read `IfcUnitAssignment` and convert.
 - Never use `getSpatialStructure` — walk `IfcRelAggregates` and `IfcRelContainedInSpatialStructure`.
 - PredefinedType `USERDEFINED` means "see ObjectType"; never store the ObjectType text in the PredefinedType field — keep the code as written and the effective type apart; an IFC2X3 occurrence often has no PredefinedType, its type does.
+- Never show the type object's `Name` as ObjectType — the occurrence's own attribute is ObjectType, the type's Name is `typeName`; and an oracle records raw readings only, or it inherits the defect it should catch.
 
 **Streaming, workers and progress**
 
