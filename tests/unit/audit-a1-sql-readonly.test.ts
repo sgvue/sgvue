@@ -3,10 +3,11 @@
  *
  * The worker (`src/worker/sql.worker.ts`, its `build` case) builds the database with
  * `buildDatabase`, which ends with `PRAGMA query_only = 1`, then calls `db.export()` to hand
- * the bytes to the renderer and keeps that same `db` as the live connection. sql.js's
- * `export()` closes and reopens the connection, which resets pragmas — so after the export the
- * live connection accepts writes. `guardSql` (the SELECT-only gate) still refuses writes; this
- * file is about the pragma layer alone.
+ * the bytes to the renderer and keeps that same `db` as the live connection. Up to 1.15.1,
+ * sql.js's `export()` closed and reopened the connection, which reset pragmas — so after the
+ * export the live connection accepted writes (1.15.2 keeps them; the fix stays, so either
+ * behaviour is read-only). `guardSql` (the SELECT-only gate) still refuses writes; this file is
+ * about the pragma layer alone.
  *
  * The fix's contract, from `src/worker/sql-schema.ts`:
  *   `export function exportDatabase(db: Database): Uint8Array` — returns `db.export()`'s bytes
@@ -85,19 +86,24 @@ describe('A1 — PIN: a freshly built database refuses writes', () => {
 })
 
 describe('A1 — library behaviour the fix works around', () => {
-  // sql.js resets pragmas on export — this is the library behaviour the fix works around; if
-  // this ever starts failing, sql.js changed and `exportDatabase` can be simplified.
-  it('a bare db.export() leaves query_only = 0', () => {
+  // sql.js up to 1.15.1 reset every pragma on export, which is what `exportDatabase` works
+  // around. 2026-11-12 — sql.js 1.15.2 (the dependency update merged that day) keeps them, and
+  // the canary that pinned the reset fired, as it was written to. It now pins what the pinned
+  // version does; `exportDatabase` still sets the pragma again, so the connection is read-only
+  // with either behaviour. If this fails, sql.js changed again: read the tests below first.
+  it('a bare db.export() keeps query_only = 1 (sql.js 1.15.2; 1.15.1 left it at 0)', () => {
     const db = built()
     db.export()
-    expect(queryOnly(db)).toBe(0)
+    expect(queryOnly(db)).toBe(1)
   })
 
-  // Also proves every statement in WRITES is a valid write, so the "throws" asserted elsewhere
-  // is the pragma refusing it, not a constraint or syntax error.
-  it('after a bare db.export() every write in WRITES succeeds', () => {
+  // Proves every statement in WRITES is a valid write, so the "throws" asserted elsewhere is the
+  // pragma refusing it, not a constraint or syntax error. 2026-11-12 — the pragma is switched off
+  // by name here; until sql.js 1.15.2 a bare export did that by itself.
+  it('with query_only switched off every write in WRITES succeeds', () => {
     const db = built()
-    db.export()
+    db.run('PRAGMA query_only = 0')
+    expect(queryOnly(db)).toBe(0)
     for (const [what, sql] of Object.entries(WRITES)) {
       expect(() => db.run(sql), what).not.toThrow()
     }

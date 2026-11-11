@@ -1220,10 +1220,54 @@ Anything not on this list is a defect.
   reads `(SVY21)`. Same span, same style string. **No new element, no new control.** Not yet
   seen in a window.
 
+- **2026-11-12 — a model picked after boot shows a federating indicator: a line along the stage's
+  top edge and a caption in the bottom row.** Asked for by the owner in these words: *"create a
+  new simple yet cool techy loading animation when model view is federating the new upload
+  model."* Of three clickable prototypes (pixel chip, edge trace, scan frame) the owner chose
+  *"B"* — Edge trace. Until now a model added to an open viewer showed its progress only in the
+  sidebar's upload row, and the 3D view nothing but the centre badge during the join. **Two new
+  elements, no new control**, DOM and CSS only (`app/FedTrace.tsx`). **The line**
+  (`data-role="fedline"`): a child of the stage, 2 px high, `top:5px;left:5px;right:5px`,
+  z-index 14, `aria-hidden`, no pointer events — clear of the visibility frame (3 px + 1 px), the
+  toolbar (12 px) and the view cube (8 px). Five equal segments 2 px apart, one per stage of
+  `STAGES`: pending `--border`; the current one a `--border-strong` track carrying the design's
+  `ifcsweep` glint (25 % wide, 1.3 s), on that segment only and only while its stage runs; a
+  finished one's `--accent` fill grows over 260 ms. It enters over 220 ms by opacity alone
+  (`fedfade`, the one new keyframe, `styles/fed-trace.css`). Joined: every fill `--ok-ink`.
+  Failed: the current segment `--warn-ink`, still. **The caption** (`data-role="fedcaption"`,
+  `role="status"`): the top piece of the bottom row's centre zone, above the reset pill and the
+  hint, in the status bar's own card, no pointer events. Loading: `<file> · <stage> · n/5`, the
+  stage in the design's words; with two or more files in flight `N models` and the stage of the
+  one furthest behind; a row that reads `ready` is `federating · 5/5`. Joined: the upload row's
+  tick at 14 px and `+N elements` (`+1 element`) in `--ok-ink` — N how much the federation grew
+  over the batch, grouped with thin spaces — or `joined` with no number when it did not grow (a
+  replacement), plus ` · N could not open` in `--warn-ink` when some files of the batch failed.
+  All failed: `could not open — see Models` in `--warn-ink`. Only the file name shrinks (22
+  characters at most, then an ellipsis). **Only what the app knows:** never a percentage, never
+  a count while parsing. **Timings:** joined holds 900 ms and failed 1 600 ms, then both pieces
+  fade over 220 ms and are removed from the DOM; a cancel fades at once; a new pick during a
+  hold or the fade restarts it. **It replaces the design's centre badge `Rebuilding federation…`
+  only while it is up**; the boot's messages and a removal with no load in flight are as
+  designed, and the landing page's first load never shows it. **Reduced motion:** every state a
+  still, no glint, and each piece removed at the end of its hold with no fade. **With no load in
+  flight both pieces are absent and every element and style string is what it was.** It reads the
+  store's upload rows alone, starts no frame loop and never wakes the 3D view. **Seen in a window** (2026-11-12, `tests/e2e/fed-trace.spec.ts`, the built app, a model added
+  with the sidebar's `upload` six times): the line is 2 px, 5 px inside the stage's top, left and
+  right at every size tried; the caption is 27 px tall, its foot 14 px above the stage's, and
+  258.62 px wide reading `high-first.ifc · reading file · 1/5`; every load showed `1/5` … `5/5`
+  in order, never together with the centre badge, ended on `+N elements` with N the status
+  bar's own growth, and both pieces were then removed. Neither piece met the toolbar, the view
+  cube, the status bar, the Ask pill, a tool hint, the reset pill or the property card, nor took
+  the pointer — at the default window, in both themes, at a stage 520 px wide (the caption
+  centred above the bars) and with the hint, the pill and the card all showing (the caption
+  above the pill). The first load showed nothing; an archive with no `.ifc` ended on `could not
+  open — see Models`; under reduced motion no glint was drawn. The numbers are in
+  `docs/DECISIONS.md`.
+
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
-2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's
-and 2026-11-07's.
+2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's,
+2026-11-07's and 2026-11-12's.
 
 ### No visible additions
 
@@ -1572,6 +1616,8 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-11 — **the schedule engine's number-as-text pattern is unambiguous (`WHOLE_NUMBER`), a yes/no filter reads `boolOfText`, an unfilled one reads "false" as before, a class is listed once, and an unknown operator's rule is dropped on load** (`OPS`, `isOp`).
 - 2026-11-11 — **`exportDatabase` sets `PRAGMA query_only` again after sql.js's export**, which resets it; **a schedule's core key and font name are own keys** (`Object.hasOwn`).
 - 2026-11-11 — **a load that was replaced fails in silence**: a project's own fresh start is not its files failing (`startingOver` around `startOver()`, `model/project.ts`, which the store subscriber's loading branch ignores — a second project opened over a loading one used to read as loaded at once); a stale batch's failed join undoes nothing and resolves `false` (`joinBatch`, `model/federation-store.ts`), so it closes no model of the newer load; `join()`'s `bootFailed` runs only for the current load (`mine === epoch`, `model/upload-pipeline.ts`). The fallback for a project whose every file fails is unchanged.
+
+- 2026-11-12 — **the federating indicator (the owner's pick "B") is read off the store alone** (`shared/fed-trace.ts` pure — `fedStep`, `fedHoldMs`, `fedExpire`, `fedView`; `model/fed-trace-store.ts` outside the shell store, like `ai/trace-store.ts`): a row is tracked only if first seen while `booted` and not an error row, in flight until it leaves `uploads` done (joined), turns `error` (failed) or leaves undone (cancelled), and the batch ends when none is in flight; its only timers are a hold (900 / 1 600 ms) or an exit (220 ms), never a frame loop or an interval, and nothing reaches `viewer/`; `upload-pipeline.ts` is untouched. `BottomRow` draws the caption itself and `fit()` counts it with the name cut to `CAPTION_NAME_MIN` (40 px); `LoadingBadge` is `null` while it is up.
 - 2026-11-12 — **a located model that did not end up loaded can be located again** (`releaseDead`, `model/project.ts`; `locateOver`, `model/upload-pipeline.ts`): its `locating` entry is released, just before `locateModel` decides whether to refuse, when the pipeline queued its file, no claim holds it any more and it is not open — its parse or its join failed, the batch it shared failed, or the project's own failed boot unloaded it with the rest (it is still unloaded then: the unload loop is unchanged) — and at once when nothing was queued ("Replace model?" cancelled). Before, that file was refused as `already open in this project` until the project was reopened. A file that is open in the project, or still on its way in, is refused as before; the model stays carried, keeps its Locate… row, and a save still writes it.
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.

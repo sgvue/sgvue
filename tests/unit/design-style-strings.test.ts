@@ -420,6 +420,8 @@ const E = {
    * `border-radius` last (`SGVue.dc.html:241`, `:246`), the port before `color` (`Toolbar.tsx`,
    * `view`'s `radius` argument). The computed style is the same; the string is not.
    */
+  fedTrace:
+    '2026-11-12 — a model picked after boot shows a federating indicator: a line along the stage’s top edge and a caption in the bottom row (the owner’s pick “B”)',
   unrecordedViewOrder: 'UNRECORDED — reported 2026-11-07: the 3D and W view buttons’ border-radius is written before color, not last'
 } as const
 
@@ -455,6 +457,22 @@ const DEVIATIONS: readonly { file: string; css: string; entry: string }[] = [
   { file: 'src/renderer/app/ColorLegend.tsx', css: 'position:absolute;left:12px;bottom:calc(42px + var(--abar, 0px));z-index:11;width:230px;max-height:calc(100% - ${…}px - 60px - var(--abar, 0px));display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow);animation:fadein .15s ease-out', entry: E.actionBar },
   { file: 'src/renderer/app/CoordsCard.tsx', css: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap', entry: E.caption },
   { file: 'src/renderer/app/CoordsCard.tsx', css: 'font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis', entry: E.coordsNote },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;top:5px;left:5px;right:5px;height:2px;display:flex;gap:2px;pointer-events:none;z-index:14;animation:fedfade .22s linear', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;top:5px;left:5px;right:5px;height:2px;display:flex;gap:2px;pointer-events:none;z-index:14;animation:fedfade .22s linear;opacity:0;transition:opacity .22s linear', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'flex:1;position:relative;overflow:hidden;border-radius:1px;background:var(--border)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'flex:1;position:relative;overflow:hidden;border-radius:1px;background:var(--border-strong)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;inset:0;width:0;background:var(--accent);transition:width .26s cubic-bezier(.2,.7,.2,1),background-color .22s ease-out', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;inset:0;width:100%;background:var(--accent);transition:width .26s cubic-bezier(.2,.7,.2,1),background-color .22s ease-out', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;inset:0;width:100%;background:var(--ok-ink);transition:width .26s cubic-bezier(.2,.7,.2,1),background-color .22s ease-out', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;inset:0;width:100%;background:var(--warn-ink)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'position:absolute;top:0;left:0;height:100%;width:25%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:ifcsweep 1.3s linear infinite', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'display:flex;align-items:center;gap:8px;font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;box-shadow:var(--shadow);white-space:nowrap;max-width:100%;pointer-events:none;animation:fadein .22s cubic-bezier(.2,.7,.2,1)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'display:flex;align-items:center;gap:8px;font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;box-shadow:var(--shadow);white-space:nowrap;max-width:100%;pointer-events:none;animation:fadein .22s cubic-bezier(.2,.7,.2,1);opacity:0;transition:opacity .22s linear', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'color:var(--ink);min-width:0;max-width:22ch;overflow:hidden;text-overflow:ellipsis', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'color:var(--faint)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'color:var(--ok-ink)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'color:var(--warn-ink)', entry: E.fedTrace },
+  { file: 'src/renderer/app/FedTrace.tsx', css: 'width:14px;height:14px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--ok-bg);color:var(--ok-ink);margin:-2px 0;animation:ifcpop .3s ease-out', entry: E.fedTrace },
   { file: 'src/renderer/app/FilterCard.tsx', css: 'width:100%;font:400 12px/1.3 var(--mono);color:var(--ink);background:var(--card);border:1px solid var(--border-strong);border-radius:8px;padding:6px 8px;min-width:0;opacity:.45', entry: E.empty },
   { file: 'src/renderer/app/HintBar.tsx', css: 'font:400 12px/1.4 var(--sans);color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 12px;box-shadow:var(--shadow);white-space:normal;text-align:center;text-wrap:balance;max-width:100%;pointer-events:auto', entry: E.bottomRow },
   { file: 'src/renderer/app/Landing.tsx', css: 'position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;padding:32px;background:var(--ground);overflow:auto;opacity:0;transition:opacity ${…}s linear;pointer-events:none', entry: E.fade },

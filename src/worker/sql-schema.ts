@@ -249,8 +249,9 @@ export function buildDatabase(SQL: SqlJsStatic, payload: SqlPayload): Database {
 /**
  * The database's bytes, with the connection left read-only.
  *
- * sql.js's `export()` closes and reopens the connection, which resets every pragma — so
- * `query_only` is set again here, or the live connection would accept writes after it.
+ * Up to 1.15.1, sql.js's `export()` closed and reopened the connection, which reset every
+ * pragma — so `query_only` is set again here, or the live connection would have accepted writes
+ * after it. sql.js 1.15.2 keeps the pragma; setting it again costs nothing and holds either way.
  */
 export function exportDatabase(db: Database): Uint8Array {
   const bytes = db.export()
