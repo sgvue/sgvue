@@ -2,15 +2,28 @@
 
 import type { Cell } from '../ifc/types';
 import { defaultHeading, type FilterRule, type Op, type ScheduleDef } from './def';
+import { boolOfText } from './format';
 
-/** Pull a number out of a cell, tolerating "1,200 mm" style text. */
+/** The whole text is one decimal number: a sign, a leading-dot form and an exponent allowed. */
+const WHOLE_NUMBER = /^[-+]?(\d+(\.\d*)?|\.\d+)(e[-+]?\d+)?$/i;
+/**
+ * The first number in other text. A decimal may start with its dot only at the start of the
+ * text or after whitespace or a sign (" .75 m"), never after a letter or a digit ("A.5" is 5).
+ */
+const FIRST_NUMBER = /-\.\d+|(?<![^\s+-])\.\d+|-?\d+(?:\.\d+)?/;
+
+/** Pull a number out of a cell, tolerating "1,200 mm" style text. Never NaN or Infinity. */
 export function numberOf(cell: Cell | undefined): number | null {
   if (cell === undefined) return null;
   const v = cell.v;
   if (typeof v === 'number') return v;
   if (typeof v === 'boolean') return v ? 1 : 0;
-  const m = String(v).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
+  const s = String(v).replace(/,/g, '');
+  const whole = s.trim();
+  const m = WHOLE_NUMBER.test(whole) ? whole : s.match(FIRST_NUMBER)?.[0];
+  if (m === undefined) return null;
+  const n = Number(m);
+  return Number.isFinite(n) ? n : null;
 }
 
 function textOf(cell: Cell | undefined): string {
@@ -112,9 +125,15 @@ function boundOf(v: string | number | null | undefined): number | null {
 
 function equalValues(cell: Cell, want: FilterRule['value']): boolean {
   if (typeof cell.v === 'boolean') {
-    const s = String(want).trim().toLowerCase();
-    const b = s === 'true' || s === 'yes' || s === 'y' || s === '1';
-    return cell.v === b;
+    // Every display style the schedule offers (Yes/No, TRUE/FALSE, Y/N, ✓/✗), 1 and 0, or a
+    // real boolean. A filled value that names neither equals no boolean cell.
+    if (typeof want === 'boolean') return cell.v === want;
+    const s = String(want ?? '').trim();
+    // Unfilled reads as "false", as before: the yes/no dropdown stores nothing until the user
+    // picks, and the totals oracle (tests/unit/schedule/support/oracleEngine.ts) pins that.
+    if (s === '') return cell.v === false;
+    const b = s === '1' ? true : s === '0' ? false : boolOfText(s);
+    return b !== null && cell.v === b;
   }
   if (typeof cell.v === 'number') {
     const n = typeof want === 'number' ? want : numberOf({ v: String(want ?? '') });

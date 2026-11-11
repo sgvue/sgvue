@@ -45,10 +45,15 @@ export type FieldRef =
   | { kind: 'prop'; pset: string; prop: string }
   | { kind: 'formula'; id: string };
 
-export type Op =
-  | '=' | '!=' | '>' | '>=' | '<' | '<='
-  | 'contains' | 'startsWith' | 'endsWith'
-  | 'hasValue' | 'noValue' | 'in' | 'between';
+/** Every filter / colour-rule operator. ONE list: `Op` is derived from it and the parser reads it. */
+export const OPS = [
+  '=', '!=', '>', '>=', '<', '<=',
+  'contains', 'startsWith', 'endsWith',
+  'hasValue', 'noValue', 'in', 'between',
+] as const;
+export type Op = (typeof OPS)[number];
+
+const isOp = (v: unknown): v is Op => (OPS as readonly unknown[]).includes(v);
 
 /**
  * How a boolean may be spelled. ONE list: the type below, the import sanitiser and the
@@ -332,7 +337,7 @@ function cleanColumn(v: unknown): Column | null {
     hidden: c.hidden === true ? true : undefined,
     conditional: Array.isArray(c.conditional)
       ? (c.conditional as Record<string, unknown>[])
-        .filter((r) => r && typeof r === 'object' && typeof r.op === 'string')
+        .filter((r) => r && typeof r === 'object' && isOp(r.op))
         .map((r) => ({
           op: r.op as Op,
           value: typeof r.value === 'number' ? r.value : text(r.value, 120),
@@ -426,7 +431,7 @@ export function parseScheduleDef(input: unknown): ScheduleDef {
 
   const base = emptySchedule(typeof o.name === 'string' ? o.name : 'Imported Schedule');
   const entity = Array.isArray(o.entity)
-    ? o.entity.filter((e): e is string => typeof e === 'string')
+    ? [...new Set(o.entity.filter((e): e is string => typeof e === 'string'))]
     : typeof o.entity === 'string' ? [o.entity] : [];
 
   const columns = (o.columns as unknown[])
@@ -443,7 +448,7 @@ export function parseScheduleDef(input: unknown): ScheduleDef {
       ? (o.calculated as unknown[]).map(cleanCalculated).filter((c): c is Calculated => c !== null)
       : undefined,
     filters: Array.isArray(o.filters)
-      ? (o.filters as FilterRule[]).filter((f) => f?.field && f.op).slice(0, MAX_FILTERS).map(cleanRange) : [],
+      ? (o.filters as FilterRule[]).filter((f) => f?.field && isOp(f.op)).slice(0, MAX_FILTERS).map(cleanRange) : [],
     filterLogic: o.filterLogic === 'or' ? 'or' : 'and',
     sort: Array.isArray(o.sort)
       ? (o.sort as SortLevel[]).filter((s) => s?.field).slice(0, MAX_SORT_LEVELS) : [],

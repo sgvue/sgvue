@@ -109,7 +109,7 @@ export function storeNum(raw: string, kind: UnitKind, system?: UnitSystem): numb
   let s = raw.trim();
   if (unit && s.toLowerCase().endsWith(unit.toLowerCase())) s = s.slice(0, -unit.length).trim();
   s = s.replace(/,/g, '');
-  if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s)) return undefined;
+  if (!/^[-+]?(\d+(\.\d*)?|\.\d+)(e[-+]?\d+)?$/i.test(s)) return undefined;
   // SGVue: an exponent past a double ("1e400") is no number either, as it was before.
   const n = Number(s);
   return Number.isFinite(n) ? fromDisplay(n, kind, unit || undefined) : undefined;
