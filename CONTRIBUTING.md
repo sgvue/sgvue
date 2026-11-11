@@ -98,7 +98,7 @@ dialog or to the project file this run opened or saved.
 spacing, copy, motion and the look of the 3D scene. The app is a port of it: the same
 structure, class names, copy and numbers. **`design-reference/` is read-only**; never edit it
 to match the code. A visible change is a design decision: propose it in an issue first, and
-when it is accepted it is recorded as an allowed deviation in `CLAUDE.md`, with a dated row in
+when it is accepted it is recorded as an allowed deviation in `docs/DEVIATIONS.md`, with a dated row in
 `docs/DECISIONS.md` and the measurements that show what moved. A pull request that changes what
 the user sees without that record will be asked to add it.
 
@@ -138,5 +138,6 @@ The maintainer makes them — [docs/RELEASING.md](docs/RELEASING.md) describes h
 ## Working with AI coding agents
 
 SGVue is built with AI coding agents, and [CLAUDE.md](CLAUDE.md) holds the notes they work from:
-the fidelity contract, the rules above in full, and an index of every decision and trap. Read it
-if you work the same way; the rules in this file apply either way.
+the fidelity contract, the rules above in full, the standing decisions and every trap; the full
+list of allowed deviations is `docs/DEVIATIONS.md` and the index of every decision
+`docs/DECISIONS-INDEX.md`. Read them if you work the same way; the rules in this file apply either way.

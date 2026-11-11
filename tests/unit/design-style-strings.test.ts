@@ -29,8 +29,8 @@
  * HTML entities in the design are decoded first.
  *
  * **The allow-list** (`DEVIATIONS`): a string the design does not have, keyed by file and string,
- * each naming the entry of `CLAUDE.md` — an "Allowed desktop deviation" by date and title, or a
- * recorded decision — that changed it. An entry marked `UNRECORDED — reported 2026-11-07` names
+ * each naming the entry that changed it — an allowed desktop deviation in `docs/DEVIATIONS.md` by
+ * date and title, or a recorded decision in `docs/DECISIONS-INDEX.md`. An entry marked `UNRECORDED — reported 2026-11-07` names
  * none: it was found when this test was written, it is the owner's to decide, and it is a
  * possible defect until then. The test fails for a string in no list, and for a listed one that
  * is no longer in the code.
@@ -376,8 +376,8 @@ function inDesign(p: readonly Piece[], d: Design): boolean {
 // ── The allow-lists ──────────────────────────────────────────────────────────────────────────
 
 /**
- * The `CLAUDE.md` entries the port's own strings stand on, by the date and opening words they are
- * recorded under ("Allowed desktop deviations", or "Decisions" where it says so).
+ * The recorded entries the port's own strings stand on, by the date and opening words they are
+ * recorded under (`docs/DEVIATIONS.md`, or `docs/DECISIONS-INDEX.md` where it says "Decisions").
  */
 const E = {
   preferences:
@@ -427,7 +427,7 @@ const E = {
 
 /**
  * Strings the design does not have, by `file` and the string (`${…}` for a hole), each with the
- * `CLAUDE.md` entry that changed it.
+ * recorded entry (`docs/DEVIATIONS.md` or `docs/DECISIONS-INDEX.md`) that changed it.
  */
 const DEVIATIONS: readonly { file: string; css: string; entry: string }[] = [
   { file: 'src/renderer/App.tsx', css: 'flex:1;position:relative;min-width:0;overflow:clip;background:var(--ground);--rlane:${…}px;--abar:${…}px;--brow:${…}px', entry: E.clipAbarBrow },
@@ -577,18 +577,18 @@ describe('inline style strings are the design’s', () => {
     expect(
       bad,
       `${bad.length} inline style string(s) are not in ${DESIGN} and not in DEVIATIONS:\n  ${bad.join('\n  ')}\n` +
-        'Restore the design’s string, or record the deviation in CLAUDE.md and list it in DEVIATIONS with that entry.'
+        'Restore the design’s string, or record the deviation in docs/DEVIATIONS.md and list it in DEVIATIONS with that entry.'
     ).toEqual([])
   })
 
-  it('every DEVIATIONS entry names its CLAUDE.md entry and is still in the code', () => {
+  it('every DEVIATIONS entry names its recorded entry and is still in the code', () => {
     const live = new Set(found.filter((f) => !inDesign(f.pieces, design)).map((f) => key(f.file, textOf(f.pieces))))
     const stale = DEVIATIONS.filter((d) => !live.has(key(d.file, d.css))).map((d) => `${d.file}  '${d.css}'`)
     expect(stale, `DEVIATIONS lists strings no longer in the code (or now the design’s) — remove them:\n  ${stale.join('\n  ')}`).toEqual([])
     const unnamed = DEVIATIONS.filter((d) => !/^\d{4}-\d{2}-\d{2} — \S/.test(d.entry) && !d.entry.startsWith('UNRECORDED — reported ')).map(
       (d) => `${d.file}  '${d.css}'`
     )
-    expect(unnamed, `DEVIATIONS entries must name a dated CLAUDE.md entry:\n  ${unnamed.join('\n  ')}`).toEqual([])
+    expect(unnamed, `DEVIATIONS entries must name a dated entry of docs/DEVIATIONS.md or docs/DECISIONS-INDEX.md:\n  ${unnamed.join('\n  ')}`).toEqual([])
   })
 
   it('every computed s(…) argument is listed with its reason, and every listed one still exists', () => {
