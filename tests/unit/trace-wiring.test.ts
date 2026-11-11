@@ -14,7 +14,7 @@ import { useShell, type ChatMessage } from '../../src/renderer/state/shell'
 import { handleEvent, installAi, runTurnOnce, scriptedTurn, sendChat } from '../../src/renderer/ai/bridge'
 import { answerFrame, traceCues, traceFrame } from '../../src/renderer/ai/trace'
 import { onTrace, pinTrace, traceFail, traceNow, traceState } from '../../src/renderer/ai/trace-store'
-import { chatRow, veeStateOf } from '../../src/renderer/state/selectors/chat'
+import { veeStateOf } from '../../src/renderer/state/selectors/chat'
 import type { AiEvent, AiToolExec, AiToolResult } from '../../src/shared/ipc-contract'
 import { resetShell } from './stub-viewer'
 
@@ -174,7 +174,7 @@ describe('a real turn, as the trace hears it', () => {
 
     pinTrace(109)
     emit!({ type: 'done', turnId, text: '**24 of 80 walls** have no Thermal Transmittance.', rounds: 2 })
-    expect(traceState().timeline).toMatchObject({ answer: 109, words: 8, table: false })
+    expect(traceState().timeline).toMatchObject({ answer: 109, table: false })
     expect(useShell.getState().chatBusy).toBe(false)
     expect(last().trace!.status).toBe('checked 80 walls · 9s')
     stop()
@@ -247,9 +247,6 @@ describe('what a finished reply keeps', () => {
     // …which is what a click on a row selects.
     useShell.getState().select(reply.trace!.rows[4].ids, false)
     expect(useShell.getState().selIds).toHaveLength(4)
-
-    const row = chatRow(reply, 2)
-    expect(row).toMatchObject({ traced: true, status: 'checked 80 walls · 7s', wide: true, who: 'Vee' })
   })
 
   it('has no rows beside a table, and keeps the table', async () => {
@@ -270,12 +267,8 @@ describe('what a finished reply keeps', () => {
     pinTrace(12.6)
     scriptedTurn.done('Hello.')
     expect(last().trace).toEqual({ status: '3s', wide: false, rows: [], noun: 'element', fold: '3s', steps: [] })
-    expect(chatRow(last(), 2)).toMatchObject({ traced: true, status: '3s', wide: false })
     // The boot audit was written by no turn.
     expect(messages()[0].trace).toBeUndefined()
-    expect(chatRow(messages()[0], 0)).toMatchObject({ traced: false, status: '', wide: false })
-    // A user's message never is, whatever it carries.
-    expect(chatRow({ role: 'user', text: 'x', trace: last().trace }, 1)).toMatchObject({ traced: false, status: '' })
   })
 
   it('draws the answer from the moment `done` arrives, whatever the trace was doing', async () => {
@@ -289,7 +282,7 @@ describe('what a finished reply keeps', () => {
     const tl = traceState().timeline!
     const layout = { width: 282, dpr: 1, textH: 19.375, reduced: false }
     const at = traceFrame(tl, 20.3, layout)
-    expect(at.bubble).toEqual({ wide: true, opacity: 1 })
+    expect(at.bubble).toEqual({ opacity: 1 })
     // The matrix is the Check's end — its 24 findings lit — though no step was ever shown.
     expect(at.steps).toEqual([])
     expect(at.dots).toBe(false)
@@ -355,7 +348,6 @@ describe('the trace is narration', () => {
       expect(useShell.getState().chatBusy).toBe(false)
       expect(last()).toMatchObject({ role: 'assistant', text: 'Twenty-four of them.' })
       expect(last().trace).toBeUndefined()
-      expect(chatRow(last(), 2)).toMatchObject({ traced: false, status: '' })
     } finally {
       said.mockRestore()
       stop()

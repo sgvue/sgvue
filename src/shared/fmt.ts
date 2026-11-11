@@ -14,7 +14,6 @@
  * | `fmtV`       | `SGVue.dc.html:1835`                   | property-card pset/qto rows                  |
  * | `mmv`        | `SGVue.dc.html:1838`                   | property-card geometry rows (bbox, base/top) |
  * | `signedMm`   | `SGVue.dc.html:1790`, `viewer-core:219`| sidebar storey list, 3D level tags           |
- * | `fmtMM`      | `viewer-core.js:9`                     | viewer-core labels (plain space before mm)   |
  * | `mmTxt`      | `viewer-core.js:435`                   | selection dimension labels (thin space)      |
  * | `mmPlain`    | `viewer-core.js:617`                   | live measure label (number only, unit split) |
  * | `f3`         | `viewer-core.js:410`                   | spot coordinate readout E/N/Z                |
@@ -51,9 +50,6 @@ export const fmtV = (v: unknown): string =>
 
 /** Metres → `"2 400 mm"` (plain space). Property-card geometry rows. */
 export const mmv = (metres: number): string => thin(Math.round(metres * 1000)) + ' mm'
-
-/** Metres → `"2 400 mm"` with a plain space. `viewer-core.js`'s label formatter. */
-export const fmtMM = mmv
 
 /** Metres → `"2 400 mm"` with a THIN space before the unit. Dimension labels only. */
 export const mmTxt = (metres: number): string =>

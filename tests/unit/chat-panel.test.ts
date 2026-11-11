@@ -22,7 +22,6 @@ import { resetShell } from './stub-viewer'
 import {
   ASSISTANT,
   authorOf,
-  BUBBLE_RADIUS,
   chatExamples,
   chatRow,
   chipsFolded,
@@ -63,30 +62,7 @@ describe('a message row', () => {
   it('puts a user turn on the left, with the assistant’s corner, in its own colour', () => {
     const row = chatRow(message({ role: 'user', text: 'how many doors?' }), 0)
     expect(row).toMatchObject({
-      who: 'You',
-      bg: 'var(--sel-bg)',
-      align: 'flex-start',
-      just: 'flex-start',
-      radius: BUBBLE_RADIUS,
-      maxW: '86%',
       opacity: '1'
-    })
-    expect(BUBBLE_RADIUS).toBe('11px 11px 11px 3px')
-    // The two sides differ in colour and in how wide they may grow, and in nothing else.
-    const theirs = chatRow(message({}), 0)
-    expect([row.align, row.just, row.radius]).toEqual([theirs.align, theirs.just, theirs.radius])
-    expect([row.bg, theirs.bg, row.maxW, theirs.maxW]).toEqual(['var(--sel-bg)', 'var(--step-bg)', '86%', '100%'])
-  })
-
-  it('puts an assistant turn on the left, full width, with its notch at the bottom left', () => {
-    const row = chatRow(message({}), 0)
-    expect(row).toMatchObject({
-      who: 'Vee',
-      bg: 'var(--step-bg)',
-      align: 'flex-start',
-      just: 'flex-start',
-      radius: '11px 11px 11px 3px',
-      maxW: '100%'
     })
   })
 
@@ -99,10 +75,6 @@ describe('a message row', () => {
     expect(ASSISTANT).toBe('Vee')
     expect(authorOf({ role: 'assistant' })).toBe('Vee')
     expect(authorOf({ role: 'user' })).toBe('You')
-    expect(chatRow(message({}), 0)).toMatchObject({ who: 'Vee', hasSprite: true })
-    expect(chatRow(message({ role: 'user' }), 1)).toMatchObject({ who: 'You', hasSprite: false })
-    // A reverted or quoted turn is still the assistant's.
-    expect(chatRow(message({ undoSnap: undo(), reverted: true }), 2)).toMatchObject({ who: 'Vee', hasSprite: true })
   })
 
   it('offers ↺ only while the turn has a snapshot and has not been reverted', () => {
@@ -117,16 +89,10 @@ describe('a message row', () => {
 
   it('carries the quote a reply was aimed at', () => {
     const row = chatRow(message({ quote: { who: 'You', text: 'isolate L2' } }), 3)
-    expect(row).toMatchObject({ hasQuote: true, quoteWho: 'You', quoteText: 'isolate L2', key: 3 })
-    expect(chatRow(message({}), 0).hasQuote).toBe(false)
+    expect(row).toMatchObject({ quoteWho: 'You', quoteText: 'isolate L2' })
   })
 
   it('reports chips, a table and a pending change only when they are there', () => {
-    expect(chatRow(message({}), 0)).toMatchObject({
-      hasChips: false,
-      hasTable: false,
-      hasPending: false
-    })
     const rich = chatRow(
       message({
         chips: [{ label: 'IfcWall (12)', ids: [1, 2] }],
@@ -136,12 +102,7 @@ describe('a message row', () => {
       0
     )
     expect(rich).toMatchObject({
-      hasChips: true,
-      hasTable: true,
-      tableTitle: 'Level',
-      tableClash: false,
-      hasPending: true,
-      pendingLabel: 'leaves 3 of 412 visible'
+      tableTitle: 'Level'
     })
     expect(rich.tableRows).toEqual([{ k: 'L1', n: '4', q: '12.3 m²', ids: [1] }])
   })

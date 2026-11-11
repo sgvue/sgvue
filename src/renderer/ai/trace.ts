@@ -189,8 +189,6 @@ export interface Timeline {
   calls: readonly TraceCall[]
   /** Answer — when `done` arrived. `null` while the turn runs. */
   answer: number | null
-  /** The reply's words, for the reveal. */
-  words: number
   /** The turn produced a table, so its answer carries no rows. */
   table: boolean
 }
@@ -199,7 +197,7 @@ export type TraceEvent =
   | { type: 'begin'; at: number; read: ReadFacts }
   | { type: 'tool_start'; at: number }
   | { type: 'tool_exec'; at: number; facts: ToolFacts }
-  | { type: 'done'; at: number; words: number; table: boolean }
+  | { type: 'done'; at: number; table: boolean }
   | { type: 'fail' }
 
 /**
@@ -209,7 +207,7 @@ export type TraceEvent =
  */
 export function traceReduce(tl: Timeline | null, ev: TraceEvent): Timeline | null {
   if (ev.type === 'begin') {
-    return { send: ev.at, read: ev.read, tool: null, calls: [], answer: null, words: 0, table: false }
+    return { send: ev.at, read: ev.read, tool: null, calls: [], answer: null, table: false }
   }
   if (ev.type === 'fail') return null
   if (!tl || tl.answer !== null) return tl
@@ -221,7 +219,7 @@ export function traceReduce(tl: Timeline | null, ev: TraceEvent): Timeline | nul
       return { ...tl, tool: tl.tool ?? at, calls: [...tl.calls, { at, facts: ev.facts }] }
     }
     case 'done':
-      return { ...tl, answer: Math.max(ev.at, tl.send), words: ev.words, table: ev.table }
+      return { ...tl, answer: Math.max(ev.at, tl.send), table: ev.table }
   }
 }
 
@@ -423,8 +421,6 @@ export interface TraceFrame {
   /** The diary's header while the turn runs: `Thinking`, its shimmer (0…1 or `null`) and the seconds since Send. */
   thinking: { shimmer: number | null; seconds: number }
   bubble: {
-    /** The turn opened the trace's bubble — the diary. */
-    wide: boolean
     /** The diary's fade in at Read. */
     opacity: number
   }
@@ -711,7 +707,7 @@ export function traceFrame(tl: Timeline, T: number, layout: TraceLayout): TraceF
     sprite: { state, scale: hexIn, opacity: clamp(hexIn, 0, 1) },
     dots,
     thinking: { shimmer, seconds: Math.max(0, Math.floor((answered ? A! : T) - tl.send)) },
-    bubble: { wide, opacity: clamp(bIn * 1.6, 0, 1) },
+    bubble: { opacity: clamp(bIn * 1.6, 0, 1) },
     steps: diary,
     cells,
     beam

@@ -99,7 +99,7 @@ const SCENE = turn([
   { type: 'begin', at: CUES.Send, read: readFacts(fed) },
   { type: 'tool_start', at: CUES.Read },
   { type: 'tool_exec', at: CUES.Read + 0.4, facts: WALL_FACTS },
-  { type: 'done', at: CUES.Answer, words: R.ANSWER.length, table: false }
+  { type: 'done', at: CUES.Answer, table: false }
 ])
 
 /**
@@ -364,10 +364,10 @@ describe('the handoff’s scene, driven by events', () => {
     for (const T of BEFORE) {
       const bIn = p(T, CUES.Read, 0.45, M.enter)
       const f = frameAt(T)
-      expect([T, f.bubble]).toEqual([T, { wide: true, opacity: expect.closeTo(clamp(bIn * 1.6, 0, 1), 6) }])
+      expect([T, f.bubble]).toEqual([T, { opacity: expect.closeTo(clamp(bIn * 1.6, 0, 1), 6) }])
       expect([T, f.dots]).toEqual([T, T >= CUES.Think && T < CUES.Read])
     }
-    expect(frameAt(CUES.Hold).bubble).toEqual({ wide: true, opacity: 1 })
+    expect(frameAt(CUES.Hold).bubble).toEqual({ opacity: 1 })
     expect(frameAt(CUES.Hold).dots).toBe(false)
     expect(H_THINK).toBeCloseTo(52, 12)
   })
@@ -564,7 +564,7 @@ describe('the cues, from real events', () => {
     const none = turn([{ type: 'begin', at: 10, read: READ }])
     expect(traceCues(none)).toMatchObject({ read: null, steps: [], answer: null, last: -1 })
     const f = traceFrame(none, 14, REF_LAYOUT)
-    expect(f.bubble).toEqual({ wide: false, opacity: 0 })
+    expect(f.bubble).toEqual({ opacity: 0 })
     // Typing dots, and nothing else.
     expect([f.sprite.state, f.cells, f.steps, f.dots]).toEqual(['thinking', [], [], true])
     // A tool that ran without announcing itself still opens the trace.
@@ -657,7 +657,7 @@ describe('the answer is never delayed by animation', () => {
     { type: 'begin', at: 0, read: READ },
     { type: 'tool_start', at: 2 },
     { type: 'tool_exec', at: 2.2, facts: WALL_FACTS },
-    { type: 'done', at: 4.3, words: 13, table: false }
+    { type: 'done', at: 4.3, table: false }
   ])
 
   it('finishes everything queued or in flight at the instant `done` arrives', () => {
@@ -681,7 +681,7 @@ describe('the answer is never delayed by animation', () => {
       ['Reading 4 models', 412, true, 0, 1],
       ['Filtering IfcWall', 86, true, 0, 1]
     ])
-    expect(at.bubble).toEqual({ wide: true, opacity: 1 })
+    expect(at.bubble).toEqual({ opacity: 1 })
     // …and the answer's own motion starts there: the first part lands from the answer itself.
     const { p, MOTION: M } = R
     for (const dt of [0.02, 0.1, 0.2, 0.4]) {
@@ -703,14 +703,14 @@ describe('the answer is never delayed by animation', () => {
     const tl = turn([
       { type: 'begin', at: 100, read: READ },
       { type: 'tool_exec', at: 100.002, facts: WALL_FACTS },
-      { type: 'done', at: 100.004, words: 4, table: false }
+      { type: 'done', at: 100.004, table: false }
     ])
     const cues = traceCues(tl)
     expect(cues.think).toBe(100.004)
     expect(cues.read).toBeNull()
     expect(cues.steps).toEqual([])
     const at = traceFrame(tl, 100.004, REF_LAYOUT)
-    expect(at.bubble).toEqual({ wide: true, opacity: 1 })
+    expect(at.bubble).toEqual({ opacity: 1 })
     expect(at.cells.filter((c) => c.a === 'hit')).toHaveLength(9)
     expect(at.steps).toEqual([])
     // The lift from the composer is what runs longest: settled once it is over, 0.95 s after Send.
@@ -731,15 +731,15 @@ describe('the answer is never delayed by animation', () => {
 describe('a turn with no tool', () => {
   const tl = turn([
     { type: 'begin', at: 0, read: READ },
-    { type: 'done', at: 3.4, words: 30, table: false }
+    { type: 'done', at: 3.4, table: false }
   ])
   const layout: TraceLayout = { ...REF_LAYOUT, textH: 58 }
 
   it('opens no diary: typing dots until the answer, then the parts land', () => {
-    expect(traceFrame(tl, 3.39, layout)).toMatchObject({ bubble: { wide: false, opacity: 0 }, dots: true, steps: [], cells: [] })
+    expect(traceFrame(tl, 3.39, layout)).toMatchObject({ bubble: { opacity: 0 }, dots: true, steps: [], cells: [] })
     for (const dt of [0, 0.05, 0.2, 1]) {
       const f = traceFrame(tl, 3.4 + dt, layout)
-      expect([f.bubble, f.dots, f.cells, f.steps, f.beam]).toEqual([{ wide: false, opacity: 0 }, false, [], [], null])
+      expect([f.bubble, f.dots, f.cells, f.steps, f.beam]).toEqual([{ opacity: 0 }, false, [], [], null])
     }
     expect(answerFrame(tl, 3.4, 2, { dpr: 1, reduced: false }).parts.map((q) => q.opacity)).toEqual([0, 0])
     expect(answerFrame(tl, 3.45, 2, { dpr: 1, reduced: false }).parts[0].opacity).toBeGreaterThan(0)
@@ -782,7 +782,7 @@ describe('a turn with no tool', () => {
         { type: 'begin', at: 0, read: READ },
         { type: 'tool_start', at: toolAt },
         { type: 'tool_exec', at: toolAt + 0.2, facts: WALL_FACTS },
-        { type: 'done', at: A, words: 30, table: false }
+        { type: 'done', at: A, table: false }
       ])
       expect(answerEnd(t, n) - t.answer!).toBeLessThanOrEqual(1.95)
       if (t.answer! >= 1) expect(answerEnd(t, n) - t.answer!).toBeLessThan(ANSWER_TOTAL_S)
@@ -823,7 +823,7 @@ describe('a large model: each cell stands for several elements, and every number
     { type: 'begin', at: 0, read: readFacts(big) },
     { type: 'tool_start', at: 2 },
     { type: 'tool_exec', at: 2.5, facts },
-    { type: 'done', at: 9, words: 12, table: false }
+    { type: 'done', at: 9, table: false }
   ])
 
   it('counts what the rules really match', () => {
@@ -1020,7 +1020,7 @@ describe('reduced motion: every state at its end, and nothing in between', () =>
     expect([think.sprite, think.dots, think.thinking.shimmer]).toEqual([{ state: 'thinking', scale: 1, opacity: 1 }, true, null])
     // Read: the diary open, all 412 cells at rest, the whole count.
     const read = at(CUES.Read)
-    expect(read.bubble).toEqual({ wide: true, opacity: 1 })
+    expect(read.bubble).toEqual({ opacity: 1 })
     expect(read.dots).toBe(false)
     expect(read.cells).toHaveLength(412)
     expect(read.cells.every((c) => c.scale === 1 && c.opacity === 1 && c.t === 1 && c.b === 'cell')).toBe(true)
@@ -1087,7 +1087,7 @@ describe('what the answer carries', () => {
     const table = turn([
       { type: 'begin', at: 0, read: READ },
       { type: 'tool_exec', at: 2, facts: WALL_FACTS },
-      { type: 'done', at: 9, words: 5, table: true }
+      { type: 'done', at: 9, table: true }
     ])
     expect(answerRows(table)).toEqual([])
     expect(traceSummary(table)).toMatchObject({ status: 'checked 86 walls · 9s', wide: true, rows: [] })
@@ -1098,7 +1098,7 @@ describe('what the answer carries', () => {
     const nothing = turn([
       { type: 'begin', at: 0, read: READ },
       { type: 'tool_exec', at: 2, facts: RULED([{ prop: 'IfcEntity', op: '=', val: 'IfcPipeSegment' }, { prop: 'FireRating', op: 'absent', val: null }]) },
-      { type: 'done', at: 9, words: 5, table: false }
+      { type: 'done', at: 9, table: false }
     ])
     expect(answerRows(nothing)).toEqual([])
     expect(traceStatus(nothing)).toBe('checked 0 pipe segments · 9s')
@@ -1110,7 +1110,7 @@ describe('what the answer carries', () => {
       { type: 'tool_exec', at: 2, facts: RULED([{ prop: 'Model', op: '=', val: 'SIT' }]) },
       { type: 'tool_exec', at: 5, facts: WALL_FACTS },
       { type: 'tool_exec', at: 6, facts: NOTE('set_view') },
-      { type: 'done', at: 12.4, words: 5, table: false }
+      { type: 'done', at: 12.4, table: false }
     ])
     expect(traceCues(tl).last).toBe(1)
     expect(traceStatus(tl)).toBe('checked 86 walls · 12s')
@@ -1124,7 +1124,7 @@ describe('what the answer carries', () => {
       { type: 'begin', at: 0, read: READ },
       { type: 'tool_start', at: 2 },
       { type: 'tool_exec', at: 2, facts: filterOnly },
-      { type: 'done', at: 9, words: 5, table: false }
+      { type: 'done', at: 9, table: false }
     ])
     expect(traceStatus(tl)).toBe('found 86 walls · 9s')
     expect(foldText(tl)).toBe('412 read · 86 walls · 9s')
@@ -1147,7 +1147,7 @@ describe('what the answer carries', () => {
       { type: 'begin', at: 0, read: READ },
       { type: 'tool_start', at: 2 },
       { type: 'tool_exec', at: 2, facts: checkOnly },
-      { type: 'done', at: 9, words: 5, table: false }
+      { type: 'done', at: 9, table: false }
     ])
     expect(traceCues(tl).steps.map((s) => [s.kind, Number(s.at.toFixed(9))])).toEqual([['read', 2], ['check', 3.8]])
     const mid = traceFrame(tl, 3.8 + 1.2, REF_LAYOUT)
@@ -1232,7 +1232,7 @@ describe('a resize mid-turn (stage 1b): the matrix keeps its width while a Check
     { type: 'begin', at: 0, read: readFacts(big) },
     { type: 'tool_start', at: 2 },
     { type: 'tool_exec', at: 2.5, facts },
-    { type: 'done', at: 9, words: 12, table: false }
+    { type: 'done', at: 9, table: false }
   ])
   const check = traceCues(tl).steps.find((st) => st.kind === 'check')!.at
   const countAt = (T: number, width: number): number | null =>
