@@ -1,6 +1,21 @@
 # The `.sgvue` project file — plan
 
-*2026-11-07 · status: **approved; phases 1–5 built 2026-11-08** (BCF export, phase 6, optional and not started) — the owner: *"Approve the recommended defaults for both plans. go with .sgvue"* · D1…D12 are the recommended defaults below.*
+*2026-11-07 · status: **approved** — the owner: *"Approve the recommended defaults for both plans. go with .sgvue"* · D1…D12 are the recommended defaults below.*
+
+> **Status, read against the code and `PROGRESS.md` on 2026-11-12 (SGVue 1.6.0).** Phases 1–3
+> built on **2026-11-07** (format and codec; Save and Open with the fourth writer; the project's
+> own lists and markups), phases 4–5 on **2026-11-08** (changed and missing models; double-click
+> and drop), each with a deep review. Shipped in 1.4.0 and later; the spec is
+> `docs/SYSTEM_SPEC.md` §9.1. Follow-up fixes after the 1.5.0 test (2026-11-11 / 12): a reopened
+> project's models share one origin, a project settles when its own batch fails, Locate… can be
+> retried, and a save keeps a missing model when another file of its name is open.
+> **Not built:** phase 6, the BCF export (optional, not started). **Checks:** the round-trip (500
+> seeded states), re-export, hostile-file and frozen-corpus tests exist and run headless
+> (`tests/unit/project-file.test.ts`, `project-file-corpus.test.ts`); the e2e
+> (`tests/e2e/project.spec.ts`) was run and passed on 2026-11-08. **Not yet done:** a real
+> double-click in Finder and in Explorer on an installed copy (the packaged checks cover
+> `Info.plist` and a `.sgvue` in `argv`), and the "before release" check below on macOS ⌘Q with
+> the Vee and Schedules windows open is not recorded as run — the e2e quits with neither open.
 
 ## What it is
 

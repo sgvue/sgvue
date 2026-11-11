@@ -895,8 +895,8 @@ The five largest tool schemas are now `apply_visibility` (1 658 B), `select_elem
 
 - **Design parity.** All seven chat-panel states re-captured on the mock: the panel rectangle
   is **pixel-identical** (mean 0.0000, max 0, 0.000 %) to the 2026-09-18 captures in both
-  themes, and every sidecar field matches. The Filter card's own states are in `CLAUDE.md`'s
-  allowed deviations and in `docs/DECISIONS.md`.
+  themes, and every sidecar field matches. The Filter card's own states are in the
+  allowed deviations (`docs/DEVIATIONS.md`) and in `docs/DECISIONS.md`.
 - **The read-only guarantee.** 26 of 26 tools declare `read` or `view`, no tool name contains a
   mutating verb, no tool takes a file-system-shaped input, every catalogue entry has an
   executor and every executor a catalogue entry. `tests/readonly-guard.test.ts` is unchanged

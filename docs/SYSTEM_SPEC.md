@@ -67,16 +67,22 @@ SGVue is a port of a finished high-fidelity design, not a fresh interpretation o
    prototype in Chrome versus the app at the same window size and state. Differences are
    defects.
 
-**Allowed deviations.** The one complete list is `CLAUDE.md`'s — *Allowed desktop deviations —
-the complete list* — and anything not on **that** list is a defect; each entry's reasoning and
-measurements are its row in `docs/DECISIONS.md`. The table below holds ten of them — the five
-the port began with and five of the dated ones — and is kept for their reasons, not as the
-list. The rest are recorded there and not here: among them the landing page's Recent pills,
-demo building, update notice and (2026-10-09) its line saying that georeferencing is taken from
-the first model opened, the sidebar's resizable sections, the toolbar's groups and
-the bottom row, the two section cuts, the Schedules window, the assistant's name, its
-thinking trace, its per-reply revert and its consent gate, and (2026-10-09) the display unit's
-`ft` and its start in the boot model's own unit.
+**Allowed deviations.** The one complete list is `docs/DEVIATIONS.md` — *Allowed desktop
+deviations — the complete list*, moved there unchanged from `CLAUDE.md` on 2026-11-12, which keeps
+a one-line pointer per entry — and anything not on **that** list is a defect; each entry's
+reasoning and measurements are its row in `docs/DECISIONS.md`. The table below holds ten of them
+— the five the port began with and five of the dated ones — and is kept for their reasons, not as
+the list. The rest are recorded there and not here: among them the landing page's Recent pills,
+demo building and update notice, the sidebar's STOREYS↔ELEMENTS drag handle and its collapsible
+MODELS section (2026-11-07: the MODELS header folds the section, and expanded it is always its
+full height; the MODELS↔STOREYS handle went with it), the path title on the whole MODELS row and
+the removal of its `library` popover (2026-11-08), the gridlines and the canvas grid starting off
+(2026-11-07), the toolbar's groups and the bottom row, the two section cuts, the Schedules window,
+the assistant's name, its thinking trace, its per-reply revert and its consent gate, the `.sgvue`
+project file's menu items and window title (§9.1), and (2026-10-09) the display unit's `ft` and
+its start in the boot model's own unit. *(The landing page's 2026-10-09 line saying that
+georeferencing is taken from the first model opened was removed on 2026-11-07: since then nothing
+depends on which model was opened first — §5.)*
 
 | Deviation | Why it is necessary |
 |---|---|
@@ -85,16 +91,16 @@ thinking trace, its per-reply revert and its consent gate, and (2026-10-09) the 
 | Settings the design has no surface for — API key, model, effort, "Data sent to AI" — live behind the native application menu (Preferences…) in a small dialog built from the design tokens. No designed surface changes. | The design predates these settings; adding them to a designed surface would break fidelity. |
 | The sample library is backed by real IFC files the user provides — same pills, same "open all N" copy, rendered only when the list is non-empty. | The prototype's samples were fake. |
 | Fonts are self-hosted (the design says to); there is no `<head>` SEO metadata; window chrome is the operating system's. | Not a web page. |
-| **2026-09-20** — the Coordinate-system card's caption keeps `project base point` verbatim and appends ` · ` plus the detected georeferencing method (`IfcSite placement`, `IfcMapConversion`, `IfcMapConversion + IfcSite placement`, `ePset_MapConversion`, and since 2026-10-08 `WorldCoordinateSystem` and `WorldCoordinateSystem + IfcSite placement`), inside the same span and the same style. Nothing is appended when the file carries no georeferencing (or, until the card became read-only on 2026-10-08, once the four fields stopped showing what the file said); when something is appended the row gains `flex-wrap:wrap` so the caption takes its own line under the CRS chip. | Asked for by the user in these words: *"auto detect which way the model is using and show it"*. A real file may be placed by its site placement, by a map conversion, by both, or by an IFC2X3 pset, and the four numbers mean different things in each case. |
+| **2026-09-20** — the Coordinate-system card's caption keeps `project base point` verbatim and appends ` · ` plus the detected georeferencing method (`IfcSite placement`, `IfcMapConversion`, `IfcMapConversion + IfcSite placement`, `ePset_MapConversion`, and since 2026-10-08 `WorldCoordinateSystem` and `WorldCoordinateSystem + IfcSite placement`), inside the same span and the same style. Nothing is appended when the file carries no georeferencing (or, until the card became read-only on 2026-10-08, once the four fields stopped showing what the file said); when something is appended the row gains `flex-wrap:wrap` so the caption takes its own line under the CRS chip. Since 2026-11-07 the method is that of the file the card shows — the loaded model with the most elements that states georeferencing, ties by key, whatever the order (`georefSourceOf`, §5). | Asked for by the user in these words: *"auto detect which way the model is using and show it"*. A real file may be placed by its site placement, by a map conversion, by both, or by an IFC2X3 pset, and the four numbers mean different things in each case. |
 | **2026-09-20** — a grid bubble that would overprint its neighbour is not drawn, and reappears as the view zooms in. `shared/annotate.ts`'s `declutterBubbles` keeps the first bubble of each row in the grid's own axis order and drops any whose measured box comes within 2 px of one already kept; a row is one family at one end. A dropped bubble is hidden through the same path an occluded one takes — same `display`, no new element, no new class — and is no more clickable. | Asked for by the user in these words: *"apply your recommendations for both"*. The design has no rule because its mock grid is nine well-spaced axes; the reference model's numbered family is 24, which in plan puts 26 px bubbles about 20 px apart, so they overprint and their labels clip. |
-| **2026-09-20** — **above six storeys** (the design's own count) the element tree keeps a `min-height` of 40 % of the aside; the STOREYS rows wrapper gives way first (`flex:0 1000000 auto`, a three-row `min-height`, `overflow:auto` — the factor is that large so the shortage shared by `flex-shrink × base size` leaks less than a 1/64 px `LayoutUnit` to the other list) and the MODELS rows wrapper is the last resort (`flex:0 1 auto;overflow:auto`), both using the design's own global scrollbar rule. At six storeys or fewer every style string is the design's, byte for byte. No new element, no new control, no class. | The design's aside is a column flexbox in which the tree is the only item that can give (`:64`, `:176`), so a real storey ladder starves it: twelve storeys left the tree **one row** at the launch window size. The user's rule: *"go with the 40 percent split"*. The gate is what keeps the design's own four-model mock untouched — its tree is only 18.1 % of the aside at the parity window — and what stops a single-model federation's MODELS list being squeezed for no reason. |
+| **2026-09-20** — **above six storeys** (the design's own count) the element tree keeps a `min-height` of 40 % of the aside; the STOREYS rows wrapper gives way first (`flex:0 1000000 auto`, a three-row `min-height`, `overflow:auto` — the factor is that large so the shortage shared by `flex-shrink × base size` leaks less than a 1/64 px `LayoutUnit` to the other list) and the MODELS rows wrapper is the last resort (`flex:0 1 auto;overflow:auto`), both using the design's own global scrollbar rule. At six storeys or fewer every style string is the design's, byte for byte. No new element, no new control, no class. *(Amended 2026-11-07: MODELS no longer scrolls — its header folds the section, and expanded it is always its full height; when the sidebar does not fit, the tree's 40 % gives way to three rows and the column under the MODELS header scrolls as one. `docs/DEVIATIONS.md` has the entry.)* | The design's aside is a column flexbox in which the tree is the only item that can give (`:64`, `:176`), so a real storey ladder starves it: twelve storeys left the tree **one row** at the launch window size. The user's rule: *"go with the 40 percent split"*. The gate is what keeps the design's own four-model mock untouched — its tree is only 18.1 % of the aside at the parity window — and what stops a single-model federation's MODELS list being squeezed for no reason. |
 | **2026-09-21** — the landing page's footer strip (`SGVue.dc.html:817–829`) is not in the port: no `© <year> SGVue`, no `·`, no `Parsed locally, never uploaded`, no spacer, no `Privacy` / `Terms` / `Support` links and no `border-top` divider. Its **theme toggle is kept unchanged** — same `onClick`, `data-tip`, `hv-accent-both` class, style string and both SVGs — right-aligned in the same 1080 px container at the same vertical position, in a plain `<div>` rather than a `<footer>`. No new element, no new control. | Asked for by the user in these words: *"remove footer. Not valid for desktop app."* A desktop app has no site-level legal surface, and the three hrefs were the prototype's placeholders (`#privacy`, `#terms`, `#support`) with nowhere to point; the landing page's own body copy already says files stay on this machine. The toggle stays because it is the only theme control a person can reach before a model is open — the toolbar's own is mounted from the first frame but sits under the landing page's full-viewport opaque overlay until a model is loaded (the user's choice: *"Keep just the button"*). |
 | **2026-09-25** — Help › Check for updates…, under About SGVue on both platforms, opens a page in the user's browser through `shell.openExternal`: the releases list until **2026-09-28**, and since then the product site told this version, `https://sgvue.github.io/?v=<version>` (`SITE_URL`, one hard-coded https constant, + the build-time version, URL-encoded), which says whether it is the latest. A native menu item, like About; no designed surface changes; the item downloads nothing and makes no network call (since **2026-10-01** the app itself makes one, at launch — the update check, §3 "Network" and §10 — and the landing page's notice opens this same page). | Asked for by the owner in these words: *"add the check for updates menu item."* The repository is private and the builds are unsigned, so there is no auto-updater (`publish: null`); the user checks and installs by hand. 2026-09-28: *"From the next version, should Help › Check for updates open the new page instead of the GitHub releases list?"* → *"Yes, open the page"*. |
 
 **No visible additions.** Provenance (which entity a value came from, the georeferencing
 source, the SHA-256 of the file) is reachable only through the assistant's tools and through
 exports — never as new UI, except where the owner asked for it in so many words: each such case
-is a dated entry of the allowed-deviations list in `CLAUDE.md`, of which the dated rows above
+is a dated entry of the allowed-deviations list in `docs/DEVIATIONS.md`, of which the dated rows above
 are five. Inputs
 the design already has, such as the Coordinate-system card, are pre-filled from the file when
 the data exists and left blank when it does not. Never a placeholder. (Since 2026-10-08 the
@@ -325,12 +331,16 @@ is shown like any other, because a badge for it would be a visible addition.
 Two values in the card cannot be the prototype's, for the same reason the Spatial-structure card
 could not be (§2, "never a placeholder"):
 
-- **Centroid** is a map coordinate. It is composed from the file's own `IfcMapConversion` /
-  `IfcSite` base point, and shows the design's em dash when the file is not georeferenced —
-  never the prototype's typed-in `{ E: 28500, N: 30200, Z: 102.5, angle: 12.5 }`.
-- **Base / top and Centroid are in the file's own coordinates.** The renderer works in scene
-  coordinates, with the federation offset already subtracted (§7), so the card adds it back.
-  Sizes, footprint and volume are differences and are unaffected either way.
+- **Centroid** is a map readout, and since 2026-11-07 a map readout prints the file's own world
+  coordinates (`toMap` over `readoutCoords`, `shared/georef.ts`; §5): the element's world point,
+  shown while a loaded file states a base point, and the design's em dash when none does —
+  never the prototype's typed-in `{ E: 28500, N: 30200, Z: 102.5, angle: 12.5 }`. *(Until
+  2026-11-07 it was composed from the file's own `IfcMapConversion` / `IfcSite` base point.)*
+- **Base / top and Centroid are in the file's own world coordinates.** The renderer works in
+  scene coordinates, with the federation offset already subtracted (§7), so the card adds it
+  back. Sizes, footprint and volume are differences and are unaffected either way; since
+  2026-11-11 they are read off the element's box in the plan frame (`Viewer.elementPlanBox`, §5),
+  so a wall of a turned building reads its own length and thickness.
 
 `selectors/ctx.ts` is `ctxItems` (`:1898–1921`): the twelve items, their shortcuts, their three
 separators, the `(n)` suffix, the "more than two names becomes a count" rule, the
@@ -467,8 +477,8 @@ buildingSMART's own validation service uses. The table below is the contract.
 as the file authored them, together with their measure type and unit, and converted only for
 display, following the design's millimetre/metre rules.
 
-> **Status: 2026-10-09 — the display unit** (owner-requested; `CLAUDE.md`, allowed desktop
-> deviations). The design's toggle is `mm` / `m` and changes the Markups card's list alone; the
+> **Status: 2026-10-09 — the display unit** (owner-requested; `docs/DEVIATIONS.md`, allowed
+> desktop deviations). The design's toggle is `mm` / `m` and changes the Markups card's list alone; the
 > app's is `mm` / `m` / `ft` — the third button in the design's own markup — and every length,
 > elevation and coordinate the app prints follows it, by one rule (`src/shared/units.ts`): in
 > `mm` every readout is what it was, byte for byte; in `m` what printed millimetres prints metres
@@ -489,7 +499,8 @@ display, following the design's millimetre/metre rules.
 CRS from an inferred one. Singapore's CORENET X convention (SVY21 / EPSG:3414 on the
 `IfcSite` placement) is recognised explicitly.
 
-`source` / `sources` say what was **found**. `method` says what is **in force**, because a file
+`source` / `sources` say what was **found**. `method` says which one **carries the position** — a reading only since 2026-11-07, when
+georeferencing stopped placing anything — because a file
 can declare an `IfcMapConversion` that converts nothing while its site placement carries the
 real position — which is exactly what the reference model does. A map conversion is identity
 when Eastings, Northings and OrthogonalHeight are zero or absent and the X axis is `(1, 0)` or
@@ -501,61 +512,129 @@ are `IfcSite placement`, `IfcMapConversion`, `IfcMapConversion + IfcSite placeme
 Coordinate-system card's caption appends and `get_model_info` reports — one spelling, in
 `shared/model-index.types.ts`.
 
-**The project frame.** A file's world coordinates need not be the frame the building was drawn
-in. On the CORENET X convention the spatial-root `IfcSite.ObjectPlacement` carries both the
-position and the rotation to true north, so the file's world axes are map axes and the building
-stands at an angle to them — 43.41° on the reference model. The app therefore renders the
-**project** frame: `geometry-streamer.ts` composes the inverse of that placement on the left of
-every placement, beside the Y-up → Z-up rotation it already composes, and grid segments and
-storey placements go through the same transform before anything draws them.
+**Placement: origin to origin** (since 2026-11-07, the owner: *"only focus on the internal origin
+of the model like how Naviswork do"*). **Every model is drawn at its file's own world
+coordinates** — the placement web-ifc hands back, the spatial-root `IfcSite.ObjectPlacement`
+included — less one shared whole-metre offset (below). **Nothing a file says about the map moves
+or turns a model**: not an `IfcMapConversion`, not IFC2X3's `ePset_MapConversion`, not the 3D
+`Model` context's `WorldCoordinateSystem` and not `TrueNorth`. Models therefore line up origin to
+origin, the way Navisworks federates them. A model's geometry is a function of its own file and
+of the shared offset (`src/worker/geometry-streamer.ts`), and every choice the app makes from
+several models at once — the plan rotation, the file whose georeferencing the Coordinate-system
+card shows, the storey and grid ladders — is taken without regard to load order, so **nothing
+visible depends on which file was opened first** (`tests/unit/federation-simulation.test.ts`
+loads each seeded federation in two orders and requires the same result). A Revit "Shared
+Coordinates" export, whose world coordinates are its map coordinates, therefore stands at its map
+position; a file that states its map position anywhere else is drawn at its file coordinates, and
+the card's note names it (below). `tests/unit/georef-federation.fixture.test.ts` holds this on
+one synthetic building written eleven ways an exporter can say where it is: each is drawn at its
+own file coordinates whatever was opened before it, only the one whose coordinates are its map
+position stands at the map position, and the note names the other ten.
 
-**The federation is assembled in map space** (since 2026-10-08). One exporter writes a model's
-map position on its site placement, another in an `IfcMapConversion` over a site at the file's
-zero; both are compliant, and by world coordinates they land kilometres apart. So each model
-gets its own world → map operation from its own declaration — `T(E·u, N·u, H·u) · Rz(θ)`, θ the
-conversion's X axis, u the map unit, `Scale` never applied, `TrueNorth` never stacked on it,
-identity when there is none — and the federation's frame is the boot model's project frame
-expressed in map coordinates, **P = M_boot ∘ Site_boot**, chosen once like the offset. Each model
-streams through its own frame **M_i⁻¹ ∘ P**, so it lands where its own declaration puts it on the
-map, read in the boot building's project frame. For a model placed the way the boot model is —
-every model of a Revit "Shared Coordinates" federation — that frame is the boot model's site
-frame itself, so nothing about such a federation changed. `shared/georef.ts` owns it all
-(`ProjectFrame`, `projectFrame`, `mapPlacement`, `federationFrame`, `modelFrame`, `toProject`,
-`toWorld`, `frameKey`) and is pure and unit-tested; `tests/unit/georef-federation.fixture.test.ts`
-federates one synthetic building written eleven ways, every pair within a millimetre.
+*History.* From 2026-09-20 the scene was the boot model's **project** frame — the inverse of its
+site placement composed on every placement — and from 2026-10-08 the federation was assembled in
+map space: the boot model's project frame expressed in map coordinates, P = M_boot ∘ Site_boot,
+with each model streamed through M_i⁻¹ ∘ P (`federationFrame`, `modelFrame`). Both were replaced
+on 2026-11-07 and those functions removed. A session, a share link or a viewpoint written under
+them carries a frame key other than `identity`, and restores everything but its camera (§7).
 
-**Rule 4 — the `WorldCoordinateSystem`** (coordinates part 2, the same day). A Revit export from
-the Survey Point, Project Base Point or Internal Origin with no EPSG code, and every Revit IFC2X3
-export, writes no map conversion: the chosen point's Easting, Northing and Elevation are the
-`Location` of the 3D `Model` context's `WorldCoordinateSystem`, in project length units, and for
-the Project Base Point and the Internal Origin the turn to true north is only in `TrueNorth`.
-web-ifc 0.0.77 applies that `WorldCoordinateSystem` to no placement (measured, and pinned by a
-test), so with no conversion and a `WorldCoordinateSystem` that is not the identity, M is the
-`WorldCoordinateSystem` — its origin through the length unit, its own turn if it has one — then,
-only when nothing else states a turn (no site turn, no turn of its own), the turn `TrueNorth`
-implies: atan2(x, y) of its direction, which puts the project's true north on the map's north.
-`placedBy` and the caption's method are `WorldCoordinateSystem` (`+ IfcSite placement` when the
-site placement moves the project too). Beside a map conversion — which current Revit never
-writes, and IFC leaves ambiguous — the `WorldCoordinateSystem` is undone before the conversion,
-M = C ∘ WCS⁻¹, as IfcOpenShell reads it, and `get_model_info` marks the pair `ambiguous`.
-`TrueNorth` still never stacks on a conversion. Three more fixtures — (i) Project Base Point with
-no EPSG code, (j) its IFC2X3 twin, (k) a `WorldCoordinateSystem` beside a conversion — federate
-with the other eight within a millimetre in all 110 ordered pairs, and IfcOpenShell agrees
-product by product: `auto_xyz2enh` for (k), and its own `get_wcs` and `get_true_north`, composed
-as Revit writes them, for (i) and (j) — `auto_xyz2enh` returns a file with no conversion unmoved.
+**What georeferencing is still read for.** It is read and reported, never applied: the
+Coordinate-system card (its four read-only fields, the caption's method, its CRS chip), the status
+bar's CRS chip, the assistant's reports (`get_model_info`, `get_view_state`) and the card's
+one-line note. `mapPlacement` (`src/shared/georef.ts`) is the one reading of where a file would
+put itself on the map:
 
-**A model that cannot be lined up** is said so in one line under the Coordinate-system card's
-caption (the owner's choice, 2026-10-08): one whose file states no map position while another
-loaded model's does, or whose geometry landed more than 5 km from the offset another model set
-(`farPlacement`). When the boot model is the one with no map position, it is named and no
-distance is. `get_model_info` and `get_view_state` report the same (`notLinedUp`).
+- its own `IfcMapConversion` on the 3D `Model` context (or a sub-context of it), else
+  `ePset_MapConversion`: `T(E·u, N·u, H·u) · Rz(θ)`, θ the conversion's X axis, u the map unit —
+  the metre when the CRS names none — with `Scale` recorded as written and **never applied**, and
+  `TrueNorth` never stacked on a conversion;
+- **rule 4** (2026-10-08, still the reading): with no conversion, a `WorldCoordinateSystem` that
+  is not the identity is the map position — its origin through the length unit, its own turn if
+  it has one, then the turn `TrueNorth` implies only when nothing else turns. web-ifc 0.0.77
+  applies that `WorldCoordinateSystem` to no placement, so such a file is drawn at its local
+  origin, and named by the note. Beside a conversion the `WorldCoordinateSystem` is undone first,
+  M = C ∘ WCS⁻¹, as IfcOpenShell reads it, and `get_model_info` marks the pair `ambiguous`;
+- identity when there is none, or one that moves nothing.
 
-**Federation and precision.** Every model is opened without recentring. The first streamed
-mesh defines a whole-metre federation offset, and placements are composed in 64-bit floating
-point before the offset is subtracted. This matters: Revit shared coordinates routinely put a
-model tens of kilometres from the file origin, where 32-bit vertices resolve to about 4 mm —
-enough to crack thin geometry. A model landing more than 5 km from the others raises a visible
-warning; beyond 10 km the file is flagged for precision loss.
+`get_model_info` reports, per model, which declaration that is (`placedBy`), in which map unit,
+the `Scale` as written and not applied, and whether the model's map position is where it is drawn
+(`notLinedUp`). `coordsFromGeoref` reads a file's project base point from the same operation, for
+the card.
+
+**Whose georeferencing the card shows.** The card has one set of fields, so it shows one file's.
+`georefSourceOf` picks it: of the loaded models whose file states a georeferencing method (else
+those whose file states anything at all — a base point, a height, a north, a CRS), the one with
+the **most elements**, ties broken by model key — the main building in a federation of a building
+and its services, whatever was opened first. It is recomputed whenever the federation changes, and
+the four fields, the caption's method and both CRS chips are that file's. *(Until 2026-11-07 they
+were the boot model's.)*
+
+**Readouts print world coordinates.** Every map readout — the spot tags, the laser's map rows,
+the property card's Centroid, the assistant's `boxCentreMap` — passes `readoutCoords`, which hands
+`toMap` the base point 0 / 0 / 0 / 0 while the card's base point is located, so a readout is the
+file's own world point, unturned, and the compass puts north on world +Y. That *is* the map
+position for every model the note does not name. While no loaded file states a base point the
+readouts show the design's em dash: a federation that states no map position has no map
+coordinates to print.
+
+**The note: a model whose map position is not where it is drawn.** One line under the card's
+caption (owner-chosen 2026-10-08, its rule replaced 2026-11-07; `notLinedUp` and `lineUpNote`,
+`src/renderer/state/selectors/status.ts`). For each loaded model, `mapShift` applies its file's
+own map operation to the centre of what the model drew (`drawnCentre`, world coordinates) and
+measures how far that point moves and how much the operation turns; past **1 m**
+(`MAP_SHIFT_METRES`) or **0.1°** (`MAP_TURN_DEGREES`) the model is named. It depends on that model
+alone — not on the others, nor on their order — and holds with one model loaded too. The wording:
+
+- `Tower B.ifc's map position is 12.3 km from where its file places it — ask for a Shared Coordinates export.`
+- `Tower B.ifc's map position is turned 30.0° from how its file places it — ask for a Shared Coordinates export.` (the turn is said alone only when the move is within a metre)
+- `2 models' map positions are not where their files place them: Tower B.ifc (12.3 km), STR.ifc (turned 30.0°) — ask for Shared Coordinates exports.`
+
+A distance is kilometres to a tenth from a kilometre, else metres to a tenth; a model is named by
+its sidebar row's file line, through `labelText`. With nothing to say the card draws no note.
+*(Until 2026-11-07 the note named a model with no map position while another had one, or one whose
+geometry landed more than 5 km from the offset another model set — the stream's `farPlacement`;
+both reasons were removed with the map-space federation.)*
+
+**The plan rotation: only the camera turns** (2026-11-07, the owner: *"I dont want my gridlines
+to be place diagonally relative to my building."*). A shared-coordinates building stands at its
+angle to true north — −43.4103° on the synthetic test set — so its grids would run diagonally
+across the screen. No model is turned to fix that. `src/shared/plan-rotation.ts` computes ρ, the
+angle the camera's plan frame stands at in the world: the length-weighted 4θ circular mean of every
+loaded model's grid segments at least 2.5 m long, folded into (−45°, 45°] and summed in a canonical
+order (model key, grid name, endpoints), so it is the same to the bit in any load order; with no
+grids, or votes that cancel, the spatial-root site rotation that the most elements share; with
+nothing, 0. A result within 10⁻⁶° of 0 is exactly 0, so an axis-aligned federation — the design's
+own mock included — draws what it drew before. Plan, the six named views, the view cube, the
+framing box (`fitFrame`, from the building's own vertices in the plan frame), the grid extent and
+its bubbles, the level rings, the ground grid and the laser's X and Y are square with the grids;
+since 2026-11-11 the selection dimension, the property card's geometry rows and the assistant's
+box tools read each element's box in the plan frame too (`Viewer.elementPlanBox`). **Coordinates
+are untouched** — every readout is still the file's own world point — and ρ is never saved.
+
+**Federation and precision: one offset.** Every model is opened without recentring
+(`COORDINATE_TO_ORIGIN` stays `false`). The first streamed mesh's translation, rounded to whole
+metres, becomes the federation offset, and every placement is composed in 64-bit floating point
+before the offset is subtracted, so the vertices sit near zero: Revit shared coordinates routinely
+put a model tens of kilometres from the file origin, where 32-bit vertices resolve to about 4 mm —
+enough to crack thin geometry. The offset only keeps float32 near zero; since every model is drawn
+at its own world coordinates, which model set it changes nothing that is seen. Two rules keep it
+one offset (2026-11-11):
+
+- **Two models never choose an offset each.** The parse worker is one thread, so with two files
+  loading at once "B parsed" could arrive before "A's geometry done" and B used to choose an offset
+  of its own — a reopened project drew its models metres apart. `ParseWorkerBridge.geometry`
+  (`src/renderer/model/worker-bridge.ts`) now holds an `offset: null` request while an earlier one
+  is unsettled (`chooser`) and sends it with the offset that stream chose.
+- **The offset is handed back only when nothing is loaded and no model streamed against it is
+  still on its way to joining** (`onTheWay`, `releaseOffset`,
+  `src/renderer/model/federation-store.ts`): emptying the federation while another model loads no
+  longer lets the next model choose its own origin.
+
+`tests/unit/worker-bridge-offset.test.ts`, `tests/unit/federation-offset-handback.test.ts` and
+`tests/unit/project-reopen-positions.test.ts` pin both. The worker also records a `precision`
+warning in its geometry summary when vertices sit more than 10 km from the file's origin
+(`PRECISION_METRES`); no surface shows it today. *(Until 2026-11-07 a model landing more than 5 km
+from the offset raised `farPlacement` as well.)*
 
 **Provenance.** Every file's SHA-256 is recorded on load and stamped on every export.
 
@@ -607,7 +686,9 @@ document, never to hide.
 > `T(−offset) × flatTransformation` is composed in Float64 and only then written as Float32.
 > On the reference model the offset is `[12520, 4, −23186] m` and the file's own coordinates
 > sit 32.88 km out, which raises the `precision` warning — the exact case the rule exists for.
-> A bbox centre more than 5 km from the offset raises `farPlacement`.
+> A bbox centre more than 5 km from the offset raised `farPlacement` until 2026-11-07, when it
+> was removed with the map-space federation (§5): it measured against whichever model was opened
+> first.
 >
 > **Memory.** `MEMORY_LIMIT` is 3.5 GB. Every `IfcGeometry` is deleted and every placement
 > vector freed inside `ifc-source.ts` before the streamer sees a mesh; every vertex and index
@@ -619,14 +700,15 @@ document, never to hide.
 > rule shared by all of them (`src/shared/georef.ts`):
 >
 > · **The project base point** — the Coordinate-system card's Easting, Northing, Elevation and
->   True north. **Superseded on 2026-09-20** by the §5 "project frame" rule above:
+>   True north. **Superseded on 2026-09-20** by the "project frame" rule (itself replaced on 2026-11-07 — §5):
 >   `coordsFromGeoref` composes `IfcMapConversion` **over** the site placement and returns the
 >   map coordinates of the project frame's origin together with the total rotation from project
 >   north to true north. Taking a present-but-zero map conversion first, as it used to, handed
 >   the card `0 / 0 / 0 / 0` for a file whose position and 43.41° rotation were sitting on its
 >   site. It still returns nothing at all for a file that states none, which leaves the four
 >   fields blank; the design's own literal base point
->   (`{ E: 28500, N: 30200, Z: 102.5, angle: 12.5 }`) is never a fallback.
+>   (`{ E: 28500, N: 30200, Z: 102.5, angle: 12.5 }`) is never a fallback. *(Since 2026-11-07 the
+>   base point shown is that of the file `georefSourceOf` picks — §5 — and it places nothing.)*
 > · **Map coordinates** — `toMap(base, x, y, z)` is the design's own expression
 >   (`viewer-core.js` L409) and is the single implementation behind both the spot-coordinate
 >   labels and the property card's Centroid row, so the two cannot drift. Its input is the point
@@ -634,14 +716,17 @@ document, never to hide.
 >   federation offset removed, and every absolute readout adds it back. Because the base point
 >   is the project origin's map coordinates, `toMap` over a project point is exactly the file's
 >   own world coordinate for it — checked against IfcOpenShell on a named vertex of the
->   reference model: **0.092 mm**.
+>   reference model: **0.092 mm**. *(Since 2026-11-07 the scene is the files' own world frame, and
+>   every readout hands `toMap` a world point through `readoutCoords` — §5 — so a readout is the
+>   file's world coordinate by construction.)*
 > · **The CRS chip** — the design writes `SVY21` in the status bar and `SVY21 · EPSG:3414` in
 >   the Coordinate-system card, true of its own Singapore subject and a placeholder otherwise.
 >   `crsChip` keeps both of those verbatim when the file's `IfcProjectedCRS` is SVY21 /
 >   EPSG:3414 (the reference model's is: `('EPSG:3414','SVY21 / Singapore TM','SVY21',…)`),
 >   names the file's own CRS when it is something else, and shows the design's em dash when
 >   there is none. (Until 2026-10-08 it kept the design's status chip for a base point typed
->   into the card; the card is read-only since then, and the chip is the boot file's.)
+>   into the card; the card is read-only since then, and the chip is the boot file's — since
+>   2026-11-07 the file the card shows, `georefSourceOf`'s.)
 >
 > Nothing about provenance or georeferencing became new UI: these are the inputs and readouts
 > the design already has.
@@ -676,42 +761,38 @@ Six mechanisms, each enforced and each tested.
 
 ## 7. Renderer and geometry contract
 
-**The frame is IFC Z-up, metres, and it is the model's own PROJECT frame.** `+z` is up,
-storey elevations are `z`, and the design's renderer, its mock federation and IFC itself all
-agree. web-ifc is the one producer that does not — its `flatTransformation` folds a Z-up → Y-up
-swap into every placement — so `geometry-streamer.ts` composes the single inverse rotation
-`(x, y, z)_Yup → (x, −z, y)_Zup` on the left of the placement, once, and nothing downstream
-rotates anything again.
+**The frame is IFC Z-up, metres, and it is the files' own world frame** (since 2026-11-07).
+`+z` is up, storey elevations are `z`, and the design's renderer, its mock federation and IFC
+itself all agree. web-ifc is the one producer that does not — its `flatTransformation` folds a
+Z-up → Y-up swap into every placement — so `geometry-streamer.ts` composes the single inverse
+rotation `(x, y, z)_Yup → (x, −z, y)_Zup` on the left of the placement, once, and nothing
+downstream rotates anything again.
 
-Composed on the left beside it is the inverse of the federation's **project frame** — the boot
-model's spatial-root `IfcSite.ObjectPlacement`, read as project → world (§5). A Revit
-shared-coordinates export states its position *and* its rotation to true north there, so its
-world axes are map axes and the building stands at an angle to them; without this every
-axis-aligned thing the app draws is wrong by that angle, and the reference model's sample wall
-reads `87.489 × 82.787 m` instead of the `120.150 × 0.300 m` its own `Qto_WallBaseQuantities`
-states. The federation's frame P is a constant, exactly like the offset: the boot model fixes
-it — since 2026-10-08 its project frame expressed in map coordinates (§5) — and every model is
-streamed through its own frame against it, M_i⁻¹ ∘ P, so models federate by their **map**
-coordinates. `null` is the identity — every file that leaves its site at the origin and states
-no map conversion, and the design's own mock federation, whose code path is then byte for byte
-the one before the frame existed.
+Nothing else is composed beside it. The placement web-ifc hands back — the spatial-root
+`IfcSite.ObjectPlacement` included — is what is drawn, less the federation offset; no project
+frame, no map operation and no `TrueNorth` turn is applied to any model, so models line up origin
+to origin and none depends on which was opened first (§5). A Revit shared-coordinates export
+states its position *and* its rotation to true north on its site placement, so it stands at that
+angle to the world axes; the camera's plan frame turns to meet it — the plan rotation, §5 — and
+the model does not. *(From 2026-09-20 to 2026-11-07 the inverse of the boot model's project frame
+was composed here, and from 2026-10-08 each model's map position against it, M_i⁻¹ ∘ P; both were
+removed on 2026-11-07.)*
 
-`geometry-streamer.ts` remains **the only place the frames meet**. Grid segments and storey
-placements come out of the index in world metres and go through the same transform in
-`renderer/model/federation-store.ts`'s `metaOf` before the viewer sees them; the offset is then
-chosen and subtracted in the project frame, so it is the number every readout adds back. On the
-reference model it falls from `[12520, 23186, 4]` to `[313, −76, −1]`, and the `precision`
-warning goes with it: the vertices sit 400 m from the project origin rather than 33 km, where
-float32 resolves about 0.05 mm instead of 4 mm.
+`geometry-streamer.ts` remains **the only place the Z-up swap and the offset meet a placement**.
+Grid segments and storey placements come out of the index in world metres and reach the viewer
+through `renderer/model/federation-store.ts`'s `metaOf` as they are; the viewer subtracts the same
+offset before it draws them.
 
-Everything that reports an absolute position states its frame. Element boxes in the index and
-the SQL `bbox` table are **project** metres, Z-up; the property card's Base / top is a project
-elevation (matching the storey ladder) and its Centroid is a **map** coordinate through
-`toMap`; spot labels print both; and `get_element`, `measure_between` and `clash_check` name
-`frame: 'project'` in their JSON. Picking, the pick grid, snapping and the section planes are
-scene-space and are unaffected. A session, a share link and a saved viewpoint carry
-`frameKey(frame)` beside their camera, and a payload from another frame restores everything
-except the camera, framing the extents instead.
+Everything that reports an absolute position states its frame. Element boxes in the index and the
+SQL `bbox` table are **world** metres, Z-up; the property card's Base / top and its Centroid are
+world coordinates (the Centroid through `toMap` and `readoutCoords`); a spot label prints the
+world point; `get_element` says `bboxFrame: 'world'`; and a markup the assistant places at a
+named `point` takes it in world metres (`pointFrame: 'world'`). Picking, the pick grid, snapping
+and the section planes are scene-space and are unaffected. A session, a share link and a saved
+viewpoint carry a frame key beside their camera — since 2026-11-07 always `identity`
+(`IDENTITY_FRAME_KEY`, `shared/georef.ts`) — and a payload with another key (one written under
+the boot model's frame before that date) or with none restores everything except the camera,
+framing the extents instead.
 
 *(2026-11-11: on a building turned in its files' coordinates, `clash_check`, `find_nearby`,
 `measure_between` and `get_element`'s `planBox…` keys take each element's box square with the
@@ -738,7 +819,7 @@ geometry and get no box, never a placeholder, which is what every consumer alrea
 The box is an **axis-aligned approximation, and a conservative one**: a part's box is the AABB
 of its *transformed local* AABB, so a part rotated about anything but `+Z` reports a box at
 least as large as the exact one. Measured against IfcOpenShell's own tessellation on the
-reference model, in the project frame: the sample wall and door agree to **0 mm on every
+reference model (in the project frame the scene used until 2026-11-07): the sample wall and door agree to **0 mm on every
 face**, and the sample slab — a plate whose outline is not square to the building — is
 conservative by **33 mm** on each of its two `y` faces and 1 mm on top. Every consumer says it
 is box arithmetic, and the SQL schema the assistant reads says so in the table's own comment.
@@ -754,7 +835,9 @@ the chunk number and total, so the progress bar reflects real work.
 **A federation offset**, whole metres, is subtracted from every placement so the scene sits
 near the origin: Revit shared coordinates routinely place a model tens of kilometres out,
 where a float32 vertex resolves about 4 mm. It is chosen in the Z-up frame from the first
-streamed mesh of the first model and then fixed. Storey elevations and grid coordinates read
+streamed mesh of the first model and then fixed — one offset for the whole federation, even when
+several files load at once, and handed back only when nothing is loaded and no model streamed
+against it is still on its way (2026-11-11, §5). Storey elevations and grid coordinates read
 from the index are in the file's own coordinates, so anything drawn alongside geometry
 subtracts it first.
 
@@ -942,7 +1025,9 @@ them labelled.
 > axis reads its two sides of the point, along the axis — one label at the middle of each half
 > that reached a face, where the design had one for the whole ray; the live reading and the
 > Markups card read `X 1 200 + 2 300` — and the whole ray is their sum. **Spot coordinates**
-> pin a point and print its map coordinates and its coordinates in the file's own frame.
+> pin a point and print its map coordinates and its coordinates in the file's own frame —
+> since 2026-11-07 the same world point twice, the map rows shown while a loaded file states a
+> base point (§5).
 > **Selection dimensions** (`D`) draw the selection's bounding box and three dimension runs
 > with ticks and millimetre labels, placed by a screen-space search: each anchor position along
 > the run crossed with each push direction, then the whole set again in whole label heights up
@@ -950,7 +1035,7 @@ them labelled.
 > against every label already placed in the same pass.
 >
 > **Status: 2026-10-01 — two section planes.** The design has one section; since 2026-10-01
-> (owner-requested; `CLAUDE.md`, allowed desktop deviations) there are two, and they are
+> (owner-requested; `docs/DEVIATIONS.md`, allowed desktop deviations) there are two, and they are
 > independent: **the gridline cut and the level cut**. The store holds
 > `sections: { grid, level }`, each `{ name, offset, flip, cut }` with an empty name for "none"
 > (`shared/sections.ts`), and the viewer takes both in one call, `setSections({ grid, level })`.
@@ -1039,8 +1124,10 @@ instead of re-sending the prompt. A second identical turn should report a non-ze
 **Tools.** The design's fifteen view-and-report tools, kept with their names and schemas, plus
 read-only additions: `get_element`, `get_entity_raw`, `list_values`, `find_properties`, `search`,
 `get_spatial_tree`, `get_relationships`, `get_model_info` (header, MVD, schema, units,
-georeferencing with the CORENET X check — and, since 2026-10-08, which declaration placed each
-model in the federation's map space, in which map unit, and that `Scale` was not applied —
+georeferencing with the CORENET X check — and, since 2026-10-08, which declaration states each
+model's map position (`placedBy`), in which map unit, and that `Scale` was not applied; since
+2026-11-07 a reading only, with whether that position is where the model is drawn
+(`notLinedUp`), because no declaration places a model any more (§5) —
 counts, SHA-256), `get_view_state`, `measure_between`,
 `find_nearby` and `query_sql`; and, since 2026-09-28, four for the Schedules window:
 `make_schedule` builds a schedule (or changes the open one) and shows it there,
@@ -1066,7 +1153,7 @@ window.
 **Phase 2 of 4, the same day — the camera, saved viewpoints, markups, one filter step.**
 `set_view` reaches what the user's own camera does: any direction, as **azimuth** (the compass
 bearing the camera looks towards, clockwise from project north — the model's own +Y, not true
-north) and **elevation** (how far it looks down from level); a **fit** of the building or the
+north; since 2026-11-07 the plan frame's +Y, turned by the plan rotation, §5) and **elevation** (how far it looks down from level); a **fit** of the building or the
 selection that does not turn; and a **zoom** on that fit. **`manage_views`** is the Viewpoints
 card — list, save, restore, rename — and **`manage_markups`** the Markups card, read: its two
 lists, and zooming to one. `manage_filters` gains **`update`**, which changes one step's action,
@@ -1112,7 +1199,7 @@ asks; and `open_file` adds the file picked to Mine without changing the open sch
 spot coordinate or a laser measurement — the click with the spot tool or the laser meter,
 committed by the viewer's own function for that click, at a point that is named because a tool
 has no pointer: the middle of an element's bounding-box top, of the box or of its underside, or
-a project-frame point; that reply's `revert` takes it away again. And a call for a turn that is
+a world point (a project-frame point until 2026-11-07); that reply's `revert` takes it away again. And a call for a turn that is
 no longer live is no longer run when it
 would change the view (§8.7). **Deliberately left out** (`docs/DECISIONS.md` has each reason): a
 schedule's column widths, auto-fit and equal width, its appearance panel, colour rules and print
@@ -1183,7 +1270,7 @@ at a whole number of device pixels to a cell: 32 px in the header (two cells a d
 sleeps between changes and does not run under reduced motion; since 2026-11-08 only the newest
 group's avatar moves, older ones holding one open-eyed frame. The specification for the mascot,
 and for the thinking trace below up to its Answer cue, is the owner's "Ask Vee" handoff in
-`design-reference/ask-vee/`, whose px ÷ 1.5 are app px (`CLAUDE.md`, allowed deviations).
+`design-reference/ask-vee/`, whose px ÷ 1.5 are app px (`docs/DEVIATIONS.md`, allowed deviations).
 
 **Its thinking trace (2026-10-01; its answer the app's own since 2026-11-08).** While a turn
 runs, the transcript's next row is the reply being written, drawn from the turn's own events:
@@ -1661,7 +1748,7 @@ is not told whether they do — so tell them what is waiting, and never say it w
   card and — for a measurement — its rays (the same picker, the same section clipping) are a
   click's. The point is named: `id` and `at` — `top` (the default), `centre` or `base`: the
   middle of that element's **bounding-box** top face, of the box, or of its underside — or
-  `point`, in project-frame metres. The box is axis-aligned and conservative, not a picked
+  `point`, in world metres (`pointFrame: 'world'`; project-frame metres until 2026-11-07). The box is axis-aligned and conservative, not a picked
   surface, and the description, the result (`on: "bounding box"`) and the prompt all say so. From
   `top` and `base` the laser does not fire into the element; from `centre` it reads the
   element's own faces. The result carries the new markup's name (`C3`, `M1`), what the card's
@@ -1755,13 +1842,15 @@ became able to ask for a change to it. (`hlColor`, the last highlight colour pus
 renderer, was excluded until a step's own colour was reported.) Markups are not in `get_view_state`; `manage_markups` lists them.
 
 **What the three spatial tools report, and what they do not.** All three read the same
-per-element box — project-frame metres, Z-up, the union of the element's placed part boxes —
+per-element box — world metres, Z-up (project-frame metres until 2026-11-07), the union of the
+element's placed part boxes —
 and all three say so in structure as well as in prose, because a box distance is not a
 surface-to-surface distance:
 
-- `get_element` returns `bboxMetres` with `bboxFrame: 'project'`, `boxSizeMetres`,
-  `boxVolumeM3`, `boxCentreMetres`, the centre's **map** coordinates through `toMap` when the
-  file georeferences (`boxCentreMap`, else `null`), and `boxMethod`, which names the
+- `get_element` returns `bboxMetres` with `bboxFrame: 'world'` (`'project'` until 2026-11-07),
+  `boxSizeMetres`, `boxVolumeM3`, `boxCentreMetres`, the centre's **map** coordinates through
+  `toMap` and `readoutCoords` — the world point — while a loaded file states a base point
+  (`boxCentreMap`, else `null`), and `boxMethod`, which names the
   approximation. Every field is `null` for an element with no geometry. It also returns
   `solidCount` — the element's **tessellated parts**, opaque and transparent together, which is
   the same number `viewer.solidCount(id)` gives the property card's Geometry row — with
@@ -1861,7 +1950,8 @@ quantity is to be preferred when one exists.
   terminating the worker and rebuilding from bytes the renderer kept.
 - **Clash and proximity.** One uniform spatial hash on bounding-box centres, shared by
   `clash_check` and `find_nearby` and asserted equal to a flat scan on random boxes; both state
-  that they are box arithmetic in the project frame rather than solid geometry, and clash
+  that they are box arithmetic — in the world frame, or the plan frame on a turned building
+  since 2026-11-11 (the project frame until 2026-11-07) — rather than solid geometry, and clash
   results are always described as *candidates for review*, never as clashes. `find_nearby`
   leaves `IfcSpace` out unless asked, because a space overlaps everything standing in it.
 - **No file system.** There is no tool that reads, writes, names or accepts a path.
@@ -2022,7 +2112,8 @@ if the file is still where it was.
 >
 > **File contents are never written — only paths and hashes.** A session or a share link that
 > names a file which has moved, or whose bytes no longer match the recorded SHA-256, is refused
-> by name in the landing page's warning banner; it never silently opens a different file. A file
+> by name in the landing page's warning banner; it never silently opens a different file (a
+> project's changed model is opened, and said so — §9.1). A file
 > main refuses for a reason the drop zone gives — over 600 MB now, say — gets the drop zone's row
 > instead, and the banner names only the files that moved (2026-10-09).
 >
@@ -2079,6 +2170,143 @@ if the file is still where it was.
 >
 > The allow-list that governs all four writers is in `src/shared/readonly-list.ts` and has
 > been enforced since Phase 0.
+
+### 9.1 The `.sgvue` project file
+
+A project file remembers a coordination review: **which IFC files, and everything done on top of
+them**. Like a playlist, it names the files and never contains them — the Navisworks NWF model.
+Owner-approved on 2026-11-07 with its plan (`docs/plans/project-file.md`, decisions D1–D12): *"Approve
+the recommended defaults for both plans. go with .sgvue"*. Built in five phases, 2026-11-07 to
+2026-11-08; the format is `src/shared/project-file.ts`, the file on disk `src/main/projects.ts`,
+the wiring to the store `src/renderer/model/project.ts`, and the operating system's way in
+`src/main/project-launch.ts`.
+
+**What a `.sgvue` holds.** One JSON object, format `sgvue-project`, version `1`
+(`PROJECT_FORMAT`, `PROJECT_VERSION`), with `savedBy` and `savedAt`:
+
+| Part | What it holds |
+|---|---|
+| `models` | Per model: an id (`m1`, `m2` … — stable inside the file, never a slot), its file name, its path **relative to the project file** (tried first) and its absolute path (the fallback), its SHA-256 and size, its label, the colour its MODELS row showed — with `own` (the user's pick, the only kind restored as the user's) and `assigned` (D12: the palette colour its neighbours used least, given when it was added to an open project) — and its eye. |
+| `view` | The camera and the lit view button, both section planes, the display switches (gridlines, levels, canvas grid, shadows, dimensions, snap), the display unit, the tree's grouping, the storey eyes and "Original materials". |
+| `visibility` | The hidden elements, the active model and the filter stack. |
+| `viewpoints`, `filterSets` | The saved viewpoints and named filter sets. |
+| `schedules` | The saved schedule setups and the open schedule. |
+| `markups` | Spots and laser measurements, at **world** coordinates — a measurement with the face normal it was fired from, when it had one. |
+
+**Every element is named by `[model id, GlobalId]`** (D2), never by a federation id, which changes
+when a model is re-exported or opened in another order; a `Model` rule names its model by the
+file's own id. Camera and markup points are world coordinates, so a project opened under another
+federation offset still points where it pointed, and the camera's frame key is `identity`.
+
+**What it never holds.** The IFC files themselves, or any model data. Nor the theme (D7), the base
+point, the selection, the open card or armed tool, the tree search, window and panel sizes, whether
+MODELS is folded, the Vee conversation (D6), the recents list, the GPU choice, or anything of
+Preferences — the API key included.
+
+**Bounds.** The reader, `readProject`, never throws: it refuses with a sentence anything over
+16 MiB (`PROJECT_MAX_BYTES`), text that is not JSON, a `__proto__` key anywhere, another format,
+a version above 1 (*"This project was made by a newer SGVue (format v2) — update the app to open
+it."*), and anything the schema does not accept. Every list and string is bounded — at most 200
+models, a million element references to a list, 1 000 viewpoints, 100 filter sets and 100 saved
+schedules, 10 000 markups of each kind — and the writer keeps inside the same bounds, so whatever it
+writes reads back. Unknown keys are ignored; every map built from the file has no prototype. A
+`relPath` must be relative — no root, no drive, no colon, no NUL; `..` is allowed, since models
+often sit beside the project's folder. The committed corpus `tests/fixtures/project/v1-synthetic.sgvue`
+must always read to the same state.
+
+**The File menu** (D8). Three native items at the top of the File menu: **Open Project…** (the
+native Open dialog, filtered to `.sgvue`), **Save Project** (⌘S / Ctrl+S — the open project, with
+no dialog; with none open, the native Save dialog) and **Save Project As…** (⇧⌘S /
+Ctrl+Shift+S). The page's own `S` (snap) leaves a key pressed with ⌘ or Ctrl alone.
+
+**The window title.** While a project is open the OS window title is `<project name> — SGVue`,
+with ` •` after the name while there are unsaved changes (`projectTitle`); on macOS the window also
+carries the title bar's proxy icon and the close button's dot, cleared when the project goes. With
+no project open the title is the app's own. "Unsaved" is decided by value: the review state a
+project saves is compared with the state as it was opened or last saved (`projectStateKey`), so the
+theme, the selection and anything else a project does not save never make it dirty.
+
+**The unsaved-changes question.** Closing the window, quitting, or opening another project while
+the open one has unsaved changes asks in a native message box: *Do you want to save the changes
+you made to "<name>"?* · *Your changes will be lost if you don't save them.* · **Save** ·
+**Don't Save** · **Cancel** (`UNSAVED_BUTTONS`; Escape is Cancel). If Save is chosen and there is
+nothing a project can write — its models still loading, or no model on screen with a file behind
+it — the native "Could not save project" box says why in one line and the window stays; with no
+model open at all nothing is unsaved, and the window closes. A save that fails says so in the same
+box. With no project open nothing asks.
+
+**Opening.** A project **replaces what is open** — the landing page's fresh start — and its models
+load through the upload pipeline like any pick. Main reads the file picked (at most 16 MiB, once,
+as text), refuses it with the reader's sentence or hands the page the text and, per model, the
+file `admit()` let through: `relPath` against the project's folder first, then `absPath`. Once the
+models have joined, the file is mapped onto them by GlobalId (`restorePlanOf`) and put back through
+the store's own `applySession`. **While a project is open its viewpoints, named filter sets and
+saved schedules are its own** (D9): every save, rename, delete or cap rule — the controls' and the
+assistant's alike — acts on the project's lists and writes nothing to `localStorage`, and the app's
+own lists come back untouched when the project closes. A first Save As from a session with no
+project takes the lists on screen into the new project, once. A spot is placed again at its point
+and a laser measurement is measured again there, through the viewer's own commit, from its stored
+face normal when it has one, else firing only the directions it read when saved.
+
+**A changed model** (D3, 2026-11-08) — another size, or another SHA-256 once parsed — **opens
+anyway**: the project's references to it are put back by GlobalId, and its designed error row says
+once `changed since the project was saved — N saved items no longer match` (`— 1 saved item no
+longer matches`; nothing appended when everything matched; `changedText`). The project is then
+unsaved, because the file still names the old bytes. This is the one place a hash mismatch opens a
+file: a session or a share link still refuses it (above).
+
+**A missing model** (D4, 2026-11-08) is left out and named — in the landing page's banner when
+nothing could be opened, and otherwise in its designed error row, `not found where the project says
+it is`, which offers one control, a **Locate…** text button. It opens the native Open dialog
+(`Locate "<name>"`, one `.ifc` / `.ifczip`); the pick goes through `admit()` and loads into the open
+project **as that model** — same id, key and label, its references restored, the project unsaved. A
+pick already open, or already being located, loads nothing (`already open in this project`). When
+every model was missing, the first one located boots the viewer with the whole project restored onto
+it. **A missing model is never dropped by a save**: its entry and every reference to it are carried
+forward exactly as the opened file had them (`carryForward`) — even when another file of the same
+name is open, which is saved as a model of its own (2026-11-12). **Locate… can be retried**
+(2026-11-12): a located file that did not end up loaded — its parse or its join failed, the batch it
+shared failed, the project's own failed boot unloaded it, or "Replace model?" was cancelled — is no
+longer held as "being located" (`releaseDead`), so picking it again is taken. And a project whose
+own batch fails to join still **settles** (`settle`, 2026-11-11), so models brought in with Locate…
+are restored and Save Project works.
+
+**Double-click and drop** (D10, 2026-11-08). The installers register `.sgvue` as **SGVue Project**
+with the app's own icon (`fileAssociations` in `electron-builder.yml`: role `Editor` on macOS,
+per-user on Windows, removed by a real uninstall). Double-clicking a `.sgvue` in Finder or
+Explorer, dropping it on the Dock icon, or naming it on the command line opens it: macOS through
+`open-file`, Windows and Linux through `argv` (`projectArgs`), and a running SGVue through
+`second-instance`, which brings its window forward; a `sgvue://` link in the same `argv` wins. The
+path waits until the page has loaded and said it is ready. A `.sgvue` dropped on the window or on
+the designed drop zone opens the same way, the drop zone keeping its look and copy. A drop opens
+its **first** project alone; every other file in it gets the designed error row (`not opened — a
+project was dropped with it`, `not opened — one project opens at a time`), and a `.sgvue` dragged
+from somewhere that is not a disk gets `not on disk — save it to a folder, then open it`. Every
+route — the menu, the OS, a drop — asks the unsaved-changes question first and ends in the one
+function `openNow`, one at a time (`runOpen`: a request while a save, an open or a question is
+under way does nothing).
+
+**Security.** `projects.ts` is the fourth disk writer (D11) and writes only the project file, to the
+path its Save dialog returned **in the same call** or to the `.sgvue` this run opened or last saved,
+UTF-8, at most 16 MiB, the extension forced to `.sgvue`, atomically — a uniquely named temporary
+file beside the target, then one rename. **The page never names that path and never asks for a
+write**: main pulls the project from the page (`project:snapshotRequest` → `project:snapshot`) and
+reads the text again with `readProject` before a byte is written, so whatever the page sends, only
+a project file can land on disk; `relPath` is worked out in main against the real folder being
+written to. Opening reads the file as text — not an `admit()` — but **every model path in it goes
+through `admit()`** before the page hears of it, so a path from the file is never opened as such.
+A network path (`\\server\share\…`) a project names is let through only on the share the project
+file was opened from, or where the user has been already (the recents list, a path admitted earlier
+this run); a project on a network share opens from the menu or a double-click, and **is refused
+from a drop** (*"A project on a network share opens with File › Open Project… or a double-click,
+not by dropping it."*). A path the OS or a drop hands the app must be a `.sgvue` by its name and by
+its real path; anything else reads *"Only an SGVue project file (.sgvue) opens this way."*
+
+**Known limits** (`docs/releases/1.6.0.md`). A project is saved with its models in the order they
+are open; a model that was missing when the project was saved is listed last. Not built: a BCF
+export of viewpoints (the plan's optional phase 6). Not yet seen: a real double-click in Finder and
+in Explorer on an installed copy (the packaged checks of 2026-11-08 cover `Info.plist` and a
+`.sgvue` in `argv`).
 
 
 ---

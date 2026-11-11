@@ -2,6 +2,23 @@
 
 *2026-11-07 · status: **approved** (the owner: *"Approve the recommended defaults for both plans"*); Tier 1 recommended, fast-check added.*
 
+> **Status, read against the code, CI and `PROGRESS.md` on 2026-11-12 (SGVue 1.6.0).** **Tier 1 is
+> built, all twelve items, on 2026-11-07:** #1 `tests/fixtures/reference.ifc` and its committed
+> `reference.expected.json`; #2 `tests/unit/design-reference-pin.test.ts`; #3
+> `tests/unit/design-style-strings.test.ts` (one `UNRECORDED` difference left for the owner: the
+> 3D / W view buttons' `border-radius` order); #4 `tests/unit/compat-corpus.test.ts`; #5
+> `store-simulation.test.ts` and #6 `federation-simulation.test.ts`, on fast-check 4.10.2;
+> #7 `viewer-invalidate.test.ts` and `shell-viewer-batch.test.ts`; #8 `float64-far-origin.test.ts`
+> (a part 32.5 km out); #9 the lint traps in `eslint.config.mjs`; #10 `release.yml` runs privacy,
+> lint and the unit tests, then the `app.asar` test on every app it builds; #11
+> `npm run eval:offline` in `ci.yml`; #12 `npm run privacy` in `ci.yml` and `release.yml`.
+> **Tier 2:** #15, the full e2e suite, was run under the guard before 1.4.0 and before 1.6.0;
+> `PROGRESS.md` records no whole-suite run before 1.5.0.
+> **Not built:** #13, visual baselines with a committed diff script and threshold, and #14, a
+> performance budget — `scripts/bench.cjs` measures but has no budget and does not fail past one.
+> "Where we stand" below is the picture of 2026-11-07, before this work (three writers then; four
+> since the project file).
+
 ## Where we stand
 
 CI (Windows + macOS + Ubuntu) runs **typecheck → lint → 3,131 unit tests → build** on every push.
