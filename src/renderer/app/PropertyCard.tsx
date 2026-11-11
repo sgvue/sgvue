@@ -110,29 +110,31 @@ function SectionHead({
 
 /** The store fields this component reads — it re-renders when one of them changes. */
 const KEYS = pick(
-  'byId', 'coords', 'copied', 'copyGuid', 'dims', 'federation', 'offset', 'propOpen', 'sel',
-  'selIds', 'select', 'toggleDims', 'toggleProp', 'units'
+  'byId', 'coords', 'copied', 'copyGuid', 'dims', 'federation', 'offset', 'planRotationDeg', 'propOpen',
+  'sel', 'selIds', 'select', 'toggleDims', 'toggleProp', 'units'
 )
 
 export default function PropertyCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
   const viewer = getViewer()
   const element = st.sel != null ? (st.byId.get(st.sel) ?? null) : null
-  const sel = useMemo(
-    () =>
-      selectionCard({
-        federation: st.federation,
-        element,
-        box: element && viewer ? viewer.elementBox(element.id) : null,
-        solids: element && viewer ? viewer.solidCount(element.id) : 0,
-        coords: st.coords,
-        offset: st.offset,
-        units: st.units
-      }),
+  const sel = useMemo(() => {
+    // The plan-frame box: square with a turned building, as the selection dimensions read it.
+    const plan = element && viewer ? viewer.elementPlanBox(element.id) : null
+    return selectionCard({
+      federation: st.federation,
+      element,
+      box: plan?.box ?? null,
+      rho: plan?.rho ?? 0,
+      solids: element && viewer ? viewer.solidCount(element.id) : 0,
+      coords: st.coords,
+      offset: st.offset,
+      units: st.units
+    })
     // `viewer` is a module-level handle, not state; the box is re-read whenever the selection,
-    // the federation or the georeferencing changes, which is every time it can have moved.
-    [st.federation, element, st.coords, st.offset, st.units, viewer]
-  )
+    // the federation, the georeferencing or the plan rotation changes, which is every time it
+    // can have moved.
+  }, [st.federation, element, st.coords, st.offset, st.units, st.planRotationDeg, viewer])
   if (!sel) return null
 
   const db = dimBtn(st.dims)

@@ -8,6 +8,17 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+### Fixed
+
+- **A project reopens with its models where their files put them.** When two or more models were
+  loading at the same moment — which opening a `.sgvue` always does — each could take its own
+  scene origin, so the models were drawn metres apart and coordinates read wrong. Every model now
+  shares the one origin. Nothing is aligned automatically: a model whose file puts it in the wrong
+  place is still shown there.
+- **The selection dimension fits a building that is turned in its file's coordinates.** The box
+  and its three dimensions are square with the grids again and read the element's own length,
+  width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.
+
 ## [1.5.0] - 2026-11-08
 
 ### Added

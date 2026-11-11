@@ -4,6 +4,10 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-11 — two position bugs from the owner's 1.5.0 test: a reopened project, and the selection DIM
+
+**Reopened `.sgvue` misaligned** — not the project file: two models loading at once could each choose a scene origin, because the one-thread worker can report "B parsed" before "A's geometry done". `ParseWorkerBridge.geometry` now holds a second `offset: null` request and posts it with the first stream's offset. **Selection DIM** — the box was the world-axis box round a diagonal element since 2026-11-07; it and the property card's geometry rows are now taken in the plan frame from the element's own vertices (`Viewer.elementPlanBox`); ρ = 0 unchanged. Risky lane: checks first (11 failing), builder, `reviewer-deep` twice (round 1 found a failed middle model handing `null` on; fixed and pinned). Checks: typecheck, lint, vitest 4 245 passed / 4 skipped, privacy 0 findings. `.sgvue` format unchanged; nothing auto-aligns. **Owed (windowed, on the owner's yes):** reopen a two- or three-model `.sgvue` and see the models where they stood; select walls on a turned building in Plan and 3D and read the DIM and the card. **Known, not built:** unloading the last model while others load (`resetBoot`); the assistant's box tools and SQL `bbox` are still world-axis boxes.
+
 ## 2026-11-09 — 1.5.0 now includes Ask Vee: notes folded, installers built locally
 
 The owner: *"Fold into 1.5.0"*. `CHANGELOG.md`'s `[Unreleased]` folded into 1.5.0; `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently (including that a deliberate Opus 5 choice is moved once too) and Known limits. Checks green: typecheck, lint, vitest 4 218 passed, privacy. Local builds, unrun, ad-hoc signed (Mac) and unsigned (Windows):

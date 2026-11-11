@@ -1528,6 +1528,9 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 
 - 2026-11-09 — **version 1.5.0 ships the Ask Vee messaging work beside the Schedules work, in one installer** (the owner: *"Fold into 1.5.0"*): 1.5.0 was prepared on main and never published; `CHANGELOG.md`'s `[Unreleased]` is folded into its section and `docs/releases/1.5.0.md` gains Ask Vee's What's new, Fixes, What works differently and Known limits; the installers are built by `release.yml` from the tag, Windows first and the macOS disk images after the owner's Mac test.
 
+- 2026-11-11 — **two models never choose an offset each: `ParseWorkerBridge.geometry` holds an `offset: null` request while an earlier one is unsettled and posts it with the offset that stream chose** (`chooser`, `model/worker-bridge.ts`; a failed request passes on what it was posted with, or its predecessor's outcome). The worker is one thread, so with two files loading at once "B parsed" could reach the renderer before "A's geometry done", B was asked with `null` and took its own origin — a reopened `.sgvue`, which queues every model together, drew its models metres apart. Nothing moves or turns a model; the `.sgvue` format is unchanged.
+- 2026-11-11 — **the selection dimension and the property card's geometry rows read the element's box in the plan frame** (`Viewer.elementPlanBox`: the element's own vertices turned by −ρ, cached per element; at ρ = 0 `elementBox` itself): `drawDims` lays the box, runs, ticks and labels out there and turns each point back by +ρ; `geoRows(…, rho)` turns the centroid back. Since 2026-11-07 both had shown the world-axis box round a diagonal element. At ρ = 0 every line, label and row is as before; the assistant's box tools and SQL `bbox` stay world-axis boxes.
+
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
 ---

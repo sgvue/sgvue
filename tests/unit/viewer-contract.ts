@@ -43,6 +43,7 @@ export const VIEWER_MEMBERS: { [K in keyof Viewer]-?: Member } = {
   frameExtents: frame(),
   elementIds: no('a read'),
   elementBox: no('a read'),
+  elementPlanBox: no('a read'),
   solidCount: no('a read'),
   isVisible: no('a read'),
   setTheme: work(1, 0, 0),
