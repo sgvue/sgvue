@@ -1199,7 +1199,8 @@ Anything not on this list is a defect.
   the design's mock never reaches that state — and the rule above `Select similar` stands above
   `Zoom to`. The mock has no type objects, so there every label and action is the design's. The
   property card's "Same ObjectType" row is unchanged and literal. **No new element, no new
-  control.** Not yet seen in a window.
+  control.** Seen in a window on `reference.ifc` (2026-11-11): twelve items on a typed element,
+  nine on one with neither, the rules in place.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
