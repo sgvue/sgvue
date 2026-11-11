@@ -195,6 +195,17 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > 337 MB (Apple silicon) and 342 MB (Intel), measured from the disk images. The Windows installed
 > size, about 390 MB, is 1.4.0's and was not re-measured. All three were published together on
 > `sgvue/releases`, the owner's choice.
+> **2026-11-12, version 1.6.0:** its published requirements (`docs/releases/1.6.0.md`) are 1.3.0's,
+> measured then, with the download sizes of the files published: built by `release.yml` from the
+> tag `v1.6.0` (commit `cdd8256`), each file's SHA-256 and build-provenance attestation verified
+> with `gh attestation verify` — `SGVue-1.6.0-setup.exe` 124 908 404 bytes (about 119 MB, unsigned),
+> `SGVue-1.6.0-arm64.dmg` 135 689 704 and `SGVue-1.6.0-x64.dmg` 142 283 558 (ad-hoc signed), each
+> Mac app holding `LICENSES.chromium.html` and `LICENSE.electron.txt`. The Apple-silicon app from
+> the published image passes `npm run test:packaged` and the `app.asar` contents test; the Intel
+> image and the Windows installer were verified by hash and attestation and not run. Installed, the
+> Mac app is 336 MB (Apple silicon) and 343 MB (Intel), measured on apps built locally from the
+> same commit; the Windows installed size, about 390 MB, is 1.4.0's and was not re-measured. All
+> three were published together on `sgvue/releases`, the owner's instruction.
 
 ---
 

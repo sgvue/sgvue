@@ -4,6 +4,38 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-12 — SGVue 1.6.0 published; `CLAUDE.md` slimmed and the system spec brought up to date
+
+**Did — the release.** GitHub's checks passed on `cdd8256` on all three systems; the tag `v1.6.0` was pushed and
+`release.yml` built the three installers. Each file's SHA-256 matches its build-provenance attestation
+(`gh attestation verify`, built by `release.yml` at `refs/tags/v1.6.0`): `SGVue-1.6.0-setup.exe` 124 908 404 bytes,
+`SGVue-1.6.0-arm64.dmg` 135 689 704, `SGVue-1.6.0-x64.dmg` 142 283 558 — the sizes the notes give. The
+Apple-silicon app inside the published image reads 1.6.0, is ad-hoc signed, holds the five licence files, passes
+the `app.asar` contents test, and passes `npm run test:packaged` (4 passed, 1 skipped, peak 1 043 MB). All three
+were published together on `sgvue/releases` with their SHA-256 (the owner: *"publish the latest version under
+v1.6.0"*). It is the latest release: the update check's endpoint answers `v1.6.0`, `?v=1.6.0` on the site reads
+"You're up to date — SGVue 1.6.0" and `?v=1.5.0` reads "Update available: SGVue 1.6.0 (you have 1.5.0)".
+`docs/SYSTEM_SPEC.md` §3 records the release.
+
+**Did — the documents (the audit's decisions 3 and 4).** `CLAUDE.md` is 359 lines, was 1 795: the
+allowed-deviations list moved byte for byte to `docs/DEVIATIONS.md` and the decisions index to
+`docs/DECISIONS-INDEX.md`, and `CLAUDE.md` keeps the goal, the fidelity rules, the commands, the rules and the
+traps unchanged, one pointer line per deviation and 37 standing constraints. This file keeps its newest entries
+in full and one line for each older one. `docs/SYSTEM_SPEC.md` describes origin-to-origin placement, the note,
+the plan rotation and the one shared offset from the code, and gains §9.1, the `.sgvue` project file; the two
+plan files say what is built. A builder each, then one reviewer: both passed, no blocking item; its three small
+notes (the pull-request template's pointer, two present-tense lines of the spec) are fixed. On the merged
+result: lint 0, privacy 0, `npm test` 234 files, 4 898 passed, 3 skipped.
+
+**Not done.** The Windows installer and the Intel Mac image were not run here (hash and attestation only) —
+the owner's Windows check is still owed. The five live Ask Vee eval cases were not run (paid credits not
+approved). Not opened: the owner's real federation. Left: a schedule filter's or sort level's `field` is not
+passed through `cleanField` (`src/schedule/schedule/def.ts`; needs its own task and check); `mergeLocated` can
+leave two ids bound to one key after the save-swap fix; source comments that still say a deviation is "in
+`CLAUDE.md`"; three stale lines of the spec outside the rewritten parts; the finished worktrees and branches
+and the old installers in `dist/` are not cleaned up. Running in sessions of their own: the product site's
+update for 1.6.0, and a marketing video.
+
 ## 2026-11-12 — SGVue 1.6.0 prepared: everything since 1.5.0, checked in a window
 
 The owner, away from the computer: *"make sure all sessions completed their works. Run quick security check. Then u run the final tests before building installers … After you completed everything, just merge and push. publish the latest version under v1.6.0. Ensure its a stable functional version."*
