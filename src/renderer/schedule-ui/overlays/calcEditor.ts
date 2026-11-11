@@ -20,7 +20,7 @@ import { ICON } from '../icons';
 
 /**
  * What the result IS. The measurements let the column convert units like any other number;
- * "yes or no" makes it a real yes/no so Column formatting can show Yes/No, TRUE/FALSE or a
+ * "yes or no" makes it a real yes/no so the column’s menu can show Yes/No, TRUE/FALSE or a
  * tick rather than 1 and 0; "text" keeps the words an if() picked, so a schedule can be
  * grouped and counted by a label the author invented.
  *

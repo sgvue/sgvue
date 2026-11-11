@@ -53,6 +53,7 @@ import { federate, type Federation } from '../../src/shared/federate'
 import { readoutCoords, toMap } from '../../src/shared/georef'
 import { RULES, TOOLS } from '../../src/shared/tool-schemas'
 import { runToolOnce, runTurnOnce } from '../../src/renderer/ai/bridge'
+import { traceFail } from '../../src/renderer/ai/trace-store'
 import { HOSTILE_OPTIONS } from '../../src/renderer/dev/hostile'
 import { MESSY_OPTIONS } from '../../src/renderer/dev/messy'
 import { attachScheduleStandIn, detachScheduleStandIn, scheduleStandInState } from '../../src/renderer/dev/schedules-standin'
@@ -264,7 +265,8 @@ async function runCase(kase: Kase, mode: 'oracle' | 'null'): Promise<Graded> {
     // button, as the window's runner does; the setup's reply is then cleared, as `chat.reset` does.
     const { index } = await runTurnOnce('(setup)', [{ name: step.tool, input: step.input || {} }])
     if (st().chatMsgs[index]?.pending) st().applyPending(index)
-    useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatEpoch: st().chatEpoch + 1 })
+    traceFail()
+    useShell.setState({ chatMsgs: [], chatErr: '', chatEnd: null, chatBusy: false, chatIfcsg: 'unknown', chatIfcsgAsked: false, chatIfcsgHeadsUp: null, chatEpoch: st().chatEpoch + 1 })
   }
   const truth = await O.collectTruth(kase, {
     sql: (statement) => fed.query(statement),

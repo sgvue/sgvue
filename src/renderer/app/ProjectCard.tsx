@@ -7,6 +7,7 @@
  * (`--abar`, `selectors/lanes.ts` — `0px` while that bar is not drawn).
  */
 import { useMemo } from 'react'
+import { crsChip } from '../../shared/georef'
 import { federation as fed } from '../model/federation-store'
 import { pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
@@ -15,7 +16,7 @@ import { s } from './css'
 import { Cross } from './icons'
 
 /** The store fields this component reads — it re-renders when one of them changes. */
-const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'library', 'uploadNames', 'units', 'assignedColors')
+const KEYS = pick('card', 'cardTop', 'closeCard', 'coords', 'federation', 'library', 'uploadNames', 'units', 'assignedColors', 'georefSource')
 
 export default function ProjectCard(): React.JSX.Element | null {
   const st = useShell(useShallow(KEYS))
@@ -30,9 +31,11 @@ export default function ProjectCard(): React.JSX.Element | null {
         coords: st.coords,
         uploadNames: st.uploadNames,
         units: st.units,
-        assigned: st.assignedColors
+        assigned: st.assignedColors,
+        // The file's own CRS, as the status bar and the Coordinate-system card name it.
+        crs: crsChip(st.georefSource).short
       }),
-    [st.federation, st.library, st.coords, st.uploadNames, st.units, st.assignedColors]
+    [st.federation, st.library, st.coords, st.uploadNames, st.units, st.assignedColors, st.georefSource]
   )
   if (st.card !== 'project') return null
   return (

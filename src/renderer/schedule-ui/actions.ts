@@ -23,7 +23,7 @@ import { libraryView } from './libraryCache';
 import { classCount, mineKey } from './libraryModel';
 import { closePopover, popoverId } from './popover';
 import {
-  deleteSchedule, duplicateSchedule, isFull, refusal, renameSchedule, saveSchedule, STORAGE_MESSAGE,
+  DELETE_STORAGE_MESSAGE, deleteSchedule, duplicateSchedule, isFull, refusal, renameSchedule, saveSchedule, STORAGE_MESSAGE,
   type SavedEntry,
 } from './schedules';
 import { render, state, update, type AppState } from './state';
@@ -182,16 +182,19 @@ export function askDeleteSaved(name: string, how?: ConfirmHow): void {
   // Where the library's selection goes once this row is gone — worked out now, while the row
   // is still in the list (ifcTable's `doDelete`).
   const sel = selectionAfterDelete(name);
+  const deleted = () => {
+    flash(`Deleted “${name}”.`);
+    // The setup it pointed at is gone; the marker must not outlive it.
+    if (state.savedName === name) update({ savedName: null, ...sel });
+    else if (sel) update(sel);
+    else render();
+  };
   // Everything else in this app can be undone; storage cannot, so this one asks first.
   void confirmDialog(`Delete the saved template “${name}”? This cannot be undone.`, 'Delete', true, how)
     .then((ok) => {
       if (!ok) return;
-      deleteSchedule(name);
-      flash(`Deleted “${name}”.`);
-      // The setup it pointed at is gone; the marker must not outlive it.
-      if (state.savedName === name) update({ savedName: null, ...sel });
-      else if (sel) update(sel);
-      else render();
+      // A refused write deleted nothing: say so, and change nothing.
+      deleteSchedule(name) ? deleted() : flash(DELETE_STORAGE_MESSAGE, true);
     });
 }
 

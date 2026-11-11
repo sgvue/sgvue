@@ -1196,7 +1196,9 @@ export const set_storeys: Executor = (input, ctx) => {
     }
   }
   if (scope === 'confirm') {
-    const shownNames = names.filter((n) => storeyVis[n] !== false).map((n) => labelText(n, SET_NAME_CHARS))
+    // Each name once — two models' storeys of one name at different elevations are two entries
+    // of the ladder (`unionStoreys`) — and bounded, as `set_models` bounds its names.
+    const shownNames = [...new Set(names.filter((n) => storeyVis[n] !== false))].map((n) => labelText(n, SET_NAME_CHARS))
     return {
       forModel: {
         message: confirmText(would, total),
@@ -1207,7 +1209,7 @@ export const set_storeys: Executor = (input, ctx) => {
       },
       ui: {
         pending: {
-          label: `show only ${shownNames.join(', ')} — leaves ${would} of ${total} visible`,
+          label: `show only ${firstFew(shownNames)} — leaves ${would} of ${total} visible`,
           patch: { storeyVis }
         }
       }

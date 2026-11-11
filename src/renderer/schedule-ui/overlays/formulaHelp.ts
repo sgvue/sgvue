@@ -87,7 +87,7 @@ Family != "Basic Wall"        → 1 if it does not</code></pre>
         <p>Because those answer 1 or 0, they drop straight into <code>if()</code> and into a column
           total: give the column a <em>Sum</em> and you have counted the matching rows.</p>
         <p>A column of 1s and 0s reads badly, though. Set <strong>“Result is a”</strong> to
-          <em>yes or no</em> and the same formula answers Yes or No instead — Column formatting can
+          <em>yes or no</em> and the same formula answers Yes or No instead — the column’s menu can
           then show it as <em>Yes/No</em>, <em>TRUE/FALSE</em>, <em>Y/N</em> or a tick. There is no
           special syntax for this; it is a property of the calculated value, not something you
           write into the formula.</p>

@@ -20,6 +20,7 @@ export const CAP = 100;
 /** What the caller says when a write was refused, and why. */
 export const FULL_MESSAGE = `Saved templates are full (${CAP}). Delete one to make room.`;
 export const STORAGE_MESSAGE = 'Could not save — storage is unavailable or full.';
+export const DELETE_STORAGE_MESSAGE = 'Could not delete — storage is unavailable or full.';
 
 /** Would a save that may replace `own` have to add an entry to a list already at the cap? */
 export function isFull(own: string | null = null, entries = listSaved()): boolean {
@@ -213,6 +214,7 @@ export function duplicateSchedule(name: string): string | null {
   return write(entries) ? fresh : null;
 }
 
-export function deleteSchedule(name: string): void {
-  write(listSaved().filter((e) => e.name !== name));
+/** False when storage (or a project's list) refused the write: then nothing was deleted. */
+export function deleteSchedule(name: string): boolean {
+  return write(listSaved().filter((e) => e.name !== name));
 }

@@ -722,8 +722,8 @@ function wireViewBar(root: HTMLElement) {
     paintPopover();
   });
   // "+ Filter" and "+ Sort / group" pick a field and land in that rule's or level's own
-  // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. Both adds are
-  // no-ops at the cap.
+  // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. At the cap both
+  // say so and add nothing.
   onClick(root, '[data-act="vb-add"]', (el) => addFrom(el.dataset.v ?? '', el.dataset.id ?? ''));
   wirePicker(root);
 }
@@ -733,7 +733,10 @@ function addFrom(kind: string, id: string) {
   const f = fieldFromKey(id);
   if (!f) return;
   if (kind === 'filter') {
-    if (state.def.filters.length >= MAX_FILTERS) return;
+    if (state.def.filters.length >= MAX_FILTERS) {
+      flash(`${MAX_FILTERS} filter rules is the most a schedule holds.`, true);
+      return;
+    }
     openChipPopover('filter', state.def.filters.length);
     updateDef((def) => {
       const next = act.addFilterRule(def);
@@ -741,7 +744,10 @@ function addFrom(kind: string, id: string) {
     });
     return;
   }
-  if (state.def.sort.length >= MAX_SORT_LEVELS) return;
+  if (state.def.sort.length >= MAX_SORT_LEVELS) {
+    flash(`${MAX_SORT_LEVELS} sort levels is the most a schedule holds — remove one first.`, true);
+    return;
+  }
   openChipPopover('sort', state.def.sort.length);
   updateDef((def) => {
     const next = act.addSortLevel(def);
