@@ -15,6 +15,10 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
   scene origin, so the models were drawn metres apart and coordinates read wrong. Every model now
   shares the one origin. Nothing is aligned automatically: a model whose file puts it in the wrong
   place is still shown there.
+- **Models still loading when the scene empties keep one origin.** When a project's first model
+  failed to open while models brought in with Locate… were loading, one of them kept the old
+  scene origin and the next took a new one, so the two could be drawn tens of metres apart. They
+  now share one origin.
 - **The selection dimension fits a building that is turned in its file's coordinates.** The box
   and its three dimensions are square with the grids again and read the element's own length,
   width and height; the property card's Bounding box, Footprint, Box volume and Centroid agree.

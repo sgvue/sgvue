@@ -480,8 +480,12 @@ async function join(hold: Promise<unknown>): Promise<void> {
     }
     dropRows()
     // A boot refused after it committed (no geometry) is still in the scene and the store:
-    // unloaded here, so the landing page does not stand over it.
-    if (mine === epoch && fed.current.models.length) fed.resetUnshown()
+    // unloaded here, so the landing page does not stand over it. 2026-11-11 — unloaded as
+    // `discard` does, model by model, never with `resetUnshown`: a model located into a project
+    // meanwhile may be prepared in `pending` against this offset, or still streaming, and
+    // `resetUnshown` would hand the offset back under it (the next one choosing its own, kilometres
+    // off) and cancel the worker under it. `removeModel` keeps the offset while one is on its way.
+    if (mine === epoch) for (const m of [...fed.current.models]) await fed.removeModel(m.meta.modelKey)
     bootFailed(err)
   }
 }
