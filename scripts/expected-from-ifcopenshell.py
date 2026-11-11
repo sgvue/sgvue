@@ -10,14 +10,18 @@ Usage:
     python3 scripts/expected-from-ifcopenshell.py "samples/Sample Ifc Model.ifc"
     python3 scripts/expected-from-ifcopenshell.py            # every .ifc in samples/
     python3 scripts/expected-from-ifcopenshell.py --cells-only tests/fixtures/feet.ifc
+    python3 scripts/expected-from-ifcopenshell.py --identities  # tests/fixtures/identities.json
 
 Writes tests/fixtures/<file-stem>.expected.json — since 2026-11-07 with `identities`, every
-indexed element's PredefinedType code as written, `get_predefined_type` and ObjectType by GlobalId,
-which the test compares element by element (an older file lacks it, and that case skips) — and,
+indexed element's raw identity by GlobalId (since 2026-11-11 one key per attribute, the
+occurrence's own ObjectType and the type's Name apart: `identity()`), which the test compares
+element by element (a file written before 2026-11-11 fails and asks to be regenerated) — and,
 since 2026-11-08, tests/fixtures/<file-stem>.cells.json: every indexed element's property and
 quantity values with their measure types, the fields a schedule shows, and the file's unit
 scales, which `tests/unit/schedule/oracle.test.ts` checks every schedule cell against.
-`--cells-only` writes just the cells file. Requires the system python3 to have
+`--cells-only` writes just the cells file. `--identities` writes tests/fixtures/identities.json,
+the same identities for every committed fixture model that has no expected.json of its own.
+Requires the system python3 to have
 IfcOpenShell installed (0.8.4 was used to write this). This is a development script and
 lives outside src/ on purpose: only settings.ts and sessions.ts may write to disk inside
 the app.
@@ -211,18 +215,42 @@ def predefined_code(element) -> str:
     return occurrence if stated(occurrence) else of_type if stated(of_type) else occurrence or of_type
 
 
+def indexed_elements(model) -> list:
+    """Every element the app indexes — IfcElement less openings, then IfcSpace — the one list
+    `build()`, `cells()` and `--identities` read."""
+    openings = {e.id() for e in model.by_type("IfcOpeningElement")}
+    out = [e for e in model.by_type("IfcElement") if e.id() not in openings]
+    return out + list(model.by_type("IfcSpace"))
+
+
 def identity(element) -> dict:
-    """The identity fields the index builder must agree on for *every* element (2026-11-07)."""
+    """The identity fields the index builder must agree on for *every* element: IfcOpenShell's
+    **raw readings only**, one key per attribute (2026-11-07; widened 2026-11-11).
+
+    The lesson of 2026-11-11: this script records what IfcOpenShell reads. A rule of the app — a
+    fallback, a join, "the type's Name, else the occurrence's ObjectType" — is stated in the test
+    that compares, by name, and is never baked in here. `objectType` once was the type's Name
+    before the occurrence's ObjectType, which is the app's own rule, so the truth agreed with the
+    bug it was meant to catch. `predefinedType` is the one computed value, and the test says so.
+    """
     type_object = ifcopenshell.util.element.get_type(element)
     return {
         "expressId": element.id(),
+        "guid": element.GlobalId,
         "type": element.is_a(),
+        "name": element.Name or "",
+        "longName": getattr(element, "LongName", None) or "",
+        "description": element.Description or "",
+        "tag": getattr(element, "Tag", None) or "",
+        # The occurrence's own `ObjectType` attribute, as written — never the type's Name.
+        "objectType": getattr(element, "ObjectType", None) or "",
+        # `get_type(element).Name` — the type object `IfcRelDefinesByType` assigns.
+        "typeName": (type_object.Name or "") if type_object else "",
+        "typeGuid": type_object.GlobalId if type_object else "",
+        # The code as written: the app's documented reading of the raw attributes (2026-11-07).
         "predefinedType": predefined_code(element),
         # IfcOpenShell's own reading — `IfcElement.effectivePredefinedType`.
         "effectivePredefinedType": ifcopenshell.util.element.get_predefined_type(element) or "",
-        "objectType": (type_object.Name if type_object else None)
-        or getattr(element, "ObjectType", None)
-        or "",
     }
 
 
@@ -385,9 +413,7 @@ def _measures_of(cell: dict) -> list:
 def cells(path: Path) -> dict:
     """What a schedule shows for every indexed element, as IfcOpenShell reads it."""
     model = ifcopenshell.open(str(path))
-    openings = {e.id() for e in model.by_type("IfcOpeningElement")}
-    indexed = [e for e in model.by_type("IfcElement") if e.id() not in openings]
-    indexed += model.by_type("IfcSpace")
+    indexed = indexed_elements(model)
 
     scales = {u: ifcopenshell.util.unit.calculate_unit_scale(model, u) for u in SCALED_UNIT_TYPES}
     measure_types: dict = {}
@@ -456,19 +482,12 @@ def sample_element(model, ifc_class: str, length_to_m: float, georef: dict) -> d
         return None
     element = min(candidates, key=lambda e: e.id())
     storey = ifcopenshell.util.element.get_container(element, ifc_class="IfcBuildingStorey")
-    type_object = ifcopenshell.util.element.get_type(element)
     site = georef.get("site") or {}
     geometry = world_geometry(
         element, site.get("placement"), site.get("rotationDeg") or 0.0
     ) or {}
     return {
-        "expressId": element.id(),
-        "guid": element.GlobalId,
-        "type": element.is_a(),
-        "name": element.Name or "",
-        "tag": getattr(element, "Tag", None) or "",
         **identity(element),
-        "typeGuid": type_object.GlobalId if type_object else "",
         "storey": (storey.Name or storey.LongName or "") if storey else "",
         "material": material_name(element),
         "classifications": classifications(element),
@@ -657,9 +676,7 @@ def build(path: Path) -> dict:
             samples[ifc_class] = sample
 
     # Every element the app indexes — IfcElement less openings, and IfcSpace — by GlobalId.
-    indexed = [e for e in model.by_type("IfcElement") if e.id() not in openings]
-    indexed += model.by_type("IfcSpace")
-    identities = {e.GlobalId: identity(e) for e in indexed}
+    identities = {e.GlobalId: identity(e) for e in indexed_elements(model)}
 
     return {
         "generatedBy": f"IfcOpenShell {ifcopenshell.version}",
@@ -696,8 +713,41 @@ def build(path: Path) -> dict:
     }
 
 
+IDENTITIES = FIXTURES / "identities.json"
+
+
+def identities_of_fixtures() -> dict:
+    """`--identities`: every committed fixture model's raw identities, in one file.
+
+    For every `.ifc` under `tests/fixtures/`, recursively, that has no `<stem>.expected.json` of
+    its own beside it (that file carries its identities already), keyed by its path relative to
+    `tests/fixtures`: its SHA-256, its schema and every indexed element's `identity` by expressId
+    — not by GlobalId, which a file may repeat. `tests/unit/index-builder.fixture.test.ts` holds
+    the index to it and fails a fixture with no truth by name, and a stale one by its hash.
+    """
+    out = {}
+    for path in sorted(FIXTURES.rglob("*.ifc")):
+        if (path.parent / f"{path.stem}.expected.json").exists():
+            continue
+        model = ifcopenshell.open(str(path))
+        out[path.relative_to(FIXTURES).as_posix()] = {
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "schema": model.schema,
+            "elements": {str(e.id()): identity(e) for e in indexed_elements(model)},
+        }
+    return {"generatedBy": f"IfcOpenShell {ifcopenshell.version}", "files": out}
+
+
 def main(argv: list[str]) -> int:
     args = argv[1:]
+    if "--identities" in args:
+        data = identities_of_fixtures()
+        IDENTITIES.write_text(
+            json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        n = sum(len(f["elements"]) for f in data["files"].values())
+        print(f"wrote {IDENTITIES.relative_to(ROOT)} — {len(data['files'])} files, {n} elements")
+        return 0
     cells_only = "--cells-only" in args
     targets = [Path(a) for a in args if a != "--cells-only"] or sorted(SAMPLES.glob("*.ifc"))
     if not targets:

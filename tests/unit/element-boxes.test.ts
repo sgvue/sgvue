@@ -143,6 +143,7 @@ const el = (id: number, bbox?: [number, number, number, number, number, number])
     predefinedType: '',
     effectivePredefinedType: '',
     objectType: '',
+    typeName: '',
     typeGuid: '',
     storey: 'L1',
     material: '',

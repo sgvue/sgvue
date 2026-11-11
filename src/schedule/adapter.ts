@@ -14,10 +14,10 @@
  *   entity          `IfcElement.type` — already canonical case, the sidebar's own spelling
  *   name, description, guid     verbatim
  *   mark            `tag`
- *   family/typeName `objectType` split on the first ':' — SGVue's `objectType` is exactly
- *                   ifcTable's `fullType` (type Name, falling back to the occurrence's)
- *   objectType      the same string. ifcTable reads the occurrence's raw `ObjectType`; the
- *                   index keeps only the type-first one (gap)
+ *   family/typeName `typeName || objectType` split on the first ':' — ifcTable's `fullType`
+ *                   (the type object's Name, falling back to the occurrence's ObjectType)
+ *   objectType      the occurrence's raw `ObjectType` (`IfcElement.objectType`, 2026-11-11),
+ *                   as ifcTable reads it
  *   predefinedType  the code as written (`IfcElement.predefinedType`, 2026-11-07): the raw
  *                   token, `USERDEFINED` kept, as ifcTable keeps it — the occurrence's, or its
  *                   type object's when the occurrence states none
@@ -253,7 +253,8 @@ export function snapshotOf(
     const model = byModel.get(el.model)
     if (!model || SKIP.has(el.type)) continue
     const { scales, derived, storeys, spaces, above } = model
-    const colon = el.objectType.indexOf(':')
+    const fullType = el.typeName || el.objectType
+    const colon = fullType.indexOf(':')
     const place = el.storey ? storeys.get(el.storey) : undefined
     const held = el.container !== undefined ? above.get(el.container) : undefined
     const row: Record<string, Cell> = {}
@@ -265,8 +266,8 @@ export function snapshotOf(
       name: el.name,
       description: el.description,
       mark: el.tag,
-      typeName: colon > 0 ? el.objectType.slice(colon + 1) : el.objectType,
-      family: colon > 0 ? el.objectType.slice(0, colon) : '',
+      typeName: colon > 0 ? fullType.slice(colon + 1) : fullType,
+      family: colon > 0 ? fullType.slice(0, colon) : '',
       objectType: el.objectType,
       predefinedType: el.predefinedType,
       guid: el.guid,

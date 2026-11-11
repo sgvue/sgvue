@@ -1190,6 +1190,29 @@ Anything not on this list is a defect.
   focused by themselves; only the user's click answers it. **New controls:** the quick replies.
   Styled by `.vm` classes only; no inline string changed. Not yet seen in a window.)*
 
+- **2026-11-11 — the right-click menu's "similar · …" items go by the element's type, and are not
+  drawn for an element with neither a type nor an ObjectType.** Asked *"Should right-click
+  'similar' match by the type name first, as other viewers do?"*, the owner: *"Yes, by type"*.
+  `Hide similar · X`, `Isolate similar · X` and `Select similar · X` (`SGVue.dc.html:1898–1921`)
+  keep their copy, order, keys and handlers; `X` and what they take is the type object's Name, the
+  element's own ObjectType only when it has no type. With neither, the three items are absent —
+  the design's mock never reaches that state — and the rule above `Select similar` stands above
+  `Zoom to`. The mock has no type objects, so there every label and action is the design's. The
+  property card's "Same ObjectType" row is unchanged and literal. **No new element, no new
+  control.** Seen in a window on `reference.ifc` (2026-11-11): twelve items on a typed element,
+  nine on one with neither, the rules in place.
+- **2026-11-11 — an identity tile with no value shows the em dash.** Asked for by the owner in
+  these words, looking at an element with no ObjectType: *"show a dash on the empty tile"*. The
+  design's four tiles (`SGVue.dc.html:330–333`) draw `{{ sel.… }}` with nothing behind it, so a
+  value the file does not carry was a label over a blank box. Each of the four — IfcEntity,
+  PredefinedType, ObjectType, Level — now draws `—` for an empty value (`tileText`,
+  `selectors/props.ts`), in the tile's own span and style string; a written value is never
+  replaced, `NOTDEFINED` included. No tooltip on the dash; the card's values, "Same ObjectType",
+  rules and the assistant keep the empty value. The design's mock states all four on every
+  element, so its captures are unchanged. **No new element, no new control, no style string
+  changed.** **Measured** in a window on `reference.ifc`: the ObjectType tile is 142 × 43.75 px
+  with a written value and with the dash.
+
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
 2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's
@@ -1531,6 +1554,7 @@ An index. **The full log — the alternatives, the reasoning and the measurement
 - 2026-11-11 — **two models never choose an offset each: `ParseWorkerBridge.geometry` holds an `offset: null` request while an earlier one is unsettled and posts it with the offset that stream chose** (`chooser`, `model/worker-bridge.ts`; a failed request passes on what it was posted with, or its predecessor's outcome). The worker is one thread, so with two files loading at once "B parsed" could reach the renderer before "A's geometry done", B was asked with `null` and took its own origin — a reopened `.sgvue`, which queues every model together, drew its models metres apart. Nothing moves or turns a model; the `.sgvue` format is unchanged.
 - 2026-11-11 — **the selection dimension and the property card's geometry rows read the element's box in the plan frame** (`Viewer.elementPlanBox`: the element's own vertices turned by −ρ, cached per element; at ρ = 0 `elementBox` itself): `drawDims` lays the box, runs, ticks and labels out there and turns each point back by +ρ; `geoRows(…, rho)` turns the centroid back. Since 2026-11-07 both had shown the world-axis box round a diagonal element. At ρ = 0 every line, label and row is as before; the assistant's box tools and SQL `bbox` stay world-axis boxes.
 - 2026-11-11 — **the federation offset is handed back only when nothing is loaded and no model streamed against it is still on its way to joining** (`onTheWay`, `releaseOffset`, `model/federation-store.ts`): from its geometry request until its `prepare` fails, its item has been through `addBatch` — whatever the outcome — or it is `forget`-ten. Emptying the federation while another model was loading (`resetBoot`: a project's boot join that failed while a located model loads, or an unload of the last model, which no designed control does) used to hand it back at once, so the next model chose its own origin and the two joined on two. A boot refused after it committed (`the model contains no geometry`) is unloaded through `removeModel`, never `resetUnshown`, which is right only together with `disposeUploads` (`upload-pipeline.ts` `join`). Left as it is: a first model with no meshes still reports `[0, 0, 0]` — consistent placement, reduced precision far out; the row has the reason.
+- 2026-11-11 — **ObjectType is the occurrence's own attribute, as written; the type object's Name is `typeName`** (owner-reported: *"I open in other BIM Viewer, see different thing"*): `objectType` is never the type's Name, and with none the tile shows the em dash (`tileText`; the owner: *"show a dash on the empty tile"*); the card's "Same ObjectType" row is literal; the right-click "similar · …" items go by the type's Name, by ObjectType only for an element with no type, and are not drawn for an element with neither (`similarKey`, the owner: *"Yes, by type"*); Schedules' Family / Type split `typeName || objectType`, SQL `type_object` and `get_relationships`' `typeObject` read `typeName`, `isSiteLike` tests `typeName || objectType` (framing unchanged); **the oracle script records IfcOpenShell's raw readings only** — an app rule is named in the test's `APP_RULES`, `KNOWN_DIFFERENCES` stays empty, and every element of every committed fixture is compared (`tests/fixtures/identities.json`, `object-type.pipeline.test.ts`).
 
 A new decision is recorded as **one line here and a full row in `docs/DECISIONS.md`**.
 
@@ -1666,6 +1690,7 @@ One line each. **Read `docs/TRAPS.md` before touching `src/worker/` or
 - Storey `Elevation` is in the file's own length unit; read `IfcUnitAssignment` and convert.
 - Never use `getSpatialStructure` — walk `IfcRelAggregates` and `IfcRelContainedInSpatialStructure`.
 - PredefinedType `USERDEFINED` means "see ObjectType"; never store the ObjectType text in the PredefinedType field — keep the code as written and the effective type apart; an IFC2X3 occurrence often has no PredefinedType, its type does.
+- Never show the type object's `Name` as ObjectType — the occurrence's own attribute is ObjectType, the type's Name is `typeName`; and an oracle records raw readings only, or it inherits the defect it should catch.
 
 **Streaming, workers and progress**
 

@@ -180,6 +180,15 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > `SGVue-1.4.0-arm64.dmg` 135 651 172 and `SGVue-1.4.0-x64.dmg` 142 221 161 (ad-hoc signed);
 > installed, the Mac app is 336 MB (Apple silicon) and 342 MB (Intel). All three were published
 > together on `sgvue/releases`, after the owner's test of the Mac build.
+> **2026-11-09, version 1.5.0:** its published requirements (`docs/releases/1.5.0.md`) are 1.3.0's,
+> measured then, with the download sizes of the files published: built by `release.yml` from the
+> tag `v1.5.0` (commit `d6d22f4`), each file's SHA-256 and build-provenance attestation verified
+> with `gh attestation verify` — `SGVue-1.5.0-setup.exe` 124 904 558 bytes (about 119 MB, unsigned),
+> `SGVue-1.5.0-arm64.dmg` 135 687 554 and `SGVue-1.5.0-x64.dmg` 142 289 643 (ad-hoc signed), each
+> Mac app holding `LICENSES.chromium.html` and `LICENSE.electron.txt`; installed, the Mac app is
+> 337 MB (Apple silicon) and 342 MB (Intel), measured from the disk images. The Windows installed
+> size, about 390 MB, is 1.4.0's and was not re-measured. All three were published together on
+> `sgvue/releases`, the owner's choice.
 
 ---
 
@@ -439,8 +448,8 @@ buildingSMART's own validation service uses. The table below is the contract.
 |---|---|
 | Files | ISO 10303-21 STEP; header `FILE_DESCRIPTION` (incl. the MVD `ViewDefinition[...]` string), `FILE_NAME`, `FILE_SCHEMA`; SHA-256 recorded |
 | Schemas | IFC2X3 TC1, IFC4 ADD2 TC1, IFC4X3 ADD2 — schema-specific attribute names respected (e.g. `IfcClassificationReference.ItemReference` in 2X3 vs `Identification` in 4) |
-| Identity | `IfcRoot.GlobalId` verbatim (22-char base64 alphabet `0-9A-Za-z_$`, validated, never regenerated); `expressId` kept; `Name`, `Description`, `Tag`, `ObjectType` |
-| Entity typing | Exact `IfcEntity`; `PredefinedType` as **two values** (2026-11-07): the code as written — the occurrence's, else its type object's, `USERDEFINED` kept, never `ObjectType` text — and the effective type, IfcOpenShell's `get_predefined_type` (`USERDEFINED` → the type's `ElementType` / the occurrence's `ObjectType`, the type's code first); type object via `IfcRelDefinesByType` (`IfcTypeObject.Name` as the type family) |
+| Identity | `IfcRoot.GlobalId` verbatim (22-char base64 alphabet `0-9A-Za-z_$`, validated, never regenerated); `expressId` kept; `Name`, `Description`, `Tag`, `ObjectType` (the occurrence's own attribute as written, never the type's `Name` — 2026-11-11) |
+| Entity typing | Exact `IfcEntity`; `PredefinedType` as **two values** (2026-11-07): the code as written — the occurrence's, else its type object's, `USERDEFINED` kept, never `ObjectType` text — and the effective type, IfcOpenShell's `get_predefined_type` (`USERDEFINED` → the type's `ElementType` / the occurrence's `ObjectType`, the type's code first); type object via `IfcRelDefinesByType` (its `Name` kept apart as `typeName`, 2026-11-11 — Schedules' Family / Type, SQL `type_object`, the assistant's `typeObject`) |
 | Spatial structure | `IfcProject › IfcSite › IfcBuilding › IfcBuildingStorey › IfcSpace` by `IfcRelAggregates`; elements by `IfcRelContainedInSpatialStructure`; storey `Elevation`; `IfcSpatialStructureElement.CompositionType` (`COMPLEX`/`ELEMENT`/`PARTIAL`) as authored, absent when the file leaves the optional attribute unset; `IfcZone` and other `IfcGroup`/`IfcSystem` memberships via `IfcRelAssignsToGroup` |
 | Decomposition | `IfcRelAggregates` (assemblies), `IfcRelNests`, `IfcRelVoidsElement` (openings), `IfcRelFillsElement` (doors/windows in openings) |
 | Property sets | `IfcRelDefinesByProperties` → `IfcPropertySet`; value types per `IfcValue`: `IfcPropertySingleValue`, `EnumeratedValue`, `ListValue`, `BoundedValue`, `TableValue`, `ReferenceValue`, `IfcComplexProperty` (nested); values kept **as authored** with their measure type and unit; type-level psets (`IfcTypeObject.HasPropertySets`) inherited and **overridden by occurrence psets**, flagged `inherited`; `Pset_*` (buildingSMART) vs `SGPset_*` (IFC-SG) vs other prefixes distinguished |

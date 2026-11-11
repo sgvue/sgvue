@@ -2,6 +2,8 @@
  * The property card's derived values — `SGVue.dc.html:1834–1873`, `:1985–1990` and
  * `:1650–1655` — checked against the design's own rules without a DOM.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { federate, type FederatedElement } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
@@ -18,7 +20,8 @@ import {
   psetBoxes,
   relRows,
   selectionCard,
-  selTitle
+  selTitle,
+  tileText
 } from '../../src/renderer/state/selectors/props'
 import { DASH } from '../../src/renderer/state/selectors/spatial'
 
@@ -39,6 +42,7 @@ function element(patch: Partial<FederatedElement>): FederatedElement {
     predefinedType: 'NOTDEFINED',
     effectivePredefinedType: patch.predefinedType ?? 'NOTDEFINED',
     objectType: '',
+    typeName: '',
     typeGuid: '',
     storey: 'L1',
     material: '',
@@ -320,6 +324,47 @@ describe('the hover title of a clipped text (2026-10-01)', () => {
     const [box] = psetBoxes(element({ psets: { Pset_WallCommon: { IsExternal: true } } }))
     expect(box.short).toBe('Wall Common')
     expect(fullText(box.name)).toBe('Pset_WallCommon')
+  })
+})
+
+/**
+ * 2026-11-11 — the owner, looking at an element with no ObjectType: *"show a dash on the empty
+ * tile"*. The design's tile is `{{ sel.objectType }}` with nothing behind it, so a value the file
+ * does not carry was a label over a blank box.
+ */
+describe('an identity tile with no value shows the em dash (2026-11-11)', () => {
+  it('shows the dash for an empty value, and the value itself otherwise — as written', () => {
+    expect(tileText('')).toBe(DASH)
+    expect(tileText('Corridor partition')).toBe('Corridor partition')
+    expect(tileText('USERDEFINED')).toBe('USERDEFINED')
+    // A written value is never replaced: not NOTDEFINED, not spaces, not a dash someone typed.
+    expect(tileText('NOTDEFINED')).toBe('NOTDEFINED')
+    expect(tileText('  PADDED_CODE  ')).toBe('  PADDED_CODE  ')
+    expect(tileText('-')).toBe('-')
+  })
+
+  it('is display only: the card’s own values stay what the file says, and the dash has no tooltip', () => {
+    const fed = federate([mockModelIndex('ARC')])
+    const wall = fed.elements.find((e) => e.type === 'IfcWall')!
+    const card = selectionCard({
+      federation: fed,
+      element: { ...wall, objectType: '', storey: '' },
+      box: null,
+      solids: 0,
+      coords: NOWHERE,
+      offset: [0, 0, 0]
+    })!
+    expect(card.objectType).toBe('')
+    expect(card.storey).toBe('')
+    expect(fullText(card.objectType)).toBeUndefined()
+  })
+
+  it('is what all four tiles draw', () => {
+    const src = readFileSync(join(__dirname, '../../src/renderer/app/PropertyCard.tsx'), 'utf8')
+    const tile = src.slice(src.indexOf('function Tile('), src.indexOf('function SectionHead('))
+    expect(tile).toContain('{tileText(value)}')
+    expect(tile).not.toMatch(/\{value\}/)
+    expect(src.match(/<Tile /g)).toHaveLength(4)
   })
 })
 

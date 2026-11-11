@@ -12,10 +12,19 @@
  * runs everywhere, CI included, and a missing file fails the test (2026-11-07). A **real model**
  * in `samples/` runs only where one is present: `samples/` and its expected.json are git-ignored,
  * so without one that part reports itself as skipped rather than failing.
+ *
+ * **Every element's identity, against IfcOpenShell's raw readings (2026-11-11).** The truth is
+ * one key per attribute, as IfcOpenShell reads it (`identity()` in the script); a rule of the
+ * app — a fallback — is one named entry of `APP_RULES` below, never baked into the truth. The
+ * truth once wrote "the type's Name, else the occurrence's ObjectType" as `objectType`, which is
+ * the app's own rule, so the check agreed with the bug it was there to catch: about one element
+ * in five on a Revit export showed the type's "Family:Type" name as its ObjectType. Every other
+ * committed `.ifc` under `tests/fixtures/` is held to `tests/fixtures/identities.json` the same
+ * way (`--identities`): one with no truth fails by name, a stale truth by its SHA-256.
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { coordsFromGeoref, detectMethod, projectFrame } from '../../src/shared/georef'
 import type { ModelIndex } from '../../src/shared/model-index.types'
@@ -26,16 +35,93 @@ const ROOT = join(__dirname, '..', '..')
 const SAMPLES = join(ROOT, 'samples')
 const FIXTURES = join(ROOT, 'tests', 'fixtures')
 
-interface ExpectedSample {
+/**
+ * IfcOpenShell's raw reading of one indexed element (`identity()` in
+ * `scripts/expected-from-ifcopenshell.py`, 2026-11-11): one key per attribute.
+ */
+interface Identity {
   expressId: number
   guid: string
   type: string
   name: string
+  longName: string
+  description: string
   tag: string
-  predefinedType: string
-  effectivePredefinedType?: string
+  /** The occurrence's own `ObjectType` attribute, as written. */
   objectType: string
+  /** `get_type(element).Name`. */
+  typeName: string
   typeGuid: string
+  /** The code as written (`predefined_code`), the app's documented reading of the raw codes. */
+  predefinedType: string
+  /** `ifcopenshell.util.element.get_predefined_type`. */
+  effectivePredefinedType: string
+}
+
+/** The identity values compared for every element, value for value. */
+const COMPARED = [
+  'guid',
+  'type',
+  'name',
+  'description',
+  'tag',
+  'objectType',
+  'typeName',
+  'typeGuid',
+  'predefinedType',
+  'effectivePredefinedType'
+] as const
+type Compared = (typeof COMPARED)[number]
+
+/**
+ * The app's rules over the raw readings — the only places the index may say something other than
+ * IfcOpenShell's own attribute. Anything not here is plain equality.
+ */
+const APP_RULES: Partial<Record<Compared, (want: Identity) => string>> = {
+  // `index-builder.ts`: `text(row.Name) || text(row.LongName)`. Recorded as it is, a fallback
+  // awaiting the owner's word — not a reading IfcOpenShell makes.
+  name: (want) => want.name || want.longName
+}
+
+/**
+ * A difference from IfcOpenShell that is recorded and accepted: `{ file, expressId, field, why }`.
+ * Empty, and asserted empty — a difference is a defect to fix, not a line to add here.
+ */
+const KNOWN_DIFFERENCES: readonly { file: string; expressId: number; field: Compared; why: string }[] = []
+
+const REGENERATE =
+  'its identities predate 2026-11-11 (no `typeName`): regenerate it with ' +
+  '`python3 scripts/expected-from-ifcopenshell.py <model>` (or `--identities` for a fixture)'
+
+/** Whether a truth carries the 2026-11-11 identity shape. */
+const currentShape = (want: Partial<Identity>): boolean => COMPARED.every((k) => k in want) && 'longName' in want
+
+/**
+ * Every element of `wants` against the index, field by field. Returns one line per field that
+ * differs — the count and the first few elements — so a real model's thousands stay readable.
+ */
+function identityDifferences(index: ModelIndex, wants: readonly Identity[], file: string): string[] {
+  const byExpressId = new Map(index.elements.map((e) => [e.expressId, e]))
+  const lines: string[] = []
+  const missing = wants.filter((w) => !byExpressId.has(w.expressId)).map((w) => `#${w.expressId}`)
+  if (missing.length) lines.push(`${missing.length} element(s) IfcOpenShell indexes are missing: ${missing.slice(0, 8).join(', ')}`)
+  for (const field of COMPARED) {
+    const rule = APP_RULES[field]
+    const bad: string[] = []
+    for (const want of wants) {
+      const got = byExpressId.get(want.expressId) as unknown as Record<string, unknown> | undefined
+      if (!got) continue
+      const expected = rule ? rule(want) : want[field]
+      if (got[field] === expected) continue
+      if (KNOWN_DIFFERENCES.some((k) => k.file === file && k.expressId === want.expressId && k.field === field)) continue
+      bad.push(`#${want.expressId} got ${JSON.stringify(got[field])} want ${JSON.stringify(expected)}`)
+    }
+    if (bad.length) lines.push(`${field}: ${bad.length} of ${wants.length} differ — ${bad.slice(0, 5).join('; ')}`)
+  }
+  return lines
+}
+
+interface ExpectedSample extends Identity {
   storey: string
   material: string
   classifications: { system: string; identification: string; name: string; location: string }[]
@@ -72,13 +158,10 @@ interface Expected {
   georeference: Record<string, unknown>
   samples: Record<string, ExpectedSample>
   /**
-   * Every indexed element's identity, by GlobalId (2026-11-07): the code as written, IfcOpenShell's
-   * `get_predefined_type` and the type family. Absent from a fixture written before that date.
+   * Every indexed element's identity, by GlobalId (2026-11-07; raw, one key per attribute, since
+   * 2026-11-11 — `Identity`). Absent from, or of the old shape in, a file written before that.
    */
-  identities?: Record<
-    string,
-    { expressId: number; type: string; predefinedType: string; effectivePredefinedType: string; objectType: string }
-  >
+  identities?: Record<string, Identity>
 }
 
 /** The synthetic reference model, committed with its ground truth: always run, never skipped. */
@@ -292,27 +375,19 @@ for (const { ifc, expected } of ALL) {
 
     // Every element, not the first of each class (2026-11-07): the first wall of the reference
     // model states its code outright, so a USERDEFINED wall whose ObjectType had replaced its
-    // PredefinedType was never compared.
-    it.skipIf(!expected.identities)('agrees on every element\'s PredefinedType, effective type and ObjectType', async () => {
+    // PredefinedType was never compared. Every identity value since 2026-11-11, raw on one side.
+    it('agrees on every element\'s identity, value for value, with IfcOpenShell\'s raw reading', async () => {
+      const wants = Object.values(expected.identities ?? {})
+      expect(
+        expected.identities !== undefined && wants.every(currentShape),
+        `${expected.file || basename(ifc)}: ${REGENERATE}`
+      ).toBe(true)
       await ready
-      const byGuid = new Map(index.elements.map((e) => [e.guid, e]))
-      const identities = Object.entries(expected.identities ?? {})
       // By GlobalId on both sides, so a file that repeats one counts it once on both.
-      expect(byGuid.size).toBe(identities.length)
-      for (const [guid, want] of identities) {
-        const got = byGuid.get(guid)
-        expect(got, `${guid} missing from the index`).toBeDefined()
-        expect(
-          {
-            expressId: got!.expressId,
-            type: got!.type,
-            predefinedType: got!.predefinedType,
-            effectivePredefinedType: got!.effectivePredefinedType,
-            objectType: got!.objectType
-          },
-          guid
-        ).toEqual(want)
-      }
+      const byGuid = new Map(index.elements.map((e) => [e.guid, e]))
+      expect(byGuid.size).toBe(wants.length)
+      const differences = identityDifferences(index, wants, basename(ifc))
+      expect(differences, basename(ifc)).toEqual([])
     })
 
     for (const [ifcClass, want] of Object.entries(expected.samples)) {
@@ -329,6 +404,7 @@ for (const { ifc, expected } of ALL) {
         if (want.effectivePredefinedType !== undefined)
           expect(got!.effectivePredefinedType).toBe(want.effectivePredefinedType)
         expect(got!.objectType).toBe(want.objectType)
+        expect((got as unknown as Record<string, unknown>).typeName).toBe(want.typeName)
         expect(got!.typeGuid).toBe(want.typeGuid)
         expect(got!.storey).toBe(want.storey)
         expect(got!.material).toBe(want.material)
@@ -354,3 +430,70 @@ for (const { ifc, expected } of ALL) {
     }
   })
 }
+
+/* ── every other committed fixture model, against identities.json (2026-11-11) ───────────── */
+
+interface IdentityFile {
+  generatedBy: string
+  files: Record<string, { sha256: string; schema: string; elements: Record<string, Identity> }>
+}
+
+/** Every `.ifc` under `tests/fixtures/`, by its path relative to it, `/`-separated. */
+function fixtureModels(dir: string = FIXTURES): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...fixtureModels(path))
+    else if (entry.name.endsWith('.ifc')) out.push(relative(FIXTURES, path).split(sep).join('/'))
+  }
+  return out.sort()
+}
+
+const IDENTITIES_PATH = join(FIXTURES, 'identities.json')
+const IDENTITIES: IdentityFile = existsSync(IDENTITIES_PATH)
+  ? (JSON.parse(readFileSync(IDENTITIES_PATH, 'utf8')) as IdentityFile)
+  : { generatedBy: '(missing)', files: {} }
+/** A model with an expected.json of its own beside it is checked against that, above. */
+const hasOwnTruth = (rel: string): boolean => existsSync(join(FIXTURES, rel.replace(/\.ifc$/, '.expected.json')))
+
+describe(`IFC conformance — every committed fixture model vs ${IDENTITIES.generatedBy}`, () => {
+  const models = fixtureModels()
+
+  it('records no accepted difference', () => {
+    expect(KNOWN_DIFFERENCES).toEqual([])
+  })
+
+  it('has a truth for every fixture model, and none for a model that is gone', () => {
+    const want = models.filter((m) => !hasOwnTruth(m))
+    const without = want.filter((m) => !(m in IDENTITIES.files))
+    expect(without, 'no truth — run `python3 scripts/expected-from-ifcopenshell.py --identities`').toEqual([])
+    const gone = Object.keys(IDENTITIES.files).filter((m) => !want.includes(m))
+    expect(gone, 'a truth for a model that is not a fixture any more — regenerate identities.json').toEqual([])
+  })
+
+  for (const rel of models.filter((m) => !hasOwnTruth(m))) {
+    it(`${rel}: every element's identity agrees with IfcOpenShell's raw reading`, async () => {
+      const truth = IDENTITIES.files[rel]
+      expect(truth, `${rel}: no truth — run \`python3 scripts/expected-from-ifcopenshell.py --identities\``).toBeDefined()
+      const wants = Object.values(truth.elements)
+      expect(wants.every(currentShape), `${rel}: ${REGENERATE}`).toBe(true)
+      const bytes = readFileSync(join(FIXTURES, rel))
+      const sha256 = createHash('sha256').update(bytes).digest('hex')
+      expect(sha256, `${rel}: identities.json is stale — the file changed; regenerate it with --identities`).toBe(
+        truth.sha256
+      )
+      const src = await createReadOnlyIfcSource()
+      const modelID = src.openFromBuffer(new Uint8Array(bytes))
+      const index = buildModelIndex(src, modelID, { modelKey: 'FIXTURE', fileName: basename(rel), sha256 })
+      src.close(modelID)
+      src.dispose()
+      expect(index.schema).toBe(truth.schema)
+      // The same elements on both sides, by expressId.
+      expect(index.elements.map((e) => e.expressId).sort((a, b) => a - b)).toEqual(
+        wants.map((w) => w.expressId).sort((a, b) => a - b)
+      )
+      for (const [key, want] of Object.entries(truth.elements)) expect(String(want.expressId), rel).toBe(key)
+      expect(identityDifferences(index, wants, rel), rel).toEqual([])
+    })
+  }
+})

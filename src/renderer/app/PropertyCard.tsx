@@ -24,7 +24,7 @@
 import { Fragment, useMemo } from 'react'
 import { getViewer, pick, useShell } from '../state/shell'
 import { useShallow } from 'zustand/react/shallow'
-import { dimBtn, fullText, selectionCard, selTitle } from '../state/selectors/props'
+import { dimBtn, fullText, selectionCard, selTitle, tileText } from '../state/selectors/props'
 import { s } from './css'
 
 /** `SGVue.dc.html:363` etc. — the 9 px chevron each collapsible section opens with. */
@@ -73,7 +73,7 @@ function Tile({
         title={fullText(value)}
         style={s(`font:${font};color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis`)}
       >
-        {value}
+        {tileText(value)}
       </span>
     </div>
   )
