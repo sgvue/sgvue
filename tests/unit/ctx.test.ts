@@ -34,6 +34,7 @@ function element(patch: Partial<FederatedElement>): FederatedElement {
     predefinedType: 'NOTDEFINED',
     effectivePredefinedType: patch.predefinedType ?? 'NOTDEFINED',
     objectType: 'Basic Wall:EW200',
+    typeName: '',
     typeGuid: '',
     storey: 'L1',
     material: '',
@@ -146,6 +147,95 @@ describe('the items', () => {
     const two = labels(input({ ctxId: 1, selIds: [1, 2] }))
     expect(two[1]).toBe('Hide similar · Basic Wall:EW200')
     expect(two[2]).toBe('Hide similar entity · Wall')
+  })
+})
+
+/**
+ * 2026-11-11 — the owner, asked "Should right-click 'similar' match by the type name first, as
+ * other viewers do?": *"Yes, by type"*. "Similar" is the same type object's Name; the element's
+ * own ObjectType only when it has no type; and an element with neither gets no "similar · …"
+ * item — never a blank label that takes every element with nothing.
+ */
+describe('"similar" is by the type, then by ObjectType, and never by nothing', () => {
+  const T1 = element({ id: 11, type: 'IfcWall', typeName: 'Family A:Type 1', objectType: 'CODE_A' })
+  const T2 = element({ id: 12, type: 'IfcWall', typeName: 'Family A:Type 1', objectType: 'CODE_B' })
+  const T3 = element({ id: 13, type: 'IfcSlab', typeName: 'Family B:Type 2', objectType: 'CODE_A' })
+  const T4 = element({ id: 14, type: 'IfcWall', typeName: 'Family A:Type 1', objectType: '' })
+  const U1 = element({ id: 15, type: 'IfcBuildingElementProxy', typeName: '', objectType: 'CODE_A' })
+  const U2 = element({ id: 16, type: 'IfcBuildingElementProxy', typeName: '', objectType: 'CODE_A' })
+  const E1 = element({ id: 17, type: 'IfcBeam', typeName: '', objectType: '' })
+  const E2 = element({ id: 18, type: 'IfcColumn', typeName: '', objectType: '' })
+  const ALL = [T1, T2, T3, T4, U1, U2, E1, E2]
+  const on = (patch: Partial<CtxInput>): CtxInput =>
+    input({ elements: ALL, byId: new Map(ALL.map((e) => [e.id, e])), ...patch })
+  const ids = (i: CtxInput, label: string): number[] | undefined =>
+    (ctxItems(i).find((x) => x.label.startsWith(label))?.action as { ids: number[] } | undefined)?.ids
+
+  it('a typed element: the label is the type’s Name and it takes that type, whatever each ObjectType is', () => {
+    const i = on({ ctxId: 11 })
+    expect(labels(i)).toContain('Hide similar · Family A:Type 1')
+    expect(labels(i)).toContain('Isolate similar · Family A:Type 1')
+    expect(labels(i)).toContain('Select similar · Family A:Type 1')
+    // T2 has another ObjectType and T4 none: same type, so similar. T3, U1 and U2 share T1's
+    // ObjectType but not its type: not similar.
+    expect(ids(i, 'Hide similar ·')).toEqual([11, 12, 14])
+    expect(ids(i, 'Isolate similar ·')).toEqual([11, 12, 14])
+    expect(ids(i, 'Select similar ·')).toEqual([11, 12, 14])
+  })
+
+  it('a typed element with no ObjectType of its own is still similar to its type', () => {
+    const i = on({ ctxId: 14 })
+    expect(labels(i)).toContain('Hide similar · Family A:Type 1')
+    expect(ids(i, 'Hide similar ·')).toEqual([11, 12, 14])
+  })
+
+  it('an element with no type: by its own ObjectType, among elements with no type', () => {
+    const i = on({ ctxId: 15 })
+    expect(labels(i)).toContain('Hide similar · CODE_A')
+    expect(ids(i, 'Hide similar ·')).toEqual([15, 16])
+  })
+
+  it('an element with neither gets no "similar · …" item, and the rest of the menu stands', () => {
+    const i = on({ ctxId: 17 })
+    expect(labels(i)).toEqual([
+      'Hide',
+      'Hide similar entity · Beam',
+      'Isolate',
+      'Isolate similar entity · Beam',
+      'Zoom to',
+      'Properties',
+      'Ask about this',
+      'Show all hidden',
+      'Zoom extents'
+    ])
+    // No label ends in the separator dot with nothing after it.
+    expect(labels(i).some((l) => /·\s*$/.test(l))).toBe(false)
+    // The rule above the Select group moves to its next item; no rule is doubled or lost.
+    const top = (label: string): string => ctxItems(i).find((x) => x.label === label)!.top
+    expect(top('Zoom to')).toBe('1px solid var(--border)')
+    expect(top('Isolate')).toBe('1px solid var(--border)')
+    expect(top('Ask about this')).toBe('1px solid var(--border)')
+    // With the item present, the rule is where the design has it.
+    const typed = ctxItems(on({ ctxId: 11 }))
+    expect(typed.find((x) => x.label.startsWith('Select similar ·'))!.top).toBe('1px solid var(--border)')
+    expect(typed.find((x) => x.label === 'Zoom to')!.top).toBe('0')
+  })
+
+  it('a multi-selection names only the kinds it has, and one with none has no "similar · …" item', () => {
+    const mixed = on({ ctxId: 11, selIds: [11, 15, 17] })
+    expect(labels(mixed)).toContain('Hide similar · Family A:Type 1, CODE_A')
+    expect(ids(mixed, 'Hide similar ·')).toEqual([11, 12, 14, 15, 16])
+    const none = on({ ctxId: 17, selIds: [17, 18] })
+    expect(labels(none).some((l) => l.includes('similar ·'))).toBe(false)
+    expect(labels(none)).toContain('Hide similar entity · Beam, Column')
+  })
+
+  it('never takes the elements with neither, whatever is clicked', () => {
+    for (const e of ALL) {
+      const got = ids(on({ ctxId: e.id }), 'Hide similar ·') ?? []
+      if (e.id !== 17) expect(got).not.toContain(17)
+      if (e.id !== 18) expect(got).not.toContain(18)
+    }
   })
 })
 

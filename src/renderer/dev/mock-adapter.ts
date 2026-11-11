@@ -169,6 +169,7 @@ export function mockModelIndex(key: string, options?: MockOptions): ModelIndex {
       // the effective type is the code (2026-11-07).
       effectivePredefinedType: e.predefinedType,
       objectType: e.objectType,
+      typeName: '',
       typeGuid: '',
       storey: e.storey,
       material: e.material,

@@ -5,7 +5,7 @@
  * writes combinations nobody chose — the occurrence's code (`$`, NOTDEFINED, USERDEFINED, an
  * enumeration), its `ObjectType` (`$` or text), and either no type object or one with its own code,
  * `ElementType` and `Name` — as STEP text in memory, parses it once with web-ifc, and holds every
- * element to three invariants:
+ * element to four invariants:
  *
  *   1. the property card's PredefinedType tile shows one of the file's own PredefinedType tokens
  *      for that element (the occurrence's or its type's), or nothing — never ObjectType,
@@ -13,7 +13,9 @@
  *   2. `effectivePredefinedType` is IfcOpenShell 0.8.4's `get_predefined_type`, re-written here
  *      from its Python source rather than imported from the app;
  *   3. a `PredefinedType` rule on either value matches, and `absent` matches only when both are
- *      empty.
+ *      empty;
+ *   4. (2026-11-11) `objectType` is the occurrence's own `ObjectType` as written, `''` for `$`,
+ *      and `typeName` the type's `Name`, `''` for no type — never one standing in for the other.
  *
  * Every text value is lower case with a prefix, so it can never equal an enumeration token and
  * invariant 1 means something. The PRNG is seeded: the same seed writes the same file on every
@@ -153,7 +155,7 @@ describe(`PredefinedType, ${COUNT} seeded combinations (seed ${SEED})`, () => {
       for (const v of [c.occurrence.objectType, c.type?.elementType, c.type?.name]) if (v) expect(tokens.has(v)).toBe(false)
   })
 
-  it('holds every element to the three invariants', async () => {
+  it('holds every element to the four invariants', async () => {
     const src = await createReadOnlyIfcSource()
     const modelID = src.openFromBuffer(new TextEncoder().encode(text))
     const index = buildModelIndex(src, modelID, { modelKey: 'FUZZ', fileName: 'fuzz.ifc', sha256: '' })
@@ -188,6 +190,10 @@ describe(`PredefinedType, ${COUNT} seeded combinations (seed ${SEED})`, () => {
       if (tile) expect(matches(rule('=', tile)), at).toBe(true)
       if (e!.effectivePredefinedType) expect(matches(rule('=', e!.effectivePredefinedType)), at).toBe(true)
       expect(matches(rule('absent', null)), at).toBe(!tile && !e!.effectivePredefinedType)
+
+      // 4. (2026-11-11) ObjectType is the occurrence's own, as written; typeName the type's Name.
+      expect(e!.objectType, at).toBe(c.occurrence.objectType ?? '')
+      expect((e as unknown as Record<string, unknown>).typeName, at).toBe(c.type?.name ?? '')
     })
   })
 })

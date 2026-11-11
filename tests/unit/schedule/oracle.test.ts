@@ -176,7 +176,11 @@ type Want = { v: Scalar; k?: UnitKind } | undefined
 const text = (s: string): Want => (s === '' ? undefined : { v: s })
 const label = (n: Named | undefined): string => (n ? n.longName || n.name : '')
 
-/** The type's Name before the occurrence's ObjectType — `adapter.ts`'s documented source. */
+/**
+ * The type's Name before the occurrence's ObjectType — ifcTable's rule for Family and Type
+ * (`adapter.ts`). The Object Type column itself is the occurrence's own ObjectType (2026-11-11):
+ * it expected `fullType` until then, the type's Name, where IfcOpenShell reads the occurrence's.
+ */
 const fullType = (e: TruthElement): string => e.typeName || e.objectType
 
 function wantCore(t: Truth, e: TruthElement, key: CoreKey, guid: string, model: string): Want {
@@ -193,7 +197,7 @@ function wantCore(t: Truth, e: TruthElement, key: CoreKey, guid: string, model: 
     case 'mark':
       return text(e.tag)
     case 'objectType':
-      return text(type)
+      return text(e.objectType)
     case 'family':
       return text(colon > 0 ? type.slice(0, colon) : '')
     case 'typeName':
