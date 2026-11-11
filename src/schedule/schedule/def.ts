@@ -314,7 +314,8 @@ function cleanField(v: unknown): FieldRef | null {
   if (!v || typeof v !== 'object') return null;
   const kind = (v as { kind?: unknown }).kind;
   if (kind !== 'core' && kind !== 'prop' && kind !== 'formula') return null;
-  if (kind === 'core' && !(((v as { key?: string }).key ?? '') in CORE_LABELS)) return null;
+  // Own keys only: `in` also accepts names every object inherits (`constructor`, `toString`).
+  if (kind === 'core' && !Object.hasOwn(CORE_LABELS, (v as { key?: string }).key ?? '')) return null;
   return v as FieldRef;
 }
 

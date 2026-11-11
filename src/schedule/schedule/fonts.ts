@@ -51,17 +51,21 @@ export const BODY_FONTS: BodyFont[] = [
  */
 const LEGACY: Record<string, string> = { sans: 'plex', serif: 'georgia' };
 
+/** A legacy name's replacement, or undefined. Own keys only, so `constructor` is no legacy name. */
+const legacy = (key: string | undefined): string | undefined =>
+  key !== undefined && Object.hasOwn(LEGACY, key) ? LEGACY[key] : undefined;
+
 export function fontStack(key: string | undefined): string {
-  const k = LEGACY[key ?? ''] ?? key ?? 'plex';
+  const k = legacy(key) ?? key ?? 'plex';
   return (BODY_FONTS.find((f) => f.key === k) ?? BODY_FONTS[0]).stack;
 }
 
 /** True for anything we can render, including the three legacy names. */
 export function isBodyFont(key: unknown): key is string {
-  return typeof key === 'string' && (key in LEGACY || BODY_FONTS.some((f) => f.key === key));
+  return typeof key === 'string' && (Object.hasOwn(LEGACY, key) || BODY_FONTS.some((f) => f.key === key));
 }
 
 /** The key a picker should show as selected, with legacy names resolved. */
 export function normaliseFont(key: string | undefined): string {
-  return LEGACY[key ?? ''] ?? (BODY_FONTS.some((f) => f.key === key) ? key! : 'plex');
+  return legacy(key) ?? (BODY_FONTS.some((f) => f.key === key) ? key! : 'plex');
 }
