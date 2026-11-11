@@ -114,7 +114,9 @@ test('the packaged app opens a model from a share link, under the production CSP
   // both instantiate from a URL, and a file inside an archive has no readable one.
   const unpacked = join(UNPACKED, 'out/renderer/assets')
   const wasm = (await readdir(unpacked)).filter((f) => f.endsWith('.wasm')).sort()
-  expect(wasm.map((f) => f.replace(/-[A-Za-z0-9_]+\.wasm$/, '.wasm'))).toEqual([
+  // Vite's content hash is eight base64url characters, and one of them can be a hyphen
+  // (2026-11-12: sql.js 1.15.2's file is `sql-wasm-B-9ndiyM.wasm`), so the hash is cut by length.
+  expect(wasm.map((f) => f.replace(/-[A-Za-z0-9_-]{8}\.wasm$/, '.wasm'))).toEqual([
     'sql-wasm.wasm',
     'web-ifc.wasm'
   ])

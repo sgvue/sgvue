@@ -111,8 +111,9 @@ test('a heads-up stands before its consent card; IFC terms take their colour and
     // The card asked for this; it never takes the focus by itself.
     expect(await vee.evaluate(() => !!document.activeElement?.closest('[data-role="consent"]'))).toBe(false)
 
-    // 3 — IFC terms: exactly the names the models carry, in the one colour, mono at medium weight;
-    // the near misses are the plain mono a code span always was.
+    // 3 — IFC terms: exactly the names the models carry, in the one colour, mono and bold (600
+    // since 2026-11-09, the owner: "also bold it"; 500 before); the near misses are the plain mono
+    // a code span always was.
     const bubbles = reply.locator('.vm-stack > .vm-b.vm-tx')
     await expect(bubbles).toHaveCount(2)
     await expect(reply.locator('.vm-stack > .vm-b.vm-tx .ifc-term')).toHaveText(['FireRating', 'IfcDoor', 'D2 Double 2400x2400'])
@@ -120,7 +121,7 @@ test('a heads-up stands before its consent card; IFC terms take their colour and
     for (const t of await reply.locator('.ifc-term').all()) {
       expect(await t.evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).fontWeight, getComputedStyle(e).fontFamily.includes('Mono')])).toEqual([
         termColour,
-        '500',
+        '600',
         true
       ])
     }

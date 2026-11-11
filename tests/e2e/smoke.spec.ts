@@ -676,12 +676,14 @@ test('the assistant panel opens from its pill, seeds the audit, and is not ready
     })
     expect(shape).toEqual({ child: true, top: false, modal: false, title: 'Ask Vee', width: 330, height: 420 })
     // 2026-11-08 — the header names Vee (`Ask Vee` is the OS title), with its 32 px face and a
-    // presence line; it has no × of its own (the OS close and Esc remain).
+    // presence line; it has no × of its own (the OS close and Esc remain). 2026-11-09 — its one
+    // button is `New conversation` (the allowed deviation of that date), and nothing else.
     const title = vee.locator('#sgvue-chat-title')
     await expect(title).toHaveText('Vee')
     const header = vee.locator('header.vm-hd')
     await expect(header.locator('[data-role="vee"] canvas')).toHaveCount(1)
-    await expect(header.locator('button')).toHaveCount(0)
+    await expect(header.locator('button')).toHaveCount(1)
+    await expect(header.locator('button')).toHaveAttribute('aria-label', 'New conversation')
     await expect(vee.locator('[data-role="vee-presence"]')).toHaveText('no key')
     await expect(vee.getByText('Ask SGVue')).toHaveCount(0)
 
