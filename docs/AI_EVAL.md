@@ -434,6 +434,15 @@ nudge, the heads-up across calls, the quote-stripped enum, the prompt lines — 
 
 None turned to fail.
 
+### Owed: a live re-run after the plan-frame boxes (2026-11-11)
+
+The descriptions of `clash_check`, `find_nearby`, `measure_between` and `get_element` now say
+that on a building turned in its file's coordinates the boxes are taken square with it, and
+results carry `frame` and `planRotationDeg` (`docs/DECISIONS.md`, 2026-11-11). The eval's
+federation is not turned, so every truth is unchanged and `npm run eval:offline` still scores
+100 % / 0 %; a live re-run of `ana-clash`, `ana-proximity`, `ana-tallest`, `op-place-spot` and
+`op-place-measure` is **owed**, to see that the new wording changes no answer.
+
 ### Run counts, the pilot and the estimate (2026-11-08)
 
 The owner's cheaper plan. **The twenty tagged cases run three times in a live pass, every other

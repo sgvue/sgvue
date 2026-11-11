@@ -20,8 +20,10 @@
  * **The box is an approximation, and a conservative one.** A part's `bbox6` is the AABB of its
  * *transformed local* AABB rather than of its transformed vertices, so a part whose placement
  * rotates it about anything but `+Z` reports a box at least as large as the exact one. That is
- * the same box the picker filters with and the same one the property card's "Box volume" row
- * reports; every consumer says it is box arithmetic.
+ * the same box the picker filters with; every consumer says it is box arithmetic. (Since
+ * 2026-11-11 the property card and, on a turned building, the assistant's box tools and the SQL
+ * `plan_box` table read the plan-frame box from the element's vertices instead —
+ * `viewer.elementPlanBox`, `plan-boxes.ts`; this box is their fallback and the world box beside it.)
  */
 import type { FederationOffset, GeometryChunk } from '../../shared/geometry-contract.types'
 

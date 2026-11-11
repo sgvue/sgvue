@@ -229,7 +229,15 @@ export const CLASH_TEST_CAP = 400_000
 
 type Box = readonly [number, number, number, number, number, number]
 
-const boxOf = (e: FederatedElement): Box | null => (e.bbox ? (e.bbox as Box) : null)
+/**
+ * Which box an element is read by. The default is its own `bbox`, the world-axis box; the
+ * assistant's box tools pass the plan frame's (`model/plan-boxes.ts`) while the building is
+ * turned, so the same arithmetic runs square with the building (2026-11-11). It answers `null`
+ * exactly when the element has no `bbox`.
+ */
+export type BoxOf = (e: FederatedElement) => Box | null
+
+const ownBox: BoxOf = (e) => (e.bbox ? (e.bbox as Box) : null)
 
 /* ────────────────────────────── the uniform box hash ────────────────────────────── */
 
@@ -251,7 +259,7 @@ export interface BoxGrid {
 
 const cellKey = (i: number, j: number, k: number): string => `${i},${j},${k}`
 
-export function buildBoxGrid(items: readonly FederatedElement[]): BoxGrid {
+export function buildBoxGrid(items: readonly FederatedElement[], boxOf: BoxOf = ownBox): BoxGrid {
   let sum = 0
   const half: [number, number, number] = [0, 0, 0]
   for (const e of items) {
@@ -323,7 +331,8 @@ export function queryBoxGrid(
  * Axis-aligned bounding-box interference between two models.
  *
  * Deterministic, bbox-level only — it finds **candidates for review**, it is not a
- * solid-geometry clash engine, and every caller says so.
+ * solid-geometry clash engine, and every caller says so. The boxes are `boxOf`'s: the world box
+ * by default, the plan frame's while the building is turned (2026-11-11).
  *
  * The grid hashes each B box by its **centre**. A box from A then scans only the cells its
  * own half-extent, B's largest half-extent and the tolerance can reach, which is exactly the
@@ -334,15 +343,16 @@ export function clashPairs(
   visible: Predicate,
   a: string,
   b: string,
-  tol = 0
+  tol = 0,
+  boxOf: BoxOf = ownBox
 ): { pairs: ClashPair[]; capped: boolean } {
   const of = (key: string): FederatedElement[] =>
-    elements.filter((e) => e.model === key && e.bbox && visible(e))
+    elements.filter((e) => e.model === key && boxOf(e) && visible(e))
   const A = of(a)
   const B = of(b)
   if (!A.length || !B.length) return { pairs: [], capped: false }
 
-  const grid = buildBoxGrid(B)
+  const grid = buildBoxGrid(B, boxOf)
   const pairs: ClashPair[] = []
   let tested = 0
   let capped = false
@@ -395,8 +405,9 @@ export function boxGap(x: Box, y: Box): number {
  * Every boxed element within `distance` metres of one of `seeds`, nearest first — 2026-09-20,
  * `docs/AI_REVIEW.md` §9 gap 7.
  *
- * Box arithmetic in the files' own world coordinates, exactly as `measure_between` and `clash_check` are, on
- * the same uniform hash `clash_check` uses. A seed is never its own neighbour, and a duplicate
+ * Box arithmetic on the boxes `boxOf` gives — the world box by default, the plan frame's while
+ * the building is turned — exactly as `measure_between` and `clash_check` are, on the same
+ * uniform hash `clash_check` uses. A seed is never its own neighbour, and a duplicate
  * across two seeds is kept once, at its smallest gap.
  *
  * `pool` is the caller's — the executor passes the visible elements, minus `IfcSpace` unless
@@ -405,12 +416,13 @@ export function boxGap(x: Box, y: Box): number {
 export function nearbyElements(
   pool: readonly FederatedElement[],
   seeds: readonly FederatedElement[],
-  distance: number
+  distance: number,
+  boxOf: BoxOf = ownBox
 ): Neighbour[] {
   const seedIds = new Set(seeds.map((e) => e.id))
-  const boxed = pool.filter((e) => e.bbox && !seedIds.has(e.id))
+  const boxed = pool.filter((e) => boxOf(e) && !seedIds.has(e.id))
   if (!boxed.length || !seeds.length) return []
-  const grid = buildBoxGrid(boxed)
+  const grid = buildBoxGrid(boxed, boxOf)
   const best = new Map<number, Neighbour>()
   for (const seed of seeds) {
     const x = boxOf(seed)
@@ -430,7 +442,8 @@ export function nearbyElements(
 export function nearbyElementsBrute(
   pool: readonly FederatedElement[],
   seeds: readonly FederatedElement[],
-  distance: number
+  distance: number,
+  boxOf: BoxOf = ownBox
 ): Neighbour[] {
   const seedIds = new Set(seeds.map((e) => e.id))
   const best = new Map<number, Neighbour>()
@@ -438,7 +451,7 @@ export function nearbyElementsBrute(
     const x = boxOf(seed)
     if (!x) continue
     for (const e of pool) {
-      if (seedIds.has(e.id) || !e.bbox) continue
+      if (seedIds.has(e.id) || !boxOf(e)) continue
       const gap = boxGap(x, boxOf(e)!)
       if (gap > distance) continue
       const had = best.get(e.id)
@@ -454,10 +467,11 @@ export function clashPairsBrute(
   visible: Predicate,
   a: string,
   b: string,
-  tol = 0
+  tol = 0,
+  boxOf: BoxOf = ownBox
 ): ClashPair[] {
   const of = (key: string): FederatedElement[] =>
-    elements.filter((e) => e.model === key && e.bbox && visible(e))
+    elements.filter((e) => e.model === key && boxOf(e) && visible(e))
   const pairs: ClashPair[] = []
   for (const ea of of(a)) {
     const x = boxOf(ea)!

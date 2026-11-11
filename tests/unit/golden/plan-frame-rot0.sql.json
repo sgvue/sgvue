@@ -1,0 +1,50 @@
+{
+ "attribute": {
+  "rows": 2884,
+  "sha256": "637285e38647f7b1baf3ec206fcb5d52c21d81c1bfc6271e0cb88231deab2f41"
+ },
+ "bbox": {
+  "rows": 412,
+  "sha256": "da556cee234889bd4d42ada1e877bcc035f9fda8cd5e966d14a1ef233af9da1c"
+ },
+ "classification": {
+  "rows": 0,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ "element": {
+  "rows": 412,
+  "sha256": "76d73bdb3d2ac54523d45029091384d482259f1459e179a1ac955ab61010c399"
+ },
+ "material": {
+  "rows": 412,
+  "sha256": "328413f7d5413c3c9e04aff6e7697c446d4e7512081ecaa226431d4f7599b5f1"
+ },
+ "model": {
+  "rows": 4,
+  "sha256": "cc852fbaf5aac8d83b3bf7cddf3afde608fec04704f5bd524f96677bd0104937"
+ },
+ "property": {
+  "rows": 2120,
+  "sha256": "ce8ba83c5ed3c7379f1bfed6c2f3dcca8a667c29ec45cbf937c5758ee93fc8ea"
+ },
+ "pset": {
+  "rows": 844,
+  "sha256": "a1474ddec77b5ab1b5f068e64a7d3d91b461a257797d85a10fd190a2945cae77"
+ },
+ "quantity": {
+  "rows": 1341,
+  "sha256": "34fcec8335a9c1db890f6fe7746e4e8a3f164736a3513ee2b84842f0ed777862"
+ },
+ "relationship": {
+  "rows": 0,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ "spatial": {
+  "rows": 28,
+  "sha256": "c409209abc704579751ecf1ebb77c1930f1b32640753c09ef11214d72394a8d1"
+ },
+ "type_object": {
+  "rows": 0,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ }
+}
