@@ -1,7 +1,7 @@
 {
   "name": "sgvue",
-  "version": "1.5.0",
-  "description": "SGVue \u2014 read-only IFC model viewer for BIM coordination review",
+  "version": "1.6.0",
+  "description": "SGVue — read-only IFC model viewer for BIM coordination review",
   "main": "./out/main/index.js",
   "author": {
     "name": "Yong Yen"

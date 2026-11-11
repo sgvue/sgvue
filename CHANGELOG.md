@@ -8,6 +8,8 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-12
+
 ### Added
 
 - **Adding a model to an open view shows its progress in the 3D view.** A thin line along the top
@@ -111,6 +113,11 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 - **A schedule file cannot name a field that does not exist.** A crafted `.schedule.json` (or
   saved template, or project) could name built-in JavaScript words such as `constructor` as a
   column, which showed program text as the heading. Such a column is dropped on load.
+- **A schedule formula or number format cannot borrow a built-in word.** A crafted schedule
+  could use `constructor(1)` as a formula, which showed a program error as the column's text,
+  or name `toString` as a column's display unit, which blanked the column's numbers. Both are
+  now read as any unknown name is: the formula is refused with the usual message, and the
+  number is shown unconverted.
 
 ## [1.5.0] - 2026-11-08
 
@@ -454,6 +461,7 @@ assistant, and the accessibility, performance and packaging pass. It was not pub
 releases page.
 
 [Unreleased]: https://github.com/sgvue/sgvue/commits/main
+[1.6.0]: https://github.com/sgvue/releases/releases/tag/v1.6.0
 [1.5.0]: https://github.com/sgvue/releases/releases/tag/v1.5.0
 [1.4.0]: https://github.com/sgvue/releases/releases/tag/v1.4.0
 [1.3.0]: https://github.com/sgvue/releases/releases/tag/v1.3.0

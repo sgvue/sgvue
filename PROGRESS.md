@@ -4,6 +4,25 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-12 — SGVue 1.6.0 prepared: everything since 1.5.0, checked in a window
+
+The owner, away from the computer: *"make sure all sessions completed their works. Run quick security check. Then u run the final tests before building installers … After you completed everything, just merge and push. publish the latest version under v1.6.0. Ensure its a stable functional version."*
+
+**Merged into `main`:** every open branch (the position, ObjectType and identity-tile fixes; the box tools; the offset hand-back; a project that settles; a replaced load; Locate… again; the save-swap fix; the audit's decisions 6 to 10 and its sure list; the federating indicator) and GitHub's dependency update (sql.js 1.15.2, zustand 5.1.0, four dev tools). The update fired the sql.js canary — a bare export now keeps `query_only` — and the two library tests pin the new behaviour (`docs/DECISIONS.md`).
+
+**Quick security pass** (`reviewer-deep`, the diff since `v1.5.0`): PASS, no new IPC, preload key, disk write or HTML sink. Two older notes were fixed, checks first — a formula's function name and a display unit are own keys only. One older note is left: a filter's or sort level's `field` is not cleaned.
+
+**Checked.** Headless: typecheck 0, lint 0, `npm test` 234 files / 4 898 passed / 3 skipped, privacy 0 findings, offline eval pass, build 0. In a window, through the guards, on this Mac: the end-to-end suite 71 passed / 11 skipped (Windows-only, real-model and screenshot tests) / 1 failed only because `dist/` still held a 1.4.0 package, peak footprint 1 138 MB; on a development-tools build `project-positions.spec.ts` 2 of 2 — a three-model project reopens with every element where it was, and the selection dimension and the card read a turned wall's own size; the packaged app (`dist:mac`, ad-hoc signed, `identityName=-`) 4 passed / 1 skipped, both `app.asar`s pass the packaging test, both apps hold the two licence files. Three stale window-test expectations were corrected on the way (`docs/DECISIONS.md`). A first run was stopped by the guard at memory pressure 2 while another session ran its tests; run alone it never tripped.
+
+| File (built here, for the check) | Bytes | SHA-256 |
+|---|--:|---|
+| `SGVue-1.6.0-arm64.dmg` | 135 692 896 | `08641bff105cc98ef54ce51c9328e0be85de1943e6629edf7f9b0c3d454852cc` |
+| `SGVue-1.6.0-x64.dmg` | 142 287 015 | `d7050354d4491857f66f5a24e418b4cc108000a070bc91f8647757f162c055d0` |
+
+The published files are built by `release.yml` from the tag, not these. Installed, the Mac app is 336 MB (Apple silicon) and 343 MB (Intel).
+
+**Not checked.** The Windows installer was not run (no Windows machine). The five live Ask Vee eval cases owed for the box tools were not re-run: they spend paid credits the owner had not approved. The owner's own saved federation was not opened: its files are not in this repository. Audit decisions 3 and 4 (slim `CLAUDE.md`, update `docs/SYSTEM_SPEC.md`) are still owed.
+
 ## 2026-11-12 — a save no longer swaps a missing project model for another file of the same name
 
 **Did.** With a `.sgvue` open and one of its models missing (say `m2 STR.ifc`), opening a different `STR.ifc` as an ordinary pick and saving wrote that other file in `m2`'s place and dropped what the project stored for `m2` (hidden elements, viewpoint entries). Cause: `buildProject` dropped a carried model whenever any loaded model had its *key* — a rule older than Locate…. Now a carried model is left out only when a loaded model is bound to its *id*; the missing model is saved exactly as the project had it and the other file as a model of its own. One expression in `model/project.ts`, two comments. **The `.sgvue` format is unchanged** (two models of one name were always allowed; a 1.5.0 build opens what this saves). Fix mode, Risky lane: failing checks first by a separate run (the pure case and the pipeline case failing, five guards passing), builder, `reviewer-deep` PASS in one round. Main was merged in before the commit. Headless: typecheck, lint, the whole `npm test`, privacy and build pass.

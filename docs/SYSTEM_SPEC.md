@@ -9,8 +9,8 @@ Every section carries a **Status** line. Phase 0 is the scaffold, so most sectio
 the agreed design and say plainly which parts are not built yet. The document is updated at
 the end of every phase.
 
-- Version: 1.5.0 · all ten phases built (`docs/releases/1.5.0.md` is what changed since 1.4.0)
-- Last updated: 2026-11-11
+- Version: 1.6.0 · all ten phases built (`docs/releases/1.6.0.md` is what changed since 1.5.0)
+- Last updated: 2026-11-12
 - Specification of record for everything visible: `design-reference/design/SGVue.dc.html`
   and `design-reference/design/viewer-core.js`
 
