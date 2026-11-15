@@ -1258,7 +1258,9 @@ Anything not on this list is a defect.
   space moves the building's centre 1.303 × the cursor before and 1.000 × after (both). 12 notches
   in with the cursor on ground 300 m behind the building put the orbit point 81.6 m from the
   building box before, more than its 72.1 m plan diagonal, and 0.0 m after; 12 notches out there
-  keep it at 0.0 m after.
+  keep it at 0.0 m after. **A side effect:** a switch to orthographic after a gesture takes its
+  framing from the re-anchored distance — the depth of what was last under the cursor — not from
+  the stale orbit point, so its view size can differ from before this change.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
