@@ -22,6 +22,13 @@
  * cannot give at a pole — and a `zoom` factor on `fitBox`, held to the wheel's own limits.
  * The table of named views moved to `shared/view-angles.ts`, where a direction is also put
  * into words (azimuth and elevation); it is re-exported here unchanged.
+ *
+ * 2026-11-15 — `anchor`, a deviation from L290 / L297 (`docs/DEVIATIONS.md`): the design sizes a
+ * perspective pan, and the dolly's limits, to the distance to its orbit point, a point nobody
+ * sees. A wheel zoom towards a near surface left it a metre in front of the lens, and a pan
+ * across a façade 88 m away then crept at 1/75 of the cursor. The input layer now moves the
+ * orbit point onto the view axis at the depth of what is under the cursor when a gesture
+ * starts; nothing on screen moves, and `pan` and `dolly` are unchanged.
  */
 import { Box3, MathUtils, Matrix4, OrthographicCamera, PerspectiveCamera, Quaternion, Vector3 } from 'three/webgpu'
 import { POLE_PHI, VIEWS } from '../../shared/view-angles'
@@ -160,6 +167,15 @@ export interface CameraRig {
   setProjection(p: Projection, quiet?: boolean): void
   getCamera(): CameraState
   setCamera(c: CameraState): void
+  /**
+   * 2026-11-15. Perspective only: put the orbit point on the view axis `depth` in front of the
+   * camera, for `goal` and for `cur` each along its own axis, so the camera neither moves nor
+   * turns. A no-op in orthographic and outside 0.5 × `nearScale()` … 900 × `scale` — the same
+   * band `setFromPosTarget` and the dolly's far limit hold `dist` to.
+   */
+  anchor(depth: number): void
+  /** The near-limit scale the dolly and `fitBox` floor on (`CameraRigOptions.nearScale`). */
+  nearScale(): number
   /** The reference's `Object.assign(cur, { dist: goal.dist * 1.6 })` ease-in (L744). */
   easeIn(): void
 }
@@ -360,6 +376,16 @@ export function createCameraRig(options: CameraRigOptions): CameraRig {
     syncCur()
   }
 
+  function anchor(depth: number): void {
+    if (projection !== 'persp' || !(depth >= 0.5 * ns()) || depth > 900 * s) return
+    for (const g of [goal, cur]) {
+      dirOf(g.theta, g.phi, tmpA)
+      // The camera is at target + dir × dist; keep it there and slide the target along −dir.
+      g.target.addScaledVector(tmpA, g.dist - depth)
+      g.dist = depth
+    }
+  }
+
   const lerp = (a: number, b: number, k: number): number => a + (b - a) * k
 
   /** Is the ease close enough to its goal to call it arrived? See `REST_ANGLE`. */
@@ -446,6 +472,8 @@ export function createCameraRig(options: CameraRigOptions): CameraRig {
       cur.theta = wrapNear(cur.theta, goal.theta)
       fly()
     },
+    anchor,
+    nearScale: ns,
     easeIn: () => {
       cur.dist = goal.dist * 1.6
       cur.half = goal.half
