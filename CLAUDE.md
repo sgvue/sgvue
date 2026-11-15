@@ -110,6 +110,7 @@ read it before changing anything visible.** One line per entry here, in its orde
 - 2026-11-11 — an empty identity tile shows the em dash
 - 2026-11-11 — the Spatial-structure card's site line names the file's own CRS
 - 2026-11-12 — a federating indicator: a line along the stage's top edge and a caption in the bottom row
+- 2026-11-15 — in perspective a mouse drag and the wheel re-anchor the orbit point on what is under the cursor
 
 ### No visible additions
 

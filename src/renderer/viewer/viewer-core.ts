@@ -1089,6 +1089,10 @@ export async function createViewer(options: ViewerOptions): Promise<Viewer> {
       target: () => cam.goal.target,
       groundZ: () => rig.groundZ,
       scale: () => stageScale,
+      // 2026-11-15: the orbit point is re-anchored at a gesture's start (`input.ts`).
+      building: () => frameBox,
+      nearScale: () => cam.nearScale(),
+      anchor: (depth) => cam.anchor(depth),
       pick: (at) => picker.pick(at, cam.camera),
       orbit: (dx, dy, pivot) => cam.orbit(dx, dy, pivot),
       pan: (dx, dy, height) => cam.pan(dx, dy, height),

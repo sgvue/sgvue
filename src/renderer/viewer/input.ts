@@ -1,6 +1,7 @@
 /**
  * Pointer and wheel handling — `design-reference/design/viewer-core.js` L533–603, ported as
- * written, including the parts that look like accidents and are not.
+ * written, including the parts that look like accidents and are not — except the perspective
+ * mouse drag's and wheel's orbit point, a deviation since 2026-11-15 (below).
  *
  * **Mouse.** Dragging pans; Shift-dragging orbits; the wheel dollies by `exp(deltaY·0.0011)`
  * towards whatever is under the cursor. A press that never moves more than 3 px is a click,
@@ -25,11 +26,23 @@
  * above or below its own zero — the class of bug `CLAUDE.md` records as slicing the roof off a
  * 56 m warehouse.
  *
+ * **The orbit point, 2026-11-15** (`docs/DEVIATIONS.md`, owner: *"Yes, fix both"*). In
+ * perspective the design's pan speed is the distance to the orbit point, and its wheel pivot is
+ * the ground under the cursor whenever that lies within 300 × scale of the orbit point. A zoom
+ * towards a near surface left the orbit point a metre from the lens, so a later pan over a
+ * façade 88 m away crept at 1/75 of the cursor; with the cursor on the ground, each notch out
+ * dragged the orbit point sideways into the site, and the building slid at 1.3 × the cursor.
+ * Now a mouse drag, the moment it starts, and every wheel notch first re-anchor the orbit point
+ * (`CameraRig.anchor`) at the depth of what is under the cursor, or else of the building box's
+ * centre (`anchorDepth`); and with nothing under the cursor the pivot is the ground only within
+ * the building's reach, else none, so the notch zooms along the view axis (`groundPivot`).
+ * Orthographic, touch and the pinch keep the design's rule (`pivotAt`).
+ *
  * The maths is exported as plain functions so `tests/unit/input.test.ts` can check the
  * one-finger/two-finger split, the Shift branch and the toggle modifier under Node; the rest
  * of the file is the event wiring, which is as thin as the reference's.
  */
-import type { Vector2 } from 'three/webgpu'
+import type { Box3, Ray, Vector2 } from 'three/webgpu'
 import { Plane, Raycaster, Vector3 } from 'three/webgpu'
 import { Z_AXIS } from './camera'
 import type { ViewerCamera } from './overlay'
@@ -44,9 +57,63 @@ export const PINCH_MIN = 0.5
 export const PINCH_MAX = 2
 /** L551. A pinch under half a pixel of change is noise. */
 export const PINCH_DEADZONE = 0.5
-/** L565 and L593, before scaling: how far the ground-plane fallback pivot may be from the target. */
+/**
+ * L565 and L593, before scaling: how far the ground-plane fallback pivot may be from the target.
+ * Since 2026-11-15 only orthographic and touch use them; a perspective mouse gesture's no-hit
+ * pivot is `groundPivot`'s.
+ */
 export const PIVOT_RANGE = 400
 export const WHEEL_PIVOT_RANGE = 300
+
+/** Where a camera looks: its −Z, from its quaternion, as `CameraRig.pan` reads it. */
+const forwardOf = (camera: ViewerCamera, out: Vector3): Vector3 =>
+  out.set(0, 0, -1).applyQuaternion(camera.quaternion)
+
+/** How far in front of the camera `p` is, along its view axis. */
+export function depthOf(camera: ViewerCamera, p: Vector3): number {
+  return forwardOf(camera, new Vector3()).dot(new Vector3().subVectors(p, camera.position))
+}
+
+/**
+ * 2026-11-15. The depth to re-anchor the orbit point at when a gesture starts: that of the pick
+ * under the cursor; else that of the building box's centre, if it is at least 0.5 × `nearScale`
+ * in front (the nearest the rig lets the orbit point be); else `null`, and the gesture keeps the
+ * orbit point it has.
+ */
+export function anchorDepth(
+  camera: ViewerCamera,
+  hit: Vector3 | null,
+  building: Box3,
+  nearScale: number
+): number | null {
+  if (hit) return depthOf(camera, hit)
+  if (building.isEmpty()) return null
+  const d = depthOf(camera, building.getCenter(new Vector3()))
+  return d >= 0.5 * nearScale ? d : null
+}
+
+/**
+ * 2026-11-15. Is a ground point within the building's reach: inside its plan extent grown on
+ * every side by half its plan diagonal?
+ */
+export function withinReach(p: Vector3, building: Box3): boolean {
+  if (building.isEmpty()) return false
+  const g = 0.5 * Math.hypot(building.max.x - building.min.x, building.max.y - building.min.y)
+  return (
+    p.x >= building.min.x - g && p.x <= building.max.x + g && p.y >= building.min.y - g && p.y <= building.max.y + g
+  )
+}
+
+/**
+ * 2026-11-15. The perspective wheel's and mouse orbit's pivot when nothing is under the cursor:
+ * the ground (the plane z = `groundZ`) where the cursor's ray meets it, if that is within the
+ * building's reach; else `null` — the design's own fallback (L593), so the notch zooms along the
+ * view axis about the re-anchored orbit point and the building stays where it is on screen.
+ */
+export function groundPivot(ray: Ray, groundZ: number, building: Box3): Vector3 | null {
+  const ground = ray.intersectPlane(new Plane(Z_AXIS.clone(), -groundZ), new Vector3())
+  return ground && withinReach(ground, building) ? ground : null
+}
 
 /** L593. */
 export const dollyFactor = (deltaY: number): number => Math.exp(deltaY * DOLLY_RATE)
@@ -138,6 +205,12 @@ export interface InputHost {
   groundZ(): number
   /** `radius / 27.5`: the pivot ranges are the reference's × this (see `camera.ts`). */
   scale(): number
+  /** 2026-11-15. The world building box (the site left out): what the no-hit pivot keeps near. */
+  building(): Box3
+  /** 2026-11-15. The rig's near-limit scale (`CameraRig.nearScale`). */
+  nearScale(): number
+  /** 2026-11-15. Re-anchor the orbit point at this depth (`CameraRig.anchor`); moves nothing. */
+  anchor(depth: number): void
   /** NDC → hit, through `picking.ts`. */
   pick(ndc: Vector2): PickHit | null
   orbit(dx: number, dy: number, pivot: Vector3 | null): void
@@ -181,7 +254,10 @@ export function attachInput(host: InputHost, ndc: Vector2): InputHandle {
   const { canvas } = host
   const raycaster = new Raycaster()
 
-  /** L565 and L593: the pick point, else the ground plane if it is near the model. */
+  /**
+   * L565 and L593: the pick point, else the ground plane if it is near the model. Orthographic
+   * and touch only since 2026-11-15; a perspective mouse gesture uses `reanchorAt`.
+   */
   const pivotAt = (range: number): Vector3 | null => {
     const hit = host.pick(ndc)
     if (hit) return hit.point.clone()
@@ -192,12 +268,35 @@ export function attachInput(host: InputHost, ndc: Vector2): InputHandle {
     return _ground.distanceTo(host.target()) < range * host.scale() ? _ground.clone() : null
   }
 
+  /**
+   * 2026-11-15. A perspective mouse gesture's start: the pick, the depth to re-anchor at and the
+   * pivot (`anchorDepth`, `groundPivot`). `null` in orthographic, whose rule is `pivotAt`'s.
+   */
+  const reanchorAt = (): { depth: number | null; pivot: Vector3 | null } | null => {
+    const camera = host.camera()
+    if (!('isPerspectiveCamera' in camera)) return null
+    const hit = host.pick(ndc)
+    const depth = anchorDepth(camera, hit ? hit.point : null, host.building(), host.nearScale())
+    if (hit) return { depth, pivot: hit.point.clone() }
+    raycaster.setFromCamera(ndc, camera)
+    return { depth, pivot: groundPivot(raycaster.ray, host.groundZ(), host.building()) }
+  }
+
   /* ── touch: one finger orbits, two pinch-zoom and pan (L534–548) ────────── */
   const touches = createTouchTracker()
   let pinch = 0
   let pinchMid: { x: number; y: number } | null = null
 
-  const down = { on: false, x: 0, y: 0, btn: 0, moved: false, pivot: null as Vector3 | null }
+  const down = {
+    on: false,
+    x: 0,
+    y: 0,
+    btn: 0,
+    moved: false,
+    pivot: null as Vector3 | null,
+    /** 2026-11-15. The press's re-anchor depth, applied when the drag starts; never for a click. */
+    depth: null as number | null
+  }
   const handle: InputHandle = { dispose: () => {} }
 
   /**
@@ -267,7 +366,9 @@ export function attachInput(host: InputHost, ndc: Vector2): InputHandle {
     down.btn = e.button
     down.moved = false
     canvasNdc(canvas, e.clientX, e.clientY, ndc)
-    down.pivot = pivotAt(PIVOT_RANGE)
+    const fresh = e.pointerType === 'touch' ? null : reanchorAt()
+    down.pivot = fresh ? fresh.pivot : pivotAt(PIVOT_RANGE)
+    down.depth = fresh ? fresh.depth : null
     host.context(null)
   }
 
@@ -279,7 +380,10 @@ export function attachInput(host: InputHost, ndc: Vector2): InputHandle {
     if (down.on) {
       const dx = e.clientX - down.x
       const dy = e.clientY - down.y
-      if (!down.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) down.moved = true
+      if (!down.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+        down.moved = true
+        if (down.depth != null) host.anchor(down.depth)
+      }
       if (!down.moved) return
       if (touches.size > 1) return
       gesture()
@@ -329,7 +433,13 @@ export function attachInput(host: InputHost, ndc: Vector2): InputHandle {
     e.preventDefault()
     gesture()
     canvasNdc(canvas, e.clientX, e.clientY, ndc)
-    host.dolly(dollyFactor(e.deltaY), pivotAt(WHEEL_PIVOT_RANGE))
+    const fresh = reanchorAt()
+    if (!fresh) {
+      host.dolly(dollyFactor(e.deltaY), pivotAt(WHEEL_PIVOT_RANGE))
+      return
+    }
+    if (fresh.depth != null) host.anchor(fresh.depth)
+    host.dolly(dollyFactor(e.deltaY), fresh.pivot)
   }
 
   const onDoubleClick = (e: MouseEvent): void => {

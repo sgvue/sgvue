@@ -1228,8 +1228,39 @@ Anything not on this list is a defect.
   above the pill). The first load showed nothing; an archive with no `.ifc` ended on `could not
   open — see Models`; under reduced motion no glint was drawn. The numbers are in
   `docs/DECISIONS.md`.
+- **2026-11-15 — in perspective, a mouse drag and the wheel re-anchor the orbit point on what
+  is under the cursor, and the wheel's ground pivot stays near the building.** The owner, shown
+  both defects: *"Yes, fix both"*. The design sizes a perspective pan to the distance to its
+  hidden orbit point (`viewer-core.js` L290: `2 × dist × tan(fov/2) / H`), and the wheel dollies
+  that point towards the cursor (L297) or, with nothing under the cursor, towards the ground under
+  it whenever that lies within 300 × scale of the orbit point (L565, L593). Two things followed,
+  inherited by the port. **Too slow:** zooming in on a near surface pulled the orbit point to about
+  a metre from the lens, and no pan or orbit moved it out again, so a pan over a façade 88 m away
+  then moved it at 0.013 × the cursor, and a zoom towards it was refused. **Too fast:** with the
+  cursor on the ground, each notch out dragged the camera and the orbit point sideways into the
+  site, and a pan then slid the building at 1.30 × the cursor. Only a view-cube click, which
+  re-frames, put it right. **Now**, in perspective only: when a mouse drag starts (the move that
+  passes the 3 px threshold; a click never) and before every wheel notch, the orbit point moves to
+  the view axis at the depth of the pick under the cursor — else of the building box's centre, if
+  that is at least 0.5 × the near scale in front — and the orbit distance becomes that depth
+  (`CameraRig.anchor`, `anchorDepth`). The camera does not move or turn. `pan` and `dolly` are
+  unchanged and now work off a real distance. With nothing under the cursor, the wheel's and a
+  mouse orbit's pivot is the ground only where it lies within the building box's plan extent
+  grown by half its plan diagonal, else there is none and the notch zooms along the view axis,
+  as the design does when its own range check fails (`groundPivot`). The cost: with the cursor
+  over far empty site, the wheel zooms towards the screen's centre, not towards the cursor. **Unchanged:** orthographic pan and zoom, touch (one-finger orbit, pinch),
+  double-click framing, the view cube and named views, the zoom limits, click selection and tool
+  clicks, saved viewpoints and share links. **Measured** (`tests/unit/input.test.ts`, the real
+  `attachInput` and camera rig, a 60 × 40 × 20 m box at scale 1, H = 800): after 40 notches in
+  towards a surface 6 m ahead, a pan over a surface 88 m away moves it 0.0133 × the cursor before
+  and 1.000 × after, and a further notch towards it is taken (it was refused); after 12 notches out
+  with the cursor on the ground in front of the building, and beside it, a pan pressed on empty
+  space moves the building's centre 1.303 × the cursor before and 1.000 × after (both). 12 notches
+  in with the cursor on ground 300 m behind the building put the orbit point 81.6 m from the
+  building box before, more than its 72.1 m plan diagonal, and 0.0 m after; 12 notches out there
+  keep it at 0.0 m after.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
 2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's,
-2026-11-07's and 2026-11-12's.
+2026-11-07's, 2026-11-12's and 2026-11-15's.

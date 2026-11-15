@@ -305,3 +305,75 @@ describe('camera — the building box (2026-09-24)', () => {
     expect(0.4 * 15).toBeGreaterThanOrEqual(big.persp.near)
   })
 })
+
+/**
+ * 2026-11-15 — the orbit point is re-anchored at each gesture's start (`anchor`), so the pan's
+ * speed and the dolly's limits come from what is under the cursor, not from a hidden point the
+ * last zoom left a metre in front of the lens. A deviation from `viewer-core.js` L290/L297
+ * (`docs/DEVIATIONS.md`, 2026-11-15). The re-anchor itself must move nothing on screen.
+ */
+describe('camera — anchor (2026-11-15)', () => {
+  /** 60 × 40 × 20 m, scale 1, H = 800: the investigation's box. */
+  const BOX = new Box3(new Vector3(-30, -20, 0), new Vector3(30, 20, 20))
+  const settled = (): ReturnType<typeof createCameraRig> => {
+    const rig = createCameraRig({ scale: 1, bbox: BOX })
+    rig.setAspect(1200 / 800)
+    rig.fitBox(BOX)
+    const now = performance.now() + 1e6
+    for (let i = 0; i < 240; i++) rig.tick(1 / 60, now + i * 16.7)
+    return rig
+  }
+
+  it('moves nothing on screen: the camera’s position and quaternion are the same after', () => {
+    const rig = settled()
+    const pos = rig.camera.position.clone()
+    const q = rig.camera.quaternion.clone()
+    rig.anchor(12)
+    expect(rig.goal.dist).toBeCloseTo(12, 9)
+    expect(rig.cur.dist).toBeCloseTo(12, 9)
+    rig.place()
+    expect(rig.camera.position.distanceTo(pos)).toBeLessThan(1e-6)
+    expect(Math.abs(rig.camera.quaternion.dot(q))).toBeGreaterThan(1 - 1e-12)
+    const now = performance.now() + 1e6
+    for (let i = 0; i < 30; i++) rig.tick(1 / 60, now + i * 16.7)
+    expect(rig.camera.position.distanceTo(pos)).toBeLessThan(1e-6)
+    expect(Math.abs(rig.camera.quaternion.dot(q))).toBeGreaterThan(1 - 1e-12)
+  })
+
+  it('puts the orbit point on the view axis at that depth, for goal and cur alike', () => {
+    const rig = settled()
+    const pos = rig.camera.position.clone()
+    const fwd = new Vector3(0, 0, -1).applyQuaternion(rig.camera.quaternion)
+    rig.anchor(30)
+    const want = pos.clone().addScaledVector(fwd, 30)
+    expect(rig.goal.target.distanceTo(want)).toBeLessThan(1e-6)
+    expect(rig.cur.target.distanceTo(want)).toBeLessThan(1e-6)
+  })
+
+  it('is a no-op outside 0.5 × nearScale … 900 × scale', () => {
+    const rig = settled()
+    const before = rig.getCamera()
+    rig.anchor(0.49)
+    expect(rig.getCamera()).toEqual(before)
+    rig.anchor(901)
+    expect(rig.getCamera()).toEqual(before)
+  })
+
+  it('is a no-op in orthographic, so an ortho pan’s world-per-pixel is unchanged', () => {
+    const rig = settled()
+    rig.setProjection('ortho')
+    const now = performance.now() + 1e6
+    for (let i = 0; i < 60; i++) rig.tick(1 / 60, now + i * 16.7)
+    const before = rig.getCamera()
+    const cur = { dist: rig.cur.dist, half: rig.cur.half, target: rig.cur.target.clone() }
+    rig.anchor(5)
+    expect(rig.getCamera()).toEqual(before)
+    expect(rig.cur.dist).toBe(cur.dist)
+    expect(rig.cur.half).toBe(cur.half)
+    expect(rig.cur.target.equals(cur.target)).toBe(true)
+    // World per pixel of a pan: 2 × half / H, the same before and after.
+    const t0 = rig.goal.target.clone()
+    rig.pan(100, 0, 800)
+    expect(rig.goal.target.distanceTo(t0)).toBeCloseTo((100 * 2 * before.half) / 800, 9)
+  })
+})
