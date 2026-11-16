@@ -206,6 +206,11 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > Mac app is 336 MB (Apple silicon) and 343 MB (Intel), measured on apps built locally from the
 > same commit; the Windows installed size, about 390 MB, is 1.4.0's and was not re-measured. All
 > three were published together on `sgvue/releases`, the owner's instruction.
+> **2026-11-16, version 1.6.1:** one change since 1.6.0, the camera fix (`b303532`); requirements
+> as 1.6.0. Built by `release.yml` from the tag `v1.6.1` (commit `cf3acf0`), each file's SHA-256 and
+> build-provenance attestation verified with `gh attestation verify` — `SGVue-1.6.1-setup.exe`
+> 124 908 967 bytes, `SGVue-1.6.1-arm64.dmg` 135 689 847 and `SGVue-1.6.1-x64.dmg` 142 283 956 — and
+> published together on `sgvue/releases`. None of the three was run before publishing.
 
 ---
 

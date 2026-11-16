@@ -4,7 +4,14 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
-## 2026-11-16 — SGVue 1.6.1 prepared: the camera fix, checked in a window
+## 2026-11-16 — SGVue 1.6.1 published: the camera fix, checked in a window
+
+**Did — the release.** GitHub's checks passed on `cf3acf0` on all three systems; the tag `v1.6.1` was pushed and
+`release.yml` built the three installers. Each file's build-provenance attestation verifies (`refs/tags/v1.6.1`):
+`SGVue-1.6.1-setup.exe` 124 908 967 bytes, `SGVue-1.6.1-arm64.dmg` 135 689 847, `SGVue-1.6.1-x64.dmg` 142 283 956.
+All three were published on `sgvue/releases` with their SHA-256 (the owner: *"Yes, run and ship"*). The update
+check's endpoint answers `v1.6.1`, and `?v=1.6.0` on the site reads "Update available: SGVue 1.6.1". None of
+the three installers was run before publishing — the owner's Windows install and Mac launch are owed.
 
 **Did.** Version 1.6.1 — `package.json`, `docs/releases/1.6.1.md`, `CHANGELOG.md`, `docs/SYSTEM_SPEC.md` §1 — for
 one change since 1.6.0: `b303532`, perspective pan and zoom re-anchor the orbit point on what is under the cursor
@@ -17,7 +24,7 @@ cannot finish in the guard's 600 s here, so it ran in parts: every file but `smo
 the three camera files put back to v1.6.0 and built without the typecheck, the six viewer-window failures fail
 with the same numbers to the digit, so none comes from the fix.
 
-**Not done.** The 125 %-scaling failures are not fixed (the checks assume 100 %; CI runs at 100 %). The Windows
+**Not done.** No installer was run. The 125 %-scaling failures are not fixed (the checks assume 100 %; CI runs at 100 %). The Windows
 symlink tests need Developer Mode or a skip on EPERM.
 
 ## 2026-11-12 — SGVue 1.6.0 published; `CLAUDE.md` slimmed and the system spec brought up to date
