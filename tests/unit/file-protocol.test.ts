@@ -11,6 +11,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { RefusedFile } from '../../src/shared/ipc-contract'
+import { CAN_SYMLINK, noteSymlinkSkip } from './symlinks'
+
+noteSymlinkSkip('file-protocol.test.ts')
 
 let handler: ((request: { url: string }) => Promise<Response>) | null = null
 
@@ -48,7 +51,7 @@ beforeAll(async () => {
   const fh = await open(big, 'w')
   await fh.truncate(MAX_FILE_BYTES + 1)
   await fh.close()
-  await symlink(model, link)
+  if (CAN_SYMLINK) await symlink(model, link)
   registerFileProtocol()
 })
 
@@ -66,7 +69,7 @@ describe('admit', () => {
     expect(f.size).toBeGreaterThan(0)
   })
 
-  it('resolves a symlink to its target, so the token is bound to the real file', async () => {
+  it.skipIf(!CAN_SYMLINK)('resolves a symlink to its target, so the token is bound to the real file', async () => {
     const [f] = await admit([link])
     expect(f.path).toBe(await realOf(model))
     expect(f.path).not.toBe(link)
@@ -223,7 +226,7 @@ describe('the handler', () => {
     expect((await fetchToken(url)).status).toBe(403)
   })
 
-  it('403s when the path now resolves somewhere else — a repointed symlink', async () => {
+  it.skipIf(!CAN_SYMLINK)('403s when the path now resolves somewhere else — a repointed symlink', async () => {
     const hop = join(dir, 'hop.ifc')
     const other = join(dir, 'other.ifc')
     await writeFile(other, 'other')

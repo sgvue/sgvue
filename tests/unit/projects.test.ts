@@ -10,11 +10,14 @@
  * `electron` is mocked down to the dialogs, `app` and nothing else; the "page" is a stub
  * `webContents` that answers each snapshot request with the text a test sets.
  */
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CAN_SYMLINK, noteSymlinkSkip } from './symlinks'
+
+noteSymlinkSkip('projects.test.ts')
 
 // Real paths, as `admit()` gives them: on macOS the temporary folder is a link into /private, and
 // on Windows it can be an 8.3 short name (`C:\Users\<name>~1\…`) that only the native realpath —
@@ -919,25 +922,29 @@ describe('a project the OS or a drop hands the app — the same open, question f
     expect(projects.currentProject()).toBeNull()
   })
 
-  it('refuses a directory called x.sgvue, a link to a non-project, and a file over 16 MiB', async () => {
+  it('refuses a directory called x.sgvue and a file over 16 MiB', async () => {
     pageUp()
     const dir = join(review, 'folder.sgvue')
     mkdirSync(dir, { recursive: true })
     await openDroppedProject(page.contents as never, { path: dir })
     expect(opened()[0]).toMatchObject({ ok: false, message: 'This project file could not be read.' })
+    const huge = join(review, 'huge-drop.sgvue')
+    writeFileSync(huge, Buffer.alloc(PROJECT_MAX_BYTES + 1, 0x20))
+    await openDroppedProject(page.contents as never, { path: huge })
+    expect(opened()[1]).toMatchObject({ ok: false, message: expect.stringMatching(/larger than 16 MB/) as unknown as string })
+    rmSync(huge)
+  })
+
+  // 2026-11-16: its own test, so a machine that refuses symlinks still runs the two above.
+  it.skipIf(!CAN_SYMLINK)('refuses a link named x.sgvue to a file that is not a project', async () => {
+    pageUp()
     const target = join(review, 'plain.txt')
     writeFileSync(target, projectAt())
     const link = join(review, 'disguised.sgvue')
     rmSync(link, { force: true })
-    const { symlinkSync } = await import('node:fs')
     symlinkSync(target, link)
     await openDroppedProject(page.contents as never, { path: link })
-    expect(opened()[1]).toMatchObject({ ok: false, message: NOT_A_PROJECT })
-    const huge = join(review, 'huge-drop.sgvue')
-    writeFileSync(huge, Buffer.alloc(PROJECT_MAX_BYTES + 1, 0x20))
-    await openDroppedProject(page.contents as never, { path: huge })
-    expect(opened()[2]).toMatchObject({ ok: false, message: expect.stringMatching(/larger than 16 MB/) as unknown as string })
-    rmSync(huge)
+    expect(opened()[0]).toMatchObject({ ok: false, message: NOT_A_PROJECT })
   })
 
   it('answers only the main window’s page, before the payload is read', () => {

@@ -12,7 +12,11 @@ No check was changed. On Windows 11 at 125 %, the seven that failed (`smoke.spec
 :2224, :2531, :2640) pass; the whole suite, in two runs under the 600 s guard: `smoke.spec.ts` 32 passed, the
 other files 40 passed, 6 skipped. Typecheck and lint clean.
 
-**Not done.** The two Windows `symlink` EPERM unit failures remain (Developer Mode off).
+**Then — the symlink unit tests.** `tests/unit/symlinks.ts` probes once whether the OS makes a symlink:
+off CI, where Windows without Developer Mode refuses (`EPERM`), the three checks that need one skip
+(`file-protocol.test.ts` ×2, `projects.test.ts` ×1, split out of the folder / 16 MiB test so those still run) and
+a notice goes to stderr; on CI a refusal fails the run. No check changed. Here: `npm test` 4 906 passed,
+7 skipped, 0 failed — `file-protocol.test.ts`'s other 20, which its `beforeAll` had stopped, run again.
 
 ## 2026-11-16 — SGVue 1.6.1 published: the camera fix, checked in a window
 
