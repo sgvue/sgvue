@@ -4,6 +4,16 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-16 — the e2e suite runs at a device pixel ratio of 1 on any display
+
+**Did.** `tests/e2e/helpers.ts` `launch()` passes `--force-device-scale-factor=1` (`E2E_SCALE_SWITCH`) and
+asserts `devicePixelRatio` is 1, so a scaled display fails once, by name, instead of as layout checks a pixel out.
+No check was changed. On Windows 11 at 125 %, the seven that failed (`smoke.spec.ts` :631, :919, :1625, :2068,
+:2224, :2531, :2640) pass; the whole suite, in two runs under the 600 s guard: `smoke.spec.ts` 32 passed, the
+other files 40 passed, 6 skipped. Typecheck and lint clean.
+
+**Not done.** The two Windows `symlink` EPERM unit failures remain (Developer Mode off).
+
 ## 2026-11-16 — SGVue 1.6.1 published: the camera fix, checked in a window
 
 **Did — the release.** GitHub's checks passed on `cf3acf0` on all three systems; the tag `v1.6.1` was pushed and

@@ -26,17 +26,27 @@ export const DROP_COPY = 'Drop IFC files here, or click to choose'
  */
 export const E2E_KEY = 'e2e-stand-in-not-an-api-key'
 
+/**
+ * 2026-11-16 — the specs measure layout in exact CSS pixels (a `1px` border, a 42 px toolbar, a
+ * 330 × 420 window), which holds only at a device pixel ratio of 1. A Windows display at 125 %
+ * read `0.8px`, 41.6 and 332 × 421, so every launch pins the ratio, as CI's runners already have
+ * it. A spec that needs another ratio reads `devicePixelRatio`, which this makes 1.
+ */
+export const E2E_SCALE_SWITCH = '--force-device-scale-factor=1'
+
 /** The built app (`out/`) on a profile of its own, once its first window has its DOM. */
 export async function launch(
   userData: string,
   env: Record<string, string> = {}
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
-    args: [MAIN, `--user-data-dir=${userData}`],
+    args: [E2E_SCALE_SWITCH, MAIN, `--user-data-dir=${userData}`],
     env: { ...process.env, ANTHROPIC_API_KEY: E2E_KEY, ...env } as Record<string, string>
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  // If the switch ever stops taking, say so here, not as a dozen layout checks a pixel out.
+  expect(await page.evaluate(() => window.devicePixelRatio), 'e2e runs at a device pixel ratio of 1').toBe(1)
   return { app, page }
 }
 
