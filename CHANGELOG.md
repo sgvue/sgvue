@@ -8,6 +8,18 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-16
+
+### Fixed
+
+- **Pan and zoom follow what is under the cursor in the 3D view.** In perspective, a mouse drag
+  and each wheel notch now take their speed from what is under the cursor instead of a hidden
+  orbit point. After zooming in close, a pan across a far façade crept at a fraction of the
+  mouse; after zooming out over the ground, the building slid faster than the mouse. Both now
+  move 1 : 1. With the cursor over empty site far from the building, the wheel zooms towards the
+  middle of the screen. Orthographic views, touch and pinch, double-click framing, the view cube
+  and saved viewpoints are unchanged.
+
 ## [1.6.0] - 2026-11-12
 
 ### Added
@@ -461,6 +473,7 @@ assistant, and the accessibility, performance and packaging pass. It was not pub
 releases page.
 
 [Unreleased]: https://github.com/sgvue/sgvue/commits/main
+[1.6.1]: https://github.com/sgvue/releases/releases/tag/v1.6.1
 [1.6.0]: https://github.com/sgvue/releases/releases/tag/v1.6.0
 [1.5.0]: https://github.com/sgvue/releases/releases/tag/v1.5.0
 [1.4.0]: https://github.com/sgvue/releases/releases/tag/v1.4.0

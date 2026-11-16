@@ -4,6 +4,22 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-16 — SGVue 1.6.1 prepared: the camera fix, checked in a window
+
+**Did.** Version 1.6.1 — `package.json`, `docs/releases/1.6.1.md`, `CHANGELOG.md`, `docs/SYSTEM_SPEC.md` §1 — for
+one change since 1.6.0: `b303532`, perspective pan and zoom re-anchor the orbit point on what is under the cursor
+(`docs/DEVIATIONS.md`, 2026-11-15). Checked on Windows 11 at 125 % display scaling: typecheck and build pass;
+`npm test` 4 885 passed, 26 skipped, 1 failed, and `file-protocol.test.ts` fails before its tests start — both
+`symlink` EPERM (Developer Mode is off), not code; GitHub's checks are green on `584038d`. `npm run test:e2e`
+cannot finish in the guard's 600 s here, so it ran in parts: every file but `smoke.spec.ts` 40 passed, 6 skipped;
+`smoke.spec.ts` 25 passed, 7 failed. All seven are layout checks with exact pixel values, off by rounding at
+125 % (`1px` border read `0.8px`, toolbar 41.6 px for 42, the Ask Vee window 332 × 421 for 330 × 420, …). With
+the three camera files put back to v1.6.0 and built without the typecheck, the six viewer-window failures fail
+with the same numbers to the digit, so none comes from the fix.
+
+**Not done.** The 125 %-scaling failures are not fixed (the checks assume 100 %; CI runs at 100 %). The Windows
+symlink tests need Developer Mode or a skip on EPERM.
+
 ## 2026-11-12 — SGVue 1.6.0 published; `CLAUDE.md` slimmed and the system spec brought up to date
 
 **Did — the release.** GitHub's checks passed on `cdd8256` on all three systems; the tag `v1.6.0` was pushed and
