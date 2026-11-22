@@ -4,6 +4,19 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-22 — Vee builds IFC+SG schedules from the CoP property lists
+
+**Did.** A new read tool, `ifcsg_columns`, over a bundled, hash-pinned copy of the CoP 4th Edition corpus
+(v4 rev 3 from ifcsg-md.pages.dev, CC BY 4.0, an independent compilation; `scripts/ifcsg-corpus.cjs` regenerates
+it). For a class it returns each sub-type the models carry (PredefinedType, else a one-token ObjectType — the
+IFC+SG block's own rule) with the CoP properties split into carried and missing. With IFC+SG answered yes, Vee
+builds the schedule from the carried ones only, grouped by PredefinedType, and names the missing ones in the
+reply (owner's choice); a follow-up naming properties changes the open schedule (`base:"open"`). The IFC+SG
+prompt block no longer says the CoP is not loaded; it still forbids any pass / fail / compliance verdict.
+Two eval cases (89 in all): offline oracle 100 %, null 0 %. Typecheck, lint, build, privacy clean; `npm test`
+4 930 passed, 2 failed — `third-party-notices.test.ts`, exceljs not installed in this worktree, unrelated.
+Not run: the live eval (costs API credits) and the app window.
+
 ## 2026-11-16 — the e2e suite runs at a device pixel ratio of 1 on any display
 
 **Did.** `tests/e2e/helpers.ts` `launch()` passes `--force-device-scale-factor=1` (`E2E_SCALE_SWITCH`) and
