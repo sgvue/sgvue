@@ -41,6 +41,7 @@ import { betterObservation, headsUpOfTouched, headsUpText, SG_SET_MAX, touchedOf
 import { changedParts } from '../../state/selectors/snapshot'
 import { parseToolInput } from './inputs'
 import { ASK_EXECUTORS } from './ask'
+import { IFCSG_EXECUTORS } from './ifcsg'
 import { INTERFACE_EXECUTORS } from './interface'
 import { reportNames, resolveNames } from './names'
 import { READ_EXECUTORS } from './read'
@@ -69,7 +70,9 @@ export const TOOL_EXECUTORS: Record<string, Executor> = {
   ...SAVED_EXECUTORS,
   ...REQUEST_EXECUTORS,
   ...SCHEDULE_EXECUTORS,
-  ...ASK_EXECUTORS
+  ...ASK_EXECUTORS,
+  // 2026-11-22 — the CoP property list per sub-type, for an IFC+SG schedule.
+  ...IFCSG_EXECUTORS
 }
 
 /** Every catalogue name that has no executor. Empty, and a test keeps it that way. */

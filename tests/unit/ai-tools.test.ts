@@ -339,7 +339,9 @@ describe('the read-only additions', () => {
       'find_nearby',
       'query_sql',
       // 2026-11-08 — "Vee Messages" stage 2: the IFC+SG question. It only asks; the user's click answers.
-      'ask_choice'
+      'ask_choice',
+      // 2026-11-22 — the CoP property list per sub-type, for an IFC+SG schedule; a bundled corpus.
+      'ifcsg_columns'
     ])
     expect(extra.every((t) => t.kind === 'read')).toBe(true)
   })
@@ -596,8 +598,8 @@ describe('parity with the user — phase 1', () => {
     expect(TOOLS.slice(-10, -8).map((t) => t.name)).toEqual(['set_models', 'set_interface'])
     expect([models.kind, ui.kind]).toEqual(['view', 'view'])
     expect([models.strict, ui.strict]).toEqual([true, true])
-    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
-    expect(TOOLS).toHaveLength(38)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition; 39 since 2026-11-22: `ifcsg_columns`, another.
+    expect(TOOLS).toHaveLength(39)
     // Neither name says anything a guard forbids, and neither takes a path.
     expect(isViewTool('set_models')).toBe(true)
     expect(isViewTool('set_interface')).toBe(true)
@@ -813,8 +815,8 @@ describe('parity with the user — phase 2', () => {
     expect(TOOLS.slice(-10, -4).map((t) => t.name)).toEqual([...PARITY_TOOL_NAMES])
     expect([views.kind, markups.kind]).toEqual(['view', 'view'])
     expect([views.strict, markups.strict]).toEqual([true, true])
-    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
-    expect(TOOLS).toHaveLength(38)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition; 39 since 2026-11-22: `ifcsg_columns`, another.
+    expect(TOOLS).toHaveLength(39)
     // Phase 3 added `delete` and `clear` — which only ask (their own block is below) — and
     // phase 4 the two that place a markup and the one that sets a spot tag (theirs is last).
     // No other word that removes anything is offered, in either.
@@ -1055,8 +1057,8 @@ describe('parity with the user — phase 3: the consent gate', () => {
     expect(PARITY_TOOL_NAMES.slice(0, 5)).toEqual(['set_models', 'set_interface', 'manage_views', 'manage_markups', 'request_user_action'])
     expect(TOOLS.slice(-6, -5).map((t) => t.name)).toEqual(['request_user_action'])
     expect([ask.kind, ask.strict, ask.input_schema.additionalProperties]).toEqual(['view', true, false])
-    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
-    expect(TOOLS).toHaveLength(38)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition; 39 since 2026-11-22: `ifcsg_columns`, another.
+    expect(TOOLS).toHaveLength(39)
     expect([...new Set(TOOLS.map((t) => t.kind))].sort()).toEqual(['read', 'view'])
   })
 
@@ -1265,8 +1267,8 @@ describe('parity with the user — phase 4: the Schedules window, and placing ma
     ])
     expect(TOOLS.slice(-5, -4).map((t) => t.name)).toEqual(['manage_schedules'])
     expect([manage.kind, manage.strict, manage.input_schema.additionalProperties]).toEqual(['view', true, false])
-    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition.
-    expect(TOOLS).toHaveLength(38)
+    // 38 since 2026-11-08: stage 2's `ask_choice`, a read addition; 39 since 2026-11-22: `ifcsg_columns`, another.
+    expect(TOOLS).toHaveLength(39)
     expect(Object.keys(manage.input_schema.properties)).toEqual(['op', 'name', 'to'])
     expect(manage.input_schema.required).toEqual(['op'])
     expect(manage.input_schema.properties.op.enum).toEqual(SCHEDULE_MANAGE_OPS)

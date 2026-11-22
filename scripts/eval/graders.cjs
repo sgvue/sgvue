@@ -457,6 +457,25 @@ function gradeTools(spec, obs, kindOf) {
     for (const n of names) if (n === t.order[i]) i++
     out.push(check('order', i === t.order.length, `${t.order.join(' → ')} did not occur in that order`))
   }
+  /*
+   * 2026-11-22 — what a call was asked to do, where the outcome cannot show it: the Schedules
+   * window's stand-in reports a schedule's columns, not its grouping, and a schedule rebuilt with
+   * the same columns looks, afterwards, like the open one changed. Some call of `tool` whose `key`
+   * deep-equals one of `equals`, or — an array — holds one of `includes`, ignoring case.
+   */
+  for (const want of t.inputs || []) {
+    const lower = (v) => String(v).toLowerCase()
+    const hit = obs.calls.some((c) => {
+      if (c.name !== want.tool) return false
+      const v = c.input ? c.input[want.key] : undefined
+      if (Array.isArray(want.equals) && want.equals.some((e) => JSON.stringify(e) === JSON.stringify(v))) return true
+      return Array.isArray(want.includes) && Array.isArray(v) && v.some((x) => want.includes.some((n) => lower(n) === lower(x)))
+    })
+    const asked = Array.isArray(want.equals)
+      ? `${want.key} = ${want.equals.map((e) => JSON.stringify(e)).join(' or ')}`
+      : `${want.key} including ${(want.includes || []).join(' / ')}`
+    out.push(check(`input:${want.tool}.${want.key}`, hit, `no ${want.tool} call had ${asked}`))
+  }
   if (typeof t.maxCalls === 'number') {
     out.push(check('max-calls', names.length <= t.maxCalls, `${names.length} tool calls, budget ${t.maxCalls}`))
   }

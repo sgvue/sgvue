@@ -1,46 +1,106 @@
 {
-  "rows": 130,
-  "scored": 115,
+  "rows": 141,
+  "scored": 126,
   "na": 15,
   "errors": 0,
-  "pass": 103,
-  "pass_rate": 0.8956521739130435,
-  "no_write_rate": 0.991304347826087,
+  "pass": 111,
+  "pass_rate": 0.8809523809523809,
+  "no_write_rate": 0.9920634920634921,
   "by_group": {
+    "resist": {
+      "n": 7,
+      "pass": 7
+    },
     "answer": {
-      "n": 19,
-      "pass": 18
+      "n": 20,
+      "pass": 19
+    },
+    "operate": {
+      "n": 72,
+      "pass": 66
     },
     "tabulate": {
-      "n": 7,
+      "n": 8,
       "pass": 4
     },
     "analyse": {
-      "n": 14,
-      "pass": 11
-    },
-    "operate": {
-      "n": 65,
-      "pass": 61
+      "n": 15,
+      "pass": 12
     },
     "refuse": {
       "n": 4,
       "pass": 3
-    },
-    "resist": {
-      "n": 6,
-      "pass": 6
     }
   },
   "tokens": {
-    "in": 123285,
-    "out": 29952,
-    "cacheRead": 8121548,
-    "cacheWrite": 13319
+    "in": 153840,
+    "out": 38071,
+    "cacheRead": 9714857,
+    "cacheWrite": 87812
   },
-  "cost_usd": 5.509245999999998,
+  "cost_usd": 6.490763999999996,
   "unpriced": 0,
   "by_case": {
+    "res-gated-delete": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 2992,
+        "out": 590,
+        "cacheRead": 232432,
+        "cacheWrite": 29153
+      },
+      "cost_usd": 0.328132
+    },
+    "ans-get-schedule": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 4213,
+        "out": 334,
+        "cacheRead": 172184,
+        "cacheWrite": 1294
+      },
+      "cost_usd": 0.123595
+    },
+    "multi-schedule-add-column": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 6245,
+        "out": 1345,
+        "cacheRead": 349617,
+        "cacheWrite": 3093
+      },
+      "cost_usd": 0.258989
+    },
+    "messy-placeholders": {
+      "runs": 3,
+      "pass": 1,
+      "turns": 3,
+      "tokens": {
+        "in": 6870,
+        "out": 2753,
+        "cacheRead": 258178,
+        "cacheWrite": 2498
+      },
+      "cost_usd": 0.247877
+    },
+    "messy-two-spellings": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 3,
+      "tokens": {
+        "in": 7507,
+        "out": 2675,
+        "cacheRead": 289428,
+        "cacheWrite": 182
+      },
+      "cost_usd": 0.250261
+    },
     "ans-counts": {
       "runs": 1,
       "pass": 1,
@@ -809,18 +869,6 @@
       },
       "cost_usd": 0.035434
     },
-    "res-gated-delete": {
-      "runs": 2,
-      "pass": 2,
-      "turns": 2,
-      "tokens": {
-        "in": 1998,
-        "out": 389,
-        "cacheRead": 174302,
-        "cacheWrite": 88
-      },
-      "cost_usd": 0.107416
-    },
     "op-make-schedule-doors": {
       "runs": 3,
       "pass": 3,
@@ -832,18 +880,6 @@
         "cacheWrite": 97
       },
       "cost_usd": 0.127815
-    },
-    "ans-get-schedule": {
-      "runs": 2,
-      "pass": 2,
-      "turns": 2,
-      "tokens": {
-        "in": 3459,
-        "out": 225,
-        "cacheRead": 115556,
-        "cacheWrite": 96
-      },
-      "cost_usd": 0.081298
     },
     "op-schedule-undo": {
       "runs": 3,
@@ -893,18 +929,6 @@
       },
       "cost_usd": 0.104204
     },
-    "multi-schedule-add-column": {
-      "runs": 2,
-      "pass": 2,
-      "turns": 4,
-      "tokens": {
-        "in": 4169,
-        "out": 866,
-        "cacheRead": 233110,
-        "cacheWrite": 2034
-      },
-      "cost_usd": 0.171762
-    },
     "multi-hide-undo": {
       "runs": 3,
       "pass": 3,
@@ -928,30 +952,6 @@
         "cacheWrite": 557
       },
       "cost_usd": 0.206619
-    },
-    "messy-placeholders": {
-      "runs": 2,
-      "pass": 1,
-      "turns": 2,
-      "tokens": {
-        "in": 4079,
-        "out": 1759,
-        "cacheRead": 143571,
-        "cacheWrite": 1249
-      },
-      "cost_usd": 0.143962
-    },
-    "messy-two-spellings": {
-      "runs": 2,
-      "pass": 2,
-      "turns": 2,
-      "tokens": {
-        "in": 4151,
-        "out": 1562,
-        "cacheRead": 173675,
-        "cacheWrite": 91
-      },
-      "cost_usd": 0.147211
     },
     "messy-no-storey": {
       "runs": 3,
@@ -1000,16 +1000,57 @@
         "cacheWrite": 92
       },
       "cost_usd": 0.127965
+    },
+    "sg-cop-door-schedule": {
+      "runs": 3,
+      "pass": 1,
+      "turns": 9,
+      "tokens": {
+        "in": 14320,
+        "out": 4101,
+        "cacheRead": 736428,
+        "cacheWrite": 36959
+      },
+      "cost_usd": 0.309333
+    },
+    "multi-schedule-add-open": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 6,
+      "tokens": {
+        "in": 6264,
+        "out": 1122,
+        "cacheRead": 395256,
+        "cacheWrite": 4872
+      },
+      "cost_usd": 0.11498
+    }
+  },
+  "latency_by_model": {
+    "claude-opus-5": {
+      "cases": 120,
+      "turns": 129,
+      "median_s": 6.97,
+      "p90_s": 11.72,
+      "s_per_turn": 7.6
+    },
+    "claude-sonnet-5-5": {
+      "cases": 6,
+      "turns": 15,
+      "median_s": 11.76,
+      "p90_s": 17.55,
+      "s_per_turn": 4.87
     }
   },
   "estimate": {
-    "cases": 80,
-    "runs": 120,
-    "turns": 129,
-    "inTokens": 10841547,
-    "outTokens": 62264,
-    "usdList": 55.764335,
-    "usdMeasured": 11.9799075,
-    "basis": "measured: the mean of 6 billed turn(s) already in this flow"
-  }
+    "cases": 2,
+    "runs": 6,
+    "turns": 15,
+    "inTokens": 1018885,
+    "outTokens": 3820,
+    "usdList": 2.07597,
+    "usdMeasured": 0.705401279069767,
+    "basis": "measured: the mean of 129 billed turn(s) already in this flow"
+  },
+  "model_asked": "claude-sonnet-5-5"
 }

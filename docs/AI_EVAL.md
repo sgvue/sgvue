@@ -149,7 +149,8 @@ interrupted pass continues where it stopped. Delete the variant directory to sta
 
 ## The cases
 
-Eighty-seven — the count `tests/unit/ai-eval-offline.test.ts` holds the file to — every one of
+Eighty-nine — the count `tests/unit/ai-eval-offline.test.ts` holds the file to (eighty-seven until
+2026-11-22 added `sg-cop-door-schedule` and `multi-schedule-add-open`) — every one of
 them scorable since stage 2 of the Ask Vee redesign landed on 2026-11-08 (*The Ask Vee cases*,
 below); until then five waited for it. The section said "sixty-six" from 2026-10-02 until 2026-11-08, one more than
 the file held after `op-base-point` went on 2026-10-08. Five of the first thirty-six were written against
@@ -305,6 +306,8 @@ of it (below); the fifth runs on the plain mock, with its instruction in a viewp
 | `hu-dup-guid` | How many beams are on L2? — **stage 2**: the count, and the heads-up `dupGlobalId` for the L2 beams that share one — not the TBC walls a whole-model scan would pick (decision C) | messy |
 | `sg-ask-once` | *What fire ratings do the doors on L4 carry?* → *Yes* (quick reply) → And which doors carry no SGPset_Door set at all? — **stage 2**: `ask_choice` exactly once in the conversation, in turn 1, with no heads-up there; after the yes an `objectTypeOnly` heads-up (decision B); `ifcsg` reads `yes`; the last count right — no heads-up expected on the last turn, which spans property sets and so is read with `query_sql` (2026-11-09) | messy |
 | `sg-never-asks` | *Hide the slabs.* → How many walls are on L2? — **stage 2**: `ask_choice` never called, `ifcsg` still `unknown`, no mention of IFC+SG, the count right | messy |
+| `sg-cop-door-schedule` | *What fire ratings do the doors on L2 carry?* → *Yes* (quick reply) → Make me a door schedule with the CoP properties the doors carry. — **2026-11-22**: `ifcsg_columns` before `make_schedule`, grouped by PredefinedType (`tools.inputs`), only the CoP properties the doors carry as columns (FireExit, FireRating, IsExternal; never ClearWidth or ClearHeight), every door a row, `ifcsg` yes, the reply names missing ones and the CoP, no compliance claim | messy |
+| `multi-schedule-add-open` | *Make a door schedule called "Door check" with each door's name, its storey and whether it is external.* → Add fire rating. — **2026-11-22**: `make_schedule` with `base:"open"` (`tools.inputs`); "Door check" keeps its columns and gains FireRating | — |
 
 ### The Ask Vee cases (2026-11-08)
 

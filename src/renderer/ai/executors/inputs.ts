@@ -37,6 +37,7 @@ import { HL } from '../../../shared/colors'
 import {
   ASK_LEAD_MAX,
   FILTER_SET_NAME_MAX,
+  IFCSG_NAME_MAX,
   INTERFACE_CARDS,
   INTERFACE_SEARCH_MAX,
   INTERFACE_SIDEBAR,
@@ -351,6 +352,11 @@ export const TOOL_INPUTS = {
   query_sql: z.object({ sql: z.string() }),
   // 2026-11-08, stage 2: the IFC+SG question's lead-in — the app's own question follows it.
   ask_choice: z.object({ lead: z.string().max(ASK_LEAD_MAX, `at most ${ASK_LEAD_MAX} characters`) }),
+  // 2026-11-22: an IFC class and, optionally, one sub-type — names, each bounded.
+  ifcsg_columns: z.object({
+    entity: z.string().min(1, 'an IFC class').max(IFCSG_NAME_MAX, `at most ${IFCSG_NAME_MAX} characters`),
+    subtype: z.string().max(IFCSG_NAME_MAX, `at most ${IFCSG_NAME_MAX} characters`).optional()
+  }),
 
   /* parity with the user (2026-10-02) */
   // Model keys are a handful; a list longer than any federation is refused before it is read.

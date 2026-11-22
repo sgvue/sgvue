@@ -1499,8 +1499,8 @@ describe('the case set', () => {
     // 63 after phase 3; phase 4 added three (its own test is below); 2026-10-08 took the base
     // point's case away with the request, when the Coordinate-system card became read-only;
     // 2026-11-08 added the twenty Ask Vee cases (their own test is at the end); 2026-11-09 two
-    // follow-up conversations among them.
-    expect(CASES).toHaveLength(87)
+    // follow-up conversations among them; 2026-11-22 two more, an IFC+SG door schedule and a follow-up.
+    expect(CASES).toHaveLength(89)
     const names = new Set(TOOLS.map((t) => t.name))
     for (const c of CASES) {
       // A case written ahead of its capability may call a tool that build will add (stage 2's
@@ -1752,9 +1752,10 @@ describe('the Ask Vee cases (2026-11-08)', () => {
     obs({ store: { stack: [], colorBy: null, table: null, pending: null, chips: [], schedules }, storeBefore: { stack: [], colorBy: null, schedules: before } })
 
   it('are twenty-two, after every older case, and each one fails a null agent', () => {
-    // Twenty on 2026-11-08; 2026-11-09 the owner's follow-up, narrowed and not.
-    expect(VEE_CASES).toHaveLength(22)
-    expect(CASES.slice(-22).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
+    // Twenty on 2026-11-08; 2026-11-09 the owner's follow-up, narrowed and not; 2026-11-22 the CoP
+    // door schedule and a follow-up that changes the open schedule.
+    expect(VEE_CASES).toHaveLength(24)
+    expect(CASES.slice(-24).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
     for (const c of VEE_CASES) {
       expect([c.id, c.tags.includes('vee')]).toEqual([c.id, true])
       expect([c.id, G.gradeCase(c, obs(), {}, kindOf).grade.pass]).toEqual([c.id, 0])
@@ -1777,8 +1778,8 @@ describe('the Ask Vee cases (2026-11-08)', () => {
     expect(runsOf(byId.get('ans-counts'))).toBe(1)
     expect(runsOf(byId.get('op-scope-guard'))).toBe(3)
     for (const id of TRIPLE_RUN_IDS) expect([id, byId.has(id)]).toEqual([id, true])
-    // About twenty that a build without stage 2 can score (twenty-two since the 2026-11-09 follow-ups).
-    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(22)
+    // About twenty that a build without stage 2 can score (twenty-two since the 2026-11-09 follow-ups, twenty-four since 2026-11-22).
+    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(24)
     expect(PILOT_MAX).toBe(5)
     for (const id of PILOT_IDS) expect([id, TRIPLE_RUN_IDS.includes(id), !!byId.get(id).requires]).toEqual([id, true, false])
   })
@@ -2205,5 +2206,38 @@ describe('metrics.json from every row of the variant (2026-11-09)', () => {
     const m = S.summarise(run.rows, run.naRows, run.errorRows)
     expect([m.rows, m.scored, m.pass, m.na, m.errors]).toEqual([3, 2, 2, 1, 1])
     expect(m.latency_by_model['claude-sonnet-5-5']).toMatchObject({ cases: 2 })
+  })
+})
+
+/**
+ * 2026-11-22 — `tools.inputs`: what a call was asked to do, where the outcome cannot show it. The
+ * Schedules window's stand-in reports a schedule's columns, not its grouping, and a follow-up
+ * that rebuilt the schedule from scratch with the same columns looks, afterwards, like one that
+ * changed the open one. Each entry: some call of `tool` whose `key` deep-equals one of `equals`, or
+ * — an array — holds one of `includes` (case-insensitive).
+ */
+describe('tool inputs (2026-11-22)', () => {
+  const call = (input: Record<string, unknown>) => ({ name: 'make_schedule', input, ok: true })
+  const spec = (inputs: unknown[]) => ({ expect: { tools: { inputs } } })
+  // The catalogue's own kinds: `make_schedule` is not in this file's short list.
+  const kindOf = (n: string): string => TOOLS.find((t) => t.name === n)?.kind ?? 'unknown'
+
+  it('passes a call that was asked the right thing, and fails one that was not — or no call at all', () => {
+    const open = spec([{ tool: 'make_schedule', key: 'base', equals: ['open'] }])
+    expect(G.gradeCase(open, obs({ calls: [call({ base: 'open', columns: [] })] }), {}, kindOf).grade.pass).toBe(1)
+    const fresh = G.gradeCase(open, obs({ calls: [call({ category: ['IfcDoor'], columns: [] })] }), {}, kindOf)
+    expect(fresh.grade.pass).toBe(0)
+    expect(fresh.reasons.join()).toMatch(/no make_schedule call had base = "open"/)
+    expect(G.gradeCase(open, obs(), {}, kindOf).grade.pass).toBe(0)
+  })
+
+  it('finds a name in an array input, in any case, among other names', () => {
+    const grouped = spec([{ tool: 'make_schedule', key: 'groupBy', includes: ['PredefinedType', 'Predefined Type'] }])
+    expect(G.gradeCase(grouped, obs({ calls: [call({ groupBy: ['Level', 'predefined type'] })] }), {}, kindOf).grade.pass).toBe(1)
+    const byLevel = G.gradeCase(grouped, obs({ calls: [call({ groupBy: ['Level'] })] }), {}, kindOf)
+    expect(byLevel.grade.pass).toBe(0)
+    expect(byLevel.reasons.join()).toMatch(/no make_schedule call had groupBy including PredefinedType \/ Predefined Type/)
+    // A string is not an array that holds one.
+    expect(G.gradeCase(grouped, obs({ calls: [call({ groupBy: 'PredefinedType' })] }), {}, kindOf).grade.pass).toBe(0)
   })
 })

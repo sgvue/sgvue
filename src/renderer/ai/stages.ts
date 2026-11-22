@@ -66,7 +66,8 @@ export const TOOL_STAGE: Record<string, string> = {
   get_schedule: 'reading the schedule',
   export_schedule: 'opening the Save dialog',
   color_by_schedule_column: 'colouring the model by the column',
-  ask_choice: 'asking you a question'
+  ask_choice: 'asking you a question',
+  ifcsg_columns: 'reading the CoP property lists'
 }
 
 /** `request_user_action`, action by action: what is being asked of the user. */

@@ -40,6 +40,7 @@ import {
   SCHEMA_KEY_CAP,
   SCHEMA_VALUE_CAP
 } from '../../src/shared/ai-schema'
+import { TOOLS } from '../../src/shared/tool-schemas'
 import { collectPropKeys } from '../../src/shared/attr'
 import { federate } from '../../src/shared/federate'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
@@ -70,7 +71,8 @@ describe('the system contract', () => {
     // display unit (the case below). 2026-11-08: two — a tabulation answers in the chat (the
     // live baseline's F1), and an IFC term is written in backticks (stage 2) — the cases below.
     // 2026-11-09: one, a follow-up continues the previous answer's set (the case below).
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(43)
+    // 2026-11-22: two, an IFC+SG schedule from the CoP lists and changing the open schedule (the cases below).
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(45)
     expect(DESIGN_SYSTEM_LINES[0]).toBe(DESIGN_FIRST)
     expect(DESIGN_SYSTEM_LINES[1]).toContain('strictly read-only with respect to model data')
     // Still the last line, as the design ends.
@@ -731,8 +733,8 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
       'A set a rule can say — a class, a level, a property’s value — is read with a rule tool (query_elements, list_values, summarize_elements) rather than query_sql: only a rule-bearing read shows the user a heads-up about the elements it read, and only one lets ask_choice ask.'
     )
     expect(contractText()).toContain(SQL_FIRST_PARAGRAPH)
-    // No instruction line was added for it: the counts stand (43 since 2026-11-09's follow-up line).
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(43)
+    // No instruction line was added for this one; the counts are the file's (45 since 2026-11-22's two lines).
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(45)
     expect(IFCSG_LINES).toHaveLength(4)
   })
 
@@ -752,8 +754,8 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
 
   it('uses query_sql when the user names the database, SQL or a query (2026-11-09)', () => {
     expect(SQL_FIRST_PARAGRAPH).toContain('When the user names the tool — "the database", "SQL", "a query" — use query_sql, whatever else could say the set.')
-    // A sentence in the paragraph, not an instruction line: the count stands.
-    expect(DESIGN_SYSTEM_LINES).toHaveLength(43)
+    // A sentence in the paragraph, not an instruction line, so it adds nothing to the count (45 since 2026-11-22).
+    expect(DESIGN_SYSTEM_LINES).toHaveLength(45)
   })
 
   it('asks for IFC terms in backticks, the file’s own spelling, and never a number, a value or an everyday word', () => {
@@ -778,13 +780,16 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
     expect(req(sg).system[1].text).toBe(block)
     expect(req(plain).system[1].text).toBe(schemaText(plain))
     expect(req(sg).system[0].text).toBe(req(plain).system[0].text)
-    // Concept only: the identity, the honest limit, ask once, and no CoP rule.
+    // The concept: the identity, the honest limit, ask once, and no verdict. (2026-11-22: the CoP
+    // lists arrived with ifcsg_columns, so "concept only … the mapping isn’t loaded" and "I can’t
+    // check them against the CoP" became the two pins below.)
     const all = IFCSG_LINES.join(' ')
     for (const said of [
-      'concept only',
+      'What follows is the concept; the CoP property lists are available through ifcsg_columns',
+      'not an official BCA publication',
       'Entity.SUBTYPE*',
       'one upper-case token such as TRENCH',
-      'I can’t check them against the CoP. The official IFC+SG mapping isn’t loaded in SGVue',
+      'say the lists name the CoP’s properties, not whether a value is right',
       // 2026-11-09 (neither model asked in v4 / v5): answer and ask in one reply.
       'then answer the question in plain IFC terms and, in this same reply, call ask_choice once',
       'a read result that carries ifcsg is the app reminding you',
@@ -798,5 +803,70 @@ describe('2026-11-08 — tabulating in the chat, IFC terms and IFC+SG', () => {
     expect(all).toContain('read those elements first with a rule tool — query_elements, list_values or summarize_elements, not query_sql, which ask_choice does not count')
     // About 600–800 tokens (HANDOFF §5), at about four characters a token.
     expect(all.length).toBeLessThan(3600)
+  })
+})
+
+/**
+ * 2026-11-22 — an IFC+SG schedule from the CoP's own property list (`ifcsg_columns`, the bundled
+ * corpus), and a follow-up that changes the schedule already open. Two lines, right after the
+ * export-and-colour line, so the Schedules lines stay together; no other line moved.
+ */
+describe('2026-11-22 — an IFC+SG schedule from the CoP list, and changing the open schedule', () => {
+  const at = DESIGN_SYSTEM_LINES.findIndex((l) => l.startsWith('For an IFC+SG schedule'))
+  const [cop, followUp] = DESIGN_SYSTEM_LINES.slice(at, at + 2)
+
+  it('sits right after the export-and-colour line, the two together', () => {
+    expect(at).toBeGreaterThan(0)
+    expect(DESIGN_SYSTEM_LINES[at - 1]).toMatch(/^export_schedule only opens the Save dialog/)
+    expect(followUp).toMatch(/^When the view state reports an open schedule/)
+  })
+
+  it('calls ifcsg_columns first, schedules only what the model carries, and names the rest from the CoP', () => {
+    for (const said of [
+      'ifcsg names yes',
+      'call ifcsg_columns for that class before make_schedule',
+      'only the inModel names as columns',
+      'group by PredefinedType',
+      // Live eval, 2026-11-22: two of three runs filtered to one sub-type and dropped the unclassified doors.
+      'category the whole class, with no filter on sub-type or PredefinedType',
+      'elements with no sub-type stay in their own group',
+      'list the missing ones',
+      'not an official BCA publication',
+      'ask the user which to include rather than mixing them',
+      'is not an error',
+      'never say that the model or an element is IFC+SG compliant'
+    ]) {
+      expect([said, cop.includes(said)]).toEqual([said, true])
+    }
+  })
+
+  it('changes the open schedule with base:"open" when the user names properties without asking for a new one', () => {
+    for (const said of ['names properties to add or remove', 'base:"open"', 'rather than making a new one', 'new schedule']) {
+      expect([said, followUp.includes(said)]).toEqual([said, true])
+    }
+  })
+
+  it('writes in sentence case, as every added line does', () => {
+    for (const line of [cop, followUp]) {
+      const shouted = line.replace(/"[^"]*"/g, '').replace(/\bIFC\+SG|\bCoP\b|\bBCA\b|\bCORENET X\b/g, '').match(/\b[A-Z]{3,}\b/g)
+      expect([line.slice(0, 20), shouted]).toEqual([line.slice(0, 20), null])
+    }
+  })
+})
+
+/**
+ * 2026-11-22, review round 1 — the IFC+SG block and the CoP lists must not disagree: a live model
+ * that read both "the mapping isn't loaded" and "call ifcsg_columns" would hedge or refuse.
+ */
+describe('2026-11-22 — the IFC+SG block agrees with ifcsg_columns', () => {
+  it('says neither that the mapping is not loaded nor that Vee cannot check against the CoP, while the tool exists', () => {
+    expect(TOOLS.map((t) => t.name)).toContain('ifcsg_columns')
+    const block = schemaBlock({ entities: ['IfcDoor (3)'], psetKeys: [], sgPsets: ['SGPset_Door'] })
+    for (const gone of ['not loaded', 'isn’t loaded', "isn't loaded", 'I can’t check them against the CoP']) {
+      expect([gone, block.includes(gone)]).toEqual([gone, false])
+    }
+    expect(block).toContain('ifcsg_columns')
+    expect(block).toContain('never say that a model, element or sub-type is valid, compliant, passes, fails')
+    expect(block).toContain('a sub-type the CoP does not list is not wrong')
   })
 })
