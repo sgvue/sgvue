@@ -2879,6 +2879,122 @@ const VEE_CASES = [
       calls: [{ name: 'summarize_elements', input: { rules: [entity('IfcWall')], groupBy: 'ObjectType' } }],
       reply: 'All **{walls}** walls, by type, are in the table.'
     }
+  },
+
+  /*
+   * 2026-11-22 — an IFC+SG door schedule from the CoP's own property list (`ifcsg_columns`, the
+   * bundled corpus v4 rev 3), and a follow-up that changes the schedule already open.
+   *
+   * The first runs on the messy model: the design's plain mock carries no SGPset_ set, so the
+   * IFC+SG question cannot be asked there and the view state's ifcsg could never be yes. Its doors
+   * are `IfcDoor.DOOR` but for three on L4 written `NOTDEFINED` — no sub-type, so no CoP list —
+   * and they carry 3 of the CoP's 21 DOOR properties (FireExit, FireRating, IsExternal). The owner's
+   * choice: schedule only what the model carries, grouped by PredefinedType, and name the rest in
+   * the reply — never empty columns.
+   */
+  {
+    id: 'sg-cop-door-schedule',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'messy', 'ifcsg', 'conversation', 'vee'],
+    fixture: 'mock-messy',
+    harness: { schedules: true },
+    truth: {
+      doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' },
+      noSub: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor' AND predefined_type = 'NOTDEFINED'", shape: 'scalar' }
+    },
+    turns: [
+      {
+        prompt: 'What fire ratings do the doors on L2 carry?',
+        oracle: {
+          calls: [
+            { name: 'summarize_elements', input: { rules: [entity('IfcDoor'), level('L2')], groupBy: 'FireRating' } },
+            { name: 'ask_choice', input: { lead: 'These doors carry SGPset_Door values.' } }
+          ],
+          reply: 'The doors on L2 carry a `FireRating` of "1 HR".'
+        },
+        expect: { tools: { exactlyOne: ['ask_choice'] }, view: { askShown: true } }
+      },
+      { prompt: 'Yes', choice: 'yes', oracle: { calls: [], reply: 'Noted.' } }
+    ],
+    prompt: 'Make me a door schedule with the CoP properties the doors carry.',
+    expect: {
+      facts: [{ num: 'doors' }, { text: 'ClearWidth' }, { text: 'ClearHeight' }, { any: ['CoP', 'Code of Practice'] }],
+      forbid: ['is IFC+SG compliant', 'are IFC+SG compliant', 'is compliant', 'are compliant'],
+      tools: {
+        require: ['ifcsg_columns', 'make_schedule'],
+        order: ['ifcsg_columns', 'make_schedule'],
+        inputs: [{ tool: 'make_schedule', key: 'groupBy', includes: ['PredefinedType', 'Predefined Type'] }],
+        maxCalls: 6
+      },
+      view: {
+        ifcsg: 'yes',
+        schedule: {
+          category: ['IfcDoor'],
+          columnsInclude: [['FireRating', 'Fire Rating'], ['IsExternal', 'Is External'], ['FireExit', 'Fire Exit']],
+          columnsExclude: ['ClearWidth', 'ClearHeight', 'Clear Width', 'Clear Height'],
+          rowCount: 'doors'
+        }
+      }
+    },
+    oracle: {
+      calls: [
+        { name: 'ifcsg_columns', input: { entity: 'IfcDoor' } },
+        {
+          name: 'make_schedule',
+          input: {
+            title: 'Door Schedule (IFC+SG)',
+            category: ['IfcDoor'],
+            columns: [{ field: 'Name' }, { field: 'Level' }, { field: 'FireExit' }, { field: 'FireRating' }, { field: 'IsExternal' }],
+            groupBy: ['PredefinedType']
+          }
+        }
+      ],
+      reply:
+        'The door schedule is open in the Schedules window: **{doors}** doors, grouped by `PredefinedType`, with the 3 CoP properties the doors carry — `FireExit`, `FireRating` and `IsExternal`.\n\n' +
+        'The CoP lists 18 more for `IfcDoor.DOOR` that the model does not carry: AmendmentStatus, ClearWidth, ClearHeight, FireAccessOpening, MainEntrance, Material, OneWayLockingDevice, OperationType, OverallWidth, PowerOperated, SelfClosing, ShadingCoefficient_Glass, Status, StructuralHeight, StructuralWidth, ThermalTransmittance, Thickness and VisionPanel. ' +
+        'The list is from an independent compilation of the CoP, not an official BCA publication.\n\n' +
+        'The {noSub} doors with `PredefinedType` `NOTDEFINED` have no sub-type, so the CoP lists no columns for them.'
+    }
+  },
+  {
+    id: 'multi-schedule-add-open',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'conversation', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    turns: [
+      {
+        prompt: 'Make a door schedule called "Door check" with each door’s name, its storey and whether it is external.',
+        oracle: {
+          calls: [
+            {
+              name: 'make_schedule',
+              input: { title: 'Door check', category: ['IfcDoor'], columns: [{ field: 'Name' }, { field: 'Level' }, { field: 'IsExternal' }] }
+            }
+          ],
+          reply: 'The door schedule "Door check" is open in the Schedules window: **{doors}** doors.'
+        },
+        expect: { tools: { require: ['make_schedule'] } }
+      }
+    ],
+    prompt: 'Add fire rating.',
+    expect: {
+      facts: [{ any: ['FireRating', 'fire rating'] }],
+      tools: { require: ['make_schedule'], inputs: [{ tool: 'make_schedule', key: 'base', equals: ['open'] }], maxCalls: 4 },
+      view: {
+        schedule: {
+          title: 'Door check',
+          category: ['IfcDoor'],
+          columnsInclude: ['Name', ['Level', 'Storey'], ['IsExternal', 'Is External'], ['FireRating', 'Fire Rating']],
+          rowCount: 'doors'
+        }
+      }
+    },
+    oracle: {
+      calls: [{ name: 'make_schedule', input: { base: 'open', columns: [{ field: 'FireRating' }] } }],
+      reply: 'Added a `FireRating` column to "Door check"; it still lists **{doors}** doors.'
+    }
   }
 ]
 

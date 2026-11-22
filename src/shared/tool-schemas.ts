@@ -410,6 +410,9 @@ export const MARKUP_POINT_MAX = 1e7
 
 /** `ask_choice`'s lead-in, at most this long (2026-11-08, stage 2). */
 export const ASK_LEAD_MAX = 300
+/** `ifcsg_columns` (2026-11-22): sub-types one result lists, and how long a class or sub-type name may be. */
+export const IFCSG_SUBTYPES_MAX = 20
+export const IFCSG_NAME_MAX = 200
 
 const DESIGN_TOOLS: readonly ToolSpec[] = [
   {
@@ -914,6 +917,26 @@ const EXTRA_TOOLS: readonly ToolSpec[] = [
         }
       },
       ['lead']
+    ),
+    strict: true
+  },
+  /*
+   * 2026-11-22 — an IFC+SG schedule from the CoP's own property lists: a bundled, pinned copy of
+   * an independent compilation (`shared/ifcsg-cop.ts`), never fetched. It reads; make_schedule
+   * builds. The owner's choice: only the columns the model carries, the rest named in the reply.
+   */
+  {
+    name: 'ifcsg_columns',
+    kind: 'read',
+    description:
+      'The IFC+SG CoP property list for each sub-type of one IFC class the loaded models carry — call it before make_schedule when a schedule is for an IFC+SG (CORENET X) submission. It groups the class’s elements by sub-type — the PredefinedType, or when that is NOTDEFINED, USERDEFINED or empty the ObjectType if it is one upper-case token such as SINK; otherwise none — and for each gives the element count, the CoP component and pages, and the CoP’s properties split into inModel, the ones the elements carry a value for, spelled exactly as make_schedule takes them as column fields, and missing, the ones they do not (copName maps an inModel field back to the CoP’s name where the two differ). A sub-type the CoP does not list, or elements with no sub-type, come back with a note and no lists; that is not a fault in the model. ' +
+      `The lists are from a bundled copy of an independent compilation of the CORENET X Code of Practice, 4th Edition — not an official BCA publication — and say which properties it lists, never whether a value is right. At most ${IFCSG_SUBTYPES_MAX} sub-types, largest first; truncated says when it cut. Read-only.`,
+    input_schema: obj(
+      {
+        entity: { type: 'string', description: 'One IFC class, e.g. IfcDoor' },
+        subtype: { type: 'string', description: 'Only this sub-type, e.g. DOOR; omit for every sub-type the models carry' }
+      },
+      ['entity']
     ),
     strict: true
   }

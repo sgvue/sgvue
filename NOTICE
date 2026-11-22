@@ -14,6 +14,15 @@ This product includes software developed by others:
     three.js's LineSegmentsGeometry (examples/jsm/lines/LineSegmentsGeometry.js),
     MIT License, Copyright © 2010-2026 three.js authors.
 
+This product includes data compiled by others:
+
+  - src/shared/ifcsg-cop.json is a trimmed copy of the IFC-SG corpus's reference
+    classifications (corpus v4 rev 3, the CORENET X Code of Practice 4th Edition), from
+    https://ifcsg-md.pages.dev/, licensed CC BY 4.0
+    (https://creativecommons.org/licenses/by/4.0/). Trimmed to each classification's
+    components, CoP pages and property names, types and units by scripts/ifcsg-corpus.cjs.
+    It is an independent compilation, not an official BCA publication.
+
 The licences and notices of the third-party software SGVue's installers ship — Electron and
 Chromium, the bundled JavaScript libraries, web-ifc (MPL-2.0) and where its source is, and the
 IBM Plex fonts (OFL-1.1) — are in THIRD_PARTY_NOTICES.md.

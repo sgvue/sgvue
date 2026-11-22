@@ -347,7 +347,8 @@ describe('the four descriptions (NOT YET IN src/ for the new wording)', () => {
     })
   }
 
-  it('no tool is added: 38 (passes today)', () => {
-    expect(TOOLS).toHaveLength(38)
+  // 38 when this work landed; 39 since 2026-11-22's `ifcsg_columns`, which is not this work's.
+  it('the plan-frame work adds no tool: the catalogue is the 39 the other work made it', () => {
+    expect(TOOLS).toHaveLength(39)
   })
 })
