@@ -222,4 +222,17 @@ describe('ifcsg_columns', () => {
     // A stated PredefinedType is the sub-type, whatever the ObjectType says.
     for (const ot of [...yes, ...no]) expect(subtypeOf({ predefinedType: 'DOOR', objectType: ot })).toBe('DOOR')
   })
+  it('tells Vee to schedule the whole class, never filtered by sub-type, the unclassified in their own group (live eval, 2026-11-22)', async () => {
+    // Two of three live runs filtered make_schedule to PredefinedType = DOOR and dropped the
+    // NOTDEFINED doors: "no CoP columns" read as "leave these out". They are what a coordinator must see.
+    const body = await run('ifcsg_columns', { entity: 'IfcDoor' })
+    for (const said of [
+      'Schedule every IfcDoor — category IfcDoor, with no filter on sub-type or PredefinedType — grouped by PredefinedType',
+      'elements with no sub-type, or one the CoP does not list, stay in the schedule in their own group',
+      'IfcDoor — 2: no CoP columns, kept in the schedule',
+      'IfcDoor.SINK — 1: no CoP columns, kept in the schedule'
+    ]) {
+      expect([said, body.message.includes(said)]).toEqual([said, true])
+    }
+  })
 })

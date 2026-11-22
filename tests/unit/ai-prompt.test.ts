@@ -827,6 +827,9 @@ describe('2026-11-22 — an IFC+SG schedule from the CoP list, and changing the 
       'call ifcsg_columns for that class before make_schedule',
       'only the inModel names as columns',
       'group by PredefinedType',
+      // Live eval, 2026-11-22: two of three runs filtered to one sub-type and dropped the unclassified doors.
+      'category the whole class, with no filter on sub-type or PredefinedType',
+      'elements with no sub-type stay in their own group',
       'list the missing ones',
       'not an official BCA publication',
       'ask the user which to include rather than mixing them',

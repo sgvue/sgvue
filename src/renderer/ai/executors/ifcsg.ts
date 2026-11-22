@@ -182,13 +182,14 @@ export const ifcsg_columns: Executor = (input, ctx) => {
   const lines = subtypes.map((g) =>
     Array.isArray(g.inModel)
       ? `${String(g.classification)} — ${String(g.count)}: ${(g.inModel as string[]).length} of the CoP's ${String(g.copProperties)} properties are carried, ${(g.missing as string[]).length} are not`
-      : `${String(g.classification)} — ${String(g.count)}: no CoP columns`
+      : `${String(g.classification)} — ${String(g.count)}: no CoP columns, kept in the schedule`
   )
   return {
     forModel: {
       message:
         `${entity}: ${picked.length} sub-type${picked.length === 1 ? '' : 's'} in the loaded models. ${lines.join('; ')}. ` +
-        'Schedule only the inModel names, as make_schedule column fields; name the missing ones in the reply as what the CoP lists that the model does not carry.',
+        `Schedule every ${entity} — category ${entity}, with no filter on sub-type or PredefinedType — grouped by PredefinedType: elements with no sub-type, or one the CoP does not list, stay in the schedule in their own group. ` +
+        'Use only the inModel names as make_schedule column fields; name the missing ones in the reply as what the CoP lists that the model does not carry.',
       entity,
       source: COP_SOURCE,
       subtypes,
