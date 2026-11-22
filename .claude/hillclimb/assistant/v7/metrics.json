@@ -1,0 +1,57 @@
+{
+  "rows": 3,
+  "scored": 3,
+  "na": 0,
+  "errors": 0,
+  "pass": 3,
+  "pass_rate": 1,
+  "no_write_rate": 1,
+  "by_group": {
+    "operate": {
+      "n": 3,
+      "pass": 3
+    }
+  },
+  "tokens": {
+    "in": 17249,
+    "out": 3949,
+    "cacheRead": 674023,
+    "cacheWrite": 38163
+  },
+  "cost_usd": 0.304199,
+  "unpriced": 0,
+  "by_case": {
+    "sg-cop-door-schedule": {
+      "runs": 3,
+      "pass": 3,
+      "turns": 9,
+      "tokens": {
+        "in": 17249,
+        "out": 3949,
+        "cacheRead": 674023,
+        "cacheWrite": 38163
+      },
+      "cost_usd": 0.304199
+    }
+  },
+  "latency_by_model": {
+    "claude-sonnet-5-5": {
+      "cases": 3,
+      "turns": 9,
+      "median_s": 15.5,
+      "p90_s": 16.52,
+      "s_per_turn": 5.27
+    }
+  },
+  "estimate": {
+    "cases": 1,
+    "runs": 3,
+    "turns": 9,
+    "inTokens": 360000,
+    "outTokens": 10800,
+    "usdList": 0.828,
+    "usdMeasured": null,
+    "basis": "a-priori: ROUGH_TURN in scripts/eval/cost.cjs"
+  },
+  "model_asked": "claude-sonnet-5-5"
+}

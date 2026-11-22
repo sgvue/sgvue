@@ -15,7 +15,10 @@ reply (owner's choice); a follow-up naming properties changes the open schedule 
 prompt block no longer says the CoP is not loaded; it still forbids any pass / fail / compliance verdict.
 Two eval cases (89 in all): offline oracle 100 %, null 0 %. Typecheck, lint, build, privacy clean; `npm test`
 4 930 passed, 2 failed — `third-party-notices.test.ts`, exceljs not installed in this worktree, unrelated.
-Not run: the live eval (costs API credits) and the app window.
+**Then — live.** `multi-schedule-add-open` 3/3 at once; `sg-cop-door-schedule` 1/3: twice Vee filtered the
+schedule to `Predefined Type = DOOR` and dropped the 3 doors with no sub-type. `ifcsg_columns`' message and the
+prompt line now say to schedule the whole class with no sub-type filter (`dfa5ccb`); re-run (`--variant=v7`) 3/3,
+$0.30, claude-sonnet-5-5.
 
 ## 2026-11-16 — the e2e suite runs at a device pixel ratio of 1 on any display
 
