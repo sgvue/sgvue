@@ -4,6 +4,19 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-23 — the Spatial-structure card compares the models
+
+**Did.** The IfcProject card is the owner-approved comparison table (prototype `prototype/project-card/`, rows
+merged, 11.5 px): a column per model, every IfcProject / IfcSite / IfcBuilding attribute and property set from
+each model's own file, differing rows dotted and tinted, "differences only" (card state, not saved). The worker
+keeps the containers' remaining attributes and own psets in `ModelIndexMeta.containers` (optional);
+`spatialTable` replaces `spatialCards`. Two synthetic fixtures (`scripts/make-container-fixtures.py`) are checked
+against IfcOpenShell 0.8.4's raw reading; Easting / Northing and True north are pinned to the old card's strings
+for one model. Deep review, two rounds: one blocking test gap (RefElevation could not be told from the georef Z)
+and three smaller ones closed. **In a window:** `tests/e2e/project-card.spec.ts` 2 passed, with a sideways-scroll
+step that caught the group heading's rule 8 px too wide (fixed); the `project-compare*` states captured on the
+4-model mock. Not seen on a real Revit export, nor on Windows.
+
 ## 2026-11-22 — Vee builds IFC+SG schedules from the CoP property lists
 
 **Did.** A new read tool, `ifcsg_columns`, over a bundled, hash-pinned copy of the CoP 4th Edition corpus

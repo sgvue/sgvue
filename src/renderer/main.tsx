@@ -4,6 +4,7 @@ import './styles/hover.css'
 import './styles/a11y.css'
 import './styles/vee.css'
 import './styles/fed-trace.css'
+import './styles/project-card.css'
 
 import { createRoot } from 'react-dom/client'
 import App from './App'

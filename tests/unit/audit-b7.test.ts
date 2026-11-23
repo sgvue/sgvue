@@ -15,7 +15,7 @@ import { visFn } from '../../src/shared/rules'
 import { mockModelIndex } from '../../src/renderer/dev/mock-adapter'
 import { executeTool, newTurnState, type ToolContext } from '../../src/renderer/ai/executors'
 import { modelToSave } from '../../src/renderer/app/model-draft'
-import { spatialCards } from '../../src/renderer/state/selectors/spatial'
+import { spatialTable, type SpatialRow } from '../../src/renderer/state/selectors/spatial'
 import { setViewer, useShell, type ShellState } from '../../src/renderer/state/shell'
 import { memoryStorage, resetShell, stubViewer } from './stub-viewer'
 
@@ -53,30 +53,45 @@ describe('1. Preferences › Model — modelToSave', () => {
 /* ────────────────────────────── 2. Spatial-structure CRS ────────────────────────────── */
 
 describe('2. the Spatial-structure card names the file’s own CRS', () => {
-  const federation = federate([mockModelIndex('ARC')])
-  const coords = { E: 28500, N: 30200, Z: 102.5, angle: 12.5 }
-  const row = (crs?: string): string =>
-    spatialCards({ federation, library: [], coords, uploadNames: {}, ...(crs === undefined ? {} : { crs }) })
-      .find((c) => c.type === 'IfcSite')!
-      .rows.find((r) => r.k === 'Easting / Northing')!.v
+  // 2026-11-23 — the card compares the models: each column's CRS is its own file's
+  // (`crsChip(meta.georef).short`), no longer the store's `georefSource` passed in.
+  const arc = mockModelIndex('ARC')
+  const crs = (name: string) => ({ name, description: '', geodeticDatum: '', verticalDatum: '', mapProjection: '', mapZone: '' })
+  const row = (name?: string): string => {
+    const r = (12.5 * Math.PI) / 180
+    const federation = federate([
+      {
+        ...arc,
+        georef: {
+          source: 'IfcMapConversion',
+          sources: ['IfcMapConversion'],
+          method: 'IfcMapConversion',
+          eastings: 28500,
+          northings: 30200,
+          orthogonalHeight: 102.5,
+          xAxisAbscissa: Math.cos(r),
+          xAxisOrdinate: Math.sin(r),
+          ...(name === undefined ? {} : { crs: crs(name) })
+        }
+      }
+    ])
+    const site = spatialTable({ federation, library: [], uploadNames: {} })!.groups.find((g) => g.type === 'IfcSite')!
+    return (site.lines.find((l) => l.kind === 'row' && l.k === 'Easting / Northing') as SpatialRow).cells[0]
+  }
 
-  it('crs omitted → the design’s literal (SVY21)', () => {
-    expect(row()).toBe('28,500.000 E · 30,200.000 N (SVY21)')
-  })
-  it('crs SVY21 → (SVY21)', () => {
+  it('SVY21 → (SVY21)', () => {
     expect(row('SVY21')).toBe('28,500.000 E · 30,200.000 N (SVY21)')
+    expect(row('EPSG:3414')).toBe('28,500.000 E · 30,200.000 N (SVY21)')
   })
-  it('crs the em dash or empty → no parenthesis', () => {
-    expect(row('—')).toBe('28,500.000 E · 30,200.000 N')
+  it('no CRS stated → no parenthesis', () => {
+    expect(row()).toBe('28,500.000 E · 30,200.000 N')
     expect(row('')).toBe('28,500.000 E · 30,200.000 N')
   })
   it('another CRS → its own name', () => {
     expect(row('EPSG:27700')).toBe('28,500.000 E · 30,200.000 N (EPSG:27700)')
   })
-  it('ProjectCard passes crsChip(georefSource).short', () => {
-    const src = source('src/renderer/app/ProjectCard.tsx')
-    expect(src).toMatch(/crs:\s*crsChip\(st\.georefSource\)\.short/)
-    expect(src).toMatch(/pick\([^)]*'georefSource'/)
+  it('the selector reads each model’s own crsChip(meta.georef).short', () => {
+    expect(source('src/renderer/state/selectors/spatial.ts')).toMatch(/crsChip\(m\.georef\)\.short/)
   })
 })
 

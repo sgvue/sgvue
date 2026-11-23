@@ -1261,8 +1261,67 @@ Anything not on this list is a defect.
   keep it at 0.0 m after. **A side effect:** a switch to orthographic after a gesture takes its
   framing from the re-anchored distance — the depth of what was last under the cursor — not from
   the stale orbit point, so its view size can differ from before this change.
+- **2026-11-23 — the Spatial-structure card compares the models: a column per model, every
+  IfcProject / IfcSite / IfcBuilding attribute and property set, differing rows marked, a
+  "differences only" switch.** Owner-approved from a clickable prototype
+  (`prototype/project-card/`, its `HANDOFF.md` and `shots/`), with matching rows **merged** and
+  text at **11.5 px**. The design's card lists one `IfcProject` per file and then the *first*
+  model's site and building, labelled `shared`; it showed neither the project's LongName,
+  Description or Phase, which the index already read, nor any property set of the three, which it
+  read and dropped. **Now** the card has the same place, chrome, header, cross, z-order and type
+  scale, and its body is a table: a key column and one column per loaded model, in the MODELS
+  rows' order, headed by that row's swatch and label (the file name as hover title). Four groups:
+  **IfcProject** (Name, LongName, Description, ObjectType, Phase, GlobalId), **IfcSite** (Name,
+  LongName, Description, ObjectType, CompositionType, GlobalId, RefLatitude, RefLongitude,
+  RefElevation, LandTitleNumber, SiteAddress, Easting / Northing, True north), **IfcBuilding**
+  (Name, LongName, Description, ObjectType, CompositionType, GlobalId, ElevationOfRefHeight,
+  ElevationOfTerrain, BuildingAddress, Storeys, Height to top), each followed by its property
+  sets — the union of set names across the models, sorted, a set heading showing `—` in the
+  column of a model that lacks it — and **File** (File, Schema, Units, Elements). Every cell is
+  that model's own file's: the Name is the entity's own (`<federation> — <label>` and the building
+  name's fallback to the project's are gone); RefElevation is `IfcSite.RefElevation`, no longer
+  the Coordinate-system card's Z; ElevationOfRefHeight / ElevationOfTerrain / RefElevation are
+  converted from the file's length unit and printed as the old row printed a height;
+  RefLatitude / RefLongitude are `12° 34′ 56.789000″ N` (millionths only when authored); an
+  address is its authored `IfcPostalAddress` parts in schema order on one line; property values
+  go through the property card's own `fmtV`; Easting / Northing and True north come from each
+  model's own georeferencing through the Coordinate-system card's own functions, so for the
+  model that card describes they print what they printed; Storeys and Height to top are each
+  model's own storeys. A value the file does not carry is the em dash, now in `--faint`.
+  **Difference rule** (HANDOFF.md): identity rows — the three GlobalIds, File and Elements —
+  never count and print per column (GlobalIds muted, on one line); the em dash is a value; a
+  differing row carries a 5 px accent dot in the key gutter and tints
+  (`--diff-bg`, accent 12 % light / 17 % dark) the cells off the most common value, the leftmost
+  winning a tie; a row equal across every model prints once, across the model columns, its value
+  kept in view when scrolled sideways, 8 px clear of the key column's hairline. **Size and scroll:** 340 px for one model, as before, and
+  190 px more for each other one, inside the card's existing `max-width` (lane) and `max-height`
+  (action bar); the body scrolls both ways under the fixed header, the key column and the model
+  heading row sticky, the key column gaining a hairline once scrolled; each row has a hairline in
+  a new token `--row-line` and tints `--step-bg` under the pointer. The prototype's column scroll
+  snap and trailing spacer column are not built. **"differences only"** — a pill in the header
+  (dot, label, count; pressed in the MODELS `active` pill's look) — hides matching rows, identity
+  rows and any set or group left with no differing row, and says "All rows match across N
+  models." when nothing differs; it is the card's own state, never saved in a session, a link or
+  a project file. **With one model** there is no heading row, no pill, no dot, no tint and no
+  merging; the group headings carry the model's swatch and label, the site's Name, the
+  building's own Name — the em dash when the file has none, where the old card fell back to the
+  project's — and the file. Supersedes the 2026-11-11 entry's design mock note:
+  the CRS in the site line is each model's own. New model data, additive and optional
+  (`ModelIndexMeta.containers`); the assistant's tools, the SQL schema, sessions, project files
+  and exports are unchanged. **Seen in a window** (2026-11-23): `tests/e2e/project-card.spec.ts`
+  passed (one model: 340 px, no heading row, no switch; three models: 720 px, a column each, one
+  dot per counted row, one tinted cell on LongName, "differences only" leaving the counted rows
+  alone), and the `project-compare*` parity states were captured on the demo's 4-model mock,
+  light. Scrolled sideways (a 900 × 760 window; `project-compare-scrolled` at
+  `SGVUE_SIZE=1100x820`) the group heading's rule overshot the visible width by the 8 px
+  scrollbar and merged values touched the key column's hairline; both were fixed (the rule now
+  scrolls with the table behind a sticky label, a merged value stops 8 px clear) and re-run in
+  a window (2026-11-24): the spec passed with its scroll step, and the scrolled capture shows
+  both. One consequence of the rule scrolling with the table: while the table is wider than the
+  card and not scrolled to its end, a group heading's rule runs to the card's inner edge, as the
+  row hairlines do, where the prototype's stopped 14 px short.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
 2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's,
-2026-11-07's, 2026-11-12's and 2026-11-15's.
+2026-11-07's, 2026-11-12's, 2026-11-15's and 2026-11-23's.

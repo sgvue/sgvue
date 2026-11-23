@@ -1,0 +1,230 @@
+{
+ "files": {
+  "full-ifc4.ifc": {
+   "building": {
+    "BuildingAddress": [
+     [
+      "Purpose",
+      null
+     ],
+     [
+      "Description",
+      null
+     ],
+     [
+      "UserDefinedPurpose",
+      null
+     ],
+     [
+      "InternalLocation",
+      null
+     ],
+     [
+      "AddressLines",
+      [
+       "1 Example Avenue"
+      ]
+     ],
+     [
+      "PostalBox",
+      null
+     ],
+     [
+      "Town",
+      null
+     ],
+     [
+      "Region",
+      null
+     ],
+     [
+      "PostalCode",
+      "000001"
+     ],
+     [
+      "Country",
+      "Example Country"
+     ]
+    ],
+    "attributes": {
+     "CompositionType": "ELEMENT",
+     "Description": "A synthetic building description",
+     "ElevationOfRefHeight": 5050.0,
+     "ElevationOfTerrain": 4800.0,
+     "GlobalId": "0000000000000000000003",
+     "LongName": "Tower C — Residential",
+     "Name": "Tower C",
+     "ObjectType": "SYNTHETIC_BUILDING_TYPE"
+    },
+    "psets": {
+     "Pset_BuildingCommon": {
+      "NumberOfStoreys": 2,
+      "YearOfConstruction": "2027"
+     },
+     "SGPset_Building": {
+      "OwnerBuiltOwnerStay": false
+     }
+    }
+   },
+   "lengthUnitMetres": 0.001,
+   "project": {
+    "attributes": {
+     "Description": "A synthetic project description",
+     "GlobalId": "0000000000000000000001",
+     "LongName": "Synthetic Project — Long Name",
+     "Name": "Synthetic Project",
+     "ObjectType": "SYNTHETIC_PROJECT_TYPE",
+     "Phase": "Construction Documents"
+    },
+    "psets": {
+     "Project_Information": {
+      "Budget": 1250000.5,
+      "ClientName": "Sample Client",
+      "IsSample": true,
+      "ProjectNumber": "P-0001"
+     }
+    }
+   },
+   "schema": "IFC4",
+   "sha256": "990347ebd808af5b879078cf64f1cef28b5c5cf18a9be5d484a42763ab5e2837",
+   "site": {
+    "SiteAddress": [
+     [
+      "Purpose",
+      "SITE"
+     ],
+     [
+      "Description",
+      "Main gate"
+     ],
+     [
+      "UserDefinedPurpose",
+      "Deliveries"
+     ],
+     [
+      "InternalLocation",
+      "Gate 2"
+     ],
+     [
+      "AddressLines",
+      [
+       "1 Example Avenue",
+       "Block C"
+      ]
+     ],
+     [
+      "PostalBox",
+      "PO 12"
+     ],
+     [
+      "Town",
+      "Example Town"
+     ],
+     [
+      "Region",
+      "Example Region"
+     ],
+     [
+      "PostalCode",
+      "000001"
+     ],
+     [
+      "Country",
+      "Example Country"
+     ]
+    ],
+    "attributes": {
+     "CompositionType": "ELEMENT",
+     "Description": "A synthetic site description",
+     "GlobalId": "0000000000000000000002",
+     "LandTitleNumber": "LOT-0001-A",
+     "LongName": "Plot A",
+     "Name": "Site Plot A",
+     "ObjectType": "SYNTHETIC_SITE_TYPE",
+     "RefElevation": 4700.0,
+     "RefLatitude": [
+      12,
+      34,
+      56,
+      789000
+     ],
+     "RefLongitude": [
+      98,
+      7,
+      6,
+      543210
+     ]
+    },
+    "psets": {
+     "Pset_SiteCommon": {
+      "BuildableArea": 6100.0,
+      "TotalArea": 8420.0
+     },
+     "SGPset_Site": {
+      "CXBlockID": "1",
+      "NumberOfWorkers": 120
+     }
+    }
+   }
+  },
+  "sparse-ifc2x3.ifc": {
+   "building": {
+    "BuildingAddress": null,
+    "attributes": {
+     "CompositionType": "ELEMENT",
+     "Description": null,
+     "ElevationOfRefHeight": 0.0,
+     "ElevationOfTerrain": 2.5,
+     "GlobalId": "0000000000000000000003",
+     "LongName": null,
+     "Name": null,
+     "ObjectType": null
+    },
+    "psets": {}
+   },
+   "lengthUnitMetres": 1,
+   "project": {
+    "attributes": {
+     "Description": null,
+     "GlobalId": "0000000000000000000001",
+     "LongName": null,
+     "Name": "Synthetic Project",
+     "ObjectType": null,
+     "Phase": null
+    },
+    "psets": {}
+   },
+   "schema": "IFC2X3",
+   "sha256": "798f318899a34c419e12fc2127bcff08d28911b79645d5a40c4ec4fe5a2aac05",
+   "site": {
+    "SiteAddress": null,
+    "attributes": {
+     "CompositionType": "ELEMENT",
+     "Description": null,
+     "GlobalId": "0000000000000000000002",
+     "LandTitleNumber": null,
+     "LongName": null,
+     "Name": "Default Site",
+     "ObjectType": null,
+     "RefElevation": null,
+     "RefLatitude": [
+      -12,
+      -34,
+      -56
+     ],
+     "RefLongitude": [
+      -98,
+      -7,
+      -6
+     ]
+    },
+    "psets": {
+     "Pset_SiteCommon": {
+      "TotalArea": 8420.0
+     }
+    }
+   }
+  }
+ },
+ "generatedBy": "IfcOpenShell 0.8.4.post1"
+}

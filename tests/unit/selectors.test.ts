@@ -17,7 +17,13 @@ import {
 } from '../../src/renderer/state/selectors/tree'
 import { soloStoreyName, storeyRows } from '../../src/renderer/state/selectors/storeys'
 import { baseSwatch, modelRows } from '../../src/renderer/state/selectors/models'
-import { spatialCards, unitsLine, DASH } from '../../src/renderer/state/selectors/spatial'
+import {
+  spatialTable,
+  unitsLine,
+  DASH,
+  type SpatialRow,
+  type SpatialTable
+} from '../../src/renderer/state/selectors/spatial'
 import {
   hasActionBar,
   matHint,
@@ -302,6 +308,11 @@ describe('model and library selectors', () => {
 })
 
 describe('spatial structure card', () => {
+  /*
+   * 2026-11-23 — ported from `spatialCards` to `spatialTable` (the card compares the models): one
+   * column per file, every row read from that file, so the "shared" site and building, the
+   * `Declared in` row and the federation-wide totals are gone, and RefElevation is the site's own.
+   */
   const federation = federate([mockModelIndex('ARC'), mockModelIndex('STR')])
   const library = SAMPLE_FILES.map((f) => ({
     key: f.key,
@@ -309,45 +320,36 @@ describe('spatial structure card', () => {
     file: f.file,
     swatch: f.swatch
   }))
-  const cards = spatialCards({
-    federation,
-    library,
-    coords: { E: null, N: null, Z: null, angle: null },
-    uploadNames: {}
-  })
+  const table = spatialTable({ federation, library, uploadNames: {} })!
+  const rowOf = (t: SpatialTable, type: string, k: string): SpatialRow =>
+    t.groups
+      .find((g) => g.type === type)!
+      .lines.find((l): l is SpatialRow => l.kind === 'row' && l.k === k)!
 
-  it('lists one IfcProject per file, then the shared site and building', () => {
-    expect(cards.map((c) => c.type)).toEqual([
-      'IfcProject',
-      'IfcProject',
-      'IfcSite',
-      'IfcBuilding'
-    ])
-    expect(cards[2].shared).toBe(true)
-    expect(cards[3].shared).toBe(true)
+  it('lists the project, site and building of every file, a column per file, then the file lines', () => {
+    expect(table.groups.map((g) => g.type)).toEqual(['IfcProject', 'IfcSite', 'IfcBuilding', 'File'])
+    expect(table.columns.map((c) => c.key)).toEqual(['ARC', 'STR'])
   })
 
   it('composes the units line from the file’s own IfcUnitAssignment', () => {
     expect(unitsLine(mockModelIndex('ARC').units)).toBe(
       'MILLI.METRE · SQUARE_METRE · CUBIC_METRE'
     )
-    expect(cards[0].rows.find((r) => r.k === 'Units')!.v).toBe(
-      'MILLI.METRE · SQUARE_METRE · CUBIC_METRE'
-    )
+    expect(rowOf(table, 'File', 'Units').cells[0]).toBe('MILLI.METRE · SQUARE_METRE · CUBIC_METRE')
   })
 
   it('shows an em dash rather than inventing a value the file does not carry', () => {
     // The mock federation has no GlobalIds, no georeferencing and no CompositionType.
-    expect(cards[0].rows.find((r) => r.k === 'GlobalId')!.v).toBe(DASH)
-    expect(cards[2].rows.find((r) => r.k === 'RefElevation')!.v).toBe(DASH)
-    expect(cards[2].rows.find((r) => r.k === 'True north')!.v).toBe(DASH)
-    expect(cards[2].rows.find((r) => r.k === 'CompositionType')!.v).toBe(DASH)
-    expect(cards[3].rows.find((r) => r.k === 'CompositionType')!.v).toBe(DASH)
+    expect(rowOf(table, 'IfcProject', 'GlobalId').cells).toEqual([DASH, DASH])
+    expect(rowOf(table, 'IfcSite', 'RefElevation').cells).toEqual([DASH, DASH])
+    expect(rowOf(table, 'IfcSite', 'True north').cells).toEqual([DASH, DASH])
+    expect(rowOf(table, 'IfcSite', 'CompositionType').cells).toEqual([DASH, DASH])
+    expect(rowOf(table, 'IfcBuilding', 'CompositionType').cells).toEqual([DASH, DASH])
   })
 
   it('fills CompositionType from IfcSite / IfcBuilding when the file states one', () => {
     const arc = mockModelIndex('ARC')
-    const withComposition = spatialCards({
+    const withComposition = spatialTable({
       federation: federate([
         {
           ...arc,
@@ -356,40 +358,57 @@ describe('spatial structure card', () => {
         }
       ]),
       library,
-      coords: { E: null, N: null, Z: null, angle: null },
       uploadNames: {}
-    })
-    expect(withComposition[1].rows.find((r) => r.k === 'CompositionType')!.v).toBe('COMPLEX')
-    expect(withComposition[2].rows.find((r) => r.k === 'CompositionType')!.v).toBe('ELEMENT')
+    })!
+    expect(rowOf(withComposition, 'IfcSite', 'CompositionType').cells).toEqual(['COMPLEX'])
+    expect(rowOf(withComposition, 'IfcBuilding', 'CompositionType').cells).toEqual(['ELEMENT'])
   })
 
   it('fills the coordinate rows when the file does georeference', () => {
-    const withCoords = spatialCards({
-      federation,
+    const arc = mockModelIndex('ARC')
+    // An IfcMapConversion at 28,500 / 30,200 / 102.5, turned 12.5°, in SVY21 — and the site's own
+    // RefElevation, 48 000 mm — not the conversion's 102.5 m, so a row that read the base point's Z
+    // instead of the attribute would print 102.500 m and fail here.
+    const r = (12.5 * Math.PI) / 180
+    const withCoords = spatialTable({
+      federation: federate([
+        {
+          ...arc,
+          georef: {
+            source: 'IfcMapConversion',
+            sources: ['IfcMapConversion'],
+            method: 'IfcMapConversion',
+            eastings: 28500,
+            northings: 30200,
+            orthogonalHeight: 102.5,
+            xAxisAbscissa: Math.cos(r),
+            xAxisOrdinate: Math.sin(r),
+            crs: { name: 'EPSG:3414', description: '', geodeticDatum: '', verticalDatum: '', mapProjection: '', mapZone: '' }
+          },
+          containers: { site: { objectType: '', description: '', landTitleNumber: '', address: '', refElevation: 48000, psets: {} } }
+        }
+      ]),
       library,
-      coords: { E: 28500, N: 30200, Z: 102.5, angle: 12.5 },
       uploadNames: {}
-    })
-    const site = withCoords[2]
-    expect(site.rows.find((r) => r.k === 'RefElevation')!.v).toBe('102.500 m')
-    expect(site.rows.find((r) => r.k === 'Easting / Northing')!.v).toBe(
+    })!
+    expect(rowOf(withCoords, 'IfcSite', 'RefElevation').cells).toEqual(['48.000 m'])
+    expect(rowOf(withCoords, 'IfcSite', 'Easting / Northing').cells).toEqual([
       '28,500.000 E · 30,200.000 N (SVY21)'
-    )
-    expect(site.rows.find((r) => r.k === 'True north')!.v).toBe(
+    ])
+    expect(rowOf(withCoords, 'IfcSite', 'True north').cells).toEqual([
       '12.50° clockwise from project north'
-    )
+    ])
   })
 
-  it('reports the storey ladder and the element totals from the federation', () => {
-    const building = cards[3]
-    expect(building.rows.find((r) => r.k === 'Storeys')!.v).toBe(
-      `${federation.storeys.length} IfcBuildingStorey`
+  it('reports each file’s own storeys and element count', () => {
+    expect(rowOf(table, 'IfcBuilding', 'Storeys').cells).toEqual(
+      federation.models.map((m) => `${m.meta.storeys.length} IfcBuildingStorey`)
     )
-    expect(building.rows.find((r) => r.k === 'Declared in')!.v).toBe(
-      'SB_ARC_R25.ifc  ·  SB_STR_R25.ifc'
-    )
-    expect(building.rows.find((r) => r.k === 'Elements')!.v).toBe(
-      federation.elements.length.toLocaleString('en-US')
+    expect(rowOf(table, 'File', 'File').cells).toEqual(['SB_ARC_R25.ifc', 'SB_STR_R25.ifc'])
+    expect(rowOf(table, 'File', 'Elements').cells).toEqual(
+      federation.models.map((m) =>
+        federation.elements.filter((e) => e.model === m.meta.modelKey).length.toLocaleString('en-US')
+      )
     )
   })
 })

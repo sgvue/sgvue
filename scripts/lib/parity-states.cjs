@@ -247,6 +247,35 @@ const CHROME_STATES = {
 }
 
 /**
+ * 2026-11-23 — the Spatial-structure card compares the models (`docs/DEVIATIONS.md`; the owner's
+ * approved prototype, `prototype/project-card/`). **App only**: the design's card has no model
+ * columns and no "differences only" switch, so `scripts/screenshot.cjs` runs these and
+ * `parity-prototype.cjs` does not; they are captured for a reviewer to set beside the prototype's
+ * `shots/` (the demo's 4-model federation against the prototype's 3- and 6-model mocks), never
+ * differenced. The card is still found by its "Spatial structure" heading (`RECTS`).
+ *
+ *   project-compare            the card open over the demo federation: a column per model
+ *   project-compare-diffonly   "differences only" pressed: the differing rows alone
+ *   project-compare-scrolled   every row again, the body scrolled to its far corner
+ *
+ * The demo's four columns make a 910 px card, which fits the 1440 × 860 window's stage, so the
+ * three are captured at `SGVUE_SIZE=1100x820`: a 800 px stage clamps the card to 776 px and the
+ * table scrolls sideways. `project-compare-scrolled` refuses to capture a table that does not
+ * overflow, rather than record a scroll that moved nothing.
+ */
+const PROJECT_CARD_STATES = {
+  'project-compare':
+    `if (!$('[data-role="projtable"]')) click($('button[data-tip="Project, site and building information"]'));` +
+    ` await sleep(300)`,
+  'project-compare-diffonly': `click($$('button').find((b) => txt(b).startsWith('differences only')))`,
+  'project-compare-scrolled':
+    `click($$('button').find((b) => txt(b).startsWith('differences only'))); await sleep(200);` +
+    ` { const b = $('[data-role="projtable"]');` +
+    ` if (b.scrollWidth <= b.clientWidth) throw new Error('parity: the table does not overflow — capture at SGVUE_SIZE=1100x820');` +
+    ` b.scrollLeft = b.scrollWidth; b.scrollTop = b.scrollHeight; } await sleep(200)`
+}
+
+/**
  * Phase 4 — selection, the property card and the context menu. Identical text in both scripts.
  *
  * They run **in order**, each undoing the previous one's change, so one invocation per theme
@@ -682,6 +711,7 @@ module.exports = {
   EMPTY,
   UI,
   CHROME_STATES,
+  PROJECT_CARD_STATES,
   PROP_STATES,
   FILTER_STATES,
   ANNOTATION_STATES,

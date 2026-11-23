@@ -335,6 +335,17 @@ Three rules hold the port to the design:
    one case, which is the design's (`viewer-core.js:529`): hiding a selected element trims it
    from the selection and says so, which is why the property card closes behind `Hide`.
 
+**The Spatial-structure card** (`app/ProjectCard.tsx`, `selectors/spatial.ts`'s `spatialTable`)
+compares the loaded models since 2026-11-23 (`docs/DEVIATIONS.md`): a key column and one column
+per model in the MODELS rows' order — 340 px for one model, 190 px more for each other one,
+inside the lane — with four groups, IfcProject, IfcSite, IfcBuilding (each followed by its
+property sets, the union across the models) and File. Every cell is that model's own file's, the
+em dash where it carries nothing; Easting / Northing and True north go through the
+Coordinate-system card's own `coordsFromGeoref` / `crsChip` on that model's `georef`. With two or
+more models a row equal across all of them prints once; a differing one is marked with a dot and
+tints the cells off the most common value; GlobalIds, File and Elements are never compared.
+"differences only" is the card's own state and is never saved.
+
 ### 4.2 The property card and the context menu
 
 The card is `selectors/props.ts` (`renderVals()`'s `sel` object) plus `app/PropertyCard.tsx`
@@ -477,7 +488,7 @@ buildingSMART's own validation service uses. The table below is the contract.
 | Schemas | IFC2X3 TC1, IFC4 ADD2 TC1, IFC4X3 ADD2 — schema-specific attribute names respected (e.g. `IfcClassificationReference.ItemReference` in 2X3 vs `Identification` in 4) |
 | Identity | `IfcRoot.GlobalId` verbatim (22-char base64 alphabet `0-9A-Za-z_$`, validated, never regenerated); `expressId` kept; `Name`, `Description`, `Tag`, `ObjectType` (the occurrence's own attribute as written, never the type's `Name` — 2026-11-11) |
 | Entity typing | Exact `IfcEntity`; `PredefinedType` as **two values** (2026-11-07): the code as written — the occurrence's, else its type object's, `USERDEFINED` kept, never `ObjectType` text — and the effective type, IfcOpenShell's `get_predefined_type` (`USERDEFINED` → the type's `ElementType` / the occurrence's `ObjectType`, the type's code first); type object via `IfcRelDefinesByType` (its `Name` kept apart as `typeName`, 2026-11-11 — Schedules' Family / Type, SQL `type_object`, the assistant's `typeObject`) |
-| Spatial structure | `IfcProject › IfcSite › IfcBuilding › IfcBuildingStorey › IfcSpace` by `IfcRelAggregates`; elements by `IfcRelContainedInSpatialStructure`; storey `Elevation`; `IfcSpatialStructureElement.CompositionType` (`COMPLEX`/`ELEMENT`/`PARTIAL`) as authored, absent when the file leaves the optional attribute unset; `IfcZone` and other `IfcGroup`/`IfcSystem` memberships via `IfcRelAssignsToGroup` |
+| Spatial structure | `IfcProject › IfcSite › IfcBuilding › IfcBuildingStorey › IfcSpace` by `IfcRelAggregates`; elements by `IfcRelContainedInSpatialStructure`; storey `Elevation`; `IfcSpatialStructureElement.CompositionType` (`COMPLEX`/`ELEMENT`/`PARTIAL`) as authored, absent when the file leaves the optional attribute unset; `IfcZone` and other `IfcGroup`/`IfcSystem` memberships via `IfcRelAssignsToGroup`; since 2026-11-23 the project's, the spatial-root site's and its building's remaining attributes and own property sets as authored (`ModelIndexMeta.containers`): `ObjectType`, `Description`, `RefLatitude`/`RefLongitude` (the compound angle's list), `RefElevation`, `ElevationOfRefHeight`, `ElevationOfTerrain` (the file's length unit), `LandTitleNumber`, and `SiteAddress`/`BuildingAddress` (`IfcPostalAddress`'s authored parts in schema order, on one line) |
 | Decomposition | `IfcRelAggregates` (assemblies), `IfcRelNests`, `IfcRelVoidsElement` (openings), `IfcRelFillsElement` (doors/windows in openings) |
 | Property sets | `IfcRelDefinesByProperties` → `IfcPropertySet`; value types per `IfcValue`: `IfcPropertySingleValue`, `EnumeratedValue`, `ListValue`, `BoundedValue`, `TableValue`, `ReferenceValue`, `IfcComplexProperty` (nested); values kept **as authored** with their measure type and unit; type-level psets (`IfcTypeObject.HasPropertySets`) inherited and **overridden by occurrence psets**, flagged `inherited`; `Pset_*` (buildingSMART) vs `SGPset_*` (IFC-SG) vs other prefixes distinguished |
 | Quantities | `IfcElementQuantity` → `IfcQuantityLength/Area/Volume/Count/Weight/Time`, `IfcPhysicalComplexQuantity`; `MethodOfMeasurement` kept; `Qto_*` naming |

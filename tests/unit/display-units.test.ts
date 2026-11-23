@@ -58,7 +58,7 @@ import {
   parseFeet,
   parseOffset
 } from '../../src/renderer/state/selectors/section'
-import { spatialCards } from '../../src/renderer/state/selectors/spatial'
+import { spatialTable } from '../../src/renderer/state/selectors/spatial'
 import { storeyRows } from '../../src/renderer/state/selectors/storeys'
 import { markupsState } from '../../src/renderer/ai/executors/saved'
 import { executeTool, newTurnState, type ToolContext } from '../../src/renderer/ai/executors'
@@ -390,20 +390,37 @@ describe('the storey list', () => {
 })
 
 describe('the Spatial-structure card', () => {
-  const federation = federate([mockModelIndex('ARC')])
+  // 2026-11-23 — one model's column of `spatialTable` (the card compares the models): the site's
+  // position from its own georeferencing (an IfcSite placement at the synthetic set, SVY21), and
+  // RefElevation the site's own attribute, 4 800 mm — not the placement's 5.05 m, so a row that read
+  // the base point's Z would print 5.050 m and fail.
+  const arc = mockModelIndex('ARC')
+  const federation = federate([
+    {
+      ...arc,
+      georef: {
+        source: 'IfcSite',
+        sources: ['IfcSite'],
+        method: 'IfcSite placement',
+        site: { placement: [12345.457, 23456.766, 5.05] },
+        crs: { name: 'EPSG:3414', description: '', geodeticDatum: '', verticalDatum: '', mapProjection: '', mapZone: '' }
+      },
+      containers: { site: { objectType: '', description: '', landTitleNumber: '', address: '', refElevation: 4800, psets: {} } }
+    }
+  ])
   const rows = (u?: 'mm' | 'm' | 'ft'): Record<string, string> => {
-    const cards = spatialCards({ federation, library: [], coords: { E: 12345.457, N: 23456.766, Z: 5.05, angle: 0 }, uploadNames: {}, units: u })
-    return Object.fromEntries(cards.flatMap((c) => c.rows.map((r) => [`${c.type}.${r.k}`, r.v])))
+    const t = spatialTable({ federation, library: [], uploadNames: {}, units: u })!
+    return Object.fromEntries(t.groups.flatMap((g) => g.lines.flatMap((l) => (l.kind === 'row' ? [[`${g.type}.${l.k}`, l.cells[0]]] : []))))
   }
 
   it('prints the site’s height and position, and the height to the top storey, in the unit', () => {
     const mm = rows('mm')
     expect(rows()).toEqual(mm)
     expect(rows('m')).toEqual(mm)
-    expect(mm['IfcSite.RefElevation']).toBe('5.050 m')
+    expect(mm['IfcSite.RefElevation']).toBe('4.800 m')
     expect(mm['IfcSite.Easting / Northing']).toBe('12,345.457 E · 23,456.766 N (SVY21)')
     const ft = rows('ft')
-    expect(ft['IfcSite.RefElevation']).toBe('16.568 ft')
+    expect(ft['IfcSite.RefElevation']).toBe('15.748 ft')
     expect(ft['IfcSite.Easting / Northing']).toBe('40,503.468 E · 76,957.894 N (SVY21)')
     const top = federation.storeys[federation.storeys.length - 1]
     expect(mm['IfcBuilding.Height to top']).toBe(`${top.elev.toFixed(3)} m (${top.name})`)
