@@ -21,7 +21,7 @@ import {
   modelSwatches,
   type ModelInput
 } from '../../src/renderer/state/selectors/models'
-import { spatialCards } from '../../src/renderer/state/selectors/spatial'
+import { spatialTable } from '../../src/renderer/state/selectors/spatial'
 import { setModelFiles, setViewer, useShell } from '../../src/renderer/state/shell'
 import { resetShell, stubViewer } from './stub-viewer'
 
@@ -107,15 +107,9 @@ describe('a real file’s library entry is found by its path', () => {
   })
 
   it('the Spatial-structure card’s model swatch agrees with the row', () => {
-    const cards = spatialCards({
-      federation,
-      files,
-      library,
-      coords: { E: null, N: null, Z: null, angle: null },
-      uploadNames: {}
-    })
-    const projects = cards.filter((c) => c.type === 'IfcProject')
-    expect(projects.map((c) => c.swatch)).toEqual([A, B])
+    // 2026-11-23 — the card's model columns are headed by the MODELS rows' swatches.
+    const table = spatialTable({ federation, files, library, uploadNames: {} })!
+    expect(table.columns.map((c) => c.swatch)).toEqual([A, B])
   })
 
   describe('pushed by the store, with the paths the federation holds', () => {

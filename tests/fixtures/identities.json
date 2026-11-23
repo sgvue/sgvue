@@ -1,5 +1,59 @@
 {
  "files": {
+  "containers/full-ifc4.ifc": {
+   "elements": {
+    "39": {
+     "description": "",
+     "effectivePredefinedType": "FLOOR",
+     "expressId": 39,
+     "guid": "0000000000000000000007",
+     "longName": "",
+     "name": "Slab",
+     "objectType": "",
+     "predefinedType": "FLOOR",
+     "tag": "",
+     "type": "IfcSlab",
+     "typeGuid": "",
+     "typeName": ""
+    },
+    "55": {
+     "description": "",
+     "effectivePredefinedType": "FLOOR",
+     "expressId": 55,
+     "guid": "000000000000000000000A",
+     "longName": "",
+     "name": "Slab",
+     "objectType": "",
+     "predefinedType": "FLOOR",
+     "tag": "",
+     "type": "IfcSlab",
+     "typeGuid": "",
+     "typeName": ""
+    }
+   },
+   "schema": "IFC4",
+   "sha256": "990347ebd808af5b879078cf64f1cef28b5c5cf18a9be5d484a42763ab5e2837"
+  },
+  "containers/sparse-ifc2x3.ifc": {
+   "elements": {
+    "37": {
+     "description": "",
+     "effectivePredefinedType": "FLOOR",
+     "expressId": 37,
+     "guid": "0000000000000000000007",
+     "longName": "",
+     "name": "Slab",
+     "objectType": "",
+     "predefinedType": "FLOOR",
+     "tag": "",
+     "type": "IfcSlab",
+     "typeGuid": "",
+     "typeName": ""
+    }
+   },
+   "schema": "IFC2X3",
+   "sha256": "798f318899a34c419e12fc2127bcff08d28911b79645d5a40c4ec4fe5a2aac05"
+  },
   "edge.ifc": {
    "elements": {
     "105": {

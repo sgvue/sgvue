@@ -111,6 +111,7 @@ read it before changing anything visible.** One line per entry here, in its orde
 - 2026-11-11 — the Spatial-structure card's site line names the file's own CRS
 - 2026-11-12 — a federating indicator: a line along the stage's top edge and a caption in the bottom row
 - 2026-11-15 — in perspective a mouse drag and the wheel re-anchor the orbit point on what is under the cursor
+- 2026-11-23 — the Spatial-structure card compares the models: a column per model, every IfcProject / IfcSite / IfcBuilding attribute and property set, differing rows marked, a "differences only" switch
 
 ### No visible additions
 

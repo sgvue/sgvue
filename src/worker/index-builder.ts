@@ -24,6 +24,8 @@ import { collectPropKeys } from '../shared/attr'
 import { detectMethod } from '../shared/georef'
 import type {
   ClassificationRef,
+  ContainerInfo,
+  ContainersInfo,
   Decomposition,
   Georeference,
   GeorefSource,
@@ -69,6 +71,20 @@ export interface BuildOptions {
 }
 
 /* ────────────────────────────── value helpers ────────────────────────────── */
+
+/** `IfcPostalAddress`'s attributes in schema order (`IfcAddress`'s three, then its own), IFC2X3 and IFC4 alike. */
+const POSTAL_ADDRESS = [
+  'Purpose',
+  'Description',
+  'UserDefinedPurpose',
+  'InternalLocation',
+  'AddressLines',
+  'PostalBox',
+  'Town',
+  'Region',
+  'PostalCode',
+  'Country'
+] as const
 
 const isHandle = (v: unknown): v is { value: number } =>
   typeof v === 'object' &&
@@ -712,6 +728,67 @@ export function buildModelIndex(
   }
   stage('building elements', `${elements.length.toLocaleString('en-US')} elements`, 1)
 
+  /*
+   * ── the containers' own attributes and property sets (2026-11-23) ──
+   * What the Spatial-structure card compares across models, as authored: the attributes
+   * `ProjectInfo` and `SpatialNode` do not carry, and each container's own property sets, which
+   * the pass above already resolved (`containerIds`). Lengths stay in the file's unit; a compound
+   * angle stays its list. An `IfcPostalAddress` is one shallow line read by hand — never
+   * `GetLine(id, true)` — and becomes its authored parts, in schema order, on one line.
+   */
+  const address = (v: unknown): string => {
+    const row = line(ref(v))
+    if (!row) return ''
+    return POSTAL_ADDRESS.map((k) => text(row[k])).filter(Boolean).join(', ')
+  }
+  const lengthOf = (v: unknown): { v?: number } => {
+    const n = numberOf(v)
+    return n === null ? {} : { v: n }
+  }
+  const angleOf = (v: unknown): readonly number[] | undefined => {
+    const a = authored(v)
+    return Array.isArray(a) ? a.map(Number) : undefined
+  }
+  const ownOf = (id: number): { row: IfcLine; info: ContainerInfo } | null => {
+    const row = id ? line(id) : null
+    return row ? { row, info: { objectType: text(row.ObjectType), psets: psetsOf.get(id) ?? {} } } : null
+  }
+  const readContainers = (): ContainersInfo | null => {
+    const p = ownOf(projectId)
+    const s = ownOf(site?.expressId ?? 0)
+    const b = ownOf(building?.expressId ?? 0)
+    if (!p && !s && !b) return null
+    const out: ContainersInfo = {}
+    if (p) out.project = p.info
+    if (s) {
+      const lat = angleOf(s.row.RefLatitude)
+      const lon = angleOf(s.row.RefLongitude)
+      const elevation = lengthOf(s.row.RefElevation).v
+      out.site = {
+        ...s.info,
+        description: text(s.row.Description),
+        ...(lat ? { refLatitude: lat } : {}),
+        ...(lon ? { refLongitude: lon } : {}),
+        ...(elevation !== undefined ? { refElevation: elevation } : {}),
+        landTitleNumber: text(s.row.LandTitleNumber),
+        address: address(s.row.SiteAddress)
+      }
+    }
+    if (b) {
+      const refHeight = lengthOf(b.row.ElevationOfRefHeight).v
+      const terrain = lengthOf(b.row.ElevationOfTerrain).v
+      out.building = {
+        ...b.info,
+        description: text(b.row.Description),
+        ...(refHeight !== undefined ? { elevationOfRefHeight: refHeight } : {}),
+        ...(terrain !== undefined ? { elevationOfTerrain: terrain } : {}),
+        address: address(b.row.BuildingAddress)
+      }
+    }
+    return out
+  }
+  const containers = readContainers()
+
   /* ── grids and georeferencing ─────────────────────────────────────── */
   const grids = readGrids(src, modelID, units.length)
   const georef = readGeoreference(
@@ -750,6 +827,7 @@ export function buildModelIndex(
     project,
     site,
     building,
+    ...(containers ? { containers } : {}),
     spatial,
     storeys,
     grids,

@@ -95,6 +95,7 @@ const {
   CORNER,
   UI,
   CHROME_STATES,
+  PROJECT_CARD_STATES,
   PROP_STATES,
   FILTER_STATES,
   ANNOTATION_STATES,
@@ -673,6 +674,7 @@ const STATE_JS = {
   'cube-click-east': { js: '', input: [CLICK(CUBE.e[0], CUBE.e[1]), { wait: 1200 }] },
 
   ...CHROME_STATES,
+  ...PROJECT_CARD_STATES,
   ...PROP_STATES,
   ...FILTER_STATES,
   ...APP_ONLY_STATES,

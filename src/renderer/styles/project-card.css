@@ -1,0 +1,51 @@
+/*
+ * 2026-11-23 — the Spatial-structure card compares the models (`app/ProjectCard.tsx`;
+ * `docs/DEVIATIONS.md`; the owner's approved prototype `prototype/project-card/`). The rules an
+ * inline style cannot carry. None of them is in `SGVue.dc.html`; the design's reduced-motion rule
+ * (`design.css:6`) applies to the fade as to every animation.
+ */
+
+/* Two tokens, per theme: the hairline under a row (lighter than `--border`) and a differing cell's tint. */
+:root {
+  --row-line: color-mix(in srgb, var(--border) 75%, var(--card));
+  --diff-bg: color-mix(in srgb, var(--accent) 17%, transparent);
+}
+:root[data-theme='light'] {
+  --row-line: color-mix(in srgb, var(--border) 60%, var(--card));
+  --diff-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* A hovered row tints whole, to read across a wide table. `!important`: the key cell's own
+   background is an inline style (as `hover.css` explains). */
+[data-role='projtable'] tr[data-row]:hover > td {
+  background: var(--step-bg) !important;
+}
+
+/* Once scrolled sideways, the sticky key column gains a hairline on its right. */
+[data-role='projtable'] [data-key] {
+  transition: box-shadow 0.12s;
+}
+[data-role='projtable'][data-scrolled] [data-key] {
+  box-shadow: 1px 0 0 var(--border);
+}
+
+/* A merged value (one value across the model columns) is sticky at the key column's edge (128 px,
+   `KEY_W` in `app/ProjectCard.tsx`), where it sits at rest, aligned with the split values. Once
+   scrolled — when the hairline appears — it stops 8 px clear of that hairline instead of
+   touching it: 136 px. */
+[data-role='projtable'] [data-merged] {
+  transition: left 0.12s;
+}
+[data-role='projtable'][data-scrolled] [data-merged] {
+  left: 136px !important;
+}
+
+/* Rows fade in when "differences only" shows them again. */
+@keyframes pcrowin {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

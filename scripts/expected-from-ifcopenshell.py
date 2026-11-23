@@ -11,6 +11,7 @@ Usage:
     python3 scripts/expected-from-ifcopenshell.py            # every .ifc in samples/
     python3 scripts/expected-from-ifcopenshell.py --cells-only tests/fixtures/feet.ifc
     python3 scripts/expected-from-ifcopenshell.py --identities  # tests/fixtures/identities.json
+    python3 scripts/expected-from-ifcopenshell.py --containers  # tests/fixtures/containers/ifcopenshell.json
 
 Writes tests/fixtures/<file-stem>.expected.json — since 2026-11-07 with `identities`, every
 indexed element's raw identity by GlobalId (since 2026-11-11 one key per attribute, the
@@ -738,8 +739,68 @@ def identities_of_fixtures() -> dict:
     return {"generatedBy": f"IfcOpenShell {ifcopenshell.version}", "files": out}
 
 
+CONTAINERS = FIXTURES / "containers"
+
+# The attributes the Spatial-structure card shows (2026-11-23), by entity, in its row order.
+CONTAINER_ATTRIBUTES = {
+    "project": ["Name", "LongName", "Description", "ObjectType", "Phase", "GlobalId"],
+    "site": [
+        "Name", "LongName", "Description", "ObjectType", "CompositionType", "GlobalId",
+        "RefLatitude", "RefLongitude", "RefElevation", "LandTitleNumber",
+    ],
+    "building": [
+        "Name", "LongName", "Description", "ObjectType", "CompositionType", "GlobalId",
+        "ElevationOfRefHeight", "ElevationOfTerrain",
+    ],
+}
+
+
+def _address(address) -> list | None:
+    """An `IfcPostalAddress` as [attribute, value] pairs in the schema's own order, raw."""
+    if address is None:
+        return None
+    info = address.get_info(include_identifier=False, recursive=False)
+    return [[k, plain(v)] for k, v in info.items() if k not in ("type",)]
+
+
+def containers_of_fixtures() -> dict:
+    """`--containers`: the raw attributes, postal addresses and property sets of `IfcProject`, the
+    spatial-root `IfcSite` and the first `IfcBuilding` it aggregates, for every `.ifc` in
+    `tests/fixtures/containers/` — `tests/unit/containers.fixture.test.ts`'s truth (2026-11-23).
+    Values are as IfcOpenShell reads them; nothing is converted or formatted here."""
+    out = {}
+    for path in sorted(CONTAINERS.glob("*.ifc")):
+        model = ifcopenshell.open(str(path))
+        project = model.by_type("IfcProject")[0]
+        site = spatial_root_site(model)
+        building = None
+        for rel in model.by_type("IfcRelAggregates"):
+            if rel.RelatingObject == site:
+                building = next((c for c in rel.RelatedObjects if c.is_a("IfcBuilding")), None)
+        entry = {
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "schema": model.schema,
+            "lengthUnitMetres": ifcopenshell.util.unit.calculate_unit_scale(model),
+        }
+        for key, entity in (("project", project), ("site", site), ("building", building)):
+            entry[key] = {
+                "attributes": {a: plain(getattr(entity, a)) for a in CONTAINER_ATTRIBUTES[key]},
+                "psets": strip_ids(ifcopenshell.util.element.get_psets(entity, psets_only=True)),
+            }
+        entry["site"]["SiteAddress"] = _address(site.SiteAddress)
+        entry["building"]["BuildingAddress"] = _address(building.BuildingAddress)
+        out[path.name] = entry
+    return {"generatedBy": f"IfcOpenShell {ifcopenshell.version}", "files": out}
+
+
 def main(argv: list[str]) -> int:
     args = argv[1:]
+    if "--containers" in args:
+        data = containers_of_fixtures()
+        target = CONTAINERS / "ifcopenshell.json"
+        target.write_text(json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"wrote {target.relative_to(ROOT)} — {len(data['files'])} files")
+        return 0
     if "--identities" in args:
         data = identities_of_fixtures()
         IDENTITIES.write_text(

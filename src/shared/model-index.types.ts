@@ -464,6 +464,48 @@ export interface ProjectInfo {
   description: string
 }
 
+/**
+ * 2026-11-23 — what the Spatial-structure card compares across the models, beyond `ProjectInfo`
+ * and the `SpatialNode`s: each container's remaining attributes and its own property sets, **as
+ * authored**. A text the file leaves unset is `''`; a number it leaves unset is absent.
+ */
+export interface ContainerInfo {
+  /** `IfcObject.ObjectType`. */
+  objectType: string
+  /** The container's own property sets — not its quantity sets — `psets[setName][key]`. */
+  psets: Record<string, Record<string, PropValue>>
+}
+
+/** `IfcSite`'s, for the spatial-root site (`ModelIndexMeta.site`). */
+export interface SiteInfo extends ContainerInfo {
+  /** `IfcRoot.Description`. */
+  description: string
+  /** `RefLatitude`, the `IfcCompoundPlaneAngleMeasure` as written: degrees, minutes, seconds[, millionths]. */
+  refLatitude?: readonly number[]
+  refLongitude?: readonly number[]
+  /** `RefElevation` in the file's own length unit — not converted. */
+  refElevation?: number
+  landTitleNumber: string
+  /** `SiteAddress` on one line: the `IfcPostalAddress`'s authored parts in schema order, `, `-joined. */
+  address: string
+}
+
+/** `IfcBuilding`'s, for `ModelIndexMeta.building`. */
+export interface BuildingInfo extends ContainerInfo {
+  description: string
+  /** `ElevationOfRefHeight` / `ElevationOfTerrain` in the file's own length unit. */
+  elevationOfRefHeight?: number
+  elevationOfTerrain?: number
+  /** `BuildingAddress` on one line, as `SiteInfo.address`. */
+  address: string
+}
+
+export interface ContainersInfo {
+  project?: ContainerInfo
+  site?: SiteInfo
+  building?: BuildingInfo
+}
+
 export interface ModelIndexMeta {
   /** Stable key for this loaded file; the element's `model` field. */
   modelKey: string
@@ -477,6 +519,11 @@ export interface ModelIndexMeta {
   project: ProjectInfo | null
   site: SpatialNode | null
   building: SpatialNode | null
+  /**
+   * 2026-11-23 — the three containers' remaining attributes and property sets (`ContainersInfo`),
+   * for the Spatial-structure card. Absent from a meta built before it, and from the dev mock.
+   */
+  containers?: ContainersInfo
   /** `IfcProject` root of the aggregation tree, or `null` when the file has no project. */
   spatial: SpatialNode | null
   storeys: readonly Storey[]
