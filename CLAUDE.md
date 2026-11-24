@@ -75,7 +75,7 @@ read it before changing anything visible.** One line per entry here, in its orde
 - 2026-09-24 — the landing page offers the design's demo building
 - 2026-09-24 — `IfcSpace` is see-through by default
 - 2026-09-25 — Help › Check for updates… opens the product site in the browser
-- 2026-09-25 — the Schedules window and its one toolbar button (amended up to 2026-11-08, 1.5.0)
+- 2026-09-25 — the Schedules window and its one toolbar button (amended up to 2026-11-25: the one-line view bar)
 - 2026-09-25 — on Windows the app draws on NVIDIA when present; a Preferences switch; About names it
 - 2026-09-28 — a spot tag shows its level until clicked; the snap prefers the surface looked at
 - 2026-09-28 — a section outlines what it cuts, 2.5 px wide (model colours since 2026-11-07)

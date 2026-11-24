@@ -248,7 +248,7 @@ async function useTemplate(win: Page, key: string): Promise<void> {
 const inPop = (win: Page, name: string, more = '') => pop(win).locator(`[data-act="${name}"]${more}`)
 
 /**
- * "+ Filter" or "+ Sort / group", then a field from its picker (searched for by `find`): the new
+ * The view bar's `+` for a filter or a sort level, then a field from its picker (searched for by `find`): the new
  * rule's or level's own popover opens, as the inspector's "+ Add" and field select used to.
  */
 async function addOn(win: Page, kind: 'filter' | 'sort', fieldId: string, find: string): Promise<void> {
@@ -298,7 +298,7 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     // 3 — group by Level with a header row, and switch itemise off: identical rows collapse.
     // A template already groups by Level (a header row and a count footer —
     // `scheduleFromPreset`), so that level is taken away first, from its chip's popover, and
-    // the grouping is built again through "+ Sort / group".
+    // the grouping is built again through the view bar's sort `+`.
     await expect(sched.locator('tr.group')).toHaveCount(2)
     await chip(sched, 'sort', '[data-i="0"]').click()
     await inPop(sched, 'sort-remove', '[data-i="0"]').click()
@@ -340,9 +340,9 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(sched.locator('.cur-row')).toContainText('Wall Schedule')
     await expect(sched.locator('.cur-row .state')).toHaveText('in use')
 
-    // 7 — edit, then switch category: the window's own dialog asks first.
-    await chip(sched, 'style').click()
-    await inPop(sched, 'app-zebra').uncheck()
+    // 7 — edit, then switch category: the window's own dialog asks first. (Stripes are the
+    // view bar's own switch since 2026-11-25.)
+    await act(sched, 'app-zebra').click()
     await railItems(sched).filter({ hasText: 'IfcSlab' }).click()
     const dialog = sched.locator('.dlg[role="dialog"]')
     await expect(dialog).toContainText('Replace the current schedule setup?')
@@ -409,7 +409,8 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
     // Coverage: the tiny model carries no wall quantities, so those columns say so on the
     // heading, and the view bar's fields chip counts them (v1.5.0: the Fields tab is gone).
     await expect(sched.locator('table.schedule thead th .badge', { hasText: '0 values' }).first()).toBeVisible()
-    await expect(sched.locator('.viewbar .warnc')).toContainText('empty')
+    await expect(chip(sched, 'picker', '[data-id="chip"]')).toHaveClass(/\bwarn\b/)
+    await expect(chip(sched, 'picker', '[data-id="chip"]')).toHaveAttribute('data-tip', /empty/)
 
     // Shift-click marks a run of headings; Equal width wakes up; Escape clears the marks.
     await heads.nth(0).click()
@@ -503,7 +504,9 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
     await inPop(sched, 'sort-footer', '[data-i="0"]').check()
     await chip(sched, 'rows').click()
     await inPop(sched, 'itemize').uncheck()
-    await inPop(sched, 'grand-total').check()
+    // The grand total is the view bar's Σ since 2026-11-25.
+    await act(sched, 'grand-total').click()
+    await expect(act(sched, 'grand-total')).toHaveAttribute('aria-pressed', 'true')
     await sched.locator('table.schedule thead th[data-defcol="0"]').click()
     await inPop(sched, 'cm-view', '[data-v="colour"]').click()
     await inPop(sched, 'cond-add').click()
@@ -564,9 +567,8 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
       await snap('column-menu', theme)
       await sched.keyboard.press('Escape')
       // An edit that changes nothing on screen, so a category click has something to ask about.
-      await chip(sched, 'style').click()
-      await inPop(sched, 'app-zebra').uncheck()
-      await inPop(sched, 'app-zebra').check()
+      await act(sched, 'app-zebra').click()
+      await act(sched, 'app-zebra').click()
       await railItems(sched).filter({ hasText: 'IfcWall' }).first().click()
       await snap('dialog', theme)
       await sched.keyboard.press('Escape')

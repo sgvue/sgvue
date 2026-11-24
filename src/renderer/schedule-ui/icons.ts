@@ -76,6 +76,22 @@ export const ICON = {
   templates: svg('<path d="M4.5 4v16M9 7v13M13.5 5.5v14.5M16.6 6.2l3.8 13.6"/>'),
   templatesLarge: svg('<path d="M4.5 4v16M9 7v13M13.5 5.5v14.5M16.6 6.2l3.8 13.6"/>', 40, 1.4),
   search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>', 14),
+
+  // The one-line view bar (2026-11-25). The funnel, the plus and the grid are the main window's
+  // (`icons.tsx` IconFilter, Plus, IconGroundGrid), path for path; the rest are drawn here in
+  // the same idiom.
+  funnel: svg('<path d="M3 5h18l-7 8v6l-4 2v-8z"/>', 15),
+  plus: svg('<path d="M12 5v14M5 12h14"/>', 14, 1.8),
+  gridLines: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17"/>'),
+  group: svg('<rect x="3.5" y="4" width="17" height="4.5" rx="1.2"/><path d="M8 12.5h12.5M8 16.5h12.5M8 20.5h12.5M4.5 8.5v12"/>'),
+  sigma: svg('<path d="M18 5H6.5l6 7-6 7H18"/>'),
+  columns: svg('<rect x="3.5" y="4.5" width="4.5" height="15" rx="1"/><rect x="9.75" y="4.5" width="4.5" height="15" rx="1"/><rect x="16" y="4.5" width="4.5" height="15" rx="1"/>'),
+  // How rows show: every element, identical rows merged, one row per sort value.
+  rowsEvery: svg('<path d="M4 5.5h16M4 10h16M4 14.5h16M4 19h16"/>'),
+  rowsMerge: svg('<path d="M3.5 6h6c3 0 4 6 7 6h4M3.5 18h6c3 0 4-6 7-6M3.5 12h13"/><path d="M18 9.5l2.5 2.5-2.5 2.5"/>'),
+  rowsGroup: svg('<rect x="3.5" y="4" width="17" height="7" rx="1.5"/><rect x="3.5" y="13" width="17" height="7" rx="1.5"/><path d="M7 7.5h6M7 16.5h6"/>'),
+  stripes: svg(`<rect x="3.5" y="4" width="17" height="16" rx="1.5"/>${solid('M3.5 8h17v4h-17z')}${solid('M3.5 16h17v4h-17z')}`),
+  brush: svg('<path d="M19.5 3.5l1 1-8.2 9.8-2.6-2.6z"/><path d="M9.6 11.8c-2.3-.2-4.1 1.3-4.1 3.7 0 1.6-.7 2.8-2 3.5 2.4 1.5 7.7 1.3 8.6-2.6.3-1.3 0-2.4-.4-2.9"/>'),
 } as const;
 
 /** Six dots: the grip a row is dragged by. Filled, since dots have no stroke to speak of. */

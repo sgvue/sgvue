@@ -347,7 +347,8 @@ describe('the view bar’s Rows chip names the sort fields (Done 3)', () => {
   const chip = (def: ScheduleDef) => {
     state.store = store;
     state.def = def;
-    const m = renderViewBar(state, store).match(/<button class="vset hv-step" data-act="vb-open" data-v="rows"[^>]*>([\s\S]*?)<\/button>/);
+    // 2026-11-25, the one-line bar: the Rows chip is an icon button whose name says the mode.
+    const m = renderViewBar(state, store).match(/<button class="icon-btn[^"]*" data-act="vb-open" data-v="rows"[^>]*aria-label="Rows: ([^"]*)"/);
     if (!m) throw new Error('no Rows chip');
     return m[1];
   };
@@ -358,14 +359,14 @@ describe('the view bar’s Rows chip names the sort fields (Done 3)', () => {
   });
 
   it('itemise on and identical rows read as today (guard)', () => {
-    expect(chip({ ...doors(BY_TYPE), itemize: true })).toBe('Every instance');
-    expect(chip(doors(BY_TYPE, null))).toBe('<b>Combined rows</b>');
+    expect(chip({ ...doors(BY_TYPE), itemize: true })).toBe('every element');
+    expect(chip(doors(BY_TYPE, null))).toBe('identical rows merged');
   });
 
   it('combine by sort: One row per Type · One row per Level + Type · One row', () => {
-    expect(chip(doors(BY_TYPE))).toBe('<b>One row per Type</b>');
-    expect(chip(doors(BY_LEVEL_TYPE))).toBe('<b>One row per Level + Type</b>');
-    expect(chip(doors([]))).toBe('<b>One row</b>');
+    expect(chip(doors(BY_TYPE))).toBe('one row per Type');
+    expect(chip(doors(BY_LEVEL_TYPE))).toBe('one row per Level + Type');
+    expect(chip(doors([]))).toBe('one row');
   });
 });
 

@@ -79,7 +79,7 @@ test('itemise off, by sort value: one row per Level, <varies> where the doors di
     await importAndUse(app, sched, file, written.name)
     await expect(sched.locator('tr.data').first()).toBeVisible()
     const itemised = await sched.locator('tr.data').count()
-    await expect(rowsChip(sched)).toHaveText('Every instance')
+    await expect(rowsChip(sched)).toHaveAttribute('aria-label', 'Rows: every element')
     await expect(sched.locator('td.varies')).toHaveCount(0)
 
     // 1 — the Rows chip: itemise off shows the Combine control, "Identical rows" chosen.
@@ -87,12 +87,12 @@ test('itemise off, by sort value: one row per Level, <varies> where the doors di
     await expect(pop(sched).locator('[data-act="combine"]')).toHaveCount(0)
     await pop(sched).locator('label.switch-row', { has: sched.locator('[data-act="itemize"]') }).click()
     await expect(pop(sched).locator('[data-act="combine"][data-v="identical"]')).toHaveAttribute('aria-pressed', 'true')
-    await expect(rowsChip(sched)).toHaveText('Combined rows')
+    await expect(rowsChip(sched)).toHaveAttribute('aria-label', 'Rows: identical rows merged')
 
     // 2 — By sort value: one row per Level, the chip and the hint say so.
     await pop(sched).locator('[data-act="combine"][data-v="sort"]').click()
     await expect(pop(sched).locator('[data-act="combine"][data-v="sort"]')).toHaveAttribute('aria-pressed', 'true')
-    await expect(rowsChip(sched)).toHaveText('One row per Level')
+    await expect(rowsChip(sched)).toHaveAttribute('aria-label', 'Rows: one row per Level')
     await expect(pop(sched).locator('.hint').first()).toContainText('Off — one row per Level.')
     const combined = await sched.locator('tr.data').count()
     expect(combined).toBeGreaterThan(0)
@@ -134,7 +134,7 @@ test('itemise off, by sort value: one row per Level, <varies> where the doors di
 
     // 6 — undo takes the combine back to identical rows.
     await act(sched, 'undo').click()
-    await expect(rowsChip(sched)).toHaveText('Combined rows')
+    await expect(rowsChip(sched)).toHaveAttribute('aria-label', 'Rows: identical rows merged')
     await expect(sched.locator('td.varies')).toHaveCount(0)
   } finally {
     await app.close()

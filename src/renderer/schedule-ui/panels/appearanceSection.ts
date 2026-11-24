@@ -1,4 +1,5 @@
 // Appearance: how the whole table looks on screen and on paper — the view bar's Style chip.
+// Grid lines and stripe rows are the bar's own switches since 2026-11-25.
 
 import { BODY_FONTS, normaliseFont } from '../../../schedule/schedule/fonts';
 import type { AppState } from '../state';
@@ -29,9 +30,7 @@ export function appearanceBody(state: AppState, idp = ''): string {
 
   return `<div class="eyebrow block-label">Graphics</div>
     <div class="switch-list">
-      ${toggle('app-grid', 'Grid lines', a.gridLines !== false, '', 'row')}
       ${toggle('app-outline', 'Outline', a.outline !== false, '', 'row')}
-      ${toggle('app-zebra', 'Stripe rows', a.zebra !== false, '', 'row')}
       ${toggle('app-blankfirst', 'Blank row before data', !!a.blankRowBeforeData, '', 'row')}
     </div>
 

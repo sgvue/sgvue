@@ -1,4 +1,5 @@
-// What a sort level's footer can show, and the Rows chip's body: itemise and the grand total.
+// What a sort level's footer can show, and the Rows chip's body: itemise, how rows combine and
+// the grand total's label (the grand total itself is the view bar's Σ since 2026-11-25).
 // (ifcTable's 2026-11-05 version, SGVue v1.5.0 phase 2: the levels themselves are the view
 // bar's sort chips, each with its own popover — `viewPopovers.ts`.)
 
@@ -22,7 +23,8 @@ function bySortHint(labels: string[]): string {
     : 'Off — no sort level, so everything is one row. Add a sort level to split it.';
 }
 
-/** Itemise, how itemise off combines, and the grand total — the view bar's Rows chip. */
+/** Itemise, how itemise off combines, and the grand total's label while it is on — the view
+ *  bar's Rows chip. */
 export function rowsBody(state: AppState): string {
   const def = state.def;
   const bySort = def.combine === 'sort';
@@ -32,7 +34,6 @@ export function rowsBody(state: AppState): string {
   return `${toggle('itemize', 'Itemise every instance', def.itemize, '', 'lead', hint)}
     ${def.itemize ? '' : rowx('Combine', seg('combine', [['identical', 'Identical rows'], ['sort', 'By sort value']],
     bySort ? 'sort' : 'identical', '', 'How rows combine'))}
-    ${toggle('grand-total', 'Grand total', !!def.grandTotal, '', 'lead')}
     ${def.grandTotal ? `<input class="full block snug" type="text" data-act="grand-title"
       value="${esc(def.grandTotalTitle ?? '')}" placeholder="Grand total" aria-label="Grand total label" />` : ''}`;
 }

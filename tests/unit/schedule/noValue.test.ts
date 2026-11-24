@@ -96,7 +96,9 @@ describe('counts as no value', () => {
   it('the fields chip counts a placeholder-only column as empty', () => {
     state.store = store;
     state.def = { ...base, columns: [{ field: prop('Dash') }, { field: prop('Comments') }] };
-    expect(renderViewBar(state, store)).toMatch(/<span class="warnc">1 empty<\/span>/);
+    // 2026-11-25, the one-line bar: the columns button turns warn-coloured and says so in its tooltip.
+    const html = renderViewBar(state, store).replace(/\s+/g, ' ');
+    expect(html).toMatch(/<button class="icon-btn num hv-step warn" data-act="vb-open" data-v="picker"[^>]*data-tip="Columns: 2 shown of \d+ fields · 1 empty\./);
   });
 
   it('the remap offer never points a column at a placeholder-only property', () => {
