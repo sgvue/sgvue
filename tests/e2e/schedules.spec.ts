@@ -248,7 +248,7 @@ async function useTemplate(win: Page, key: string): Promise<void> {
 const inPop = (win: Page, name: string, more = '') => pop(win).locator(`[data-act="${name}"]${more}`)
 
 /**
- * "+ Filter" or "+ Sort / group", then a field from its picker (searched for by `find`): the new
+ * The view bar's `+` for a filter or a sort level, then a field from its picker (searched for by `find`): the new
  * rule's or level's own popover opens, as the inspector's "+ Add" and field select used to.
  */
 async function addOn(win: Page, kind: 'filter' | 'sort', fieldId: string, find: string): Promise<void> {
@@ -298,16 +298,19 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     // 3 — group by Level with a header row, and switch itemise off: identical rows collapse.
     // A template already groups by Level (a header row and a count footer —
     // `scheduleFromPreset`), so that level is taken away first, from its chip's popover, and
-    // the grouping is built again through "+ Sort / group".
+    // the grouping is built again through the view bar's sort `+`.
     await expect(sched.locator('tr.group')).toHaveCount(2)
     await chip(sched, 'sort', '[data-i="0"]').click()
     await inPop(sched, 'sort-remove', '[data-i="0"]').click()
     await expect(sched.locator('tr.group')).toHaveCount(0)
     await addOn(sched, 'sort', 'core|storey', 'level')
+    // A sort level's grouping is under its More… since 2026-11-25.
+    await inPop(sched, 'vb-more').click()
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await expect(sched.locator('tr.group')).toHaveCount(2)
     await chip(sched, 'rows').click()
-    await inPop(sched, 'itemize').uncheck()
+    // Itemise off is the Rows choice's Merge identical since 2026-11-25.
+    await inPop(sched, 'rows-mode', '[data-v="merge"]').click()
     await expect(sched.locator('table.schedule thead th', { hasText: 'Count' })).toHaveCount(1)
     await expect(sched.locator('tr.data')).toHaveCount(2)
     // Header rows select nothing: they carry no data-row.
@@ -340,9 +343,9 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await expect(sched.locator('.cur-row')).toContainText('Wall Schedule')
     await expect(sched.locator('.cur-row .state')).toHaveText('in use')
 
-    // 7 — edit, then switch category: the window's own dialog asks first.
-    await chip(sched, 'style').click()
-    await inPop(sched, 'app-zebra').uncheck()
+    // 7 — edit, then switch category: the window's own dialog asks first. (Stripes are the
+    // view bar's own switch since 2026-11-25.)
+    await act(sched, 'app-zebra').click()
     await railItems(sched).filter({ hasText: 'IfcSlab' }).click()
     const dialog = sched.locator('.dlg[role="dialog"]')
     await expect(dialog).toContainText('Replace the current schedule setup?')
@@ -409,7 +412,8 @@ test('phase 2: column selection, auto-fit, equal width, a resize drag, keyboard 
     // Coverage: the tiny model carries no wall quantities, so those columns say so on the
     // heading, and the view bar's fields chip counts them (v1.5.0: the Fields tab is gone).
     await expect(sched.locator('table.schedule thead th .badge', { hasText: '0 values' }).first()).toBeVisible()
-    await expect(sched.locator('.viewbar .warnc')).toContainText('empty')
+    await expect(chip(sched, 'picker', '[data-id="chip"]')).toHaveClass(/\bwarn\b/)
+    await expect(chip(sched, 'picker', '[data-id="chip"]')).toHaveAttribute('data-tip', /empty/)
 
     // Shift-click marks a run of headings; Equal width wakes up; Escape clears the marks.
     await heads.nth(0).click()
@@ -499,11 +503,13 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
     await useTemplate(sched, 'b:door-schedule')
     await addOn(sched, 'filter', 'core|storey', 'level')
     await chip(sched, 'sort', '[data-i="0"]').click()
+    await inPop(sched, 'vb-more').click()
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await inPop(sched, 'sort-footer', '[data-i="0"]').check()
     await chip(sched, 'rows').click()
-    await inPop(sched, 'itemize').uncheck()
-    await inPop(sched, 'grand-total').check()
+    await inPop(sched, 'rows-mode', '[data-v="merge"]').click()
+    // The grand total is the view bar's Σ, on for a new schedule (2026-11-25).
+    await expect(act(sched, 'grand-total')).toHaveAttribute('aria-pressed', 'true')
     await sched.locator('table.schedule thead th[data-defcol="0"]').click()
     await inPop(sched, 'cm-view', '[data-v="colour"]').click()
     await inPop(sched, 'cond-add').click()
@@ -564,9 +570,8 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
       await snap('column-menu', theme)
       await sched.keyboard.press('Escape')
       // An edit that changes nothing on screen, so a category click has something to ask about.
-      await chip(sched, 'style').click()
-      await inPop(sched, 'app-zebra').uncheck()
-      await inPop(sched, 'app-zebra').check()
+      await act(sched, 'app-zebra').click()
+      await act(sched, 'app-zebra').click()
       await railItems(sched).filter({ hasText: 'IfcWall' }).first().click()
       await snap('dialog', theme)
       await sched.keyboard.press('Escape')
@@ -978,8 +983,9 @@ async function exportAs(win: Page, label: string): Promise<void> {
 }
 
 /**
- * The table on screen as text: the headings, then every data row — badges and swatches left
- * out, and the `+ Column` heading too: it is the field picker's button, not a column (no
+ * The table on screen as text: the headings, then every data row and the grand-total row (on by
+ * default since 2026-11-25, so the export's last line has a row on screen to equal) — badges and
+ * swatches left out, and the `+ Column` heading too: it is the field picker's button, not a column (no
  * `data-defcol`, no cells, hidden in print by `print.css`), and the exporter never sees it.
  */
 const tableText = (win: Page): Promise<string[][]> =>
@@ -991,7 +997,8 @@ const tableText = (win: Page): Promise<string[][]> =>
     }
     return [
       [...document.querySelectorAll('table.schedule thead th:not(.add-col)')].map(text),
-      ...[...document.querySelectorAll('table.schedule tbody tr.data')].map((tr) => [...tr.querySelectorAll('td')].map(text))
+      ...[...document.querySelectorAll('table.schedule tbody tr.data, table.schedule tbody tr.grand')].map((tr) =>
+        [...tr.querySelectorAll('td')].map(text))
     ]
   })
 
@@ -1088,6 +1095,8 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const csv = await readFile(csvPath, 'utf8')
     expect(csv.charCodeAt(0)).toBe(0xfeff)
     const screen = await tableText(sched)
+    // The grand-total row is on screen and in the file, the same: "Grand total: 4".
+    expect(screen.at(-1)![0]).toBe('Grand total: 4')
     expect(parseCsv(csv.slice(1))).toEqual(screen.map((row) => row.map(plain)))
 
     // 4 — Excel: the same table, one sheet named after the schedule; text is text, and a
@@ -1177,13 +1186,16 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const book = new Workbook()
     await book.xlsx.readFile(bookPath)
     expect(book.worksheets.map((w) => w.name)).toEqual(['Wall Schedule'])
-    expect(book.worksheets[0].rowCount).toBe(5)
+    // The heading, 4 walls and — new since 2026-11-25, a new schedule's default — the grand total.
+    expect(book.worksheets[0].rowCount).toBe(6)
+    expect(book.worksheets[0].getRow(6).getCell(1).value).toBe('Grand total: 4')
 
     // 8 — the schedule file: a distinctive setup (renamed, grouped by level, itemise off)
     // exported from the menu; the Save dialog's name is forced to .schedule.json.
     await sched.locator('.schedule-name').fill('Walls round trip')
     await sched.locator('.schedule-name').press('Tab')
     await addOn(sched, 'sort', 'core|storey', 'level')
+    await inPop(sched, 'vb-more').click()
     // The switches are labels over a 1 px input: clicked where a hand clicks them. The label
     // is looked for in the popover; the input inside it is a plain `[data-act]` locator, because
     // Playwright reads a `has` locator relative to each label — a `#popover …` one would look
@@ -1192,8 +1204,8 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     await toggleOf('sort-header', '[data-i="0"]').click()
     await expect(inPop(sched, 'sort-header', '[data-i="0"]')).toBeChecked()
     await chip(sched, 'rows').click()
-    await toggleOf('itemize').click()
-    await expect(inPop(sched, 'itemize')).not.toBeChecked()
+    await inPop(sched, 'rows-mode', '[data-v="merge"]').click()
+    await expect(inPop(sched, 'rows-mode', '[data-v="merge"]')).toHaveAttribute('aria-pressed', 'true')
     await expect(sched.locator('tr.data')).toHaveCount(2)
     await answerSave(app, join(out, 'setup.json'))
     await exportAs(sched, 'Schedule file (.schedule.json)')
@@ -1598,7 +1610,9 @@ test('the assistant exports the open schedule through its Save dialog, and colou
     const wb = new Workbook()
     await wb.xlsx.readFile(xlsxPath)
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Walls from chat'])
-    expect(wb.worksheets[0].rowCount).toBe(5)
+    // The heading, 4 walls and — new since 2026-11-25, a new schedule's default — the grand total.
+    expect(wb.worksheets[0].rowCount).toBe(6)
+    expect(wb.worksheets[0].getRow(6).getCell(1).value).toBe('Grand total: 4')
 
     // 4 — Cancel: the dialog opens, nothing is written, and the menu's own toast says so.
     await answerSave(app, '')

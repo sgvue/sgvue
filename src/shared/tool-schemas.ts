@@ -1305,7 +1305,7 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
               type: 'string',
               enum: ['sum', 'count', 'min', 'max', 'avg', 'none'],
               description:
-                'Total this column in each group footer and the grand total; none takes a total away'
+                'Total this column in each group footer and the grand total; none takes a total away. A new column of areas, volumes, masses or counts is summed unless you say otherwise'
             },
             // 2026-10-02 — the column menu's switches for this column, and its place.
             hidden: {
@@ -1406,7 +1406,10 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
         description:
           'How itemize:false combines rows; sort switches itemize off. identical (the default) merges rows that read alike in every column; sort makes one row per distinct value of the sortBy / groupBy fields, as Revit does with Itemize every instance off: a column with a total shows that total over the row’s elements, a column whose elements all read the same shows that value, and any other column reads <varies>.'
       },
-      grandTotals: { type: 'boolean', description: 'Add a grand-total row under the table.' }
+      grandTotals: {
+        type: 'boolean',
+        description: 'A grand-total row under the table. A new schedule has one; false takes it away.'
+      }
     }),
     strict: true
   },

@@ -335,6 +335,90 @@ Anything not on this list is a defect.
   menus, the legend squares, the `Model` column, Export, Print, undo / redo and the assistant's
   port are kept. **Nothing is added to the main window.** The full record is in
   `docs/DECISIONS.md`, 2026-11-08.)*
+  *(Amended 2026-11-25 — the view bar is one line of short chips and icon switches. Asked for by
+  the owner in these words: *"Review how to compact the filter in schedules, sometimes it get very
+  long. … The main goal is to make the schedule easier to use and clear, rather than so many
+  setting to configure."* and *"Anything we can make them icon only? Make the UI shows its
+  work."*; approved from the throwaway prototype `prototype/schedule-bar/` with *"Yes, build
+  it"*. In the Schedules window only, the bar reads, left to right: a funnel and the kept count in
+  the mono face (`13 of 40`, the elements the filters keep of the category's; it flashes once,
+  `vbump`, when it changes, and not under reduced motion; warn-coloured at 0); a dashed
+  **ALL / ANY** pill, only with two filters or more, one click switching every-rule and any-rule —
+  it replaces the and / or join between chips and the filter popover's "Match: All rules / Any
+  rule" pair; **short filter chips** — field, condition, value: `Width ≥ 900 mm`, `Level = L3`,
+  `Fire rating has value`; symbols for = ≠ > ≥ < ≤, short words for the rest (contains, starts
+  with, ends with, has value, no value, any of, between a – b, at most, at least) — with no
+  "Only where", no "−N removed" button and no ×; a chip opens the same rule popover as before
+  (field, condition, value, keep bar, "Keeps N · removes N", "show them", remove). A rule that
+  removes every row it decides turns its chip the window's warn colours, and so does `+N` when
+  such a rule is folded in it. **At most three filter chips; the rest fold into `+N`**, and the
+  bar never wraps and never runs off: when it would run over, chips fold one step at a time —
+  filter chips down to one, then sort chips down to one, then the last filter chip, then the last
+  sort chip — and it re-folds after every paint and on a window resize. `+N` lists the folded
+  rules (short words and what each removes), each opening its editor on `+N` or removed from
+  there; its tooltip lists them in the short words, separated by " · ". Folded sort levels go into
+  a neutral sort `+N` where their chips were, whose tooltip lists them ("Then sorted by Mark · …")
+  and whose list gives each its name (opening its popover on the sort `+N`), a direction button
+  and a group button, both one click as on the chip. A round dashed `+` adds a
+  filter (disabled at eight, and says so). After a separator, a **sort chip** per level: the
+  field's name (the same sort popover), an arrow segment that reverses the direction in one
+  click, and a group segment, lit when grouped, that does exactly what the column menu's "Group
+  by this" does (on: header row and a title, count and totals footer; off: neither, no blank
+  line); no level numbers ("Sorted first by …" / "Then sorted by …" in the tooltip); a `+` adds a
+  level (four at most, and says so). The "N formulas to fix" chip is unchanged. On the right, the
+  window's icon buttons, `.on` when lit: columns with the shown-column count (the field picker;
+  hidden and empty columns named in its tooltip, warn-coloured when a shown column is empty),
+  rows — its glyph the current mode's (every element, identical rows merged, one row per sort
+  value), its tooltip naming it ("Rows: one row per Level + Mark"), opening the Rows popover, lit
+  with itemise off — **Σ** (the grand total, one click), a thin
+  separator, **grid lines** and **stripe rows** (one click each), and a brush (the Style
+  popover). Because they are on the bar, the Rows popover loses its Grand total switch — its
+  label box stays there, shown while the grand total is on — and the Style popover loses Grid
+  lines and Stripe rows. **Every control on the
+  bar shows its words fast**, through the design's own `data-tip` tooltip (`design.css`, about
+  0.14 s, also on keyboard focus) and an `aria-label`, never a native `title`; tooltips hang
+  inside the window from the control's left edge, on the right from its right edge, and an open
+  control shows its popover, not its tooltip. New glyphs in the icon set's idiom: group, Σ,
+  columns, the three rows modes, stripes, brush; the funnel, plus and grid are the main window's own.
+  **Step 2, the same day — the popovers get fewer, combined controls**, as the same prototype
+  shows them: **Rows** is one choice of three, `Every element` | `Merge identical` | `One row per
+  sort value` (one row per value of all the sort levels, the engine's meaning), one undo step,
+  with one line under it for the mode chosen (`<varies>` and the Count column named where they
+  apply; "No sort level, so everything is one row" when that is so) — the Itemise switch and the
+  Combine row are gone; the grand-total label box stays, while the total is on. **A sort level's
+  popover** is its field, move earlier / later and remove, and a `More…` (shut when the popover
+  opens) holding Header row, Footer, what the footer shows and Blank line after each group; its
+  Order pair is gone (the chip's arrow and the sort `+N` list reverse it in one click). **Style**
+  shows Title with its Show title switch and Text size; `More…` holds Outline, Bold header, Blank
+  row before data and Body font with its note. **The column menu**: Align is three icon buttons,
+  the current one lit; Group by this, Filter by this…, Colour rules and the hide / remove icons
+  are one icon row (group lit when grouped, colour rules with its count as a small number); the
+  rest of the menu is unchanged. **Fast descriptions inside popovers and the modal cards:** every
+  icon-only button there names itself in one fixed tooltip element (`#pop-tip`) with the design
+  tooltip's look and timing, outside every scroll container, instead of a native `title`; the
+  `::after` tooltip is switched off there. **One tooltip rule for the window:** no control carries
+  a native `title` but a column heading, whose paragraph of mouse-and-keyboard help stays the slow
+  `title` it was — the header's width buttons, the rail's buttons, the table's badges and Count heading, the
+  field picker's and the `+N` lists' text buttons and the rest now show the fast tooltip (the
+  design's `::after` in the header and on the bar, the fixed one in the popover, the modal cards,
+  the rail and the table); the schedule-name box lost its "Rename this schedule" title (a box
+  cannot draw an `::after`, and its look says it); a `title` stays only on content that is not a
+  control and is cut short or abbreviated (a property set's short tag, a template's classes and
+  filter in the library list, the open schedule's name in the rail) and on the Vee dot's
+  three-line hover of 2026-11-24. **An empty table names its cause:** when filters leave
+  no row, the table keeps its headings and one full-width row under them — not a data row; it
+  selects nothing, is in no export and prints without its button — reads `No rows. “Width ≥ 5000 mm” removes every one.` with `Change that
+  filter`, which opens that rule's editor (on its chip, or on `+N` when folded), or, when the rules
+  empty it only together, `No rows match these filters.` with `Change the first filter`. **New
+  defaults, for new things only:** a new schedule — blank, a category's default, a template, Vee's
+  `make_schedule` when the ask does not say — has its grand total on, and a new column holding an
+  area, a volume, a mass or a count starts with Total = Sum, unless its creator stated a total; a
+  saved file opens exactly as it was saved (no grand total unless it says so). The grand-total
+  row's label carries its element count, as a group footer's does — `Grand total: 40`, or
+  `Doors in total: 40` with a label of the user's own — because a row that is on by default must
+  say something even when no column totals; a schedule saved with a grand total shows the count
+  in it too from now on. The save format is unchanged, and
+  the engine changed in that one label only. **Nothing is added to the main window.** Seen in a window on macOS (2026-11-25, `tests/e2e/schedules.spec.ts` and `combine-by-sort.spec.ts`); not on Windows.)*
 - **2026-09-25 — on Windows the app draws on NVIDIA when there is one; Preferences can turn it
   off, and the About box names the adapter.** Asked for by the owner in these words: *"auto set
   the highest graphic card if available? Nvidia as first choice."* Preferences (the allowed

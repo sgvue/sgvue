@@ -114,6 +114,11 @@ export function seg(act: string, opts: [string, string][], on: string, at: strin
     v === on ? ' on' : ''}" data-act="${act}" data-v="${esc(v)}"${at} aria-pressed="${v === on}">${esc(l)}</button>`).join('')}</div>`;
 }
 
+/** A chip popover's More… (a sort level's, Style's; 2026-11-25) — the column menu's own fold
+ *  look; what it holds is drawn only while it is open. */
+export const moreFold = (open: boolean) => `<button class="fold hv-step${open ? '' : ' shut'}" data-act="vb-more"
+  aria-expanded="${open}"><span class="tw">▾</span>More…</button>`;
+
 /** A labelled popover row: the label, then its control. */
 export const rowx = (label: string, body: string) =>
   `<div class="pop-row"><span class="pop-lbl">${esc(label)}</span><div class="grow-1">${body}</div></div>`;

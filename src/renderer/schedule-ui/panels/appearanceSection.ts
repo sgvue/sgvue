@@ -1,9 +1,11 @@
 // Appearance: how the whole table looks on screen and on paper — the view bar's Style chip.
+// Grid lines and stripe rows are the bar's own switches since 2026-11-25, and the rest sits under
+// a More… as in the prototype.
 
 import { BODY_FONTS, normaliseFont } from '../../../schedule/schedule/fonts';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
-import { toggle } from './shared';
+import { moreFold, toggle } from './shared';
 
 /** Recommended first, under a heading, because that is the answer for most people. */
 function fontOptions(current: string | undefined): string {
@@ -23,31 +25,20 @@ function fontNote(current: string | undefined): string {
   return f?.note ?? '';
 }
 
-/** The Style chip's body. `idp` prefixes its label/input ids. */
-export function appearanceBody(state: AppState, idp = ''): string {
+/**
+ * The Style chip's body (2026-11-25, the prototype's): the title, with its Show title switch, and
+ * the text size; More… holds the outline, the bold header, the blank row and the body font.
+ * `idp` prefixes its label/input ids; `more` is whether More… is open.
+ */
+export function appearanceBody(state: AppState, idp = '', more = false): string {
   const a = state.def.appearance ?? {};
 
-  return `<div class="eyebrow block-label">Graphics</div>
-    <div class="switch-list">
-      ${toggle('app-grid', 'Grid lines', a.gridLines !== false, '', 'row')}
-      ${toggle('app-outline', 'Outline', a.outline !== false, '', 'row')}
-      ${toggle('app-zebra', 'Stripe rows', a.zebra !== false, '', 'row')}
-      ${toggle('app-blankfirst', 'Blank row before data', !!a.blankRowBeforeData, '', 'row')}
-    </div>
-
-    <div class="rule-sep"></div>
-
-    <div class="eyebrow block-label">Text</div>
-    <div class="switch-list">
-      ${toggle('app-showtitle', 'Show title', a.showTitle !== false, '', 'row')}
-      ${toggle('app-headerbold', 'Bold header', a.headerBold !== false, '', 'row')}
-    </div>
-
-    <div class="block tight">
+  return `<div class="row ends">
       <label class="lbl" for="${idp}app-title">Title</label>
-      <input id="${idp}app-title" class="full" type="text" data-act="app-title"
-        value="${esc(a.title ?? '')}" placeholder="${esc(state.def.name)}" />
+      ${toggle('app-showtitle', 'Show title', a.showTitle !== false, '', 'row')}
     </div>
+    <input id="${idp}app-title" class="full" type="text" data-act="app-title"
+      value="${esc(a.title ?? '')}" placeholder="${esc(state.def.name)}" />
 
     <div class="block">
       <div class="row ends">
@@ -58,11 +49,20 @@ export function appearanceBody(state: AppState, idp = ''): string {
         data-act="app-fontsize" value="${esc(a.fontSize ?? 13)}" />
     </div>
 
-    <div class="block">
-      <label class="lbl" for="${idp}app-font">Body font</label>
-      <select id="${idp}app-font" class="full" data-act="app-font" aria-label="Body font">
-        ${fontOptions(a.bodyFont)}
-      </select>
-      <div class="sub hint-under">${esc(fontNote(a.bodyFont))}</div>
-    </div>`;
+    <hr class="pop-rule" />
+    ${moreFold(more)}
+    ${more ? `<div class="pop-more">
+      <div class="switch-list">
+        ${toggle('app-outline', 'Outline', a.outline !== false, '', 'row')}
+        ${toggle('app-headerbold', 'Bold header', a.headerBold !== false, '', 'row')}
+        ${toggle('app-blankfirst', 'Blank row before data', !!a.blankRowBeforeData, '', 'row')}
+      </div>
+      <div class="block">
+        <label class="lbl" for="${idp}app-font">Body font</label>
+        <select id="${idp}app-font" class="full" data-act="app-font" aria-label="Body font">
+          ${fontOptions(a.bodyFont)}
+        </select>
+        <div class="sub hint-under">${esc(fontNote(a.bodyFont))}</div>
+      </div>
+    </div>` : ''}`;
 }

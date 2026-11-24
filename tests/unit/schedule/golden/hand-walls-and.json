@@ -398,7 +398,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 4",
     "count": 4,
     "cells": [
      null,
@@ -451,7 +451,7 @@
   "Roof (1),,,,,,",
   "IfcWallStandardCase,1009,,10.77,,,",
   "Total,,,10.77,,,",
-  "Grand total,,,19.34,,,1.200"
+  "Grand total: 4,,,19.34,,,1.200"
  ],
  "xlsx": [
   {
@@ -1678,7 +1678,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 4",
        "font": {
         "bold": true
        },

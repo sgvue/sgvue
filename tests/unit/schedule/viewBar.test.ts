@@ -23,7 +23,7 @@ import { buildCoverage } from '../../../src/renderer/schedule-ui/coverage';
 import { wireApp } from '../../../src/renderer/schedule-ui/events';
 import { flushPending, wirePending } from '../../../src/renderer/schedule-ui/pending';
 import { closePopover, wirePopover } from '../../../src/renderer/schedule-ui/popover';
-import { openChip, renderViewBar } from '../../../src/renderer/schedule-ui/viewBar';
+import { openChip, renderViewBar, toggleChipMore } from '../../../src/renderer/schedule-ui/viewBar';
 import { renderViewPopover } from '../../../src/renderer/schedule-ui/viewPopovers';
 import { buildStore } from './support/fixture';
 import { FakeEl, installFakeDom } from './support/fakeDom';
@@ -118,17 +118,22 @@ const CASES: [string, [Record<string, string>, Fire][], [Record<string, string>,
   ['sort: add on a field', steps([{ act: 'vb-add', v: 'sort', id: 'core|storey' }, click]),
     steps([{ act: 'sort-add' }, click], [{ act: 'sort-field', i: '2' }, change('core|storey')]),
     act.setSortField(act.addSortLevel(base), 2, { kind: 'core', key: 'storey' })],
-  ['rows: itemise', steps([{ act: 'itemize' }, change('', false)]), steps([{ act: 'itemize' }, change('', false)]),
-    act.setItemize(base, false)],
-  ['rows: grand total', steps([{ act: 'grand-total' }, change('', true)]), steps([{ act: 'grand-total' }, change('', true)]),
-    act.setGrandTotal(base, true)],
+  // 2026-11-25, step 2: itemise is one of the Rows choice's three — Merge identical is itemise off.
+  ['rows: itemise', steps([{ act: 'rows-mode', v: 'merge' }, click]), steps([{ act: 'itemize' }, change('', false)]),
+    act.setCombine(act.setItemize(base, false), 'identical')],
+  // 2026-11-25: the grand total, grid lines and stripes are the view bar's one-click switches
+  // (Σ, grid, stripes), so the chip steps are a click. The label box stays in Rows.
+  // A new schedule has its grand total on since 2026-11-25, so the one click turns it off.
+  ['rows: grand total', steps([{ act: 'grand-total' }, click]), steps([{ act: 'grand-total' }, change('', true)]),
+    act.setGrandTotal(base, false)],
   ['rows: grand total title', steps([{ act: 'grand-title' }, typed('All doors')]), steps([{ act: 'grand-title' }, typed('All doors')]),
     act.setGrandTotalTitle(base, 'All doors')],
   ...(['grid:gridLines', 'outline:outline', 'zebra:zebra', 'blankfirst:blankRowBeforeData',
     'showtitle:showTitle', 'headerbold:headerBold'].map((pair) => {
     const [a, key] = pair.split(':');
     const on = key === 'blankRowBeforeData';
-    return [`style: ${key}`, steps([{ act: `app-${a}` }, change('', on)]), steps([{ act: `app-${a}` }, change('', on)]),
+    const onBar = a === 'grid' || a === 'zebra';
+    return [`style: ${key}`, steps([{ act: `app-${a}` }, onBar ? click : change('', on)]), steps([{ act: `app-${a}` }, change('', on)]),
       act.setAppearance(base, { [key]: on })] as (typeof CASES)[number];
   })),
   ['style: title', steps([{ act: 'app-title' }, typed('Doors L1')]), steps([{ act: 'app-title' }, typed('Doors L1')]),
@@ -156,21 +161,27 @@ describe('every chip-popover control writes what its action writes', () => {
 /** Every data-act in a chunk of markup. */
 const actsIn = (html: string) => new Set([...html.matchAll(/data-act="([a-z][a-z0-9-]*)"/g)].map((m) => m[1]));
 
-describe('the chip popovers carry every control the Filter, Sort and Style tabs had', () => {
+describe('the chip popovers and the bar carry every control the Filter, Sort and Style tabs had', () => {
   // The acts the inspector's three tabs emitted when it was removed (M4), bar its own "+ Add"
-  // buttons and the level drag handle — each must still be drawn in a chip popover.
+  // buttons and the level drag handle — each must still be drawn in a chip popover or, since
+  // the one-line bar (2026-11-25), on the bar itself: the all / any switch, the grand total, grid
+  // lines and stripes. The grand total's label box stays in the Rows popover while it is on.
+  // Step 2 (2026-11-25): itemise is the Rows choice's `rows-mode`; what a sort level's and the
+  // Style popover's More… hold is drawn with More… open.
   const TAB_ACTS = {
     filter: ['filter-logic', 'filter-field', 'filter-op', 'filter-value', 'filter-lo', 'filter-hi', 'filter-values', 'filter-remove', 'show-removed'],
-    sort: ['sort-field', 'sort-dir', 'sort-header', 'sort-footer', 'sort-footer-style', 'sort-blank', 'sort-remove', 'itemize', 'grand-total', 'grand-title'],
+    sort: ['sort-field', 'sort-dir', 'sort-header', 'sort-footer', 'sort-footer-style', 'sort-blank', 'sort-remove', 'rows-mode', 'grand-total', 'grand-title'],
     style: ['app-grid', 'app-outline', 'app-zebra', 'app-blankfirst', 'app-showtitle', 'app-headerbold', 'app-title', 'app-fontsize', 'app-font'],
   };
   const cov = () => buildCoverage(store, state.def.entity);
   const chipActs = (kind: string, i?: number) => {
     const btn = new FakeEl('button', { act: 'vb-open', v: kind, ...(i === undefined ? {} : { i: String(i) }) }, root);
     click(btn);
-    const html = renderViewPopover(state, store, cov());
+    const html = renderViewPopover(state, store, cov()) + renderViewBar(state, store);
+    toggleChipMore();
+    const more = renderViewPopover(state, store, cov());
     closePopover();
-    return actsIn(html);
+    return actsIn(html + more);
   };
 
   it('Filter', () => {
@@ -192,32 +203,31 @@ describe('the chip popovers carry every control the Filter, Sort and Style tabs 
 });
 
 describe('the view bar as drawn', () => {
-  it('a filter chip reads as a sentence with what it removes; an open end says so', () => {
+  // 2026-11-25, the one-line bar: a chip is short words, its tooltip the sentence; what it
+  // removes is in the tooltip and the popover; the all / any pill names no side and switches.
+  it('a filter chip reads in short words, its tooltip as the sentence; an open end says so', () => {
     state.def = act.setFilterRange(base, 2, 1, 1);
     const html = renderViewBar(state, store).replace(/\s+/g, ' ');
-    expect(html).toMatch(/Only where<\/span><span class="v">Width<\/span><span class="k">is at most<\/span><span class="v">1000 mm<\/span><\/button>/);
-    // What it removes is its own button in the chip, opening the same popover.
-    expect(html).toMatch(/<button class="hv-step" data-act="vb-open" data-v="filter" data-i="2" data-id="removed"[^>]*><span class="removed">−\d+ removed<\/span><\/button>/);
-    // The join between chips is the all/any switch, sending the other value.
-    expect(html).toMatch(/class="logic hv-accent-sel" data-act="filter-logic" data-v="or"/);
+    expect(html).toMatch(/<span class="f">Width<\/span><span class="k">at most<\/span><span class="v">1000 mm<\/span><\/button>/);
+    expect(html).toMatch(/data-i="2" aria-haspopup="dialog" data-tip="Only where Width is at most 1000 mm · removes \d+ elements?\. Click to change it"/);
+    expect(html).toMatch(/class="logic hv-accent-sel" data-act="filter-logic" data-tip/);
   });
 
-  it('at the caps the adds give way to a hint', () => {
+  it('at the caps the adds are disabled and say so', () => {
     let d = structuredClone(base);
     while (d.filters.length < 8) d = act.addFilterRule(d);
     while (d.sort.length < 4) d = act.addSortLevel(d);
     state.def = d;
-    const html = renderViewBar(state, store);
-    expect(html).toMatch(/<span class="vhint">8 filters max<\/span>/);
-    expect(html).toMatch(/<span class="vhint">4 levels max<\/span>/);
-    expect(html).not.toMatch(/add-filter|add-sort/);
+    const html = renderViewBar(state, store).replace(/\s+/g, ' ');
+    expect(html).toMatch(/data-v="add-filter" aria-haspopup="dialog" disabled data-tip="8 filters is the most a schedule holds"/);
+    expect(html).toMatch(/data-v="add-sort" aria-haspopup="dialog" disabled data-tip="4 sort levels is the most a schedule holds"/);
   });
 
-  it('a grouped level reads as grouped, a sort level as sorted', () => {
+  it('a grouped level lights its group segment, a sort level does not', () => {
     state.def = act.setGroupOptions(base, 1, { header: true });
-    const html = renderViewBar(state, store);
-    expect(html).toMatch(/Sorted by<\/span><span\s+class="v">Tag \(Revit ID\)/);
-    expect(html).toMatch(/Grouped by<\/span><span\s+class="v">Width/);
+    const html = renderViewBar(state, store).replace(/\s+/g, ' ');
+    expect(html).toMatch(/data-act="sort-group" data-i="0" aria-pressed="false" data-tip="Group by Tag \(Revit ID\)/);
+    expect(html).toMatch(/class="ic hv-step on" data-act="sort-group" data-i="1" aria-pressed="true" data-tip="Grouped: a heading and a footer for each Width/);
   });
 
   it('the column menu’s Filter by this opens the new rule’s chip popover', () => {

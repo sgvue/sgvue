@@ -129,7 +129,8 @@ function checkStep(store: ModelStore, def: ScheduleDef): number {
   else {
     expect(grand.length).toBe(1);
     expect(grand[0].count).toBe(want.length);
-    expect(grand[0].label).toBe(def.grandTotalTitle?.trim() || 'Grand total');
+    // The label carries the count since 2026-11-25 ("Grand total: 40"), as a footer's does.
+    expect(grand[0].label).toBe(`${def.grandTotalTitle?.trim() || 'Grand total'}: ${want.length}`);
     figures += compareTotals(store, grand[0], got, cols, true, 'grand total');
   }
   return figures;

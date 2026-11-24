@@ -4,7 +4,8 @@
 // "show them" turn that from a mystery into a click.
 //
 // ifcTable's 2026-11-05 version (SGVue v1.5.0, phase 2): the Filter tab's list became one
-// rule's body (`ruleBody`) and the All / Any pair (`matchToggle`); the boxes are text with
+// rule's body (`ruleBody`) and the All / Any pair (since 2026-11-25 the view bar's ALL / ANY
+// pill, `viewBar.ts`); the boxes are text with
 // `inputmode=decimal`, since a repaint must not eat what is typed (ifcTable LESSONS).
 
 import type { ModelStore } from '../../../schedule/ifc/store';
@@ -20,12 +21,22 @@ import { esc, option } from '../dom';
 import { displayNum, kindOf, statOf, typeOf } from './shared';
 
 interface Effect { keeps: number; removes: number }
+/** What every rule is doing, and what they keep together, out of the category's elements. */
+interface Sweep { effects: Effect[]; kept: number; total: number }
 
 /**
  * What each rule is responsible for, in ONE pass over the category rather than one pass
  * per rule: a rule only decides the rows the other rules leave to it.
  */
-export function ruleEffects(store: ModelStore, def: ScheduleDef): Effect[] {
+export const ruleEffects = (store: ModelStore, def: ScheduleDef): Effect[] => swept(store, def).effects;
+
+/** How many of the category's elements the filters keep — the view bar's count (2026-11-25). */
+export function keptCount(store: ModelStore, def: ScheduleDef): { kept: number; total: number } {
+  const { kept, total } = swept(store, def);
+  return { kept, total };
+}
+
+function swept(store: ModelStore, def: ScheduleDef): Sweep {
   // The view bar and the chip popover both ask on the same paint; a definition is replaced,
   // never mutated, so its identity is a safe key for the one pass.
   if (memo?.store === store && memo.def === def) return memo.out;
@@ -33,21 +44,24 @@ export function ruleEffects(store: ModelStore, def: ScheduleDef): Effect[] {
   memo = { store, def, out };
   return out;
 }
-let memo: { store: ModelStore; def: ScheduleDef; out: Effect[] } | null = null;
+let memo: { store: ModelStore; def: ScheduleDef; out: Sweep } | null = null;
 
-function sweep(store: ModelStore, def: ScheduleDef): Effect[] {
+function sweep(store: ModelStore, def: ScheduleDef): Sweep {
   const rules = def.filters;
-  const out: Effect[] = rules.map(() => ({ keeps: 0, removes: 0 }));
-  if (!rules.length) return out;
+  const effects: Effect[] = rules.map(() => ({ keeps: 0, removes: 0 }));
+  const rows = candidateRows(store, def);
+  if (!rules.length) return { effects, kept: rows.length, total: rows.length };
   const or = (def.filterLogic ?? 'and') === 'or';
   // Formula columns are legal filter targets, and resolveField returns nothing for them
   // without their computed values — the engine threads the same plan through its own
   // filter pass, and if these two disagree the stated count contradicts the rows shown.
   const plan = planComputed(def);
+  let kept = 0;
 
-  for (const r of candidateRows(store, def)) {
+  for (const r of rows) {
     const computed = plan.compute(store, r);
     const hits = rules.map((f) => matchRule(resolveField(store, r, f.field, computed), f));
+    if (or ? hits.some(Boolean) : hits.every(Boolean)) kept++;
     for (let i = 0; i < rules.length; i++) {
       // Under AND the others must all pass for this rule to matter; under OR the others
       // must all fail, or the row is already in regardless of what this rule says.
@@ -55,10 +69,10 @@ function sweep(store: ModelStore, def: ScheduleDef): Effect[] {
         ? !hits.some((h, n) => n !== i && h)
         : hits.every((h, n) => n === i || h);
       if (!mine) continue;
-      if (hits[i]) out[i].keeps++; else out[i].removes++;
+      if (hits[i]) effects[i].keeps++; else effects[i].removes++;
     }
   }
-  return out;
+  return { effects, kept, total: rows.length };
 }
 
 /**
@@ -92,20 +106,6 @@ export function ruleBody(state: AppState, store: ModelStore, i: number, e: Effec
         ${unit ? `<span class="sub mono unit-hint">${esc(unit)}</span>` : ''}
       </div>` : ''}
       ${effect}`;
-}
-
-/** All rules / Any rule — the chip popover's, once there are two. */
-export function matchToggle(state: AppState): string {
-  const logic = state.def.filterLogic ?? 'and';
-  return `<div class="row match-row">
-      <span class="sub">Match</span>
-      <div class="seg grow-1" role="group" aria-label="Match all or any rule">
-        <button class="seg-btn${logic === 'and' ? ' on' : ''}" data-act="filter-logic" data-v="and"
-          aria-pressed="${logic === 'and'}">All rules</button>
-        <button class="seg-btn${logic === 'or' ? ' on' : ''}" data-act="filter-logic" data-v="or"
-          aria-pressed="${logic === 'or'}">Any rule</button>
-      </div>
-    </div>`;
 }
 
 /**

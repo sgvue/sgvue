@@ -8,8 +8,29 @@ import {
   type Calculated, type Column, type CoreKey, type FieldRef, type ScheduleDef,
 } from './def';
 import { calcNames, nameKey } from './calcNames';
-import { defaultDecimals, defaultUnit } from './format';
+import { defaultDecimals, defaultUnit, unitOptions } from './format';
 import { dimensionKey } from './formula';
+
+/** What a column of this kind is added up into, when nothing else is said: a quantity is. */
+const SUMMED: ReadonlySet<UnitKind> = new Set<UnitKind>(['area', 'volume', 'mass', 'count']);
+
+/**
+ * The one rule for a NEW column's total (2026-11-25): a column that holds a quantity you add
+ * up — an area, a volume, a mass or a count — starts with Sum; a length, an angle or a plain
+ * value does not, and a total already stated wins. Every route that makes a column comes
+ * through here (the field picker and "+ Column" through `columnForProp`, a category's default
+ * columns, a template, Vee's make_schedule); a column that already exists, or one read from a
+ * file, never does. Returns a copy when it adds the total.
+ */
+export function withDefaultTotal(col: Column, kind: UnitKind): Column {
+  return col.total !== undefined || !SUMMED.has(kind) ? col : { ...col, total: 'sum' };
+}
+
+/** What a display unit measures — a template names its column's unit, not its kind. */
+export function kindOfDisplay(display: string | undefined): UnitKind {
+  const kinds: UnitKind[] = ['length', 'area', 'volume', 'angle', 'mass'];
+  return (display && kinds.find((k) => unitOptions(k).includes(display))) || 'none';
+}
 
 /**
  * A column built from a discovered property, with sensible display defaults.
@@ -19,7 +40,7 @@ import { dimensionKey } from './formula';
  */
 export function columnForProp(stat: PropStat, system: UnitSystem = 'metric'): Column {
   const numeric = stat.type === 'number';
-  return {
+  return withDefaultTotal({
     field: { kind: 'prop', pset: stat.pset, prop: stat.prop },
     align: numeric ? 'right' : stat.type === 'bool' ? 'center' : 'left',
     format: numeric
@@ -29,7 +50,7 @@ export function columnForProp(stat: PropStat, system: UnitSystem = 'metric'): Co
         thousands: true,
       }
       : undefined,
-  };
+  }, stat.kind);
 }
 
 /**

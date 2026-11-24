@@ -4,6 +4,38 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-25 — the Schedules view bar is one line; the popovers get fewer controls and better defaults
+
+**Did.** Owner-approved from the prototype `prototype/schedule-bar/` (*"Yes, build it"*), in two steps.
+**Step 1 (`aee8e4d`):** the view bar is one line that never wraps or runs off — a funnel and the kept count, an
+ALL / ANY pill, up to three short filter chips (`Width ≥ 900 mm`), sort chips with a direction and a group segment,
+filter and sort levels folding into `+N` chips to fit (after every paint and on resize), Σ / grid lines / stripes
+as one-click icon switches, every control's words in the design's fast `data-tip` tooltip. **Step 2:** the Rows
+popover is one choice of three (Every element | Merge identical | One row per sort value, one undo step, one line of
+hint); a sort level's popover and Style keep their first controls and put the rest under More…; the column menu's
+align is three icons and group / filter / colour rules / hide / remove are one icon row; every icon-only button in a
+popover or a modal card names itself in one fixed fast tooltip (`tips.ts`) instead of a native `title`; a table that
+filters leave empty keeps its headings and names the rule that does it, with "Change that filter"; no control in the
+window carries a native `title` any more, but a column heading: its paragraph of mouse-and-keyboard help stays the slow
+`title` it was (at the fast tooltip's 0.14 s it would cover the table whenever the pointer crossed the header row). **New defaults, for new things only:** a
+new schedule (blank, a category's default, a template, Vee's when the ask does not say) has a grand total, and a new
+column of areas, volumes, masses or counts starts with Total = Sum (`withDefaultTotal`, every route that makes a
+column); a loaded file opens as it was saved. After the window test, the grand-total row reads "Grand total: N" (a
+default-on row must say something even when no column totals), saved schedules with a grand total included. **How it was checked:** each step's checks first and seen failing —
+`viewBar-compact`, `viewBar-refold` (the window's composition root with a laid-out bar: fold, resize, focus, open
+popovers), `popovers-step2`, `defaults`; the whole unit suite, the compatibility corpus untouched, the offline eval
+(oracle 100 %, null 0 %), typecheck, lint and privacy clean. 34 golden files re-pointed for the new defaults (a
+grand-total row, Sum on quantity columns), each diff only that. Headless Chromium renders of the real bar code at
+three widths, with and without the rail, are in `prototype/schedule-bar/` (untracked).
+
+**In a window** (macOS, the built app, `scripts/safe-e2e.cjs`): `tests/e2e/schedules.spec.ts`,
+`combine-by-sort.spec.ts`, `chained-formulas.spec.ts` and `vee-column-dot.spec.ts`, 13 passed and 3 skipped (the
+SGVUE_SHOTS and SGVUE_IFC runs), peak 557 MB, nothing survived. The first run failed two export tests and showed the
+flaw the grand-total label now answers: a default-on row that said only "Grand total". The SGVUE_SHOTS run was looked
+at in both themes; the Rows choice wrapped its three labels side by side and is stacked since. **Not checked:** the
+tooltips' speed and their placement at the window's edges by eye, the fold with a real model's long headings at
+780 px, a print with the empty-table note, Windows. No live Ask Vee eval was run (it spends paid credits).
+
 ## 2026-11-25 — a formula may use another calculated column; calculated names are unique
 
 **Did.** In the Schedules window a formula names another formula calculated value as it names a model column
@@ -186,14 +218,9 @@ The published files are built by `release.yml` from the tag, not these. Installe
 
 **Not checked.** The Windows installer was not run (no Windows machine). The five live Ask Vee eval cases owed for the box tools were not re-run: they spend paid credits the owner had not approved. The owner's own saved federation was not opened: its files are not in this repository. Audit decisions 3 and 4 (slim `CLAUDE.md`, update `docs/SYSTEM_SPEC.md`) are still owed.
 
-## 2026-11-12 — a save no longer swaps a missing project model for another file of the same name
-
-**Did.** With a `.sgvue` open and one of its models missing (say `m2 STR.ifc`), opening a different `STR.ifc` as an ordinary pick and saving wrote that other file in `m2`'s place and dropped what the project stored for `m2` (hidden elements, viewpoint entries). Cause: `buildProject` dropped a carried model whenever any loaded model had its *key* — a rule older than Locate…. Now a carried model is left out only when a loaded model is bound to its *id*; the missing model is saved exactly as the project had it and the other file as a model of its own. One expression in `model/project.ts`, two comments. **The `.sgvue` format is unchanged** (two models of one name were always allowed; a 1.5.0 build opens what this saves). Fix mode, Risky lane: failing checks first by a separate run (the pure case and the pipeline case failing, five guards passing), builder, `reviewer-deep` PASS in one round. Main was merged in before the commit. Headless: typecheck, lint, the whole `npm test`, privacy and build pass.
-
-**Known limits, recorded in `docs/DECISIONS.md`:** a `Model = STR` rule follows the file on screen while the other file is open; a project saved in that state, reopened, then located with Replace also hides on `m2` what was hidden in the other file (older fault in `mergeLocated`, easier to reach now — a follow-up). **Also read:** the slot question from the Locate… hand-over is not reachable in the app as it stands (the real `addModel` has no pause). **Owed:** nothing was seen in a window.
-
 ## Earlier work
 
+- **2026-11-12** — a save no longer swaps a missing project model for another file of the same name (`.sgvue` with a missing model, another file of its key opened and saved). Not seen in a window
 - **2026-11-12** — Locate… works again after a located model did not load: the "being located" mark is released when nothing holds the file any more. Not seen in a window
 - **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a five-segment line along the 3D view's top edge and a caption in the bottom row, seen in a window
 - **2026-11-11** — the repo audit's fixes: decisions 6 to 10, and the sure list

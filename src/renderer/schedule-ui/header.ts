@@ -37,24 +37,24 @@ export function renderHeader(state: AppState): string {
   // saving and reloading.
   const notes = def.meta?.notes;
   const template = notes
-    ? `<span class="tpl-chip" title="Started from this template">${esc(notes)}</span>` : '';
+    ? `<span class="tpl-chip" data-tip="Started from this template">${esc(notes)}</span>` : '';
   const categories = def.entity
-    .map((e) => `<span class="cat-chip" title="The category this schedule lists">${esc(e)}</span>`).join('');
+    .map((e) => `<span class="cat-chip" data-tip="The category this schedule lists">${esc(e)}</span>`).join('');
 
   // Equal width acts on the marked headings, so it can only be offered once two of them are
   // marked — filtered the way main.ts filters them for the resizer. Disabled rather than
-  // hidden: its title says what to do to earn it.
+  // hidden: its tooltip says what to do to earn it.
   const picked = state.selectedCols.filter((n) => def.columns[n]);
   const equal = picked.length >= 2;
 
   return `<input class="schedule-name" type="text" data-act="name" value="${esc(def.name)}"
-      aria-label="Schedule name" title="Rename this schedule" spellcheck="false" />
+      aria-label="Schedule name" spellcheck="false" />
     ${categories}${template}
     <span class="spacer"></span>
     <button class="icon-btn accent hv-step" data-act="fit-all" aria-label="Auto-fit columns"
-      title="Fit every column to its contents, and give columns of nearly equal width one shared width">${ICON.autofit}</button>
+      data-tip="Fit every column to its contents, and give columns of nearly equal width one shared width">${ICON.autofit}</button>
     <button class="icon-btn accent hv-step" data-act="fit-equal"${equal ? '' : ' disabled'} aria-label="Equal width"
-      title="${equal
+      data-tip="${equal
         ? 'Give the selected columns the width of the column you last clicked'
         : 'Shift+click two or more column headings first'}">${ICON.equalWidth}</button>
     <span class="hdr-group" role="group" aria-label="Schedule actions">

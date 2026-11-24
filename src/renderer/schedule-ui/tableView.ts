@@ -31,6 +31,9 @@ import { esc } from './dom';
 // Straight from the leaf, not through ./panels: the barrel re-exports formatSection, which
 // imports cellStyle from here, and that round trip would be a cycle.
 import { fieldKey } from './panels/shared';
+import { ruleEffects } from './panels/filterSection';
+import { shortWords } from './viewBar';
+import type { ModelStore } from '../../schedule/ifc/store';
 import { colourKey } from '../../schedule/colour';
 
 /** The calculated entry `id` names when Vee made it (`by: 'vee'`, 2026-11-24), else undefined. */
@@ -194,7 +197,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
   const sw: Swatches | null = colourCol >= 0 ? { col: colourCol, map } : null;
   const firstColours = [...new Set(map.values())].slice(0, 3);
   const sourceMark = firstColours.length
-    ? `<span class="hd-sw" title="The 3D view is coloured by this column. Right-click the heading to clear it."`
+    ? `<span class="hd-sw" data-tip="The 3D view is coloured by this column. Right-click the heading to clear it."`
       + ` style="background:linear-gradient(90deg,${firstColours.map((c, i) =>
         `${esc(c)} ${(i * 100 / firstColours.length).toFixed(1)}% ${((i + 1) * 100 / firstColours.length).toFixed(1)}%`).join(',')})"></span>`
     : '';
@@ -202,7 +205,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
   const head = res.columns.map((c, i) => {
     const vertical = c.headingOrientation === 'vertical' ? 'vertical' : '';
     const badge = populated(cov, c.field) === 0
-      ? ` <span class="badge" title="No element in this category carries this property. Click the heading: its menu offers a remap.">0 values</span>`
+      ? ` <span class="badge" data-tip="No element in this category carries this property. Click the heading: its menu offers a remap.">0 values</span>`
       : '';
     // The heading follows its column. It used to honour `center` only, so a right-aligned
     // column of numbers sat under a left-aligned heading.
@@ -231,7 +234,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
     return `<th${cls ? ` class="${cls}"` : ''} data-defcol="${defIndex[i]}" tabindex="0" aria-haspopup="dialog"
       title="Click for this column's settings, or drag its right edge to resize. Shift+click to select the columns in between, Ctrl+click to add or remove one, then drag or double-click a grip to size them together. Right-click to colour the 3D view by it. Keys: Enter or Space for a click (with Shift or Ctrl as above); Left and Right to the next heading; Shift+F10 or the menu key for the right-click menu.">${i === colourCol ? sourceMark : ''}${esc(res.headings[i])}${vee}${badge}</th>`;
   }).join('')
-    + (res.countColumn ? '<th class="num" title="How many elements this row stands for">Count</th>' : '')
+    + (res.countColumn ? '<th class="num" data-tip="How many elements this row stands for">Count</th>' : '')
     // The field picker's third way in, where a new column would go. Not a column itself: no
     // data-defcol, so the resizer, the menus and every width rule pass it by.
     + '<th class="add-col"><button class="th-add" type="button" data-act="vb-open" data-v="picker" data-id="th" aria-haspopup="dialog">+ Column</button></th>';
@@ -255,17 +258,38 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
   const title = a.showTitle === false ? ''
     : `<h2 class="schedule-title">${esc(a.title?.trim() || def.name)}</h2>`;
 
-  const blankFirst = a.blankRowBeforeData
-    ? `<tr class="blank"><td colspan="${res.columns.length + (res.countColumn ? 1 : 0)}"></td></tr>` : '';
+  const span = res.columns.length + (res.countColumn ? 1 : 0);
+  const blankFirst = a.blankRowBeforeData ? `<tr class="blank"><td colspan="${span}"></td></tr>` : '';
+  // Filters that leave nothing: say which one does it and offer the way back, under the headings
+  // (2026-11-25). Not during a preview of what a rule removes — that table is the preview's own.
+  const empty = store && def.filters.length && !res.matchedElements && state.removedBy === null
+    ? emptyByFilters(store, def, span) : '';
 
   return `${title}${notices(state, res)}
     <style>${widthRules(defIndex, def.columns)}</style>
     <div class="table-wrap${a.outline === false ? ' no-outline' : ''}">
       <table class="${classes}"${style ? ` style="${style}"` : ''}>
         <thead><tr>${head}</tr></thead>
-        <tbody>${blankFirst}${body}</tbody>
+        <tbody>${blankFirst}${empty}${body}</tbody>
       </table>
     </div>`;
+}
+
+/**
+ * The table filters emptied: one full-width row under the headings, never a data row (no
+ * `data-row`, so it selects nothing, and the exports never see it — they read the engine's
+ * rows). A rule that keeps none of the rows it decides and removes some is the cause, named in
+ * the bar's short words (the first such rule); with none — the rules empty it only together —
+ * it says so. Either way the button opens a rule's editor, on its chip or on +N when folded.
+ */
+function emptyByFilters(store: ModelStore, def: ScheduleDef, span: number): string {
+  const k = ruleEffects(store, def).findIndex((e) => e.keeps === 0 && e.removes > 0);
+  const note = k >= 0
+    ? `<div class="empty-note">No rows. “${esc(shortWords(store, def, def.filters[k]))}” removes every one.
+      <button class="btn" data-act="open-filter" data-i="${k}">Change that filter</button></div>`
+    : `<div class="empty-note">No rows match these filters.
+      <button class="btn" data-act="open-filter" data-i="0">Change the first filter</button></div>`;
+  return `<tr class="empty-row"><td colspan="${span}">${note}</td></tr>`;
 }
 
 /** The two things that make the table lie if left unsaid: a preview, and a truncated list. */

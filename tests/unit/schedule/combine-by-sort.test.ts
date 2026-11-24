@@ -115,7 +115,9 @@ const BY_LEVEL_TYPE: SortLevel[] = [{ field: colLevel.field, dir: 'asc' }, { fie
 /** `combine` is what the build adds to `ScheduleDef`; cast so the checks compile before it. */
 type Combine = 'sort' | null;
 const doors = (sort: SortLevel[], combine: Combine = 'sort', over: Partial<ScheduleDef> = {}): ScheduleDef =>
-  ({ ...emptySchedule('Door schedule', ['IfcDoor']), columns: COLS, sort, itemize: false, ...(combine ? { combine } : {}), ...over }) as ScheduleDef;
+  // grandTotal false: this file pins the rows and exports of a schedule without one (a new
+  // schedule has a grand total since 2026-11-25).
+  ({ ...emptySchedule('Door schedule', ['IfcDoor']), grandTotal: false, columns: COLS, sort, itemize: false, ...(combine ? { combine } : {}), ...over }) as ScheduleDef;
 const combineOf = (d: unknown): unknown => (d as { combine?: unknown } | null | undefined)?.combine;
 
 type Combined = DataRow & { mixed?: boolean[]; filled?: number[] };
@@ -297,49 +299,50 @@ describe('ScheduleDef.combine: kept when "sort", dropped otherwise', () => {
 /* ────────────────────────────── Done 3: the Rows chip ────────────────────────────── */
 
 const appState = (def: ScheduleDef): AppState => ({ ...blankState, store, def }) as AppState;
-const combineButtons = (html: string) => [...html.matchAll(/<button\b([^>]*data-act="combine"[^>]*)>([\s\S]*?)<\/button>/g)]
+// 2026-11-25 (step 2 of the one-line bar): the Rows popover is ONE choice of three — Every
+// element | Merge identical | One row per sort value — where it was the Itemise switch and a
+// Combine pair under it. Re-pointed: what each mode draws and says, same meaning.
+const modeButtons = (html: string) => [...html.matchAll(/<button\b([^>]*data-act="rows-mode"[^>]*)>([\s\S]*?)<\/button>/g)]
   .map(([, attrs, label]) => ({
     v: attrs.match(/data-v="([^"]*)"/)?.[1],
     on: /class="[^"]*\bseg-btn\b[^"]*\bon\b[^"]*"/.test(attrs),
-    seg: /class="[^"]*\bseg-btn\b/.test(attrs),
     pressed: attrs.match(/aria-pressed="([^"]*)"/)?.[1],
     label: label.trim(),
   }));
-const hintOf = (html: string) => html.match(/<span class="hint">([\s\S]*?)<\/span>/)?.[1];
+const hintOf = (html: string) => html.match(/<p class="hint rows-hint">([\s\S]*?)<\/p>/)?.[1];
+const chosen = (html: string) => modeButtons(html).filter((b) => b.on).map((b) => b.v);
 
-describe('the Rows chip’s body: Combine shows only with itemise off (Done 3)', () => {
-  it('itemise on: no Combine control, today’s hint (guard)', () => {
-    const html = rowsBody(appState({ ...doors(BY_TYPE), itemize: true }));
-    expect(combineButtons(html)).toEqual([]);
-    expect(hintOf(html)).toBe(esc('On — every matching element gets its own row.'));
-  });
-
-  it('itemise off, identical rows: today’s hint (guard)', () => {
-    expect(hintOf(rowsBody(appState(doors(BY_TYPE, null))))).toBe(
-      esc('Off — rows identical in every visible column are combined, and a Count column says how many.'));
-  });
-
-  it('itemise off: a row labelled Combine, a .seg of two buttons, "Identical rows" chosen by default', () => {
+describe('the Rows chip’s body: one choice of three (Done 3; step 2 of the bar)', () => {
+  it('the three choices, in order, as a .seg', () => {
     const html = rowsBody(appState(doors(BY_TYPE, null)));
-    expect(html).toMatch(/>\s*Combine\s*</);
     expect(html).toMatch(/class="seg"/);
-    expect(html.indexOf('class="seg"')).toBeLessThan(html.indexOf('data-act="combine"'));
-    expect(combineButtons(html)).toEqual([
-      { v: 'identical', on: true, seg: true, pressed: 'true', label: 'Identical rows' },
-      { v: 'sort', on: false, seg: true, pressed: 'false', label: 'By sort value' },
+    expect(modeButtons(html).map((b) => [b.v, b.label])).toEqual([
+      ['every', 'Every element'], ['merge', 'Merge identical'], ['sort', 'One row per sort value'],
     ]);
   });
 
-  it('combine by sort: "By sort value" chosen, and the hint names the sort fields', () => {
+  it('itemise on: Every element chosen, and its line', () => {
+    const html = rowsBody(appState({ ...doors(BY_TYPE), itemize: true }));
+    expect(chosen(html)).toEqual(['every']);
+    expect(hintOf(html)).toBe(esc('Every matching element gets its own row.'));
+  });
+
+  it('itemise off, identical rows: Merge identical chosen, and its line', () => {
+    const html = rowsBody(appState(doors(BY_TYPE, null)));
+    expect(chosen(html)).toEqual(['merge']);
+    expect(hintOf(html)).toBe(esc('Rows identical in every shown column become one; a Count column says how many.'));
+  });
+
+  it('combine by sort: One row per sort value chosen, and the line names the sort fields', () => {
     const html = rowsBody(appState(doors(BY_LEVEL_TYPE)));
-    expect(combineButtons(html).map((b) => [b.v, b.on, b.pressed])).toEqual([['identical', false, 'false'], ['sort', true, 'true']]);
-    expect(hintOf(html)).toBe(esc('Off — one row per Level + Type. A column whose values differ reads <varies>; a column with a total shows the total. A Count column says how many.'));
-    expect(hintOf(rowsBody(appState(doors(BY_TYPE))))).toBe(esc('Off — one row per Type. A column whose values differ reads <varies>; a column with a total shows the total. A Count column says how many.'));
+    expect(modeButtons(html).map((b) => [b.v, b.on, b.pressed])).toEqual([['every', false, 'false'], ['merge', false, 'false'], ['sort', true, 'true']]);
+    expect(hintOf(html)).toBe(esc('One row per Level + Type. A cell that differs reads <varies>; a column with a total shows it. A Count column says how many.'));
+    expect(hintOf(rowsBody(appState(doors(BY_TYPE))))).toBe(esc('One row per Type. A cell that differs reads <varies>; a column with a total shows it. A Count column says how many.'));
     expect(html).not.toContain('reads <varies>');
   });
 
   it('combine by sort with no sort level: everything is one row, and how to split it', () => {
-    expect(hintOf(rowsBody(appState(doors([]))))).toBe(esc('Off — no sort level, so everything is one row. Add a sort level to split it.'));
+    expect(hintOf(rowsBody(appState(doors([]))))).toBe(esc('No sort level, so everything is one row. Add a sort level to split it.'));
   });
 });
 
@@ -347,7 +350,8 @@ describe('the view bar’s Rows chip names the sort fields (Done 3)', () => {
   const chip = (def: ScheduleDef) => {
     state.store = store;
     state.def = def;
-    const m = renderViewBar(state, store).match(/<button class="vset hv-step" data-act="vb-open" data-v="rows"[^>]*>([\s\S]*?)<\/button>/);
+    // 2026-11-25, the one-line bar: the Rows chip is an icon button whose name says the mode.
+    const m = renderViewBar(state, store).match(/<button class="icon-btn[^"]*" data-act="vb-open" data-v="rows"[^>]*aria-label="Rows: ([^"]*)"/);
     if (!m) throw new Error('no Rows chip');
     return m[1];
   };
@@ -358,18 +362,18 @@ describe('the view bar’s Rows chip names the sort fields (Done 3)', () => {
   });
 
   it('itemise on and identical rows read as today (guard)', () => {
-    expect(chip({ ...doors(BY_TYPE), itemize: true })).toBe('Every instance');
-    expect(chip(doors(BY_TYPE, null))).toBe('<b>Combined rows</b>');
+    expect(chip({ ...doors(BY_TYPE), itemize: true })).toBe('every element');
+    expect(chip(doors(BY_TYPE, null))).toBe('identical rows merged');
   });
 
   it('combine by sort: One row per Type · One row per Level + Type · One row', () => {
-    expect(chip(doors(BY_TYPE))).toBe('<b>One row per Type</b>');
-    expect(chip(doors(BY_LEVEL_TYPE))).toBe('<b>One row per Level + Type</b>');
-    expect(chip(doors([]))).toBe('<b>One row</b>');
+    expect(chip(doors(BY_TYPE))).toBe('one row per Type');
+    expect(chip(doors(BY_LEVEL_TYPE))).toBe('one row per Level + Type');
+    expect(chip(doors([]))).toBe('one row');
   });
 });
 
-describe('the Combine buttons write the definition, through the window’s own wiring (Done 3)', () => {
+describe('the Rows choice writes the definition, through the window’s own wiring (Done 3; re-pointed 2026-11-25)', () => {
   const popover = new FakeEl('div', {}, root);
   popover.attrs.id = 'popover';
   beforeAll(() => {
@@ -383,15 +387,15 @@ describe('the Combine buttons write the definition, through the window’s own w
   afterEach(() => { flushPending(); vi.runOnlyPendingTimers(); vi.useRealTimers(); });
   const click = (el: FakeEl) => { dispatch(el, 'pointerdown'); dispatch(el, 'pointerup'); dispatch(el, 'click'); };
 
-  it('By sort value sets combine: "sort"', () => {
+  it('One row per sort value sets combine: "sort"', () => {
     state.def = doors(BY_TYPE, null);
-    click(new FakeEl('button', { act: 'combine', v: 'sort' }, popover));
+    click(new FakeEl('button', { act: 'rows-mode', v: 'sort' }, popover));
     expect(state.def).toEqual(doors(BY_TYPE));
   });
 
-  it('Identical rows takes the key away', () => {
+  it('Merge identical takes the key away', () => {
     state.def = doors(BY_TYPE);
-    click(new FakeEl('button', { act: 'combine', v: 'identical' }, popover));
+    click(new FakeEl('button', { act: 'rows-mode', v: 'merge' }, popover));
     expect(Object.hasOwn(state.def, 'combine')).toBe(false);
     expect(state.def).toEqual(doors(BY_TYPE, null));
   });

@@ -65,6 +65,11 @@ export function followColumn(i: number) {
 export function setMenuView(v: string) { view = v === 'colour' ? 'colour' : 'main'; }
 export function toggleMore() { more = !more; }
 
+/** The alignment icons, in reading order (2026-11-25). */
+const ALIGNS: [string, string, string][] = [
+  ['left', ICON.alignLeft, 'Align left'], ['center', ICON.alignCentre, 'Align centre'], ['right', ICON.alignRight, 'Align right'],
+];
+
 /** Rows the preview will look through for an example value before giving up. */
 const PREVIEW_SCAN = 200;
 
@@ -143,6 +148,7 @@ export function renderColumnMenu(
   const level = lvl < 0 ? undefined : def.sort[lvl];
   const grouped = !!level && (!!level.header || (level.footer ?? 'none') !== 'none');
   const unit = f.display || defaultUnit(kind);
+  const rules = col.conditional?.length ?? 0;
   const sample = shown ?? '—';
 
   // Who carries it, and what to do when nobody does.
@@ -169,9 +175,9 @@ export function renderColumnMenu(
         ${BOOL_STYLES.map((s) => option(s, s, (f.boolStyle ?? 'Yes/No') === s)).join('')}</select>`) : ''}
       ${rowx('Move', `<div class="icon-row">
         <button class="icon-btn sm hv-step" data-act="cm-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}
-          title="Move left" aria-label="Move column left">${ICON.arrowLeft}</button>
+          data-tip="Move left" aria-label="Move column left">${ICON.arrowLeft}</button>
         <button class="icon-btn sm hv-step" data-act="cm-move" data-v="1"${at}${i === def.columns.length - 1 ? ' disabled' : ''}
-          title="Move right" aria-label="Move column right">${ICON.arrowRight}</button></div>`)}
+          data-tip="Move right" aria-label="Move column right">${ICON.arrowRight}</button></div>`)}
     </div>` : '';
 
   const hiddenNote = col.hidden
@@ -191,26 +197,30 @@ export function renderColumnMenu(
       </span><span class="preview-box pop-preview grow-1${lit ? ' lit' : ''}"${lit}><span class="mono value">${esc(sample)}</span>${
   unit && !f.showSymbol && shown !== null ? `<span class="sub">${esc(unit)}</span>` : ''}</span></span>`) : ''}
     ${rowx('Total', seg('cm-total', totalsFor(type, numeric), col.total ?? '', at, 'Total at footers'))}
-    ${rowx('Align', seg('fmt-align', [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']], alignOf(col), at, 'Alignment'))}
+    ${rowx('Align', `<div class="icon-row">${ALIGNS.map(([v, icon, words]) => `<button class="icon-btn sm hv-step${
+    alignOf(col) === v ? ' on' : ''}" data-act="fmt-align" data-v="${v}"${at} aria-pressed="${alignOf(col) === v}"
+        data-tip="${words}" aria-label="${words}">${icon}</button>`).join('')}</div>`)}
     <hr class="pop-rule" />
     ${rowx('Sort', `<div class="icon-row">
       <button class="icon-btn sm hv-step${level?.dir === 'asc' ? ' on' : ''}" data-act="cm-sort" data-v="asc"${at}
-        aria-pressed="${level?.dir === 'asc'}" title="Sort A to Z" aria-label="Sort A to Z">${ICON.sortAsc}</button>
+        aria-pressed="${level?.dir === 'asc'}" data-tip="Sort A to Z" aria-label="Sort A to Z">${ICON.sortAsc}</button>
       <button class="icon-btn sm hv-step${level?.dir === 'desc' ? ' on' : ''}" data-act="cm-sort" data-v="desc"${at}
-        aria-pressed="${level?.dir === 'desc'}" title="Sort Z to A" aria-label="Sort Z to A">${ICON.sortDesc}</button></div>`)}
-    <button class="mi hv-step${grouped ? ' on' : ''}" data-act="cm-group"${at}>${grouped ? 'Grouped by this — ungroup' : 'Group by this'}</button>
-    <button class="mi hv-step" data-act="cm-filter"${at}>Filter by this…</button>
-    <button class="mi hv-step" data-act="cm-view" data-v="colour"${at}>Colour rules<span class="tail">${col.conditional?.length || ''}</span></button>
-    <button class="fold hv-step${more ? '' : ' shut'}" data-act="cm-more"${at} aria-expanded="${more}"><span class="tw">▾</span>More…</button>
-    ${moreBody}
-    <hr class="pop-rule" />
-    <div class="icon-row end">
-      ${col.hidden ? `<button class="icon-btn sm hv-step" data-act="cm-show"${at} title="Show column" aria-label="Show column">${ICON.eye}</button>`
-    : `<button class="icon-btn sm hv-step" data-act="cm-hide"${at} title="Hide column — keeps it for sorting, grouping and filtering"
+        aria-pressed="${level?.dir === 'desc'}" data-tip="Sort Z to A" aria-label="Sort Z to A">${ICON.sortDesc}</button></div>`)}
+    <div class="icon-row cm-actions">
+      <button class="icon-btn sm hv-step${grouped ? ' on' : ''}" data-act="cm-group"${at} aria-pressed="${grouped}"
+        data-tip="${grouped ? 'Grouped by this. Click to stop grouping' : 'Group by this column'}" aria-label="Group by this">${ICON.group}</button>
+      <button class="icon-btn sm hv-step" data-act="cm-filter"${at} data-tip="Filter by this column" aria-label="Filter by this">${ICON.filterThis}</button>
+      <button class="icon-btn sm hv-step cm-colour" data-act="cm-view" data-v="colour"${at} data-tip="Colour rules"
+        aria-label="Colour rules${rules ? `, ${rules}` : ''}">${ICON.fill}${rules ? `<span class="n">${rules}</span>` : ''}</button>
+      <span class="spacer"></span>
+      ${col.hidden ? `<button class="icon-btn sm hv-step" data-act="cm-show"${at} data-tip="Show column" aria-label="Show column">${ICON.eye}</button>`
+    : `<button class="icon-btn sm hv-step" data-act="cm-hide"${at} data-tip="Hide column — it still sorts, groups and filters"
         aria-label="Hide column">${ICON.eyeOff}</button>`}
-      <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" title="Remove column"
+      <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" data-tip="Remove column from this schedule"
         aria-label="Remove column">${ICON.remove}</button>
-    </div>`;
+    </div>
+    <button class="fold hv-step${more ? '' : ' shut'}" data-act="cm-more"${at} aria-expanded="${more}"><span class="tw">▾</span>More…</button>
+    ${moreBody}`;
 }
 
 /**

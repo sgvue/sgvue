@@ -50,7 +50,8 @@ describe('csvCell quoting', () => {
 describe('CSV export', () => {
   it('includes the header and every data row', () => {
     const store = build([{ name: 'A', w: 0.9 }, { name: 'B', w: 1.2 }]);
-    const def: ScheduleDef = { ...emptySchedule('S', ['IfcDoor']), columns: [colName, colWidth] };
+    // No grand total: a new schedule has one since 2026-11-25; this pins the data rows alone.
+    const def: ScheduleDef = { ...emptySchedule('S', ['IfcDoor']), grandTotal: false, columns: [colName, colWidth] };
     const csv = toCsv(toRows(fullResult(store, def)));
     expect(csv.split('\r\n')).toEqual(['Name,Width', 'A,900', 'B,1200']);
   });
@@ -78,7 +79,8 @@ describe('CSV export', () => {
     // every exported row has the same width as the header
     const width = rows[0].cells.length;
     expect(rows.every((r) => r.cells.length === width)).toBe(true);
-    expect(rows.at(-1)!.cells).toEqual(['Grand total', '3000']);
+    // The grand row's label carries its element count since 2026-11-25.
+    expect(rows.at(-1)!.cells).toEqual(['Grand total: 2', '3000']);
   });
 
   it('exports every row even when the render was capped', () => {
@@ -208,7 +210,8 @@ describe('workbook round-trip', () => {
   // nothing about whether the sheets are right.
   it('writes one sheet per schedule, with the right names and rows', async () => {
     const store = build([{ name: 'A', w: 0.9 }, { name: 'B', w: 1.2 }]);
-    const doors: ScheduleDef = { ...emptySchedule('Doors', ['IfcDoor']), columns: [colName, colWidth] };
+    // No grand total (a new schedule's default since 2026-11-25): the sheet's rows are pinned below.
+    const doors: ScheduleDef = { ...emptySchedule('Doors', ['IfcDoor']), grandTotal: false, columns: [colName, colWidth] };
     const blob = await xlsxBlob([
       { name: 'Doors', res: fullResult(store, doors) },
       { name: 'Doors', res: fullResult(store, doors) },       // same name on purpose

@@ -97,11 +97,11 @@ function tableRows(cov: Coverage, rows: PickRow[]): string {
       : c.field.kind === 'core' ? CORE_GROUP : CALC_GROUP;
     peeks.set(`col:${i}`, { name, source, field: c.field });
     return `<div class="crow hv-step${c.hidden ? ' hid' : ''}" draggable="true" data-drag="col" data-i="${i}">
-      <span class="handle" tabindex="0" data-act="col-handle" data-i="${i}" title="Drag to reorder, or focus and use the arrow keys" aria-label="Reorder ${esc(name)}">${grip}</span>
-      <button class="nm" data-act="pick-jump" data-i="${i}" title="${c.hidden ? 'Hidden — open its settings' : 'Go to this column'}">${esc(name)}${c.hidden ? ' <span class="sub">hidden</span>' : ''}</button>
+      <span class="handle" tabindex="0" data-act="col-handle" data-i="${i}" data-tip="Drag to reorder, or focus and use the arrow keys" aria-label="Reorder ${esc(name)}">${grip}</span>
+      <button class="nm" data-act="pick-jump" data-i="${i}" data-tip="${c.hidden ? 'Hidden — open its settings' : 'Go to this column'}">${esc(name)}${c.hidden ? ' <span class="sub">hidden</span>' : ''}</button>
       ${twinTag(byId.get(fieldKey(c.field))?.twin ?? '', source)}${covBadge(pct)}
-      <button class="eye btn" data-act="${c.hidden ? 'cm-show' : 'cm-hide'}" data-defcol="${i}"${c.hidden ? '' : ' title="Keeps it for sorting, grouping and filtering"'}>${c.hidden ? 'Show' : 'Hide'}</button>
-      <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" title="Remove column"
+      <button class="eye btn" data-act="${c.hidden ? 'cm-show' : 'cm-hide'}" data-defcol="${i}"${c.hidden ? '' : ' data-tip="Keeps it for sorting, grouping and filtering"'}>${c.hidden ? 'Show' : 'Hide'}</button>
+      <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" data-tip="Remove column"
         aria-label="Remove ${esc(name)}">${ICON.remove}</button>
     </div>`;
   }).join('');
@@ -137,7 +137,7 @@ function footHtml(): string {
       <button class="quiet hv-step-ink" data-act="pick-calc">+ Calculated value</button>`;
   }
   const rows = new Map(allTicked());
-  return `<span class="basket">${picks.map((id) => `<span class="bchip">${esc(rows.get(id) ?? id)}<button class="icon-btn sm hv-warn-both" data-act="pick-toggle" data-id="${esc(id)}" title="Untick"
+  return `<span class="basket">${picks.map((id) => `<span class="bchip">${esc(rows.get(id) ?? id)}<button class="icon-btn sm hv-warn-both" data-act="pick-toggle" data-id="${esc(id)}" data-tip="Untick"
     aria-label="Untick ${esc(rows.get(id) ?? id)}">${ICON.remove}</button></span>`).join('')}</span>
     <button class="btn primary" data-act="pick-commit">Add ${picks.length} column${picks.length === 1 ? '' : 's'} <kbd>Ctrl</kbd><kbd>Enter</kbd></button>`;
 }

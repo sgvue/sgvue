@@ -20,7 +20,7 @@ export function calcOverlay(state: AppState, store: ModelStore): string {
           <div class="grow-1">
             <h3>Calculated values</h3>
           </div>
-          <button class="icon-btn hv-step-ink" data-act="close-overlay" title="Close" aria-label="Close">${ICON.close}</button>
+          <button class="icon-btn hv-step-ink" data-act="close-overlay" data-tip="Close" aria-label="Close">${ICON.close}</button>
         </div>
       </div>
       <div class="calc-scroll">${calcEditor(state, store)}</div>

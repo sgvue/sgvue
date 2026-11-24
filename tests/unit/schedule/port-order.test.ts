@@ -171,7 +171,8 @@ async function setUp(deliver: (dir: 'toWin' | 'toMain', go: () => void) => void)
   W.connect(pair.winEnd);
   connect(pair.mainEnd as unknown as MessagePort);
   await vi.advanceTimersByTimeAsync(1000);
-  Win.state.updateDef((d) => act.setGrandTotal(d, true));
+  // A change: a new schedule has its grand total on since 2026-11-25, so the step turns it off.
+  Win.state.updateDef((d) => act.setGrandTotal(d, false));
   await vi.advanceTimersByTimeAsync(1000);
   Win.state.updateDef((d) => act.setName(d, 'Doors A'));
   await vi.advanceTimersByTimeAsync(1000);

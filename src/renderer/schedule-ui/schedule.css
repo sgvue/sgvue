@@ -276,7 +276,6 @@ button.toggle:hover, label.toggle:hover { border-color: var(--accent); }
 /* Filter */
 /* A rule's field and a level's field take the row's spare width. */
 .app .subcard .row > select[data-act="filter-field"], .app .subcard .row > select[data-act="sort-field"] { flex: 1; }
-.match-row { gap: 10px; margin-bottom: 12px; }
 .value-slot { flex: 1; display: flex; min-width: 0; }
 .value-slot > * { flex: 1; }
 .unit-hint { flex: none; }
@@ -331,54 +330,88 @@ button.cond-preset.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(-
 }
 .size-read { font: 500 12px/1 var(--mono); color: var(--ink); }
 
-/* ── the view bar (viewBar.ts, v1.5.0) ────────────────────────────────── */
+/* ── the view bar (viewBar.ts, v1.5.0; one line since 2026-11-25) ────── */
 /* ifcTable's chips under the schedule's name, at the top of the centre column here. A filter
-   chip is the sidebar's accent pill (--sel-bg, accent edge); the and / or join between two is
-   the Filter card's dashed AND / OR pill; an add is a dashed pill in the accent ink. */
+   chip is the sidebar's accent pill (--sel-bg, accent edge); the ALL / ANY switch is the Filter
+   card's dashed AND / OR pill; an add is a dashed round `+` in the accent ink; the switches on
+   the right are the window's icon buttons, `.on` (its selected look) when lit.
+   2026-11-25 (prototype/schedule-bar/, owner-approved): ONE line that never wraps — viewBar.ts
+   folds filter chips, then sort levels, into their `+N` chips until it fits. Nothing on it clips: every control's words are the
+   design's `data-tip` tooltip, drawn as its own ::after below it, so neither the bar nor a chip
+   may hide its overflow. */
 .centre-head { flex: none; padding: 10px 16px 0; min-width: 0; }
 .centre-head:empty { display: none; }
-.viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.viewbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 3px; min-width: 0; }
+.viewbar > * { flex: none; }
+.viewbar > .spacer { flex: 1; }
 .vchip {
   display: inline-flex; align-items: stretch; height: 28px; overflow: hidden;
   border: 1px solid var(--border); border-radius: 999px; background: var(--card);
 }
+/* The chip draws its pill with its segments' corners instead of clipping, so a segment's
+   tooltip shows in full. */
+.viewbar .vchip { overflow: visible; }
 .vchip > button {
-  display: flex; align-items: center; gap: 5px; padding: 0 10px; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px; padding: 0 7px; white-space: nowrap;
   font: 400 12.5px/1 var(--sans); color: var(--ink);
 }
+.viewbar .vchip > button:first-child { border-radius: 999px 0 0 999px; }
+.viewbar .vchip > button:last-child { border-radius: 0 999px 999px 0; }
+.viewbar .vchip > button:only-child { border-radius: 999px; }
 .vchip > button + button { border-left: 1px solid var(--border); }
+.vchip > button:focus-visible { outline-offset: -2px; }
 .vchip .k { color: var(--muted); }
 .vchip .v { font-weight: 600; }
-.vchip .removed { font: 400 11.5px/1 var(--mono); color: var(--warn-ink); }
-.vchip.filter { border-color: var(--accent); background: var(--sel-bg); }
-.vchip.filter > button + button { border-left-color: var(--accent); }
-.vchip > button.x { width: 28px; height: auto; padding: 0; color: var(--faint); }
-/* The chip clips its overflow, so the ring is drawn inside the button. */
-.vchip > button.x:focus-visible { outline-offset: -2px; }
+.vchip.filter, .vchip.fold { border-color: var(--accent); background: var(--sel-bg); }
+.vchip.fold > button { font: 600 12px/1 var(--mono); color: var(--sel-ink); padding: 0 10px; }
+/* Folded sort levels: the sort chips' own neutral pill. */
+.vchip.sfold > button { font: 600 12px/1 var(--mono); color: var(--muted); padding: 0 10px; }
 .vchip.alert { border-color: var(--warn-line); background: var(--warn-bg); }
 .vchip.alert > button { color: var(--warn-ink); font-weight: 500; }
+.vchip.alert .k { color: var(--warn-ink); }
+.vchip.sort > button.nm { padding: 0 9px 0 10px; }
+.vchip > button.ic { width: 26px; padding: 0; justify-content: center; color: var(--muted); }
+.vchip > button.ic.on { background: var(--sel-bg); color: var(--sel-ink); }
 /* Open = its popover is showing. popover.ts sets aria-expanded on the chip's button in place,
    so closing it un-marks the chip without a repaint. */
 .vchip:has(> button[aria-expanded="true"]) { box-shadow: 0 0 0 2px var(--accent); }
-.vchip .lvl-n { margin-right: 2px; }
+/* The kept count: a label, not a button. It flashes once when the count changes. */
+.vcount {
+  display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 3px 0 0; color: var(--muted);
+  font: 400 11.5px/1 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.vcount b { color: var(--ink); font-weight: 600; }
+.vcount.zero, .vcount.zero b { color: var(--warn-ink); }
+.vcount.bump b { animation: vbump .35s ease-out; }
+@keyframes vbump { 0% { background: var(--sel-bg); box-shadow: 0 0 0 3px var(--sel-bg); } 100% { background: transparent; box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .vcount.bump b { animation: none; } }
 button.logic {
   font: 600 10.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
-  border: 1px dashed var(--border-strong); border-radius: 4px; padding: 3px 6px;
+  border: 1px dashed var(--border-strong); border-radius: 4px; padding: 3px 4px;
 }
-button.vadd {
-  height: 28px; border-radius: 999px; border: 1px dashed var(--border-strong);
-  font: 500 12.5px/1 var(--sans); color: var(--accent-ink); padding: 0 11px;
+button.vplus {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; border: 1px dashed var(--border-strong); color: var(--accent-ink);
 }
-button.vadd[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); }
-.vhint { font: 400 12px/1 var(--sans); color: var(--faint); }
-.vsep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
-button.vset {
-  height: 28px; font: 400 12.5px/1 var(--sans); color: var(--ink);
-  padding: 0 9px; border-radius: 6px; white-space: nowrap;
-}
-button.vset b { font-weight: 600; }
-button.vset .warnc { color: var(--warn-ink); }
-button.vset[aria-expanded="true"] { background: var(--sel-bg); color: var(--sel-ink); }
+button.vplus[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); }
+button.vplus:disabled { color: var(--faint); }
+.vsep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+.vright { display: flex; align-items: center; gap: 2px; }
+.vright .icon-btn { width: 28px; height: 28px; }
+.vright .icon-btn.num { width: auto; padding: 0 7px; gap: 4px; font: 500 11.5px/1 var(--mono); }
+.vright .icon-btn.warn { color: var(--warn-ink); }
+.vright .icon-btn[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent); }
+/* Tooltips stay inside the window: each hangs from the control's left edge, or — `.tip-end`, set
+   by viewBar.ts where the window has more room to the left — from its right edge, as the
+   header's last group does. An open control shows its popover, not its tooltip. */
+.viewbar [data-tip]::after { left: 0; transform: translateY(-3px); }
+.viewbar [data-tip]:hover::after, .viewbar [data-tip]:focus-visible::after { transform: none; }
+.viewbar .tip-end[data-tip]::after { left: auto; right: 0; }
+.viewbar [aria-expanded="true"][data-tip]::after { display: none; }
+/* The `+N` list: a folded rule per row, opening its editor, with its remove beside it. */
+.rule-list .rl { display: flex; align-items: center; gap: 2px; }
+.rule-list .rl .mi { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-list .rl .mi.alert { color: var(--warn-ink); }
 
 /* ── the popover (popover.ts) and what is drawn in it ─────────────────── */
 /* One node, made once in schedule.html, so its entrance can animate: unhiding replays it, a
@@ -429,7 +462,6 @@ button.vset[aria-expanded="true"] { background: var(--sel-bg); color: var(--sel-
 .pop-eyebrow { margin: 2px 2px 8px; }
 .pop-more { padding: 0 4px 4px; }
 .popover .pop-sub { margin: 0 0 8px; }
-.popover .match-row { margin-bottom: 4px; }
 
 /* Menu items: ContextMenu's item, laid flat inside the card (`hv-step` under the pointer). */
 button.mi {
@@ -446,6 +478,30 @@ button.fold { width: 100%; }
 button.pop-back { color: var(--accent-ink); padding: 4px 6px; margin-bottom: 6px; font-weight: 500; }
 .fold .tw { display: inline-block; }
 .fold.shut .tw { rotate: -90deg; }
+
+/* 2026-11-25, step 2 of the one-line bar. The Rows choice's one line; the column menu's icon row
+   (group, filter, colour rules with its count, hide, remove). */
+/* The Rows choice is a stacked list: side by side its three labels wrap in the popover. */
+.rows-mode .seg { flex-direction: column; }
+.rows-mode .seg-btn { border-right: none; border-bottom: 1px solid var(--border); justify-content: flex-start; white-space: nowrap; }
+.rows-mode .seg-btn:last-child { border-bottom: none; }
+.rows-hint { margin: 8px 2px 0; }
+.icon-row.cm-actions { margin: 6px 0 2px; }
+.cm-colour { position: relative; }
+.cm-colour .n { position: absolute; right: 1px; bottom: 2px; font: 600 9.5px/1 var(--mono); color: var(--accent-ink); }
+
+/* The fast description inside the popover and the overlays (tips.ts): one fixed element, so a
+   scroll container neither clips it nor grows by it. The look and the timing are the design's
+   `[data-tip]::after` (design.css) — and those boxes are switched off where this one stands in. */
+.pop-tip {
+  position: fixed; z-index: 60; left: 0; top: 0; width: max-content; max-width: min(420px, 72vw);
+  white-space: normal; text-align: center; font: 400 11px/1.35 var(--sans); color: var(--ink);
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 6px; padding: 5px 7px;
+  box-shadow: var(--shadow); pointer-events: none; opacity: 0; transform: translateY(-3px);
+  transition: opacity .1s ease .04s, transform .1s ease .04s;
+}
+.pop-tip.on { opacity: 1; transform: none; }
+#popover [data-tip]::after, #overlay-root [data-tip]::after, #rail-pane [data-tip]::after, #output-pane [data-tip]::after { display: none; }
 
 /* ── the field picker (fieldPicker.ts), in the popover ────────────────── */
 /* Rows are one line — name, a twin tag, coverage below 100% — and the strip under the list

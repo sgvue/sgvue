@@ -93,7 +93,7 @@ import { renderOverlay } from './overlays';
 import { flushPending, wirePending } from './pending';
 import { clearPickerMemo } from './pickerModel';
 import {
-  afterPaintPopover, closePopover, fillPopover, popoverId, setPopoverPainter, wirePopover,
+  afterPaintPopover, anchorPopover, closePopover, fillPopover, popoverId, setPopoverPainter, wirePopover,
 } from './popover';
 import { deferWhilePressed } from './pressGate';
 import { restoreUi, snapshotUi, type Ui } from './preserve';
@@ -103,8 +103,9 @@ import {
 } from './selection';
 import { render, renderSoon, setRenderer, state, update, updateDef, type RenderScope } from './state';
 import { renderSchedule } from './tableView';
-import { afterPaintViewBar, renderViewBar } from './viewBar';
+import { afterPaintViewBar, openChip, refoldViewBar, renderViewBar } from './viewBar';
 import { renderViewPopover } from './viewPopovers';
+import { wireTips } from './tips';
 
 const app = byId('app');
 const header = byId('header');
@@ -262,7 +263,10 @@ function paint(scope: RenderScope) {
   // After restoreUi, never before: the rebuilt table's scroll is back, so the heading is where
   // the user sees it — and a first focus here is not undone by the restore.
   afterPaintPopover();
-  afterPaintViewBar(state);
+  // The bar was drawn with as many filter chips as fitted last time; fit it to its line now,
+  // before the kept count's flash is put on it.
+  if (panes) refoldBar();
+  afterPaintViewBar(state, store);
   settleOverlayFocus(ui);
   // After the overlay's own first focus: the library may ask for its name row instead.
   afterPaintLibrary();
@@ -288,9 +292,33 @@ function paintPopoverOnly() {
   fillPopover(renderColumnMenu(state, store, coverage, shown) || renderViewPopover(state, store, coverage));
   restoreUi(ui);
   afterPaintPopover();
-  afterPaintViewBar(state);
+  afterPaintViewBar(state, store);
 }
 setPopoverPainter(paintPopoverOnly);
+
+/**
+ * The view bar alone, for its refold (2026-11-25): the chips it folds into the `+N` chips change,
+ * nothing else. An open `+N` list follows what is folded now; focus and caret are kept, as in
+ * every paint.
+ */
+function paintViewBarOnly() {
+  const { store } = state;
+  if (!store || !shown) return;
+  const ui = snapshotUi();
+  // eslint-disable-next-line no-unsanitized/property -- renderViewBar: every file- or user-derived value in it goes through esc()
+  centreHead.innerHTML = renderViewBar(state, store);
+  const open = openChip()?.kind;
+  if (open === 'fold' || open === 'sfold') fillPopover(renderViewPopover(state, store, coverage));
+  restoreUi(ui);
+}
+/** Fold the bar to its line, then hang the open popover from what is drawn now — never from a
+ *  pass in between, which draws every chip to measure them (a `+N` it hangs from is not there). */
+function refoldBar() {
+  refoldViewBar(state, paintViewBarOnly);
+  anchorPopover();
+}
+// A wider or narrower window fits a different number of chips on the bar's one line.
+window.addEventListener('resize', () => { if (state.store && shown) refoldBar(); });
 
 /**
  * The Templates library alone: a move of its selection, its search, sort or folds — and a
@@ -697,6 +725,8 @@ wireColumnResize(outputPane, {
 // Outside click, Escape, scroll and resize for the one popover. The window's own dialog and
 // right-click menu sit above it and keep Escape while they are open.
 wirePopover(outputPane, () => dialogOpen() || menuOpen());
+// The fast descriptions inside the popover and the overlays (tips.ts).
+wireTips(app);
 
 // A typed edit lands before any click or key action: the window's capture phase runs first.
 wirePending(app, window);

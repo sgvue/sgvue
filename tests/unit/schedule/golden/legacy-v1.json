@@ -276,7 +276,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 7",
     "count": 7,
     "cells": [
      null,
@@ -310,7 +310,7 @@
   "Level 10,Single-Flush:0915 x 2134mm,'=SUM(A1),",
   "Roof (1),,,",
   "Roof,Single-Flush:0915 x 2134mm,'=SUM(A1),",
-  "Grand total,,7,"
+  "Grand total: 7,,7,"
  ],
  "xlsx": [
   {
@@ -360,7 +360,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 14
+     "width": 16
     },
     {
      "i": 1,
@@ -976,7 +976,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 7",
        "font": {
         "bold": true
        },

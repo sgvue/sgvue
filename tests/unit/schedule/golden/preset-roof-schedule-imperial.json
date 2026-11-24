@@ -30,7 +30,8 @@
      "display": "ft²",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    }
   ],
   "filters": [],
@@ -47,7 +48,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -85,7 +86,8 @@
      "display": "ft²",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    }
   ],
   "headings": [
@@ -171,6 +173,21 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total: 2",
+    "count": 2,
+    "cells": [
+     null,
+     null,
+     "2,596.62"
+    ],
+    "nums": [
+     null,
+     null,
+     2596.62
+    ]
    }
   ],
   "totalDataRows": 2,
@@ -191,7 +208,8 @@
   "1,,",
   "Level 2 (1),,",
   "Flat,Level 2,1291.67",
-  "1,,"
+  "1,,",
+  "Grand total: 2,,2596.62"
  ],
  "xlsx": [
   {
@@ -241,7 +259,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 13
+     "width": 16
     },
     {
      "i": 1,
@@ -581,6 +599,63 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total: 2",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": 2596.62,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",

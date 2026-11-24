@@ -71,7 +71,8 @@
      "display": "m²",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    },
    {
     "field": {
@@ -85,7 +86,8 @@
      "display": "m³",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    },
    {
     "field": {
@@ -121,7 +123,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -199,7 +201,8 @@
      "display": "m²",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    },
    {
     "field": {
@@ -213,7 +216,8 @@
      "display": "m³",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    },
    {
     "field": {
@@ -672,6 +676,33 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total: 10",
+    "count": 10,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     "46.04",
+     "7.87",
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     46.04,
+     7.87,
+     null,
+     null
+    ]
    }
   ],
   "totalDataRows": 10,
@@ -720,7 +751,8 @@
   "Generic 200mm,Roof,2.54,337,2937,7.23,1.24,90 min,No",
   "Generic 200mm,Roof,3.08,885,3485,12.17,,60 min,",
   "Exterior 300mm,Roof,10.77,574,,,,,Yes",
-  "3,,,,,,,,"
+  "3,,,,,,,,",
+  "Grand total: 10,,,,,46.04,7.87,,"
  ],
  "xlsx": [
   {
@@ -770,7 +802,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 16
+     "width": 17
     },
     {
      "i": 1,
@@ -3649,6 +3681,175 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "center"
+       }
+      }
+     ]
+    },
+    {
+     "r": 20,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total: 10",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 6,
+       "v": 46.04,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 7,
+       "v": 7.87,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 8,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 9,
+       "v": "",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",

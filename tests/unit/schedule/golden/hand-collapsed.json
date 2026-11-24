@@ -294,7 +294,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 10",
     "count": 10,
     "cells": [
      null,
@@ -328,7 +328,7 @@
   "Generic 200mm,Roof,,1",
   "Generic 200mm,Level 10,Y,1",
   "Generic 200mm: 7,,7,7",
-  "Grand total,,10,10"
+  "Grand total: 10,,10,10"
  ],
  "xlsx": [
   {
@@ -1259,7 +1259,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 10",
        "font": {
         "bold": true
        },

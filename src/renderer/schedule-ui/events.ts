@@ -56,7 +56,7 @@ import {
   clearPicks, hoverPeek, peekKey, pickedIds, pickerKey, pickerMode, refreshPicker, resetPicker, setQuery, setView,
   toggleEmpty, toggleFold, toggleTick,
 } from './fieldPicker';
-import { openChip, openChipPopover, toggleChip } from './viewBar';
+import { openChip, openChipPopover, toggleChip, toggleChipMore } from './viewBar';
 import { listSaved } from './schedules';
 
 const num = (el: HTMLElement) => Number((el as HTMLInputElement).value);
@@ -550,10 +550,12 @@ function wireFilter(root: HTMLElement) {
     state.removedBy = null;
     updateDef((def) => act.removeFilterRule(def, i));
   });
-  // A segmented pair, not a select — data-v carries which side was clicked. The view bar's
-  // and / or join between two chips sends the other value through the same act.
-  onClick(root, '[data-act="filter-logic"]', (el) =>
-    updateDef((def) => act.setFilterMode(def, el.dataset.v === 'or' ? 'or' : 'and')));
+  // The view bar's ALL / ANY pill (2026-11-25, the one place it is) names no side, and one
+  // click switches; a control that names one (data-v) sets that side.
+  onClick(root, '[data-act="filter-logic"]', (el) => updateDef((def) => {
+    const v = el.dataset.v ?? ((def.filterLogic ?? 'and') === 'and' ? 'or' : 'and');
+    return act.setFilterMode(def, v === 'or' ? 'or' : 'and');
+  }));
   onChange(root, '[data-act="filter-field"]', (el) => updateDef((def) => {
     const f = fieldFromKey(text(el));
     // The old value may be meaningless against a different field, so the action clears it.
@@ -623,8 +625,17 @@ function wireSort(root: HTMLElement) {
     const f = fieldFromKey(text(el));
     return f ? act.setSortField(def, idx(el), f) : def;
   }));
-  onClick(root, '[data-act="sort-dir"]', (el) =>
-    updateDef((def) => act.setSortDir(def, idx(el), el.dataset.v === 'desc' ? 'desc' : 'asc')));
+  // The level popover's Order pair names a direction (data-v); the view bar's arrow names
+  // none, and one click reverses it.
+  onClick(root, '[data-act="sort-dir"]', (el) => updateDef((def) => {
+    const v = el.dataset.v ?? (def.sort[idx(el)]?.dir === 'desc' ? 'asc' : 'desc');
+    return act.setSortDir(def, idx(el), v === 'desc' ? 'desc' : 'asc');
+  }));
+  // The view bar's group segment: exactly the column menu's Group by this, on this level.
+  onClick(root, '[data-act="sort-group"]', (el) => updateDef((def) => {
+    const k = idx(el);
+    return def.sort[k] ? act.setGroupOptions(def, k, groupFlip(def.sort[k])) : def;
+  }));
   onChange(root, '[data-act="sort-header"]', (el) =>
     updateDef((def) => act.setGroupOptions(def, idx(el), { header: checked(el) })));
   onChange(root, '[data-act="sort-blank"]', (el) =>
@@ -634,13 +645,22 @@ function wireSort(root: HTMLElement) {
     updateDef((def) => act.setGroupOptions(def, idx(el), { footer: checked(el) ? 'titleCountTotals' : 'none' })));
   onChange(root, '[data-act="sort-footer-style"]', (el) =>
     updateDef((def) => act.setGroupOptions(def, idx(el), { footer: text(el) as SortLevel['footer'] })));
-  onChange(root, '[data-act="itemize"]', (el) =>
-    updateDef((def) => act.setItemize(def, checked(el))));
-  onClick(root, '[data-act="combine"]', (el) =>
-    updateDef((def) => act.setCombine(def, el.dataset.v === 'sort' ? 'sort' : 'identical')));
-  onChange(root, '[data-act="grand-total"]', (el) =>
-    updateDef((def) => act.setGrandTotal(def, checked(el))));
+  // The Rows popover's one choice of three (2026-11-25): itemise and how it combines, in one
+  // update, so one undo step. Every element keeps the combine key, which only itemise off reads.
+  onClick(root, '[data-act="rows-mode"]', (el) => updateDef((def) => {
+    const v = el.dataset.v;
+    if (v === 'every') return act.setItemize(def, true);
+    return act.setCombine(act.setItemize(def, false), v === 'sort' ? 'sort' : 'identical');
+  }));
+  // The view bar's Σ (2026-11-25): one click switches. Its label box is the Rows popover's.
+  onClick(root, '[data-act="grand-total"]', () => updateDef((def) => act.setGrandTotal(def, !def.grandTotal)));
   liveText(root, '[data-act="grand-title"]', (def, v) => act.setGrandTotalTitle(def, v));
+}
+
+/** Grouped = a level with a header or a footer; switching it off keeps the sort. */
+function groupFlip(l: SortLevel): Partial<SortLevel> {
+  const grouped = !!l.header || (l.footer ?? 'none') !== 'none';
+  return grouped ? { header: false, footer: 'none', blankLine: false } : { header: true, footer: 'titleCountTotals' };
 }
 
 // ---------------------------------------------------------------- formatting
@@ -718,14 +738,17 @@ function wireFormat(root: HTMLElement) {
 
 function wireAppearance(root: HTMLElement) {
   liveText(root, '[data-act="app-title"]', (def, v) => act.setAppearance(def, { title: v }));
-  const toggle = (name: string, key: 'showTitle' | 'gridLines' | 'outline' | 'blankRowBeforeData' | 'zebra' | 'headerBold') =>
+  const toggle = (name: string, key: 'showTitle' | 'outline' | 'blankRowBeforeData' | 'headerBold') =>
     onChange(root, `[data-act="${name}"]`, (el) => updateDef((def) => act.setAppearance(def, { [key]: checked(el) })));
   toggle('app-showtitle', 'showTitle');
-  toggle('app-grid', 'gridLines');
   toggle('app-outline', 'outline');
   toggle('app-blankfirst', 'blankRowBeforeData');
-  toggle('app-zebra', 'zebra');
   toggle('app-headerbold', 'headerBold');
+  // The view bar's two switches (2026-11-25): one click each; both are on unless set off.
+  onClick(root, '[data-act="app-grid"]', () =>
+    updateDef((def) => act.setAppearance(def, { gridLines: def.appearance?.gridLines === false })));
+  onClick(root, '[data-act="app-zebra"]', () =>
+    updateDef((def) => act.setAppearance(def, { zebra: def.appearance?.zebra === false })));
   // Full repaint, not 'table': the Style popover shows a note about the chosen face.
   onChange(root, '[data-act="app-font"]', (el) =>
     updateDef((def) => act.setAppearance(def, { bodyFont: text(el) })));
@@ -736,8 +759,8 @@ function wireAppearance(root: HTMLElement) {
 // ---------------------------------------------------------------- view bar
 
 // The chips at the top of the centre column. Their controls' acts are wired by concern
-// (filter, sorting, appearance); what is wired here is opening them and the two "+" field
-// lists.
+// (filter, sorting, appearance); what is wired here is opening them (`+N` included) and the
+// two "+" field lists.
 function wireViewBar(root: HTMLElement) {
   onClick(root, '[data-act="vb-open"]', (el) => {
     const kind = el.dataset.v ?? '';
@@ -750,6 +773,10 @@ function wireViewBar(root: HTMLElement) {
   // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. At the cap both
   // say so and add nothing.
   onClick(root, '[data-act="vb-add"]', (el) => addFrom(el.dataset.v ?? '', el.dataset.id ?? ''));
+  // A sort level's or the Style popover's More… (2026-11-25): opening it changes no schedule.
+  onClick(root, '[data-act="vb-more"]', () => { toggleChipMore(); paintPopover(); });
+  // An empty table's "Change that filter": the rule's editor, on its chip or on +N.
+  onClick(root, '[data-act="open-filter"]', (el) => { openChipPopover('filter', idx(el)); paintPopover(); });
   wirePicker(root);
 }
 
@@ -918,11 +945,7 @@ function wireColumnMenu(root: HTMLElement) {
     if (!state.def.columns[i] || atCap(i)) return;
     updateDef((def) => {
       const [next, k] = levelFor(def, i);
-      const l = next.sort[k];
-      const grouped = !!l.header || (l.footer ?? 'none') !== 'none';
-      return act.setGroupOptions(next, k, grouped
-        ? { header: false, footer: 'none', blankLine: false }
-        : { header: true, footer: 'titleCountTotals' });
+      return act.setGroupOptions(next, k, groupFlip(next.sort[k]));
     });
   });
   // A new rule on this field, finished in its own chip's popover.

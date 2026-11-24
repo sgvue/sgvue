@@ -162,12 +162,13 @@ describe('one row design and one action set for both sources', () => {
     expect(bar(mine)).toContain('aria-label="Duplicate"');
   });
 
+  // 2026-11-25: in words through the fast tooltip (`data-tip`, tips.ts), no longer a slow `title`.
   it('every icon button says what it does, in words', () => {
     saveSchedule(def('Door setup'), null);
     const html = renderLibrary({ ...state, librarySel: 'm:Door setup' }, store);
     for (const m of html.matchAll(/<button class="icon-btn[^>]*>/g)) {
-      expect([m[0].slice(0, 60), /aria-label="[^"]+"/.test(m[0]), /title="[^"]+"/.test(m[0])])
-        .toEqual([m[0].slice(0, 60), true, true]);
+      expect([m[0].slice(0, 60), /aria-label="[^"]+"/.test(m[0]), /data-tip="[^"]+"/.test(m[0]), /\stitle=/.test(m[0])])
+        .toEqual([m[0].slice(0, 60), true, true, false]);
     }
   });
 

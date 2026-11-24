@@ -24,6 +24,7 @@
 
 import type { UnitSystem } from '../ifc/units';
 import { emptySchedule, type Column, type CoreKey, type FieldRef, type FilterRule, type ScheduleDef } from './def';
+import { kindOfDisplay, withDefaultTotal } from './columns';
 import { ANY_PSET } from './resolve';
 
 export interface Preset {
@@ -281,7 +282,8 @@ export function scheduleFromPreset(p: Preset, system: UnitSystem = 'metric'): Sc
   if (system === 'imperial') columns.forEach(imperialise);
   return {
     ...emptySchedule(p.name, [...p.entities]),
-    columns,
+    // A grand total, and Sum on each quantity column, as every new schedule has (2026-11-25).
+    columns: columns.map((c) => withDefaultTotal(c, kindOfDisplay(c.format?.display))),
     filters: structuredClone(p.filters ?? []),
     sort: [{ field: { kind: 'core', key: 'storey' }, dir: 'asc', header: true, footer: 'count' }],
     meta: { notes: `SGVue template — ${p.name}` },
