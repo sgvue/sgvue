@@ -107,3 +107,13 @@ export function displayNum(v: unknown, kind: UnitKind, system?: UnitSystem): str
 
 /** The box's text, read back to SI — moved to the engine (v1.5.0, phase 1); one copy. */
 export { storeNum } from '../../../schedule/schedule/format';
+
+/** A row of segmented buttons; `at` is any extra attributes, such as the column a menu edits. */
+export function seg(act: string, opts: [string, string][], on: string, at: string, label: string): string {
+  return `<div class="seg" role="group" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button class="seg-btn${
+    v === on ? ' on' : ''}" data-act="${act}" data-v="${esc(v)}"${at} aria-pressed="${v === on}">${esc(l)}</button>`).join('')}</div>`;
+}
+
+/** A labelled popover row: the label, then its control. */
+export const rowx = (label: string, body: string) =>
+  `<div class="pop-row"><span class="pop-lbl">${esc(label)}</span><div class="grow-1">${body}</div></div>`;

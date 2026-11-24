@@ -69,8 +69,11 @@ export function colourColumn(
 ): ColumnColours | { error: string } | null {
   const col = def.columns[defcol];
   if (!col || col.hidden) return null;
-  // Uncapped: the screen draws 5 000 rows, and the 3D view must not stop there.
-  const full = runSchedule(store, def, { cap: Infinity });
+  // Uncapped: the screen draws 5 000 rows, and the 3D view must not stop there. Combined by
+  // sort value, a row's cell can be <varies> or a total over its elements: each element is
+  // coloured by its OWN displayed value instead, from the same definition itemised.
+  const bySort = def.itemize === false && def.combine === 'sort';
+  const full = runSchedule(store, bySort ? { ...def, itemize: true } : def, { cap: Infinity });
   const vi = def.columns.filter((c) => !c.hidden).indexOf(col);
   const groups = columnGroups(full, vi, rowIds);
   if (!groups.length) return { error: 'Nothing to colour — this column has no values.' };

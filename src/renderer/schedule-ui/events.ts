@@ -636,6 +636,8 @@ function wireSort(root: HTMLElement) {
     updateDef((def) => act.setGroupOptions(def, idx(el), { footer: text(el) as SortLevel['footer'] })));
   onChange(root, '[data-act="itemize"]', (el) =>
     updateDef((def) => act.setItemize(def, checked(el))));
+  onClick(root, '[data-act="combine"]', (el) =>
+    updateDef((def) => act.setCombine(def, el.dataset.v === 'sort' ? 'sort' : 'identical')));
   onChange(root, '[data-act="grand-total"]', (el) =>
     updateDef((def) => act.setGrandTotal(def, checked(el))));
   liveText(root, '[data-act="grand-title"]', (def, v) => act.setGrandTotalTitle(def, v));

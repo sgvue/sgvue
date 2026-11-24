@@ -26,11 +26,30 @@ plus a unit lost through a link with no named unit; all fixed with a failing che
 fixes and found one more route of the same kind ("Point this column at…" on a heading typed then cleared), fixed
 the same way and **not reviewed a third time**. Old files: 4 000 random old-style schedules calculate cell for
 cell as at `e67e76e`; only message texts differ where a formula was already blank. Typecheck, lint, build,
-privacy clean; `npm test` 5 171 passed, 4 skipped. **In a window:** `tests/e2e/chained-formulas.spec.ts` and
-`vee-column-dot.spec.ts`, 2 passed on macOS (peak 514 MB, nothing survived). **Known, left as before this
+privacy clean. **Landed after the Revit-style rows** (below): `main` brought in, the uniqueness tripwire fired
+for that build's new `setCombine` action and it was classified, and `chain-combine.test.ts` checks a chained value
+in rows combined by sort value against the formula written in place (120 seeds, `<varies>` and totals included);
+`npm test` 5 266 passed, 4 skipped. **In a window:** `tests/e2e/chained-formulas.spec.ts`,
+`vee-column-dot.spec.ts` and `combine-by-sort.spec.ts`, 3 passed on macOS (peak 526 MB, nothing survived). **Known, left as before this
 build:** two model columns sharing a heading a formula names leave it blank with no message; on an old file with
 a model column and a calculated value of one name, removing the model column makes the formula read the
 calculated one. Not seen on Windows; the live eval was not run.
+
+## 2026-11-24 — itemise off can combine rows by sort value, as Revit does
+
+**Did.** In the Schedules window, with "Itemise every instance" off, the Rows chip offers Combine: "Identical rows"
+(the default, unchanged) or "By sort value" — one row per distinct value of the sort levels (owner-approved
+prototype `prototype/revit-rows/`). A combined row's cell is its column's total over the row's elements, else the
+one value they all display, else `<varies>` (muted, claimed by no colour rule, text in CSV and Excel). The chip
+reads "One row per Level + Type", the status line "Collapsed from N instances by Level + Type".
+`ScheduleDef.combine?: 'sort'` is additive; `make_schedule` takes `combine` and `get_schedule` reads combined rows
+truthfully. Checks were written first: the 16 prototype doors, an independent oracle over 300 seeded schedules, Vee's
+side. **Deep review, two rounds (2026-11-25):** round 1 found two readers showing a wrong value, both fixed with a
+failing check first (`combine-review.test.ts`): Excel formatted a Count on a combined row with the column's unit
+(`2 mm`), and "Colour 3D by this column" took `<varies>` and row totals for element values; also `make_schedule`'s
+`combine: 'sort'` now switches itemise off. Round 2 passed. **Seen in a window** on the owner's yes (2026-11-25, `tests/e2e/combine-by-sort.spec.ts`,
+guarded, 6.4 s, peak footprint 535 MB, nothing survived): the demo building's doors grouped by Level, the chip
+"One row per Level", the Combine control and its hint, muted `<varies>` cells in both themes, the status line.
 
 ## 2026-11-24 — a calculated column Vee made carries a dot and Vee's plain-words note
 
@@ -173,13 +192,10 @@ The published files are built by `release.yml` from the tag, not these. Installe
 
 **Known limits, recorded in `docs/DECISIONS.md`:** a `Model = STR` rule follows the file on screen while the other file is open; a project saved in that state, reopened, then located with Replace also hides on `m2` what was hidden in the other file (older fault in `mergeLocated`, easier to reach now — a follow-up). **Also read:** the slot question from the Locate… hand-over is not reachable in the app as it stands (the real `addModel` has no pause). **Owed:** nothing was seen in a window.
 
-## 2026-11-12 — Locate… works again after a located model did not load
-
-**Did.** In an open `.sgvue`, a file picked with Locate… that did not end up open stayed marked "being located", so picking it again was refused as `already open in this project` until the project was reopened. Five ways in: it fails to parse, its join fails, the project's batch it shares fails, the project's own failed boot unloads it after it joined, or "Replace model?" is cancelled (the fifth found while writing the checks). Now the mark is released when the pipeline queued the file, nothing holds it any more and it is not open (`releaseDead`, `locateOver`), and at once when nothing was queued. **Decided:** a located model is still unloaded when the project's own boot fails (that loop is the offset fix's); it can be located again, and the retry boots the project. Fix mode, Risky lane: failing checks first by a separate run (five ways failing at the refusal, two guards passing), builder — who stopped when the first design broke an existing check, rather than edit it; the design was changed so a load the pipeline never saw queued is never over — `reviewer-deep` PASS in one round, then a third guard for the half of the rule no test pinned. Headless: typecheck, lint, the whole unit suite, privacy. **Not seen in a window.** **Noticed, not changed** (row in `docs/DECISIONS.md`): with another file open under a missing model's key, a save writes that file's path for the project's model and drops its hidden references; a located model joining while the project's own model is still being put in the scene may share its slot (harness only so far); the failed-boot banner can name the wrong cause.
-
 ## Earlier work
 
-- **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a line along the stage's top edge and a caption in the bottom row
+- **2026-11-12** — Locate… works again after a located model did not load: the "being located" mark is released when nothing holds the file any more. Not seen in a window
+- **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a five-segment line along the 3D view's top edge and a caption in the bottom row, seen in a window
 - **2026-11-11** — the repo audit's fixes: decisions 6 to 10, and the sure list
 - **2026-11-11** — a project opened while another still loads (follow-up to "a project settles", below)
 - **2026-11-11** — Ask Vee's box tools and SQL read a turned building square with it (option A). **Owed:** the plan-box gather timed on a model of several million triangles in the guarded benchmark

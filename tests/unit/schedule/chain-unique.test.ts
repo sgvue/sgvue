@@ -35,7 +35,7 @@ const NOT_NAMING: ActionName[] = [
   'addConditionalRule', 'removeConditionalRule', 'updateConditionalRule', 'addFilterRule', 'removeFilterRule',
   'setFilterMode', 'setFilterField', 'setFilterOp', 'setFilterValue', 'setFilterRange', 'setFilterValues',
   'addSortLevel', 'removeSortLevel', 'moveSortLevel', 'setSortField', 'setSortDir', 'setGroupOptions',
-  'setItemize', 'setGrandTotal', 'setGrandTotalTitle', 'setAppearance', 'setName', 'setCalculatedResult',
+  'setItemize', 'setCombine', 'setGrandTotal', 'setGrandTotalTitle', 'setAppearance', 'setName', 'setCalculatedResult',
   'setCalculatedUnitKind',
 ];
 const ACTIONS = Object.keys(act).filter((k) => !HELPERS.includes(k)) as ActionName[];

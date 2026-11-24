@@ -514,6 +514,7 @@ describe('the Schedules window’s tools', () => {
       'calculated',
       'category',
       'columns',
+      'combine',
       'filterLogic',
       'filters',
       'grandTotals',

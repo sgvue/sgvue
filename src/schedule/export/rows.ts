@@ -18,6 +18,10 @@ export interface ExportRow {
    * format that carries only text (CSV) ignores it.
    */
   nums?: CellNumbers;
+  /** A combined-by-sort data row's `<varies>` flags, aligned with `cells`; absent elsewhere. */
+  mixed?: boolean[];
+  /** A combined-by-sort data row's total cells (formatted as a footer's), aligned with `cells`. */
+  totalled?: boolean[];
   /** Indent depth for group headers and footers. */
   level: number;
 }
@@ -50,6 +54,8 @@ export function toRows(res: ScheduleResult, includeHeader = true): ExportRow[] {
           cells: pad([...r.cells, ...(count ? [String(r.count)] : [])]),
           // The Count column is a number too — it is what an itemised export would sum.
           nums: padNums([...numsOf(r), ...(count ? [r.count] : [])]),
+          ...(r.mixed ? { mixed: r.mixed } : {}),
+          ...(r.totalled ? { totalled: r.totalled } : {}),
           level: 0,
         });
         break;

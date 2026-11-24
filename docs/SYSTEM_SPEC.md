@@ -1524,7 +1524,7 @@ kinds; a gated call is a `view` call that changes nothing by itself.
 | `manage_markups` | view | `op` (`list` / `focus` / `place_spot` / `place_measure` / `show` / `delete` / `clear`), `name?` (`M2`, `C1` — as the card names it), `kind?` (`measures` / `spots`, for `clear`); for placing: `id?` (an element) with `at?` (`top` / `centre` / `base` of its bounding box), or `point?` (`{x, y, z}`, project-frame metres, ±10⁷); `show?` (`level` / `full`, a spot tag's state) |
 | `request_user_action` | view | `action` (`open_files` / `open_recent` / `unload_model` / `copy_link` / `copy_guids`; `set_base_point` until 2026-10-08), `recent?` (a file's **name** on the recent list, ≤ 255 characters, never a path), `model?` (a loaded model's key), `ids?` (≤ 2 000), `selection?` or `schedule?` |
 | `manage_schedules` | view | `op` (`open` / `undo` / `redo` / `templates` / `apply_template` / `saved_list` / `load` / `save` / `rename` / `duplicate` / `delete` / `print` / `open_file`), `name?` (a saved setup's, or a template's name or id, ≤ 200 characters, no control or direction character), `to?` (for `rename`, the same bound) |
-| `make_schedule` | view | `base?` (`new` / `open`), `title?`, `category?` (≤ 12), `columns?` (≤ 40; each `field`, `heading?`, `total?`, and since phase 4 `hidden?`, `decimals?` (0–6), `unit?`, `align?`, `after?`), `removeColumns?`, `calculated?` (≤ 20; each `name`, `formula?` or `percentageOf?`, `result?`, and since 2026-11-24 `note?` (≤ 160)), `filters?` (≤ 8), `filterLogic?` (`and` / `or`), `sortBy?`, `groupBy?` (≤ 4 with `sortBy`), `itemize?`, `grandTotals?` |
+| `make_schedule` | view | `base?` (`new` / `open`), `title?`, `category?` (≤ 12), `columns?` (≤ 40; each `field`, `heading?`, `total?`, and since phase 4 `hidden?`, `decimals?` (0–6), `unit?`, `align?`, `after?`), `removeColumns?`, `calculated?` (≤ 20; each `name`, `formula?` or `percentageOf?`, `result?`, and since 2026-11-24 `note?` (≤ 160)), `filters?` (≤ 8), `filterLogic?` (`and` / `or`), `sortBy?`, `groupBy?` (≤ 4 with `sortBy`), `itemize?`, and since 2026-11-24 `combine?` (`identical` / `sort`), `grandTotals?` |
 | `get_schedule` | read | `limit?` (≤ 50), `offset?` |
 | `export_schedule` | view | `format` (`xlsx` / `csv` / `all_saved` / `schedule_file`) |
 | `color_by_schedule_column` | view | `column` (a heading or field of the open schedule; `null` clears) |
@@ -1708,7 +1708,9 @@ is not told whether they do — so tell them what is waiting, and never say it w
   (`schedule/assistant.ts`, `buildSchedule`) — the Filter, Sorting and Format tabs until 1.5.0,
   the view bar's chips and a column's menu since. `filterLogic` is the filter popover's
   every-rule / any-rule switch; `itemize: false` (the Rows chip) collapses rows that read alike
-  into one with a Count. Per column: `hidden`; `align`; `decimals`, on a number only; `unit`, one
+  into one with a Count; since 2026-11-24 `combine: 'sort'` (the Rows chip's Combine control)
+  instead makes one row per sort value, a column whose elements differ reading `<varies>`; it
+  switches itemise off, and beside `itemize: true` it is refused. Per column: `hidden`; `align`; `decimals`, on a number only; `unit`, one
   the column menu offers for
   what the column measures (a length: mm, cm, m, km, in, ft; `m2` and `m3` are read as m² and
   m³) — anything else is refused with that list; and `after`, the heading or field of the column

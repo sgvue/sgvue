@@ -194,6 +194,7 @@ const ScheduleInput = z.object({
     .optional(),
   filterLogic: en(['and', 'or']).optional(),
   itemize: z.boolean().optional(),
+  combine: en(['identical', 'sort']).optional(),
   filters: z
     .array(
       z.object({

@@ -43,7 +43,7 @@ function shapeOf(def: ScheduleDef): string {
     (def.calculated ?? []).map((c) => [c.result, c.unitKind, c.yesNo, c.ofField]),
     def.filters.map((f) => [f.field, f.op]),
     def.sort.map((s) => [s.field, s.dir]),
-    def.itemize, def.grandTotal,
+    def.itemize, def.grandTotal, def.combine,
   ]);
 }
 

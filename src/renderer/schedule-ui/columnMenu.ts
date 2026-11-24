@@ -29,7 +29,7 @@ import { ICON } from './icons';
 import { calcProblems } from './overlays/calcEditor';
 import { conditionalRules } from './panels/conditionalRules';
 import { remapBlock } from './remap';
-import { kindOf, toggle, typeOf } from './panels/shared';
+import { kindOf, rowx, seg, toggle, typeOf } from './panels/shared';
 import { openPopover, popoverId, togglePopover } from './popover';
 import { alignOf, cellStyle, veeCalc } from './tableView';
 
@@ -113,15 +113,6 @@ function totalsFor(type: string, numeric: boolean): [string, string][] {
   if (type === 'bool') return [['', 'None'], ['sum', 'Yeses'], ['count', 'Count']];
   return [['', 'None'], ['count', 'Count'], ['countDistinct', 'Distinct']];
 }
-
-/** A row of segmented buttons; `at` names the column. */
-function seg(act: string, opts: [string, string][], on: string, at: string, label: string): string {
-  return `<div class="seg" role="group" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button class="seg-btn${
-    v === on ? ' on' : ''}" data-act="${act}" data-v="${esc(v)}"${at} aria-pressed="${v === on}">${esc(l)}</button>`).join('')}</div>`;
-}
-
-const rowx = (label: string, body: string) =>
-  `<div class="pop-row"><span class="pop-lbl">${esc(label)}</span><div class="grow-1">${body}</div></div>`;
 
 export function renderColumnMenu(
   state: AppState, store: ModelStore, cov: Coverage, res: ScheduleResult,
