@@ -21,7 +21,7 @@ import { BOOL_STYLES, headingOf, type Column, type ScheduleDef } from '../../sch
 import { ANY_PSET } from '../../schedule/schedule/resolve';
 import type { ScheduleResult } from '../../schedule/schedule/engine';
 import { DECIMALS_MAX, DECIMALS_MIN, defaultDecimals, defaultUnit, unitOptions } from '../../schedule/schedule/format';
-import type { AppState } from './state';
+import { refusalFor, type AppState } from './state';
 import { COL_WIDTH_MAX, COL_WIDTH_MIN } from './colResize';
 import { coverBar, fraction, populated, type Coverage } from './coverage';
 import { esc, option } from './dom';
@@ -176,8 +176,11 @@ export function renderColumnMenu(
 
   const hiddenNote = col.hidden
     ? `<div class="pop-note"><span class="grow-1">Hidden — still sorts, groups and filters.</span><button class="btn" data-act="cm-show"${at}>Show</button></div>` : '';
+  // A heading the box refused (2026-11-24): the box keeps what was typed and says why.
+  const refused = refusalFor(state, `col:${i}`);
   return `${hiddenNote}<input class="heading-in pop-focus" type="text" data-act="fmt-heading"${at}
-      value="${esc(col.heading ?? '')}" placeholder="${esc(name)}" aria-label="Heading shown in the table" />
+      value="${esc(refused ? refused.text : col.heading ?? '')}" placeholder="${esc(name)}" aria-label="Heading shown in the table" />
+    ${refused ? `<div class="pop-note bad"><span class="grow-1">${esc(refused.problem)}</span></div>` : ''}
     ${cover}
     ${units.length > 1 ? rowx('Unit', seg('cm-unit', units.map((u) => [u, u]), unit, at, 'Unit')) : ''}
     ${numeric ? rowx('Decimals', `<span class="row"><span class="stepper">

@@ -37,6 +37,7 @@ import {
   type Column, type CondRule, type FieldRef, type FilterRule, type ScheduleDef, type SortLevel, type TotalKind,
 } from '../../schedule/schedule/def';
 import { clampDecimals, defaultDecimals } from '../../schedule/schedule/format';
+import { headingBoxProblem, nameBoxProblem } from '../../schedule/schedule/calcNames';
 import { dimensionOf } from '../../schedule/schedule/formula';
 import { printSchedule, stepHistory } from './actions';
 import { later } from './pending';
@@ -123,6 +124,22 @@ export interface Hooks {
  * v1.5.0: `apply` is a pure action; its target is named by the box itself (`data-i`,
  * `data-defcol`, `data-id`), and nothing can move a column or a rule before the edit lands.
  */
+/**
+ * A name box's edit (2026-11-24): `problem` says why `value` is refused, or null. Refused, the
+ * definition is kept and the box remembers the text and the reason (`state.nameRefusal`);
+ * accepted, the edit lands and the box's refusal is dropped.
+ */
+function named(
+  def: ScheduleDef, key: string, value: string, problem: string | null, apply: () => ScheduleDef,
+): ScheduleDef {
+  if (problem) {
+    state.nameRefusal = { key, text: value, problem, def };
+    return def;
+  }
+  if (state.nameRefusal?.key === key) state.nameRefusal = undefined;
+  return apply();
+}
+
 function liveText(
   root: HTMLElement, selector: string,
   apply: (def: ScheduleDef, value: string, el: HTMLElement) => ScheduleDef, scope: RenderScope = 'all',
@@ -636,7 +653,8 @@ function wireFormat(root: HTMLElement) {
   const setFmt = (el: HTMLElement, patch: Partial<NonNullable<ScheduleDef['columns'][number]['format']>>) =>
     updateDef((def) => act.setColumnFormat(def, at(el), patch));
 
-  liveText(root, '[data-act="fmt-heading"]', (def, v, el) => act.setHeading(def, at(el), v));
+  liveText(root, '[data-act="fmt-heading"]', (def, v, el) =>
+    named(def, `col:${at(el)}`, v, headingBoxProblem(def, at(el), v), () => act.setHeading(def, at(el), v)));
   onClick(root, '[data-act="fmt-align"]', (el) => updateDef((def) =>
     act.setAlign(def, at(el), el.dataset.v as 'left' | 'center' | 'right')));
   // Same reasoning as the Width box below: `change` alone — Enter, or leaving the field — so
@@ -949,7 +967,8 @@ function wireCalculated(root: HTMLElement) {
 
   // A column pointing at a deleted calculation would render blank forever, so it goes too.
   onClick(root, '[data-act="calc-remove"]', (el) => updateDef((def) => act.removeCalculated(def, byId(el))));
-  liveText(root, '[data-act="calc-name"]', (def, v, el) => act.updateCalculated(def, byId(el), { name: v }));
+  liveText(root, '[data-act="calc-name"]', (def, v, el) =>
+    named(def, `calc:${byId(el)}`, v, nameBoxProblem(def, byId(el), v), () => act.updateCalculated(def, byId(el), { name: v })));
   liveText(root, '[data-act="calc-formula"]', (def, v, el) => act.updateCalculated(def, byId(el), { formula: v }));
   onChange(root, '[data-act="calc-of"]', (el) => updateDef((def) => {
     const f = fieldFromKey(text(el));

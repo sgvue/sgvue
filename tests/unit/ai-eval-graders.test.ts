@@ -1499,8 +1499,9 @@ describe('the case set', () => {
     // 63 after phase 3; phase 4 added three (its own test is below); 2026-10-08 took the base
     // point's case away with the request, when the Coordinate-system card became read-only;
     // 2026-11-08 added the twenty Ask Vee cases (their own test is at the end); 2026-11-09 two
-    // follow-up conversations among them; 2026-11-22 two more, an IFC+SG door schedule and a follow-up.
-    expect(CASES).toHaveLength(92)
+    // follow-up conversations among them; 2026-11-22 two more, an IFC+SG door schedule and a follow-up;
+    // 2026-11-24 one more, a formula naming another calculated column.
+    expect(CASES).toHaveLength(93)
     const names = new Set(TOOLS.map((t) => t.name))
     for (const c of CASES) {
       // A case written ahead of its capability may call a tool that build will add (stage 2's
@@ -1753,9 +1754,9 @@ describe('the Ask Vee cases (2026-11-08)', () => {
 
   it('are twenty-two, after every older case, and each one fails a null agent', () => {
     // Twenty on 2026-11-08; 2026-11-09 the owner's follow-up, narrowed and not; 2026-11-22 the CoP
-    // door schedule and a follow-up that changes the open schedule.
-    expect(VEE_CASES).toHaveLength(27)
-    expect(CASES.slice(-27).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
+    // door schedule and a follow-up that changes the open schedule; 2026-11-24 the chained formula.
+    expect(VEE_CASES).toHaveLength(28)
+    expect(CASES.slice(-28).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
     for (const c of VEE_CASES) {
       expect([c.id, c.tags.includes('vee')]).toEqual([c.id, true])
       expect([c.id, G.gradeCase(c, obs(), {}, kindOf).grade.pass]).toEqual([c.id, 0])
@@ -1778,8 +1779,8 @@ describe('the Ask Vee cases (2026-11-08)', () => {
     expect(runsOf(byId.get('ans-counts'))).toBe(1)
     expect(runsOf(byId.get('op-scope-guard'))).toBe(3)
     for (const id of TRIPLE_RUN_IDS) expect([id, byId.has(id)]).toEqual([id, true])
-    // About twenty that a build without stage 2 can score (twenty-two since the 2026-11-09 follow-ups, twenty-four since 2026-11-22).
-    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(27)
+    // About twenty that a build without stage 2 can score (twenty-two since the 2026-11-09 follow-ups, twenty-four since 2026-11-22, one more since 2026-11-24).
+    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(28)
     expect(PILOT_MAX).toBe(5)
     for (const id of PILOT_IDS) expect([id, TRIPLE_RUN_IDS.includes(id), !!byId.get(id).requires]).toEqual([id, true, false])
   })
@@ -2317,5 +2318,54 @@ describe('the calculated-column cases (2026-11-24)', () => {
       ['contains(Type, "FD")', 'contains([Type], "FD")', 'contains([Object Type],"FD")', 'if(contains(Type, "FD"), "FD", "")'],
       ['contains(Name, "FD")', 'contains(Type, "FDX")', 'starts(Type, "FD")', 'contains(TypeName, "FD")', 'contains(Name & Type, "FD")']
     )
+  })
+})
+
+/*
+ * 2026-11-24 — a formula may name another calculated column: one case, graded on the second
+ * formula naming the first column (`Volume`), never on the expanded `Area * Height * 1.1`.
+ */
+describe('the chained calculated-column case (2026-11-24)', () => {
+  const kindOfTool = (n: string): string => TOOLS.find((t) => t.name === n)?.kind ?? 'unknown'
+  const c = CASES.find((k: { id: string }) => k.id === 'calc-vee-chain')
+  const withCalc = (calculated: unknown) =>
+    obs({
+      store: {
+        stack: [], colorBy: null, table: null, pending: null, chips: [],
+        schedules: {
+          open: { title: 'Door Schedule', category: ['IfcDoor'], columns: ['Name', 'Area', 'Height', 'Volume', 'Volume +10%'], filters: '', rowCount: 17 },
+          undo: 1, redo: 0, saved: [], exports: [], asked: [], calculated
+        }
+      },
+      storeBefore: { stack: [], colorBy: null, schedules: null }
+    })
+  const vol = { name: 'Volume', kind: 'formula', formula: 'Area * Height', by: 'vee', note: 'Area times height.' }
+  const plus = { name: 'Volume +10%', kind: 'formula', formula: 'Volume * 1.1', by: 'vee', note: 'Ten percent more than the volume.' }
+
+  it('is a Vee case on the Schedules stand-in, wanting both columns by Vee with a note', () => {
+    expect(!!c).toBe(true)
+    expect([VEE_CASES.includes(c), c.harness?.schedules, c.requires, runsOf(c)]).toEqual([true, true, undefined, 3])
+    const want = c.expect.view.schedule.calculated
+    expect(want).toHaveLength(2)
+    expect(want.every((w: { by: string; note: boolean }) => w.by === 'vee' && w.note === true)).toBe(true)
+    const sent = c.oracle.calls.find((x: { name: string }) => x.name === 'make_schedule').input.calculated
+    expect(sent.map((s: { formula: string }) => s.formula)).toEqual(['Area * Height', 'Volume * 1.1'])
+  })
+
+  it('passes the two columns, and fails the expanded formula or the first alone', () => {
+    const spec = { expect: { view: { schedule: { category: ['IfcDoor'], calculated: c.expect.view.schedule.calculated } } } }
+    expect(G.gradeCase(spec, withCalc([vol, plus]), {}, kindOfTool).grade.pass).toBe(1)
+    expect(G.gradeCase(spec, withCalc([vol, { ...plus, formula: 'Area * Height * 1.1' }]), {}, kindOfTool).grade.pass).toBe(0)
+    expect(G.gradeCase(spec, withCalc([vol]), {}, kindOfTool).grade.pass).toBe(0)
+  })
+
+  it('its pattern reads a reference to Volume, and nothing else', () => {
+    const re = new RegExp(c.expect.view.schedule.calculated[1].formula, 'i')
+    for (const f of ['Volume * 1.1', '1.1 * Volume', '[Volume] * 1.1', 'Volume + Volume * 0.1', '[Volume]*1.10', 'round(Volume * 1.1, 3)', 'Volume+[Volume]*.1']) {
+      expect([f, re.test(f)]).toEqual([f, true])
+    }
+    for (const f of ['Area * Height * 1.1', 'Volume * 1.2', 'Volume2 * 1.1', 'Volume * 11', 'Volume + 0.1', 'Volume * 1.01', 'Volume * 1.15', 'Area * 1.1']) {
+      expect([f, re.test(f)]).toEqual([f, false])
+    }
   })
 })

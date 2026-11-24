@@ -135,6 +135,22 @@ export interface AppState {
    * from and each displayed value's colour.
    */
   colours: { live: boolean; key: string | null; map: Map<string, string> };
+  /**
+   * 2026-11-24 — a name box whose last text was refused (a calculated value's name another
+   * column has, or a heading a calculated value has): which box (`calc:<id>` or `col:<i>`),
+   * what was typed, and why. The definition keeps the old name; the box keeps the text and says
+   * why, so typing on to a free name lands it. It holds only while `def` is still the definition
+   * on screen — any later edit, undo included, makes it lapse. Transient, never saved.
+   */
+  nameRefusal?: NameRefusal;
+}
+
+export interface NameRefusal { key: string; text: string; problem: string; def: ScheduleDef }
+
+/** The refusal for box `key`, while it still holds. */
+export function refusalFor(state: AppState, key: string): NameRefusal | undefined {
+  const r = state.nameRefusal;
+  return r && r.key === key && r.def === state.def ? r : undefined;
 }
 
 export const state: AppState = {

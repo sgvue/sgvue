@@ -1335,6 +1335,60 @@ Anything not on this list is a defect.
   exports are unchanged. The user editing the formula, or a percentage's field, takes the dot
   and the note away; a rename or a new result type keeps them. A user's own calculated column
   and every model column look as before. **No new control.** Not yet seen in a window.
+- **2026-11-24 — in the Schedules window, a formula may use another calculated column by its
+  name, and a calculated column's name is unique.** Asked for by the owner. A formula names a
+  formula calculated value as it names a model column — bare or `[bracketed]`, ignoring case —
+  and gets its value and its unit through the chain (`Volume * 1.1` after `Volume = Area *
+  Height` is a volume); a text or yes / no result reads as a model text or boolean column does.
+  A percentage value cannot be named (it is worked out in a second pass over every row; the
+  formula says "A percentage cannot be used in a formula: …"). A loop is refused like a formula
+  that does not parse — each member's problem text, `.pop-note.bad`, blank cells: «"A" and "B"
+  use each other in a loop — a formula cannot use its own result, directly or through another
+  column.», or «"A" uses itself — …» for one naming itself. The calculated-value editor's
+  "Refer to:" line lists the calculated names a formula may use after the model headings. A
+  calculated name another column's heading or another calculated value already has (ignoring
+  case and surrounding spaces) is refused in the editor's name box — the definition keeps the
+  old name, the box keeps what was typed and says, in its existing `.tip-error` line, «Another
+  column is already called "…" — each calculated column needs a name of its own.»; emptying the
+  name of a value another formula uses says «Another formula uses this column, so it needs a
+  name.». The column menu's heading box refuses a calculated value's name the same way, in its
+  existing `.pop-note.bad`: «A calculated column is already called "…" — give this column
+  another heading.»; on a calculated value's own column it also refuses another column's
+  heading: «Another column is already called "…" — give this column another heading.». On a
+  model column it refuses another column's heading — typed, or the default it falls back to when
+  cleared — while a formula names this column or that heading: «Another column is already
+  called "…", and a formula uses one of the two — give this column another heading.»; the old heading
+  stays, and the next keystroke renames from it. Two model columns no formula names may still
+  share a heading, as before. A model column added from the field picker, or by `make_schedule`,
+  whose heading a calculated value already has is headed apart — the picker's own label for two
+  same-named fields, "Volume (Qto)", then a number until nothing has it ("Height 2" for one with
+  no property set to name) — so a formula naming the value keeps reading it. `make_schedule`
+  refuses a calculated name another column has, and a column heading a calculated value has
+  («A calculated column is already called "…" — give this column another heading.»), with the
+  reason; a calculated value it redefines under the name it already has is never a clash. Both
+  boxes refuse, while a formula uses the column, a name holding a bracket — «A name a formula
+  uses cannot contain [ or ].» — and so does `make_schedule` for a heading. A value that uses one
+  which cannot be worked out — a loop member, one naming itself, a formula that does not parse,
+  has no formula yet, names an unknown field or a percentage, or one blank for the same reason
+  (never a unit warning, whose value is still worked out) — is blank and says so in its own
+  problem text, counted in
+  the view bar's "formulas to fix": «Cannot be worked out: "A" has a problem.» (several: «"A"
+  and "B" have a problem.»); a loop member keeps its loop sentence. A value's unit through the
+  chain is the unit the formula written in place would have — intermediate values with no named
+  unit (`Area * Area`) included, so `Quad / Area` is an area and `Quad + Area` is marked as a
+  unit mistake — unless a value it uses declares its unit, which wins. A new calculated value's
+  default name skips a number already taken. Renaming a column — a calculated value's name box or
+  a model column's heading box, cleared back to its default included — rewrites the name tokens
+  of every formula that used it (never text in quotes; a name that is not one bare word is
+  written `[bracketed]`), keeping Vee's mark and note, in one undo step. Schedules saved before
+  open and calculate as they did: where a name is both a model column's heading and a calculated
+  value's, the model column wins; two calculated values sharing a name are an unknown field to a
+  formula; a formula naming a percentage value now reads «A percentage cannot be used in a
+  formula: …» where it read «Unknown field: …», and one naming itself, a ring, or a value that
+  is blank on every row reads the loop or «Cannot be worked out…» sentence instead (its cells
+  are blank as before in each case); nothing is renamed or re-headed on load. "Point this
+  column at…" keeps the heading the user reads also when it was typed and then cleared. No new key in any file format; the exports are unchanged. **No
+  new control.** Seen in a window on macOS (2026-11-25, `tests/e2e/chained-formulas.spec.ts`); not on Windows.
 - **2026-11-24 — in the Schedules window, itemise off can combine rows by sort value, as Revit
   does: one row per distinct value of the sort levels, a column whose values differ reading
   `<varies>`.** The owner: *"I kind of miss the revit version where you can just sort one of

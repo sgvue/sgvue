@@ -10,10 +10,11 @@
 // that guide inside this window (`formulaHelp.ts`) — ifcTable's `/formula.html` was a page.
 
 import type { ModelStore } from '../../../schedule/ifc/store';
+import { calcNames, nameKey } from '../../../schedule/schedule/calcNames';
 import { calcProblems as problemsOf } from '../../../schedule/schedule/computed';
 import { headingOf, resultOf, type Calculated, type ScheduleDef } from '../../../schedule/schedule/def';
 import { dimensionOf } from '../../../schedule/schedule/formula';
-import type { AppState } from '../state';
+import { refusalFor, type AppState } from '../state';
 import { esc, option } from '../dom';
 import { fieldKey, kindsByHeading, selectableFields } from '../panels/shared';
 import { ICON } from '../icons';
@@ -39,11 +40,20 @@ const CALC_KINDS: [string, string][] = [
   ['angle', 'angle'],
 ];
 
-/** Headings a formula may refer to — the columns that are not themselves calculated. */
+/**
+ * Names a formula may refer to — the columns that are not themselves calculated, then (since
+ * 2026-11-24) the formula calculated values a name means one of. Not a percentage.
+ */
 function formulaVariables(def: ScheduleDef): string[] {
-  return def.columns
-    .filter((c) => c.field.kind === 'core' || c.field.kind === 'prop')
-    .map((c) => headingOf(c, def));
+  const names = calcNames(def);
+  return [
+    ...def.columns
+      .filter((c) => c.field.kind === 'core' || c.field.kind === 'prop')
+      .map((c) => headingOf(c, def)),
+    ...(def.calculated ?? [])
+      .filter((c) => { const b = names.bindings.get(nameKey(c.name)); return b?.kind === 'calc' && b.id === c.id; })
+      .map((c) => c.name.trim()),
+  ];
 }
 
 /**
@@ -61,6 +71,8 @@ export function calcProblems(state: AppState, store: ModelStore): Map<string, st
 function calcRow(state: AppState, c: Calculated, problems: Map<string, string>, store: ModelStore): string {
   const def = state.def;
   const problem = problems.get(c.id);
+  // A name the box refused (2026-11-24): the box keeps what was typed and says why.
+  const refused = refusalFor(state, `calc:${c.id}`);
 
   // What the expression itself says the result measures. `Width * 2` is a length and
   // `Width * Height` is an area — the operands carry their kinds, so this is derived, not
@@ -92,13 +104,14 @@ function calcRow(state: AppState, c: Calculated, problems: Map<string, string>, 
        </select>
        <div class="sub">Each row as a percentage of this field's total.</div>`;
 
-  return `<div class="subcard${problem ? ' bad' : ''}" data-id="${esc(c.id)}">
+  return `<div class="subcard${problem || refused ? ' bad' : ''}" data-id="${esc(c.id)}">
     <div class="row">
-      <input type="text" data-act="calc-name" data-id="${esc(c.id)}" value="${esc(c.name)}"
+      <input type="text" data-act="calc-name" data-id="${esc(c.id)}" value="${esc(refused ? refused.text : c.name)}"
         placeholder="Name" class="grow-1" aria-label="Calculated value name" />
       <button class="icon-btn sm hv-warn-both" data-act="calc-remove" data-id="${esc(c.id)}"
         title="Remove" aria-label="Remove ${esc(c.name || 'calculated value')}">${ICON.remove}</button>
     </div>
+    ${refused ? `<div class="sub tip-error">${esc(refused.problem)}</div>` : ''}
     <div class="calc-body">${body}</div>
   </div>`;
 }

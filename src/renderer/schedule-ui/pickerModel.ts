@@ -8,6 +8,7 @@
 
 import type { ModelStore } from '../../schedule/ifc/store';
 import { fieldKey } from '../../schedule/schedule/actions';
+import { psetTag } from '../../schedule/schedule/calcNames';
 import { CORE_KEYS, CORE_LABELS, type FieldRef, type ScheduleDef } from '../../schedule/schedule/def';
 import { suggestedFor } from '../../schedule/schedule/presets';
 import { ANY_PSET } from '../../schedule/schedule/resolve';
@@ -57,8 +58,9 @@ export interface PickerModel {
   onlyEmpty: number;
 }
 
-/** "Qto" for a quantity set, the set's own name otherwise — shown only to tell twins apart. */
-const tagOf = (pset: string) => (/^qto_/i.test(pset) ? 'Qto' : pset.replace(/^pset_/i, ''));
+/** "Qto" for a quantity set, the set's own name otherwise — shown only to tell twins apart.
+ *  2026-11-25: `calcNames.ts`'s, which also tells a new column from a calculated value's name. */
+const tagOf = psetTag;
 
 /** 0…100, never rounding a gap away: 0 only when nothing carries it, 100 only when everything does. */
 export function pctOf(cov: Coverage, f: FieldRef): number {

@@ -7,7 +7,9 @@ import {
   emptySchedule, headingOf, resultOf,
   type Calculated, type Column, type CoreKey, type FieldRef, type ScheduleDef,
 } from './def';
+import { calcNames, nameKey } from './calcNames';
 import { defaultDecimals, defaultUnit } from './format';
+import { dimensionKey } from './formula';
 
 /**
  * A column built from a discovered property, with sensible display defaults.
@@ -111,9 +113,24 @@ export function kindOf(store: ModelStore, def: ScheduleDef, field: FieldRef): Un
  * kindOf because that is the answer it is assembling.
  */
 export function kindsByHeading(store: ModelStore, def: ScheduleDef): Map<string, string> {
-  return new Map(def.columns
+  const kinds = new Map(def.columns
     .filter((col) => col.field.kind === 'core' || col.field.kind === 'prop')
     .map((col) => [headingOf(col, def).toLowerCase(), kindOf(store, def, col.field) as string]));
+  // 2026-11-24 — a formula calculated value a formula may name, in the order they are worked
+  // out: what its author declared it measures, else what its own formula works out to through
+  // the chain — since 2026-11-25 (F4) also a dimension no unit kind names (`dimensionKey`), so a
+  // chain reads as the formula written in place. Text and yes / no are plain, as a model text or
+  // boolean column is. A loop, or a formula with no unit at all, is left out — `dimensionOf`
+  // then has no opinion.
+  const names = calcNames(def);
+  for (const id of names.order) {
+    const c = def.calculated!.find((x) => x.id === id)!;
+    const b = names.bindings.get(nameKey(c.name));
+    if (b?.kind !== 'calc' || b.id !== id) continue;
+    const kind = resultOf(c) !== 'number' ? 'none' : c.unitKind ?? dimensionKey(c.formula ?? '', kinds);
+    if (kind) kinds.set(nameKey(c.name), kind);
+  }
+  return kinds;
 }
 
 /**

@@ -4,6 +4,37 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-25 — a formula may use another calculated column; calculated names are unique
+
+**Did.** In the Schedules window a formula names another formula calculated value as it names a model column
+(`Waste = Volume * 1.1` after `Volume = Area * Height`), with its value and its unit through the chain, in any
+order in the list; a percentage is never a variable. A loop is refused like a formula that does not parse, naming
+its members; a value behind one that is blank on every row says «Cannot be worked out: "A" has a problem.». A
+calculated value's name is unique against every heading and every other calculated name (the editor's name box,
+the column menu's heading box, `make_schedule`, the field picker, "Point this column at…"); a model column that
+would take such a name is headed apart ("Volume (Qto)"). Renaming a column rewrites the name tokens of the
+formulas that use it, keeping Vee's mark and note, in one undo step; a heading that would leave a formula unable
+to tell two columns apart is refused. No new key in any file format (`calcNames.ts` is the one module that says
+what a name means). One eval case, `calc-vee-chain` (93): offline oracle 100 %, null 0 %. **How it was checked:**
+the build's checks first; then seven guards by a separate builder that never saw the feature code's tests — an
+independent oracle over 220 random schedules, chained equals written in place, totals and grouping, loops, rename
+keeps meaning (typed a character at a time), a uniqueness walk of 300 × 30 random edits with a tripwire for
+future actions, and a golden file of 70 schedules computed by the code at `e67e76e` — each shown to fail under a
+deliberate break. Deep review, two rounds: round 1 found two ways a formula silently read another column (a model
+column taking a calculated name through the picker or Vee; a heading typed in steps) and the guards found the same
+plus a unit lost through a link with no named unit; all fixed with a failing check first. Round 2 confirmed the
+fixes and found one more route of the same kind ("Point this column at…" on a heading typed then cleared), fixed
+the same way and **not reviewed a third time**. Old files: 4 000 random old-style schedules calculate cell for
+cell as at `e67e76e`; only message texts differ where a formula was already blank. Typecheck, lint, build,
+privacy clean. **Landed after the Revit-style rows** (below): `main` brought in, the uniqueness tripwire fired
+for that build's new `setCombine` action and it was classified, and `chain-combine.test.ts` checks a chained value
+in rows combined by sort value against the formula written in place (120 seeds, `<varies>` and totals included);
+`npm test` 5 266 passed, 4 skipped. **In a window:** `tests/e2e/chained-formulas.spec.ts`,
+`vee-column-dot.spec.ts` and `combine-by-sort.spec.ts`, 3 passed on macOS (peak 526 MB, nothing survived). **Known, left as before this
+build:** two model columns sharing a heading a formula names leave it blank with no message; on an old file with
+a model column and a calculated value of one name, removing the model column makes the formula read the
+calculated one. Not seen on Windows; the live eval was not run.
+
 ## 2026-11-24 — itemise off can combine rows by sort value, as Revit does
 
 **Did.** In the Schedules window, with "Itemise every instance" off, the Rows chip offers Combine: "Identical rows"
@@ -161,12 +192,9 @@ The published files are built by `release.yml` from the tag, not these. Installe
 
 **Known limits, recorded in `docs/DECISIONS.md`:** a `Model = STR` rule follows the file on screen while the other file is open; a project saved in that state, reopened, then located with Replace also hides on `m2` what was hidden in the other file (older fault in `mergeLocated`, easier to reach now — a follow-up). **Also read:** the slot question from the Locate… hand-over is not reachable in the app as it stands (the real `addModel` has no pause). **Owed:** nothing was seen in a window.
 
-## 2026-11-12 — Locate… works again after a located model did not load
-
-**Did.** In an open `.sgvue`, a file picked with Locate… that did not end up open stayed marked "being located", so picking it again was refused as `already open in this project` until the project was reopened. Five ways in: it fails to parse, its join fails, the project's batch it shares fails, the project's own failed boot unloads it after it joined, or "Replace model?" is cancelled (the fifth found while writing the checks). Now the mark is released when the pipeline queued the file, nothing holds it any more and it is not open (`releaseDead`, `locateOver`), and at once when nothing was queued. **Decided:** a located model is still unloaded when the project's own boot fails (that loop is the offset fix's); it can be located again, and the retry boots the project. Fix mode, Risky lane: failing checks first by a separate run (five ways failing at the refusal, two guards passing), builder — who stopped when the first design broke an existing check, rather than edit it; the design was changed so a load the pipeline never saw queued is never over — `reviewer-deep` PASS in one round, then a third guard for the half of the rule no test pinned. Headless: typecheck, lint, the whole unit suite, privacy. **Not seen in a window.** **Noticed, not changed** (row in `docs/DECISIONS.md`): with another file open under a missing model's key, a save writes that file's path for the project's model and drops its hidden references; a located model joining while the project's own model is still being put in the scene may share its slot (harness only so far); the failed-boot banner can name the wrong cause.
-
 ## Earlier work
 
+- **2026-11-12** — Locate… works again after a located model did not load: the "being located" mark is released when nothing holds the file any more. Not seen in a window
 - **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a five-segment line along the 3D view's top edge and a caption in the bottom row, seen in a window
 - **2026-11-11** — the repo audit's fixes: decisions 6 to 10, and the sure list
 - **2026-11-11** — a project opened while another still loads (follow-up to "a project settles", below)
