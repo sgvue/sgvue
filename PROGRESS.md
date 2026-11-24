@@ -16,8 +16,9 @@ truthfully. Checks were written first: the 16 prototype doors, an independent or
 side. **Deep review, two rounds (2026-11-25):** round 1 found two readers showing a wrong value, both fixed with a
 failing check first (`combine-review.test.ts`): Excel formatted a Count on a combined row with the column's unit
 (`2 mm`), and "Colour 3D by this column" took `<varies>` and row totals for element values; also `make_schedule`'s
-`combine: 'sort'` now switches itemise off. Round 2 passed. The window spec `tests/e2e/combine-by-sort.spec.ts` is
-written and not run.
+`combine: 'sort'` now switches itemise off. Round 2 passed. **Seen in a window** on the owner's yes (2026-11-25, `tests/e2e/combine-by-sort.spec.ts`,
+guarded, 6.4 s, peak footprint 535 MB, nothing survived): the demo building's doors grouped by Level, the chip
+"One row per Level", the Combine control and its hint, muted `<varies>` cells in both themes, the status line.
 
 ## 2026-11-24 — a calculated column Vee made carries a dot and Vee's plain-words note
 
