@@ -38,6 +38,7 @@ import { keysForEntity, type ModelStore } from './ifc/store'
 import type { PropStat, UnitKind } from './ifc/types'
 import { alignForCalc, columnForCore, columnForProp, kindOf, kindsByHeading, typeOf } from './schedule/columns'
 import { matchRule, OP_LABELS, ruleText } from './schedule/compare'
+import { bracketProblem, calcCalled, calcNameClash, clearOfCalcNames, HEADING_TAKEN } from './schedule/calcNames'
 import { calcProblems, planComputed } from './schedule/computed'
 import {
   CORE_KEYS,
@@ -436,7 +437,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
 
   // ── calculated values: defined first, so that a column, a filter or a sort can name one ──
   /** The values this call defined or redefined, and what each was asked to be. */
-  const calcs: { calc: Calculated; spec: AskCalculated; of: FieldRef | null }[] = []
+  const calcs: { calc: Calculated; spec: AskCalculated; of: FieldRef | null; kept: boolean }[] = []
   if (ask.calculated?.length) {
     const said = new Set<string>()
     for (const spec of ask.calculated) {
@@ -484,7 +485,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
         delete calc.unitKind
         delete calc.yesNo
       }
-      calcs.push({ calc, spec, of })
+      calcs.push({ calc, spec, of, kept: had !== undefined })
     }
     if (def.calculated!.length > MAX_DEF_CALCULATED) {
       return { error: `A schedule may carry at most ${MAX_DEF_CALCULATED} calculated columns.` }
@@ -551,8 +552,22 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
   for (const { spec, field } of columnSpecs) {
     const shown = def.columns.find((c) => sameField(c.field, field!))
     const col = shown ?? newColumn(field!)
+    // 2026-11-25 (F1, F5) — a heading asked for is refused for what the heading box refuses it
+    // for: a calculated value's name, or a bracket in a name a formula uses.
+    const asked = spec.heading?.trim().slice(0, 120)
+    if (asked) {
+      const hit = calcCalled(def, asked, col.field.kind === 'formula' ? col.field.id : null)
+      const why = hit ? HEADING_TAKEN(hit.name.trim()) : bracketProblem(def, headingOf(col, def), asked)
+      if (why) return { error: `Column "${headingOf(col, def)}": ${why}` }
+    }
     dress(col, spec)
     if (!shown) def.columns.push(col)
+    // A model column newly shown, or put back to its default heading, that a calculated value's
+    // name already has is headed apart, as the field picker does (`clearOfCalcNames`).
+    if (col.field.kind !== 'formula' && (!shown || spec.heading !== undefined)) {
+      const apart = clearOfCalcNames(def, col)
+      if (apart) col.heading = apart
+    }
     placed.push({ spec, col })
   }
   // A calculated value this call defined is shown, unless it was asked for among the columns
@@ -589,14 +604,34 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
 
   // ── calculated values, against the columns the schedule now has ──
   if (calcs.length) {
-    const kinds = kindsByHeading(store, def)
+    // 2026-11-24 — a calculated name is unique: another column's heading, or another calculated
+    // value's name, refuses the call with the reason, as a formula that does not parse does.
+    // A value keeping the name it already has is never a new clash (2026-11-25, F6): an older
+    // file can hold one beside a model column of that heading, and Vee may still redefine it.
+    const clashes = calcs
+      .filter(({ kept }) => !kept)
+      .map(({ calc }) => ({ calc, clash: calcNameClash(def, calc.id, calc.name) }))
+      .filter((x) => x.clash)
+    if (clashes.length) {
+      const mine = new Set(calcs.map(({ calc }) => calc.id))
+      const headings = def.columns
+        .filter((c) => !(c.field.kind === 'formula' && mine.has(c.field.id)))
+        .map((c) => headingOf(c, def))
+      return {
+        error:
+          clashes.map(({ calc, clash }) => `Calculated column "${calc.name}": ${clash}`).join(' ') +
+          ` This schedule’s columns are ${headings.join(', ')}.`,
+        valid_values: { columns: headings }
+      }
+    }
     for (const { calc, spec } of calcs) {
       if (calc.kind !== 'formula') continue
       if (spec.result !== undefined) declare(calc, spec.result)
       else {
         // What the expression itself measures — `Width * Height` is an area — which is the
-        // editor's own suggestion, taken. Text and yes / no are the author's to say.
-        const kind = dimensionOf(calc.formula ?? '', kinds).kind as UnitKind | null
+        // editor's own suggestion, taken. Text and yes / no are the author's to say. Asked again
+        // for each, so a formula naming one declared just before it sees what that one is.
+        const kind = dimensionOf(calc.formula ?? '', kindsByHeading(store, def)).kind as UnitKind | null
         declare(calc, (kind && RESULT_OF_KIND[kind]) || 'number')
       }
       // Saying what the result is re-decides how the column reads, as the editor's select does.

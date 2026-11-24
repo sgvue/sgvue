@@ -40,6 +40,12 @@ Width * Height
 round(Area, 2)</code></pre>
         <p>A heading with a space in it goes in square brackets: <code>[Clear Width] / 2</code>.
           Headings are matched ignoring case.</p>
+        <p>A formula can also use another <em>formula</em> calculated value, by its name. With
+          <code>Volume</code> worked out as <code>Area * Height</code>, <code>Volume * 1.1</code> is
+          ten percent more — and a volume too. Each calculated value needs a name no other column
+          has, and renaming a column rewrites the formulas that use it. A <em>percentage</em> value
+          cannot be used in a formula in this version: it is worked out after every row. Nor can a
+          formula use its own result, directly or through another one.</p>
         <p>Operators, loosest to tightest: <code>||</code> <code>&amp;&amp;</code> ·
           <code>=</code> <code>!=</code> · <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code>
           <code>&gt;=</code> · <code>+</code> <code>-</code> · <code>*</code> <code>/</code>.
@@ -141,7 +147,8 @@ if(contains(Type, "FD"), "Fire door", "Standard")</code></pre>
         </ul>
         <p>A formula that cannot be parsed at all is different: it reports the mistake under the box
           as you type, rather than quietly giving you an empty column. A heading that two columns
-          share is reported too, instead of the app picking one of them for you.</p>
+          share is reported too, instead of the app picking one of them for you, and so are
+          formulas that use each other in a loop.</p>
       </section>
 
       <section id="help-recipes">

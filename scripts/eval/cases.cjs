@@ -3115,6 +3115,49 @@ const VEE_CASES = [
       reply: 'The door schedule is open in the Schedules window: **{doors}** doors, with an `FD` column that reads Yes where the type contains FD.'
     }
   }
+,
+  {
+    // 2026-11-24 — a formula may name another calculated column. Graded on the second formula
+    // naming the first column, Volume (the prompt names it), never on Area * Height * 1.1.
+    id: 'calc-vee-chain',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'calculated', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    prompt: 'Make a door schedule with name, area and height, a column called Volume with area times height, and a second column that is 10 % more than that volume.',
+    expect: {
+      facts: [{ num: 'doors' }],
+      tools: { require: ['make_schedule'], maxCalls: 4 },
+      view: {
+        schedule: {
+          category: ['IfcDoor'],
+          columnsInclude: ['Name', 'Area', 'Height'],
+          rowCount: 'doors',
+          calculated: [
+            { formula: '\\bArea\\b\\]?(?:\\s*[*/]\\s*\\d+(?:\\.\\d+)?)?\\s*\\)*\\s*\\*\\s*\\(*\\s*\\[?Height\\b|\\bHeight\\b\\]?(?:\\s*[*/]\\s*\\d+(?:\\.\\d+)?)?\\s*\\)*\\s*\\*\\s*\\(*\\s*\\[?Area\\b', by: 'vee', note: true },
+            { formula: '\\[?\\bVolume\\b\\]?\\s*\\*\\s*1\\.10*(?![\\d.])|(?<![\\d.])1\\.10*\\s*\\*\\s*\\[?\\bVolume\\b|\\[?\\bVolume\\b\\]?\\s*\\+\\s*\\[?\\bVolume\\b\\]?\\s*\\*\\s*0?\\.10*(?![\\d.])', by: 'vee', note: true }
+          ]
+        }
+      }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'make_schedule',
+          input: {
+            category: ['IfcDoor'],
+            columns: [{ field: 'Name' }, { field: 'Area' }, { field: 'Height' }],
+            calculated: [
+              { name: 'Volume', formula: 'Area * Height', note: 'The door’s area multiplied by its height.' },
+              { name: 'Volume +10%', formula: 'Volume * 1.1', note: 'Ten percent more than the volume.' }
+            ]
+          }
+        }
+      ],
+      reply: 'The door schedule is open in the Schedules window: **{doors}** doors, with a `Volume` column of area times height and a `Volume +10%` column ten percent above it.'
+    }
+  }
 ]
 
 CASES.push(...VEE_CASES)

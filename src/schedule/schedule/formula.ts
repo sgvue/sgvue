@@ -97,7 +97,10 @@ const ARITY_ADVICE: Record<string, string> = {
 
 export class FormulaError extends Error {}
 
-function tokenize(src: string): Tok[] {
+/** Where a name token sits in the source, for `renameReference`. */
+interface NameSpan { start: number; end: number; v: string; bracketed: boolean }
+
+function tokenize(src: string, spans?: NameSpan[]): Tok[] {
   const out: Tok[] = [];
   let i = 0;
   while (i < src.length) {
@@ -108,6 +111,7 @@ function tokenize(src: string): Tok[] {
       const end = src.indexOf(']', i);
       if (end < 0) throw new FormulaError('Unclosed [');
       out.push({ t: 'name', v: src.slice(i + 1, end).trim() });
+      spans?.push({ start: i, end: end + 1, v: src.slice(i + 1, end).trim(), bracketed: true });
       i = end + 1; continue;
     }
     if (c === '"' || c === "'") {           // "FD-60" — a piece of text to compare against
@@ -130,7 +134,10 @@ function tokenize(src: string): Tok[] {
       // 2026-11-12: own keys only, so `constructor(` or `__proto__(` is an unknown name.
       const rest = src.slice(i).trimStart();
       if (rest.startsWith('(') && Object.hasOwn(FNS, word.toLowerCase())) out.push({ t: 'fn', v: word.toLowerCase() });
-      else out.push({ t: 'name', v: word });
+      else {
+        out.push({ t: 'name', v: word });
+        spans?.push({ start: i - word.length, end: i, v: word, bracketed: false });
+      }
       continue;
     }
     if (c === '(') { out.push({ t: 'lp' }); i++; continue; }
@@ -335,6 +342,28 @@ export function referencedNames(src: string): string[] {
   }
 }
 
+/**
+ * The formula with every reference to the column `from` written as `to` — 2026-11-24, so that
+ * renaming a column keeps the formulas that use it working. Only name tokens change, bare or
+ * `[bracketed]`, matched ignoring case and surrounding spaces; text inside quotes and function
+ * names are left alone. A new name that is not a bare word is written in brackets. A formula
+ * that cannot be read into tokens, or an empty new name, is returned as it was.
+ */
+export function renameReference(src: string, from: string, to: string): string {
+  const want = from.trim().toLowerCase();
+  const name = to.trim();
+  if (!want || !name) return src;
+  const spans: NameSpan[] = [];
+  try { tokenize(src, spans); } catch { return src; }
+  const bare = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !Object.hasOwn(FNS, name.toLowerCase());
+  let out = src;
+  for (const s of spans.reverse()) {
+    if (s.v.toLowerCase() !== want) continue;
+    out = out.slice(0, s.start) + (bare && !s.bracketed ? name : `[${name}]`) + out.slice(s.end);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- dimensions
 
 /**
@@ -379,26 +408,23 @@ export interface DimResult {
   problem?: string;
 }
 
-/**
- * @param src        the formula text
- * @param kindByName lower-cased column heading -> its unit kind
- */
-export function dimensionOf(src: string, kindByName: Map<string, string>): DimResult {
+/** What a dimension walk leaves: the result's dimension, or a mistake. */
+function walkDims(src: string, kindByName: Map<string, string>): { top?: Dim | 'text' | 'unknown'; problem?: string } {
   let toks: Tok[];
-  try { toks = tokenize(src); } catch { return { kind: null }; }
+  try { toks = tokenize(src); } catch { return {}; }
 
   // A second, tiny shunting-yard over dimensions only. Re-parsing rather than threading a
   // dimension through compile() keeps the per-row evaluator exactly as fast as it was.
   const st: (Dim | 'text' | 'unknown')[] = [];
   let rpnLike: Tok[];
-  try { rpnLike = toRpn(toks); } catch { return { kind: null }; }
+  try { rpnLike = toRpn(toks); } catch { return {}; }
 
   for (const tok of rpnLike) {
     if (tok.t === 'num') { st.push(ZERO); continue; }
     if (tok.t === 'str') { st.push('text'); continue; }
     if (tok.t === 'name') {
       const k = kindByName.get(tok.v.toLowerCase());
-      st.push(k === undefined ? 'unknown' : (KIND_DIM[k] ?? ZERO));
+      st.push(k === undefined ? 'unknown' : (KIND_DIM[k] ?? dimOfKey(k) ?? ZERO));
       continue;
     }
     if (tok.t === 'fn') {
@@ -423,14 +449,14 @@ export function dimensionOf(src: string, kindByName: Map<string, string>): DimRe
     if (tok.t === 'op') {
       if (OPS[tok.v].arity === 1) continue;              // negation keeps the dimension
       const b = st.pop(), a = st.pop();
-      if (a === undefined || b === undefined) return { kind: null };
+      if (a === undefined || b === undefined) return {};
       if (/^(<|<=|>|>=|=|==|!=|&&|\|\|)$/.test(tok.v)) { st.push(ZERO); continue; }
       if (typeof a === 'string' || typeof b === 'string' || typeof a === 'boolean' || typeof b === 'boolean') { st.push('unknown'); continue; }
       if (tok.v === '*') { st.push({ L: a.L + b.L, M: a.M + b.M, A: a.A + b.A }); continue; }
       if (tok.v === '/') { st.push({ L: a.L - b.L, M: a.M - b.M, A: a.A - b.A }); continue; }
       if (tok.v === '+' || tok.v === '-') {
         if (!same(a, b)) {
-          return { kind: null, problem: `This adds a ${kindOfDim(a) ?? 'mixed unit'} to a ${kindOfDim(b) ?? 'mixed unit'}, which cannot be right.` };
+          return { problem: `This adds a ${kindOfDim(a) ?? 'mixed unit'} to a ${kindOfDim(b) ?? 'mixed unit'}, which cannot be right.` };
         }
         st.push(a); continue;
       }
@@ -439,9 +465,36 @@ export function dimensionOf(src: string, kindByName: Map<string, string>): DimRe
       st.push('unknown'); continue;
     }
   }
+  return { top: st.pop() };
+}
 
-  const top = st.pop();
+/**
+ * 2026-11-25 (F4): a dimension no unit kind names, as a `kindByName` value — `dim:4,0,0` for
+ * `Area * Area` — so that a chain carries what the formula written in place would.
+ */
+const dimKey = (d: Dim) => `dim:${d.L},${d.M},${d.A}`;
+function dimOfKey(k: string): Dim | undefined {
+  const m = /^dim:(-?\d+),(-?\d+),(-?\d+)$/.exec(k);
+  return m ? { L: Number(m[1]), M: Number(m[2]), A: Number(m[3]) } : undefined;
+}
+
+/**
+ * @param src        the formula text
+ * @param kindByName lower-cased column heading -> its unit kind (or a `dimensionKey`)
+ */
+export function dimensionOf(src: string, kindByName: Map<string, string>): DimResult {
+  const { top, problem } = walkDims(src, kindByName);
+  if (problem) return { kind: null, problem };
   if (top === undefined || typeof top === 'string') return { kind: null };
   return { kind: kindOfDim(top) };
 }
 
+/**
+ * What a formula measures as a `kindByName` value for the formulas naming it: its unit kind, or
+ * its dimension when no kind names it; null when it has none (text, mixed, or a mistake).
+ */
+export function dimensionKey(src: string, kindByName: Map<string, string>): string | null {
+  const { top, problem } = walkDims(src, kindByName);
+  if (problem || top === undefined || typeof top === 'string') return null;
+  return kindOfDim(top) ?? dimKey(top);
+}

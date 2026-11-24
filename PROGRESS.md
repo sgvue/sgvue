@@ -4,6 +4,34 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-25 — a formula may use another calculated column; calculated names are unique
+
+**Did.** In the Schedules window a formula names another formula calculated value as it names a model column
+(`Waste = Volume * 1.1` after `Volume = Area * Height`), with its value and its unit through the chain, in any
+order in the list; a percentage is never a variable. A loop is refused like a formula that does not parse, naming
+its members; a value behind one that is blank on every row says «Cannot be worked out: "A" has a problem.». A
+calculated value's name is unique against every heading and every other calculated name (the editor's name box,
+the column menu's heading box, `make_schedule`, the field picker, "Point this column at…"); a model column that
+would take such a name is headed apart ("Volume (Qto)"). Renaming a column rewrites the name tokens of the
+formulas that use it, keeping Vee's mark and note, in one undo step; a heading that would leave a formula unable
+to tell two columns apart is refused. No new key in any file format (`calcNames.ts` is the one module that says
+what a name means). One eval case, `calc-vee-chain` (93): offline oracle 100 %, null 0 %. **How it was checked:**
+the build's checks first; then seven guards by a separate builder that never saw the feature code's tests — an
+independent oracle over 220 random schedules, chained equals written in place, totals and grouping, loops, rename
+keeps meaning (typed a character at a time), a uniqueness walk of 300 × 30 random edits with a tripwire for
+future actions, and a golden file of 70 schedules computed by the code at `e67e76e` — each shown to fail under a
+deliberate break. Deep review, two rounds: round 1 found two ways a formula silently read another column (a model
+column taking a calculated name through the picker or Vee; a heading typed in steps) and the guards found the same
+plus a unit lost through a link with no named unit; all fixed with a failing check first. Round 2 confirmed the
+fixes and found one more route of the same kind ("Point this column at…" on a heading typed then cleared), fixed
+the same way and **not reviewed a third time**. Old files: 4 000 random old-style schedules calculate cell for
+cell as at `e67e76e`; only message texts differ where a formula was already blank. Typecheck, lint, build,
+privacy clean; `npm test` 5 171 passed, 4 skipped. **In a window:** `tests/e2e/chained-formulas.spec.ts` and
+`vee-column-dot.spec.ts`, 2 passed on macOS (peak 514 MB, nothing survived). **Known, left as before this
+build:** two model columns sharing a heading a formula names leave it blank with no message; on an old file with
+a model column and a calculated value of one name, removing the model column makes the formula read the
+calculated one. Not seen on Windows; the live eval was not run.
+
 ## 2026-11-24 — a calculated column Vee made carries a dot and Vee's plain-words note
 
 **Did.** In the Schedules window, a calculated column Vee made has a small accent dot after its heading; its hover
@@ -149,12 +177,9 @@ The published files are built by `release.yml` from the tag, not these. Installe
 
 **Did.** In an open `.sgvue`, a file picked with Locate… that did not end up open stayed marked "being located", so picking it again was refused as `already open in this project` until the project was reopened. Five ways in: it fails to parse, its join fails, the project's batch it shares fails, the project's own failed boot unloads it after it joined, or "Replace model?" is cancelled (the fifth found while writing the checks). Now the mark is released when the pipeline queued the file, nothing holds it any more and it is not open (`releaseDead`, `locateOver`), and at once when nothing was queued. **Decided:** a located model is still unloaded when the project's own boot fails (that loop is the offset fix's); it can be located again, and the retry boots the project. Fix mode, Risky lane: failing checks first by a separate run (five ways failing at the refusal, two guards passing), builder — who stopped when the first design broke an existing check, rather than edit it; the design was changed so a load the pipeline never saw queued is never over — `reviewer-deep` PASS in one round, then a third guard for the half of the rule no test pinned. Headless: typecheck, lint, the whole unit suite, privacy. **Not seen in a window.** **Noticed, not changed** (row in `docs/DECISIONS.md`): with another file open under a missing model's key, a save writes that file's path for the project's model and drops its hidden references; a located model joining while the project's own model is still being put in the scene may share its slot (harness only so far); the failed-boot banner can name the wrong cause.
 
-## 2026-11-12 — a federating indicator for a model added to an open view (the owner's pick "B")
-
-The owner: *"create a new simple yet cool techy loading animation when model view is federating the new upload model."* **Before:** a model added to an open viewer showed progress only in the sidebar's upload row; the 3D view showed nothing, then the plain centre badge "Rebuilding federation…" for the last second. **Prototype first** (`prototypes/federating-animation/`, git-ignored): three variants and a "Today" comparison at the real window size; the owner picked *"B"* — Edge trace. **Built:** a 2 px five-segment line along the 3D view's top edge, one segment per real stage, and a caption in the bottom row's centre (`name · stage · n/5`, then a tick and `+N elements`, or `could not open — see Models`). Both read only the store's upload rows (`shared/fed-trace.ts`, pure; `model/fed-trace-store.ts`); `upload-pipeline.ts` is untouched. They replace "Rebuilding federation…" for these loads only and are gone 900 / 1 600 + 220 ms after the end; no frame loop, nothing reaches the viewer; the first load from the home page is unchanged. Normal lane: checks first (`tests/unit/fed-trace.test.ts`), builder, reviewer. **Seen in a window** on the owner's yes (`tests/e2e/fed-trace.spec.ts`, guarded, 34 s): six models added to an open view — both themes, a 520 px stage, the hint + reset pill + property card together, a file that cannot be opened, reduced motion — every stage in order, no overlap with any other piece, never with the centre badge, both pieces removed each time.
-
 ## Earlier work
 
+- **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a line along the stage's top edge and a caption in the bottom row
 - **2026-11-11** — the repo audit's fixes: decisions 6 to 10, and the sure list
 - **2026-11-11** — a project opened while another still loads (follow-up to "a project settles", below)
 - **2026-11-11** — Ask Vee's box tools and SQL read a turned building square with it (option A). **Owed:** the plan-box gather timed on a model of several million triangles in the guarded benchmark

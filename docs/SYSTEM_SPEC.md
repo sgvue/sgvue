@@ -1729,7 +1729,22 @@ is not told whether they do — so tell them what is waiting, and never say it w
   `by: 'vee'`, which the model never sends; the Schedules window shows that mark as a dot on the
   heading, with the note and the formula in its hover title and in the column menu
   (`docs/DEVIATIONS.md`, 2026-11-24). The user editing the formula, or a percentage's field,
-  takes the mark and the note away. `get_schedule` and `make_schedule`'s own result read every
+  takes the mark and the note away. Also since 2026-11-24 a formula may name another formula
+  calculated column of the same schedule by its name, with its value and its unit through the
+  chain (`Volume * 1.1` after `Volume = Area * Height` is a volume) — never a percentage one, which
+  is worked out in a second pass; a model column's heading wins a name both have, and two
+  calculated columns sharing a name are an unknown field, as before. A loop is refused like a
+  formula that does not parse, every member naming it. A calculated column's name must differ
+  from every other heading of the schedule, ignoring case and spaces — the editor's name box, the
+  column menu's heading box and this tool refuse a duplicate with the reason; this tool also
+  refuses a column `heading` a calculated column has («A calculated column is already called
+  "…" — give this column another heading.»), and a heading holding `[` or `]` on a column a
+  formula uses («A name a formula uses cannot contain [ or ].»); a model column it adds whose
+  default heading a calculated column has is headed apart ("Height (Qto)", the field picker's
+  label), which its result's headings show; a calculated column it redefines under the name it
+  already has is never a clash — and a rename, in
+  either box, rewrites the formulas that used the old name, keeping the mark and the note, in one
+  undo step (`schedule/calcNames.ts`, `docs/DEVIATIONS.md` 2026-11-24). `get_schedule` and `make_schedule`'s own result read every
   one of these back (§8.6), the note included and `by` never.
 - `apply_visibility`, `select_elements`, `color_by_property`, and `request_user_action`'s
   `copy_guids` — **`schedule: true`**: the elements the schedule open in the Schedules window

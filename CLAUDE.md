@@ -113,6 +113,7 @@ read it before changing anything visible.** One line per entry here, in its orde
 - 2026-11-15 — in perspective a mouse drag and the wheel re-anchor the orbit point on what is under the cursor
 - 2026-11-23 — the Spatial-structure card compares the models: a column per model, every IfcProject / IfcSite / IfcBuilding attribute and property set, differing rows marked, a "differences only" switch
 - 2026-11-24 — a calculated column Vee made carries a dot on its heading; the column menu names who made it and shows the formula
+- 2026-11-24 — a formula may use another calculated column by its name; calculated names are unique; a rename rewrites the formulas that use it
 
 ### No visible additions
 
