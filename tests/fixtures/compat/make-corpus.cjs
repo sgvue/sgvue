@@ -42,7 +42,7 @@ const VERSIONS = {
   // release wrote it, before a calculated value carried `by` and `note` (2026-11-24).
   'v1.6.1': { sessions: false, schedules: false, calculated: true },
   // Today's tree, as committed when the corpus was made: the frame key is always `identity`.
-  current: { section: 'two', frame: 'identity', units: 'm', idStride: true, sessions: true, schedules: true, calculated: true }
+  current: { section: 'two', frame: 'identity', units: 'm', idStride: true, sessions: true, schedules: true, calculated: true, combined: true }
 }
 
 function entry(root, v) {
@@ -71,10 +71,12 @@ function entry(root, v) {
       `import * as act from ${at('src/schedule/schedule/actions')}`
     )
   }
+  if (v.combined && !v.calculated) throw new Error('combined reuses the calculated imports')
   lines.push(`const v = ${JSON.stringify(v)}`, `const out: Record<string, string> = {}`)
   if (v.sessions) lines.push(SESSION_BODY)
   if (v.schedules) lines.push(SCHEDULE_BODY)
   if (v.calculated) lines.push(CALCULATED_BODY)
+  if (v.combined) lines.push(COMBINED_BODY)
   lines.push(`process.stdout.write(JSON.stringify(out))`)
   return lines.join('\n')
 }
@@ -186,6 +188,23 @@ def = act.updateCalculated(def, id, { name: 'Mine' })
 def = act.updateCalculated(def, id, { formula: 'Width * 3' })
 def = act.addColumns(def, [{ field: { kind: 'formula', id } }])
 out['calculated.schedule.json'] = JSON.stringify(def, null, 2)
+`
+
+/**
+ * A door schedule combined by sort value (2026-11-24): made by the build's own `make_schedule`
+ * executor, sorted by Level, then itemise turned off and "By sort value" chosen through the
+ * Rows chip's own actions (`setItemize`, `setCombine`). Reuses CALCULATED_BODY's `world`.
+ */
+const COMBINED_BODY = String.raw`
+const sorted: any = buildSchedule({
+  category: ['IfcDoor'],
+  columns: [{ field: 'Name' }, { field: 'Level' }, { field: 'Width' }],
+  sortBy: [{ field: 'Level' }]
+} as any, world as any, null)
+if (sorted.error) throw new Error(sorted.error)
+let comb: any = act.setItemize(sorted.def, false)
+comb = act.setCombine(comb, 'sort')
+out['combined.schedule.json'] = JSON.stringify(comb, null, 2)
 `
 
 function main() {

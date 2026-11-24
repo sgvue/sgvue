@@ -22,7 +22,7 @@ export {
   updateConditionalRule,
 } from './actions/rules';
 export {
-  addSortLevel, moveSortLevel, removeSortLevel, setAppearance, setGrandTotal,
+  addSortLevel, moveSortLevel, removeSortLevel, setAppearance, setCombine, setGrandTotal,
   setGrandTotalTitle, setGroupOptions, setItemize, setName, setSortDir, setSortField,
 } from './actions/schedule';
 export {

@@ -1335,6 +1335,26 @@ Anything not on this list is a defect.
   exports are unchanged. The user editing the formula, or a percentage's field, takes the dot
   and the note away; a rename or a new result type keeps them. A user's own calculated column
   and every model column look as before. **No new control.** Not yet seen in a window.
+- **2026-11-24 — in the Schedules window, itemise off can combine rows by sort value, as Revit
+  does: one row per distinct value of the sort levels, a column whose values differ reading
+  `<varies>`.** The owner: *"I kind of miss the revit version where you can just sort one of
+  the column. for example, type, then only how many row of the type, the other columns that
+  combine are shown varies or total if numbers."* and, on correctness, *"Please make sure the
+  data always shown correctly."* The owner approved the throwaway prototype
+  `prototype/revit-rows/`. With "Itemise every instance" off, the Rows chip's popover gains one
+  row, **Combine**, a `.seg` of two buttons: "Identical rows" (the default, today's merge,
+  unchanged) and "By sort value". By sort value the hint reads "Off — one row per Level + Type.
+  A column whose values differ reads <varies>; a column with a total shows the total. A Count
+  column says how many." (the sort levels' names), or with no sort level "Off — no sort level,
+  so everything is one row. Add a sort level to split it."; the view bar's Rows chip reads
+  **One row per Level + Type**, or **One row**; the status line reads "Collapsed from N
+  instances by Level + Type", or "… into one row". A cell is a column's total over the row's
+  elements (a column with a total that is not a sort level), else the value every element
+  displays, else `<varies>` in `--muted` (`table.schedule td.varies`, the one new CSS rule),
+  claimed by no colour rule and written as text to CSV and Excel. Excel formats a row's total
+  as it formats a footer's total (a count is a plain integer). "Colour 3D by this column" goes
+  by each element's own value, and a `<varies>` or total cell carries no swatch. Itemise on and
+  "Identical rows" look and export as before. Not yet seen in a window.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,

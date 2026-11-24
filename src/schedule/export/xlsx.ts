@@ -160,7 +160,8 @@ function writeSheet(ws: any, sheet: Sheet): void {
       if (n === null) return;
       const cell = row.getCell(i + 1);
       cell.value = n;
-      cell.numFmt = r.kind === 'data' ? cellFmt[i] : totalFmt[i];
+      // A combined row's total is formatted as a footer's: a count is a plain integer.
+      cell.numFmt = r.kind === 'data' && !r.totalled?.[i] ? cellFmt[i] : totalFmt[i];
     });
     if (r.kind === 'header') {
       row.font = { bold: true };
@@ -184,7 +185,7 @@ function writeSheet(ws: any, sheet: Sheet): void {
       // thousands separators. The trailing Count column has no def column and is never
       // styled, which is what bounds the loop at res.columns.length.
       for (let i = 0; i < res.columns.length; i++) {
-        const k = firingRule(res.columns[i], r.cells[i]);
+        const k = firingRule(res.columns[i], r.cells[i], r.mixed?.[i]);
         if (k < 0) continue;
         const rule = res.columns[i].conditional![k];
         const bg = rule.bg ? argbOf(rule.bg) : undefined;

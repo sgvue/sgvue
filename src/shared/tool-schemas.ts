@@ -1400,6 +1400,12 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
         type: 'boolean',
         description: 'false collapses rows that read alike into one, with a Count column; true lists every element'
       },
+      combine: {
+        type: 'string',
+        enum: ['identical', 'sort'],
+        description:
+          'How itemize:false combines rows; sort switches itemize off. identical (the default) merges rows that read alike in every column; sort makes one row per distinct value of the sortBy / groupBy fields, as Revit does with Itemize every instance off: a column with a total shows that total over the row’s elements, a column whose elements all read the same shows that value, and any other column reads <varies>.'
+      },
       grandTotals: { type: 'boolean', description: 'Add a grand-total row under the table.' }
     }),
     strict: true

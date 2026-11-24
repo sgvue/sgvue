@@ -5,7 +5,8 @@
 import type { SortLevel } from '../../../schedule/schedule/def';
 import type { AppState } from '../state';
 import { esc } from '../dom';
-import { toggle } from './shared';
+import { sortLabels } from '../viewBar';
+import { rowx, seg, toggle } from './shared';
 
 export const FOOTER_STYLES: [SortLevel['footer'], string][] = [
   ['titleCountTotals', 'Title, count and totals'],
@@ -14,12 +15,23 @@ export const FOOTER_STYLES: [SortLevel['footer'], string][] = [
   ['totals', 'Totals only'],
 ];
 
-/** Itemise and the grand total — the view bar's Rows chip. */
+/** Itemise off, combined by sort value: what one row stands for (2026-11-24). */
+function bySortHint(labels: string[]): string {
+  return labels.length
+    ? `Off — one row per ${labels.join(' + ')}. A column whose values differ reads <varies>; a column with a total shows the total. A Count column says how many.`
+    : 'Off — no sort level, so everything is one row. Add a sort level to split it.';
+}
+
+/** Itemise, how itemise off combines, and the grand total — the view bar's Rows chip. */
 export function rowsBody(state: AppState): string {
   const def = state.def;
-  return `${toggle('itemize', 'Itemise every instance', def.itemize, '', 'lead', def.itemize
-    ? 'On — every matching element gets its own row.'
-    : 'Off — rows identical in every visible column are combined, and a Count column says how many.')}
+  const bySort = def.combine === 'sort';
+  const hint = def.itemize ? 'On — every matching element gets its own row.'
+    : bySort ? bySortHint(sortLabels(def))
+      : 'Off — rows identical in every visible column are combined, and a Count column says how many.';
+  return `${toggle('itemize', 'Itemise every instance', def.itemize, '', 'lead', hint)}
+    ${def.itemize ? '' : rowx('Combine', seg('combine', [['identical', 'Identical rows'], ['sort', 'By sort value']],
+    bySort ? 'sort' : 'identical', '', 'How rows combine'))}
     ${toggle('grand-total', 'Grand total', !!def.grandTotal, '', 'lead')}
     ${def.grandTotal ? `<input class="full block snug" type="text" data-act="grand-title"
       value="${esc(def.grandTotalTitle ?? '')}" placeholder="Grand total" aria-label="Grand total label" />` : ''}`;

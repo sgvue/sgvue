@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-24 — itemise off can combine rows by sort value, as Revit does
+
+**Did.** In the Schedules window, with "Itemise every instance" off, the Rows chip offers Combine: "Identical rows"
+(the default, unchanged) or "By sort value" — one row per distinct value of the sort levels (owner-approved
+prototype `prototype/revit-rows/`). A combined row's cell is its column's total over the row's elements, else the
+one value they all display, else `<varies>` (muted, claimed by no colour rule, text in CSV and Excel). The chip
+reads "One row per Level + Type", the status line "Collapsed from N instances by Level + Type".
+`ScheduleDef.combine?: 'sort'` is additive; `make_schedule` takes `combine` and `get_schedule` reads combined rows
+truthfully. Checks were written first: the 16 prototype doors, an independent oracle over 300 seeded schedules, Vee's
+side. **Deep review, two rounds (2026-11-25):** round 1 found two readers showing a wrong value, both fixed with a
+failing check first (`combine-review.test.ts`): Excel formatted a Count on a combined row with the column's unit
+(`2 mm`), and "Colour 3D by this column" took `<varies>` and row totals for element values; also `make_schedule`'s
+`combine: 'sort'` now switches itemise off. Round 2 passed. The window spec `tests/e2e/combine-by-sort.spec.ts` is
+written and not run.
+
 ## 2026-11-24 — a calculated column Vee made carries a dot and Vee's plain-words note
 
 **Did.** In the Schedules window, a calculated column Vee made has a small accent dot after its heading; its hover
@@ -149,12 +164,9 @@ The published files are built by `release.yml` from the tag, not these. Installe
 
 **Did.** In an open `.sgvue`, a file picked with Locate… that did not end up open stayed marked "being located", so picking it again was refused as `already open in this project` until the project was reopened. Five ways in: it fails to parse, its join fails, the project's batch it shares fails, the project's own failed boot unloads it after it joined, or "Replace model?" is cancelled (the fifth found while writing the checks). Now the mark is released when the pipeline queued the file, nothing holds it any more and it is not open (`releaseDead`, `locateOver`), and at once when nothing was queued. **Decided:** a located model is still unloaded when the project's own boot fails (that loop is the offset fix's); it can be located again, and the retry boots the project. Fix mode, Risky lane: failing checks first by a separate run (five ways failing at the refusal, two guards passing), builder — who stopped when the first design broke an existing check, rather than edit it; the design was changed so a load the pipeline never saw queued is never over — `reviewer-deep` PASS in one round, then a third guard for the half of the rule no test pinned. Headless: typecheck, lint, the whole unit suite, privacy. **Not seen in a window.** **Noticed, not changed** (row in `docs/DECISIONS.md`): with another file open under a missing model's key, a save writes that file's path for the project's model and drops its hidden references; a located model joining while the project's own model is still being put in the scene may share its slot (harness only so far); the failed-boot banner can name the wrong cause.
 
-## 2026-11-12 — a federating indicator for a model added to an open view (the owner's pick "B")
-
-The owner: *"create a new simple yet cool techy loading animation when model view is federating the new upload model."* **Before:** a model added to an open viewer showed progress only in the sidebar's upload row; the 3D view showed nothing, then the plain centre badge "Rebuilding federation…" for the last second. **Prototype first** (`prototypes/federating-animation/`, git-ignored): three variants and a "Today" comparison at the real window size; the owner picked *"B"* — Edge trace. **Built:** a 2 px five-segment line along the 3D view's top edge, one segment per real stage, and a caption in the bottom row's centre (`name · stage · n/5`, then a tick and `+N elements`, or `could not open — see Models`). Both read only the store's upload rows (`shared/fed-trace.ts`, pure; `model/fed-trace-store.ts`); `upload-pipeline.ts` is untouched. They replace "Rebuilding federation…" for these loads only and are gone 900 / 1 600 + 220 ms after the end; no frame loop, nothing reaches the viewer; the first load from the home page is unchanged. Normal lane: checks first (`tests/unit/fed-trace.test.ts`), builder, reviewer. **Seen in a window** on the owner's yes (`tests/e2e/fed-trace.spec.ts`, guarded, 34 s): six models added to an open view — both themes, a 520 px stage, the hint + reset pill + property card together, a file that cannot be opened, reduced motion — every stage in order, no overlap with any other piece, never with the centre badge, both pieces removed each time.
-
 ## Earlier work
 
+- **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a five-segment line along the 3D view's top edge and a caption in the bottom row, seen in a window
 - **2026-11-11** — the repo audit's fixes: decisions 6 to 10, and the sure list
 - **2026-11-11** — a project opened while another still loads (follow-up to "a project settles", below)
 - **2026-11-11** — Ask Vee's box tools and SQL read a turned building square with it (option A). **Owed:** the plan-box gather timed on a model of several million triangles in the guarded benchmark

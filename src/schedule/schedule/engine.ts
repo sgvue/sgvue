@@ -10,12 +10,15 @@ import type { Cell } from '../ifc/types';
 import { compareCells, matchRule, numberOf } from './compare';
 import { firingRule, litTarget } from './conditional';
 import type { Column, ScheduleDef, SortLevel, TotalKind } from './def';
-import { headingOf, MAX_SORT_LEVELS } from './def';
+import { fieldKey, headingOf, MAX_SORT_LEVELS } from './def';
 import { displayFormat, displayNumber, formatCell, formatNumber } from './format';
 import { ANY_PSET, resolveField, type Computed } from './resolve';
 import { planComputed, withPercentages, type ComputedPlan } from './computed';
 
 export const RENDER_CAP = 5000;
+
+/** A combined-by-sort cell whose members do not all display the same (2026-11-24). */
+export const VARIES = '<varies>';
 
 /**
  * The displayed value of each cell as a number, parallel to `cells` — null where the cell
@@ -31,6 +34,15 @@ export interface DataRow {
   cells: string[];
   nums?: CellNumbers;
   count: number;
+  /**
+   * Combine by sort value only (`combine: 'sort'`): per visible column, whether the cell is
+   * `VARIES` — its members display different values — whether it is a total over the members
+   * (`totalled`, formatted as a footer's total), and how many members display a non-blank
+   * cell. Absent on every other line.
+   */
+  mixed?: boolean[];
+  totalled?: boolean[];
+  filled?: number[];
 }
 export interface GroupRow { kind: 'group'; level: number; label: string; count: number }
 export interface FooterRow {
@@ -282,6 +294,7 @@ export function runSchedule(
   // ---- collapse ----
   // Key includes the sort-level values as well as the visible cells, so grouping by Level
   // keeps otherwise-identical doors on different levels apart.
+  const bySort = !def.itemize && def.combine === 'sort';
   let lines: DataRow[];
   if (def.itemize) {
     lines = rows.map((r) => ({
@@ -294,14 +307,37 @@ export function runSchedule(
       const sortPart = levels
         .map((l) => formatCell(resolveField(store, r, l.field, computedOf(r))))
         .join(SEP);
-      const key = cells.join(SEP) + SEP + SEP + sortPart;
+      const key = bySort ? sortPart : cells.join(SEP) + SEP + SEP + sortPart;
       const hit = groups.get(key);
       if (hit) { hit.rows.push(r); hit.count++; }
       // The members' cells are identical — that is what merged them — so the first
-      // member's numbers are the line's numbers.
+      // member's numbers are the line's numbers. By sort value they need not be: below.
       else groups.set(key, { kind: 'data', rows: [r], cells, nums: numbers.get(r)!, count: 1 });
     }
     lines = [...groups.values()];
+    if (bySort) {
+      // Revit's "Itemize every instance" unticked: one line per sort value. No cell shows one
+      // member's value on trust — a total over the members, else the one value every member
+      // displays, else VARIES. Members are in sorted order, so a total adds as a footer does.
+      const sortFields = new Set(levels.map((l) => fieldKey(l.field)));
+      for (const line of lines) {
+        const shown = line.rows.map((r) => formatted.get(r)!);
+        const cells: string[] = [], nums: CellNumbers = [], mixed: boolean[] = [], totalled: boolean[] = [], filled: number[] = [];
+        cols.forEach((c, i) => {
+          filled.push(shown.filter((m) => m[i] !== '').length);
+          totalled.push(!!c.total && !sortFields.has(fieldKey(c.field)));
+          if (c.total && totalled[i]) {
+            const t = aggregate(store, line.rows, c, c.total, computedOf, fmts[i]);
+            cells.push(t?.text ?? ''); nums.push(t?.num ?? null); mixed.push(false);
+          } else if (shown.every((m) => m[i] === shown[0][i])) {
+            cells.push(shown[0][i]); nums.push(line.nums![i]); mixed.push(false);
+          } else {
+            cells.push(VARIES); nums.push(null); mixed.push(true);
+          }
+        });
+        Object.assign(line, { cells, nums, mixed, totalled, filled });
+      }
+    }
   }
 
   // ---- what each colour rule claims, then the one-rule preview ----
@@ -316,7 +352,7 @@ export function runSchedule(
     if (!n || vi < 0) return;
     const hits = new Array<number>(n).fill(0);
     for (const line of lines) {
-      const k = firingRule(c, line.cells[vi]);
+      const k = firingRule(c, line.cells[vi], line.mixed?.[vi]);
       if (k >= 0) hits[k]++;
     }
     (conditionalHits ??= {})[di] = { hits, of: lines.length };
@@ -325,7 +361,7 @@ export function runSchedule(
   const lit = litTarget(def, litBy);
   if (lit) {
     const vi = cols.indexOf(lit.col);
-    lines = lines.filter((l) => firingRule(lit.col, l.cells[vi]) === litBy!.rule);
+    lines = lines.filter((l) => firingRule(lit.col, l.cells[vi], l.mixed?.[vi]) === litBy!.rule);
   }
 
   // ---- control-break walk ----
@@ -408,7 +444,10 @@ export function runSchedule(
   }
 
   if (def.grandTotal) {
-    const all = lines.flatMap((l) => l.rows);
+    // By sort value a line's members need not be contiguous in the sorted rows, so the grand
+    // total takes them in sorted order, as the itemised run adds them.
+    const kept = bySort ? new Set(lines.flatMap((l) => l.rows)) : null;
+    const all = kept ? rows.filter((r) => kept.has(r)) : lines.flatMap((l) => l.rows);
     const totals = cols.map((c, ci) => (c.total
       ? aggregate(store, all, c, c.total, computedOf, fmts[ci]) : null));
     out.push({
