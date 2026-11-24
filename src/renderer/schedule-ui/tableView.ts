@@ -20,7 +20,7 @@
 // mark are gone — a heading opens its column's menu — and the last heading is "+ Column", the
 // field picker's way in.
 
-import { headingOf, type Column } from '../../schedule/schedule/def';
+import { headingOf, type Calculated, type Column, type ScheduleDef } from '../../schedule/schedule/def';
 import { firingRule, litTarget } from '../../schedule/schedule/conditional';
 import { fontStack } from '../../schedule/schedule/fonts';
 import type { RenderRow, ScheduleResult } from '../../schedule/schedule/engine';
@@ -32,6 +32,12 @@ import { esc } from './dom';
 // imports cellStyle from here, and that round trip would be a cycle.
 import { fieldKey } from './panels/shared';
 import { colourKey } from '../../schedule/colour';
+
+/** The calculated entry `id` names when Vee made it (`by: 'vee'`, 2026-11-24), else undefined. */
+export function veeCalc(def: ScheduleDef, id: string): Calculated | undefined {
+  const c = def.calculated?.find((x) => x.id === id);
+  return c?.by === 'vee' ? c : undefined;
+}
 
 /**
  * Where a column's contents sit — the author's choice when they made one, and only then the
@@ -198,6 +204,13 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
     // column of numbers sat under a left-aligned heading.
     // `sel` marks a selected column. A grip is otherwise solo, so this is the ONLY thing
     // that makes a drag or a double-click move more than the column it grabbed.
+    // 2026-11-24 — a calculated column Vee made carries a dot; its hover title says so, with
+    // Vee's note and the formula (a percentage has none).
+    const calc = c.field.kind === 'formula' ? veeCalc(def, c.field.id) : undefined;
+    const vee = calc
+      ? `<span class="th-dot" role="img" aria-label="Calculated by Vee" title="${esc(
+        ['Calculated by Vee', calc.note, calc.kind === 'formula' ? calc.formula : undefined].filter(Boolean).join('\n'))}"></span>`
+      : '';
     const cls = [vertical, ALIGN_CLASS[alignOf(c)],
       state.selectedCols.includes(defIndex[i]) ? 'sel' : '',
       i === colourCol ? 'colour-src' : ''].filter(Boolean).join(' ');
@@ -212,7 +225,7 @@ export function renderSchedule(state: AppState, res: ScheduleResult, cov: Covera
     // <button> inside the cell for this; SGVue's cell is already focusable, and one tab stop a
     // heading is what the keyboard had.
     return `<th${cls ? ` class="${cls}"` : ''} data-defcol="${defIndex[i]}" tabindex="0" aria-haspopup="dialog"
-      title="Click for this column's settings, or drag its right edge to resize. Shift+click to select the columns in between, Ctrl+click to add or remove one, then drag or double-click a grip to size them together. Right-click to colour the 3D view by it. Keys: Enter or Space for a click (with Shift or Ctrl as above); Left and Right to the next heading; Shift+F10 or the menu key for the right-click menu.">${i === colourCol ? sourceMark : ''}${esc(res.headings[i])}${badge}</th>`;
+      title="Click for this column's settings, or drag its right edge to resize. Shift+click to select the columns in between, Ctrl+click to add or remove one, then drag or double-click a grip to size them together. Right-click to colour the 3D view by it. Keys: Enter or Space for a click (with Shift or Ctrl as above); Left and Right to the next heading; Shift+F10 or the menu key for the right-click menu.">${i === colourCol ? sourceMark : ''}${esc(res.headings[i])}${vee}${badge}</th>`;
   }).join('')
     + (res.countColumn ? '<th class="num" title="How many elements this row stands for">Count</th>' : '')
     // The field picker's third way in, where a new column would go. Not a column itself: no

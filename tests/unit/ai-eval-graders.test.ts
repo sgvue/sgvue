@@ -1500,7 +1500,7 @@ describe('the case set', () => {
     // point's case away with the request, when the Coordinate-system card became read-only;
     // 2026-11-08 added the twenty Ask Vee cases (their own test is at the end); 2026-11-09 two
     // follow-up conversations among them; 2026-11-22 two more, an IFC+SG door schedule and a follow-up.
-    expect(CASES).toHaveLength(89)
+    expect(CASES).toHaveLength(92)
     const names = new Set(TOOLS.map((t) => t.name))
     for (const c of CASES) {
       // A case written ahead of its capability may call a tool that build will add (stage 2's
@@ -1754,8 +1754,8 @@ describe('the Ask Vee cases (2026-11-08)', () => {
   it('are twenty-two, after every older case, and each one fails a null agent', () => {
     // Twenty on 2026-11-08; 2026-11-09 the owner's follow-up, narrowed and not; 2026-11-22 the CoP
     // door schedule and a follow-up that changes the open schedule.
-    expect(VEE_CASES).toHaveLength(24)
-    expect(CASES.slice(-24).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
+    expect(VEE_CASES).toHaveLength(27)
+    expect(CASES.slice(-27).map((c: { id: string }) => c.id)).toEqual(VEE_CASES.map((c: { id: string }) => c.id))
     for (const c of VEE_CASES) {
       expect([c.id, c.tags.includes('vee')]).toEqual([c.id, true])
       expect([c.id, G.gradeCase(c, obs(), {}, kindOf).grade.pass]).toEqual([c.id, 0])
@@ -1779,7 +1779,7 @@ describe('the Ask Vee cases (2026-11-08)', () => {
     expect(runsOf(byId.get('op-scope-guard'))).toBe(3)
     for (const id of TRIPLE_RUN_IDS) expect([id, byId.has(id)]).toEqual([id, true])
     // About twenty that a build without stage 2 can score (twenty-two since the 2026-11-09 follow-ups, twenty-four since 2026-11-22).
-    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(24)
+    expect(TRIPLE_RUN_IDS.filter((id: string) => !(byId.get(id).requires || []).includes('stage2'))).toHaveLength(27)
     expect(PILOT_MAX).toBe(5)
     for (const id of PILOT_IDS) expect([id, TRIPLE_RUN_IDS.includes(id), !!byId.get(id).requires]).toEqual([id, true, false])
   })
@@ -2239,5 +2239,83 @@ describe('tool inputs (2026-11-22)', () => {
     expect(byLevel.reasons.join()).toMatch(/no make_schedule call had groupBy including PredefinedType \/ Predefined Type/)
     // A string is not an array that holds one.
     expect(G.gradeCase(grouped, obs({ calls: [call({ groupBy: 'PredefinedType' })] }), {}, kindOf).grade.pass).toBe(0)
+  })
+})
+
+/*
+ * 2026-11-24 — a calculated column Vee made: the three cases that grade it, and the check they
+ * read (`schedule.calculated` against the stand-in's `calculated` list).
+ */
+describe('the calculated-column cases (2026-11-24)', () => {
+  const IDS = ['calc-vee-over-2m', 'calc-vee-volume', 'calc-vee-type-fd']
+  const open = { title: 'Door Schedule', category: ['IfcDoor'], columns: ['Name', 'Height', 'Over 2 m'], filters: '', rowCount: 17 }
+  const withCalc = (calculated: unknown) =>
+    obs({
+      store: {
+        stack: [], colorBy: null, table: null, pending: null, chips: [],
+        schedules: { open, undo: 1, redo: 0, saved: [], exports: [], asked: [], ...(calculated === undefined ? {} : { calculated }) }
+      },
+      storeBefore: { stack: [], colorBy: null, schedules: null }
+    })
+  const caseById = new Map<string, any>(CASES.map((c: { id: string }) => [c.id, c]))
+  const spec = { expect: { view: { schedule: { category: ['IfcDoor'], calculated: caseById.get('calc-vee-over-2m').expect.view.schedule.calculated } } } }
+  const good = { name: 'Over 2 m', kind: 'formula', formula: 'if([Height] > 2, "Yes", "No")', by: 'vee', note: 'Yes when the door is taller than 2 m.' }
+
+  it('are Vee cases, on the Schedules stand-in, each graded on a calculated entry by Vee with a note', () => {
+    const byId = new Map<string, any>(CASES.map((c: { id: string }) => [c.id, c]))
+    for (const id of IDS) {
+      const c = byId.get(id)
+      expect([id, !!c]).toEqual([id, true])
+      expect([id, VEE_CASES.includes(c), c.harness?.schedules, c.requires]).toEqual([id, true, true, undefined])
+      const want = c.expect.view.schedule.calculated
+      expect([id, want.length > 0, want.every((w: { by: string; note: boolean }) => w.by === 'vee' && w.note === true)]).toEqual([id, true, true])
+      // Each oracle sends a note with its calculated column.
+      const sent = c.oracle.calls.find((x: { name: string }) => x.name === 'make_schedule').input.calculated
+      expect([id, sent.every((s: { note?: string }) => typeof s.note === 'string' && s.note.length > 0)]).toEqual([id, true])
+      // Its formula matches its own case's pattern.
+      expect([id, sent.some((s: { formula?: string }) => new RegExp(want[0].formula, 'i').test(s.formula ?? ''))]).toEqual([id, true])
+    }
+  })
+
+  it('pass a Vee entry with a note whose formula matches', () => {
+    expect(G.gradeCase(spec, withCalc([good]), {}, kindOf).grade.pass).toBe(1)
+    expect(G.gradeCase(spec, withCalc([{ ...good, formula: 'IF(Height>2.0,"Yes","No")' }]), {}, kindOf).grade.pass).toBe(1)
+    // A bare comparison with a yes/no result is a correct answer too.
+    expect(G.gradeCase(spec, withCalc([{ ...good, formula: 'Height > 2' }]), {}, kindOf).grade.pass).toBe(1)
+  })
+
+  it('fail one the user made, one without a note, a blank note, another formula, or none reported', () => {
+    const { by: _by, ...unmarked } = good
+    const { note: _note, ...noNote } = good
+    expect(G.gradeCase(spec, withCalc([unmarked]), {}, kindOf).reasons.join()).toMatch(/no calculated column with .*by vee, a note/)
+    expect(G.gradeCase(spec, withCalc([noNote]), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(spec, withCalc([{ ...good, note: '  ' }]), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(spec, withCalc([{ ...good, formula: 'if(Height > 20, "Yes", "No")' }]), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(spec, withCalc([{ ...good, formula: 'Width > 2' }]), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(spec, withCalc([]), {}, kindOf).grade.pass).toBe(0)
+    expect(G.gradeCase(spec, withCalc(undefined), {}, kindOf).reasons.join()).toMatch(/reports no calculated columns/)
+  })
+
+  it('each pattern reads the formulas a model may write, and no others', () => {
+    const re = (id: string) => new RegExp(caseById.get(id).expect.view.schedule.calculated[0].formula, 'i')
+    const reads = (id: string, yes: string[], no: string[]) => {
+      for (const f of yes) expect([id, f, re(id).test(f)]).toEqual([id, f, true])
+      for (const f of no) expect([id, f, re(id).test(f)]).toEqual([id, f, false])
+    }
+    reads(
+      'calc-vee-over-2m',
+      ['Height > 2', '[Height] > 2', 'if(Height > 2, "Yes", "No")', 'IF(Height>2.0,"Yes","No")', 'Height > 2000', 'if([Height] > 2000, "Yes", "No")'],
+      ['Width > 2', 'Height > 20', 'Height > 2.5', 'Height < 2', 'Height >= 2', 'OverallHeight > 2', 'if(Width > 2, "Yes", "No")', 'Height > 200']
+    )
+    reads(
+      'calc-vee-volume',
+      ['Area * Height', '[Area]*[Height]', 'Height * Area', 'round(Area * Height, 3)', 'Area * (Height / 1000)', 'Height / 1000 * Area', '(Area) * (Height)', 'Area * Height / 1000'],
+      ['Area + Height', 'Area * Width', 'GrossArea * Heights', 'Area * 2', 'Height * Height', 'Width * Height']
+    )
+    reads(
+      'calc-vee-type-fd',
+      ['contains(Type, "FD")', 'contains([Type], "FD")', 'contains([Object Type],"FD")', 'if(contains(Type, "FD"), "FD", "")'],
+      ['contains(Name, "FD")', 'contains(Type, "FDX")', 'starts(Type, "FD")', 'contains(TypeName, "FD")', 'contains(Name & Type, "FD")']
+    )
   })
 })

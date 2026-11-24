@@ -149,7 +149,8 @@ interrupted pass continues where it stopped. Delete the variant directory to sta
 
 ## The cases
 
-Eighty-nine — the count `tests/unit/ai-eval-offline.test.ts` holds the file to (eighty-seven until
+Ninety-two — the count `tests/unit/ai-eval-offline.test.ts` holds the file to (eighty-nine until
+2026-11-24 added `calc-vee-over-2m`, `calc-vee-volume` and `calc-vee-type-fd`; eighty-seven until
 2026-11-22 added `sg-cop-door-schedule` and `multi-schedule-add-open`) — every one of
 them scorable since stage 2 of the Ask Vee redesign landed on 2026-11-08 (*The Ask Vee cases*,
 below); until then five waited for it. The section said "sixty-six" from 2026-10-02 until 2026-11-08, one more than
@@ -308,6 +309,9 @@ of it (below); the fifth runs on the plain mock, with its instruction in a viewp
 | `sg-never-asks` | *Hide the slabs.* → How many walls are on L2? — **stage 2**: `ask_choice` never called, `ifcsg` still `unknown`, no mention of IFC+SG, the count right | messy |
 | `sg-cop-door-schedule` | *What fire ratings do the doors on L2 carry?* → *Yes* (quick reply) → Make me a door schedule with the CoP properties the doors carry. — **2026-11-22**: `ifcsg_columns` before `make_schedule`, grouped by PredefinedType (`tools.inputs`), only the CoP properties the doors carry as columns (FireExit, FireRating, IsExternal; never ClearWidth or ClearHeight), every door a row, `ifcsg` yes, the reply names missing ones and the CoP, no compliance claim | messy |
 | `multi-schedule-add-open` | *Make a door schedule called "Door check" with each door's name, its storey and whether it is external.* → Add fire rating. — **2026-11-22**: `make_schedule` with `base:"open"` (`tools.inputs`); "Door check" keeps its columns and gains FireRating | — |
+| `calc-vee-over-2m` | Make a door schedule with each door’s name and height, and a column that says Yes if the height is over 2 m. — **2026-11-24**: an `IfcDoor` schedule with Name and Height and every door a row, and a calculated column whose formula compares `Height` with 2 (`Height > 2`, inside `if(…)` or bare; `> 2000` passes too, the mock's heights being unitless), marked `by: 'vee'`, with a note that is not blank (`schedule.calculated`, read off the stand-in's `calculated` list by `gradeCalculated`) | Schedules stand-in |
+| `calc-vee-volume` | Make a door schedule with name, area and height, and add a column with area times height as a volume. — **2026-11-24**: the same, the formula `Area * Height` either way round, brackets and a unit factor allowed | Schedules stand-in |
+| `calc-vee-type-fd` | Make a door schedule with name and type, and mark the rows whose type contains FD. — **2026-11-24**: the same, the formula `contains(Type, "FD")` — `Type` or `[Object Type]`, not `Name` | Schedules stand-in |
 
 ### The Ask Vee cases (2026-11-08)
 
@@ -448,9 +452,9 @@ federation is not turned, so every truth is unchanged and `npm run eval:offline`
 
 ### Run counts, the pilot and the estimate (2026-11-08)
 
-The owner's cheaper plan. **The twenty-seven tagged cases run three times in a live pass, every other
+The owner's cheaper plan. **The thirty-two tagged cases run three times in a live pass, every other
 case once** — `TRIPLE_RUN_IDS` in `cases.cjs`: the fifteen Ask Vee cases that can be scored,
-the five stage-2 ones (n/a until then), the two follow-up cases of 2026-11-09, and five older cases a single run says least about —
+the five stage-2 ones (n/a until then), the two follow-up cases of 2026-11-09, the two of 2026-11-22, the three calculated-column cases of 2026-11-24, and five older cases a single run says least about —
 `op-scope-guard`, `op-act-on-found-ids`, `op-undo-held`, `res-gated-delete`, `ana-firerating`.
 They are listed there rather than tagged, so the older cases stay as they were. `--reps=N` sets
 one count for every case instead.
@@ -863,7 +867,7 @@ Stated here rather than discovered later:
   (`turns`, above): a follow-up that adds a column, an undo of the turn before, "and hide the
   windows on it too" — and two more for stage 2. Longer conversations, and a follow-up whose
   reply has to remember a number rather than a view, are still not measured.
-- **It has error bars only where they were bought.** The twenty-seven tagged cases run three times
+- **It has error bars only where they were bought.** The thirty-two tagged cases run three times
   (*Run counts*), every other case once. At 87 scored cases a pass-rate's noise floor is roughly
   ±11 points (`1/√n`); before acting on a difference smaller than that, raise `--reps` or add
   cases. A tagged case's three runs say whether it is reliable, not only whether it passed.

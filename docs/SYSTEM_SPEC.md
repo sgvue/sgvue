@@ -1524,7 +1524,7 @@ kinds; a gated call is a `view` call that changes nothing by itself.
 | `manage_markups` | view | `op` (`list` / `focus` / `place_spot` / `place_measure` / `show` / `delete` / `clear`), `name?` (`M2`, `C1` — as the card names it), `kind?` (`measures` / `spots`, for `clear`); for placing: `id?` (an element) with `at?` (`top` / `centre` / `base` of its bounding box), or `point?` (`{x, y, z}`, project-frame metres, ±10⁷); `show?` (`level` / `full`, a spot tag's state) |
 | `request_user_action` | view | `action` (`open_files` / `open_recent` / `unload_model` / `copy_link` / `copy_guids`; `set_base_point` until 2026-10-08), `recent?` (a file's **name** on the recent list, ≤ 255 characters, never a path), `model?` (a loaded model's key), `ids?` (≤ 2 000), `selection?` or `schedule?` |
 | `manage_schedules` | view | `op` (`open` / `undo` / `redo` / `templates` / `apply_template` / `saved_list` / `load` / `save` / `rename` / `duplicate` / `delete` / `print` / `open_file`), `name?` (a saved setup's, or a template's name or id, ≤ 200 characters, no control or direction character), `to?` (for `rename`, the same bound) |
-| `make_schedule` | view | `base?` (`new` / `open`), `title?`, `category?` (≤ 12), `columns?` (≤ 40; each `field`, `heading?`, `total?`, and since phase 4 `hidden?`, `decimals?` (0–6), `unit?`, `align?`, `after?`), `removeColumns?`, `calculated?` (≤ 20; each `name`, `formula?` or `percentageOf?`, `result?`), `filters?` (≤ 8), `filterLogic?` (`and` / `or`), `sortBy?`, `groupBy?` (≤ 4 with `sortBy`), `itemize?`, `grandTotals?` |
+| `make_schedule` | view | `base?` (`new` / `open`), `title?`, `category?` (≤ 12), `columns?` (≤ 40; each `field`, `heading?`, `total?`, and since phase 4 `hidden?`, `decimals?` (0–6), `unit?`, `align?`, `after?`), `removeColumns?`, `calculated?` (≤ 20; each `name`, `formula?` or `percentageOf?`, `result?`, and since 2026-11-24 `note?` (≤ 160)), `filters?` (≤ 8), `filterLogic?` (`and` / `or`), `sortBy?`, `groupBy?` (≤ 4 with `sortBy`), `itemize?`, `grandTotals?` |
 | `get_schedule` | read | `limit?` (≤ 50), `offset?` |
 | `export_schedule` | view | `format` (`xlsx` / `csv` / `all_saved` / `schedule_file`) |
 | `color_by_schedule_column` | view | `column` (a heading or field of the open schedule; `null` clears) |
@@ -1723,8 +1723,14 @@ is not told whether they do — so tell them what is waiting, and never say it w
   and the headings it may name (`calcProblems`, the one check both use). With no `result` a
   formula is what its units work out to (a width times a height is an area); `yes_no` and `text`
   are the caller's to say. A filter on a percentage is refused: the engine works one out over
-  the rows the filters leave. `get_schedule` and `make_schedule`'s own result read every one of
-  these back (§8.6).
+  the rows the filters leave. Since 2026-11-24 each may carry a `note` — one short plain
+  sentence saying what the column works out, at most 160 characters (`CALC_NOTE_CHARS`) — and
+  every calculated column the tool makes, or whose formula or percentage it changes, is marked
+  `by: 'vee'`, which the model never sends; the Schedules window shows that mark as a dot on the
+  heading, with the note and the formula in its hover title and in the column menu
+  (`docs/DEVIATIONS.md`, 2026-11-24). The user editing the formula, or a percentage's field,
+  takes the mark and the note away. `get_schedule` and `make_schedule`'s own result read every
+  one of these back (§8.6), the note included and `by` never.
 - `apply_visibility`, `select_elements`, `color_by_property`, and `request_user_action`'s
   `copy_guids` — **`schedule: true`**: the elements the schedule open in the Schedules window
   lists. The engine runs in the main renderer, uncapped, over the definition that window last

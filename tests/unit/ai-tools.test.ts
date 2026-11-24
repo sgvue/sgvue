@@ -1344,7 +1344,7 @@ describe('parity with the user — phase 4: the Schedules window, and placing ma
     expect(Object.keys(col.properties!)).toEqual(['field', 'heading', 'total', 'hidden', 'decimals', 'unit', 'align', 'after'])
     expect(col.required).toEqual(['field'])
     const calc = make.input_schema.properties.calculated.items!
-    expect(Object.keys(calc.properties!)).toEqual(['name', 'formula', 'percentageOf', 'result'])
+    expect(Object.keys(calc.properties!)).toEqual(['name', 'formula', 'percentageOf', 'result', 'note'])
     expect([calc.required, calc.additionalProperties]).toEqual([['name'], false])
     expect(make.input_schema.properties.filterLogic.enum).toEqual(['and', 'or'])
     expect(make.input_schema.properties.itemize.type).toBe('boolean')

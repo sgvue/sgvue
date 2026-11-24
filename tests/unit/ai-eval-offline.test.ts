@@ -355,7 +355,7 @@ describe('the eval suite, offline', () => {
     // 66 until `op-base-point` went on 2026-10-08 — and two follow-ups on 2026-11-09), so a case
     // dropped from `cases.cjs` fails here rather than shrinking the run. 89 since 2026-11-22: the CoP
     // door schedule and a follow-up that changes the open schedule.
-    expect(CASES.length).toBe(89)
+    expect(CASES.length).toBe(92)
     // n/a only for stage 2 of the Ask Vee redesign — its five cases until 2026-11-08, when the
     // catalogue gained `ask_choice` and they began to be scored with the rest, with no edit here.
     for (const kase of CASES.filter((k) => !scored.includes(k))) {

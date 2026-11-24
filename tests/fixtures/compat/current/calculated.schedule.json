@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "name": "Door Schedule",
+  "entity": [
+    "IfcDoor"
+  ],
+  "columns": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "name"
+      },
+      "align": "left"
+    },
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      },
+      "align": "left"
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Width"
+      },
+      "align": "right",
+      "format": {
+        "display": "",
+        "decimals": 2,
+        "thousands": true
+      }
+    },
+    {
+      "field": {
+        "kind": "formula",
+        "id": "calc1"
+      },
+      "align": "right"
+    },
+    {
+      "field": {
+        "kind": "formula",
+        "id": "calc2"
+      }
+    }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [],
+  "itemize": true,
+  "grandTotal": false,
+  "appearance": {
+    "showTitle": true,
+    "gridLines": true,
+    "outline": true,
+    "blankRowBeforeData": false,
+    "zebra": true,
+    "fontSize": 13,
+    "headerBold": true,
+    "bodyFont": "plex"
+  },
+  "calculated": [
+    {
+      "id": "calc1",
+      "name": "Double",
+      "kind": "formula",
+      "result": "number",
+      "formula": "Width * 2",
+      "by": "vee",
+      "note": "Twice the door’s width."
+    },
+    {
+      "id": "calc2",
+      "name": "Mine",
+      "kind": "formula",
+      "formula": "Width * 3"
+    }
+  ]
+}

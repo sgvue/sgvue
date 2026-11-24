@@ -44,7 +44,7 @@
     position: static; background: #fff; color: #000; box-shadow: none;
     border-bottom: 1.5pt solid #000; text-transform: none; font-size: 9pt; letter-spacing: 0;
   }
-  table.schedule thead th .badge { display: none; }
+  table.schedule thead th .badge, table.schedule thead th .th-dot { display: none; }
   table.schedule tbody tr.data, table.schedule tbody tr.data.on { background: #fff; color: #000; }
   table.schedule.zebra tbody tr.data:nth-of-type(even) { background: #f4f4f4; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   tr.group td, tr.group.level-1 td, tr.group.level-2 td, tr.group.level-3 td {

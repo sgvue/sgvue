@@ -32,7 +32,7 @@
  */
 import type { ScheduleBrief } from '../shared/ai-schema'
 import { ATTR_KEYS } from '../shared/attr'
-import { SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
+import { CALC_NOTE_CHARS, SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
 import { ambiguousText, nearestKeys, normKey, resolveKey } from '../shared/prop-names'
 import { keysForEntity, type ModelStore } from './ifc/store'
 import type { PropStat, UnitKind } from './ifc/types'
@@ -44,6 +44,7 @@ import {
   CORE_LABELS,
   MAX_SORT_LEVELS,
   emptySchedule,
+  fieldKey,
   headingOf,
   newId,
   parseScheduleDef,
@@ -135,6 +136,8 @@ export interface AskCalculated {
   formula?: string
   percentageOf?: string
   result?: ScheduleResultKind
+  /** For the user: one plain sentence saying what the column works out (2026-11-24). */
+  note?: string
 }
 export interface AskFilter {
   field: string
@@ -456,6 +459,19 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
       const had = def.calculated.find((c) => c.name.trim().toLowerCase() === name.toLowerCase())
       const calc: Calculated = had ?? { id: newId('calc', def.calculated), name, kind: 'formula' }
       if (!had) def.calculated.push(calc)
+      // 2026-11-24 — what this call makes, or whose formula or percentage it changes, is Vee's,
+      // with the note it sends (or none). The same formula sent again changes nothing.
+      const same =
+        had !== undefined &&
+        (formula !== undefined
+          ? had.kind === 'formula' && had.formula?.trim() === formula
+          : had.kind === 'percentage' && !!had.ofField && !!of && fieldKey(had.ofField) === fieldKey(of))
+      if (!same) {
+        calc.by = 'vee'
+        const note = typeof spec.note === 'string' ? spec.note.trim().slice(0, CALC_NOTE_CHARS) : ''
+        if (note) calc.note = note
+        else delete calc.note
+      }
       if (formula !== undefined) {
         calc.kind = 'formula'
         calc.formula = formula
@@ -767,7 +783,8 @@ export function simplify(def: ScheduleDef): Record<string, unknown> {
             ...(c.kind === 'formula'
               ? { formula: clip(c.formula ?? '', SCHEDULE_FORMULA_CHARS), result: resultName(c) }
               : {}),
-            ...(c.kind === 'percentage' && c.ofField ? { percentageOf: fieldName(c.ofField, def) } : {})
+            ...(c.kind === 'percentage' && c.ofField ? { percentageOf: fieldName(c.ofField, def) } : {}),
+            ...(c.note ? { note: c.note } : {})
           }))
         }
       : {})

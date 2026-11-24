@@ -1254,6 +1254,8 @@ export const SCHEDULE_RESULT_ENUM = [
 export const SCHEDULE_CALCULATED_MAX = 20
 /** A calculated value's formula, at most — what `parseScheduleDef` keeps on read and `make_schedule`'s zod check allows; its description says so (v1.5.0). */
 export const SCHEDULE_FORMULA_CHARS = 1000
+/** A calculated value's plain-words note, at most — cut to it on read; `make_schedule`'s input check refuses a longer one, like an over-long formula, and its executor's cut is defence in depth (2026-11-24). */
+export const CALC_NOTE_CHARS = 160
 
 /** A column's field, wherever `make_schedule` takes one. The tool description lists them. */
 const SCHEDULE_FIELD: JsonSchema = {
@@ -1350,6 +1352,10 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
               enum: SCHEDULE_RESULT_ENUM,
               description:
                 'What a formula gives: a plain number, a yes or no, text, or a measure the column then converts and unit-labels. Default: what the formula’s own units work out to, else number.'
+            },
+            note: {
+              type: 'string',
+              description: `For the user: one short plain sentence saying what the column works out, for someone who does not read formulas. At most ${CALC_NOTE_CHARS} characters.`
             }
           },
           ['name']

@@ -33,6 +33,10 @@ const NOT_EDITS: Record<string, string> = {
   // mirrors what the UI sends, so they are listed rather than claimed as reachable.
   'columns[].format.prefix': 'no control today (only presets/imports carry it)',
   'columns[].format.suffix': 'no control today (only presets/imports carry it)',
+  // 2026-11-24: who made a calculated column, and its plain-words note. No user action sets
+  // either; updateCalculated only REMOVES them when the user changes the formula.
+  'calculated[].by': 'set by the assistant (make_schedule) only; a user edit of the formula removes it',
+  'calculated[].note': 'written by the assistant (make_schedule) only; a user edit of the formula removes it',
 };
 
 /** Every key path in def.ts's ScheduleDef, recursing into the interfaces it names. */

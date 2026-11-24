@@ -1320,8 +1320,23 @@ Anything not on this list is a defect.
   both. One consequence of the rule scrolling with the table: while the table is wider than the
   card and not scrolled to its end, a group heading's rule runs to the card's inner edge, as the
   row hairlines do, where the prototype's stopped 14 px short.
+- **2026-11-24 — in the Schedules window, a calculated column Vee made carries a dot on its
+  heading, and the column menu names who made a calculated column and shows its formula.**
+  Asked for by the owner, who needs to see which column Vee computed and read its formula in
+  plain words; the owner approved the throwaway prototype `prototype/vee-column-icon/` and chose
+  its dot over the mascot. After the heading text of a column whose calculated value carries
+  `by: "vee"`: a 6 px `--accent` dot, 6 px from the text (`.th-dot`, `schedule.css`),
+  `role="img"`, `aria-label="Calculated by Vee"`, and a hover title of up to three lines —
+  "Calculated by Vee", Vee's note when it wrote one, and the formula (a percentage has none).
+  The column menu's existing `.pop-note` reads "Calculated by Vee", the note and the formula
+  for such a column, and "Calculated column" and its formula for the user's own (the formula on
+  its own line in the mono face, `.pop-note .f`); a formula problem still shows the problem
+  text, marked bad. The dot is not printed (its meaning is hover-only); the Excel and CSV
+  exports are unchanged. The user editing the formula, or a percentage's field, takes the dot
+  and the note away; a rename or a new result type keeps them. A user's own calculated column
+  and every model column look as before. **No new control.** Not yet seen in a window.
 
 The three 2026-09-20 entries above are recorded in full — the arithmetic, the measurements and
 what each cost in parity — in `docs/DECISIONS.md`, and so are 2026-09-21's, 2026-09-24's,
 2026-09-25's (all three), 2026-09-28's, 2026-10-01's, 2026-10-02's, 2026-10-08's, 2026-10-09's,
-2026-11-07's, 2026-11-12's, 2026-11-15's and 2026-11-23's.
+2026-11-07's, 2026-11-12's, 2026-11-15's, 2026-11-23's and 2026-11-24's.

@@ -23,7 +23,8 @@ build's source with esbuild and run under Node. Nothing of today's `src/` is imp
 | `v1.1.0-beta.1/` | 1.1.0-beta.1 | private archive, `22c13fc` | the first build that wrote a `.schedule.json` (the format has not changed since) |
 | `v1.2.0/` | 1.2.0 | public `27fb7ee` | `sections` beside the legacy `section`; still no `idStride` or `units`; frame key `identity` (boot model without a site placement) |
 | `v1.3.0/` | 1.3.0 | public tag `v1.3.0` (`3240e8b`) | `idStride` 1 000 000 000 and `units: ft`; a frame key P placed by an `IfcMapConversion` |
-| `current/` | 1.3.0 + unreleased | public `04cbf1d` | today's format: frame key always `identity`, `units: m` |
+| `v1.6.1/` | 1.6.1 | public tag `v1.6.1` (`cf3acf0`) | only `calculated.schedule.json`: a calculated column before it carried `by` and `note` |
+| `current/` | 1.3.0 + unreleased | public `04cbf1d`; `calculated.schedule.json` added 2026-11-24 by that day's tree (the other files came out byte for byte the same) | today's format: frame key always `identity`, `units: m`; a calculated column Vee made carries `by: "vee"` and a `note` |
 
 The 1.1.0 session, link and viewpoint formats are 1.0.0's byte for byte (`session-codec.ts` and
 `views.ts` did not change between them), so 1.0.0 stands for both.
@@ -44,6 +45,7 @@ node tests/fixtures/compat/make-corpus.cjs v1.3.0 /tmp/sgvue-1.3.0
 | `viewpoints.json` | `{ key, value }`: the `localStorage` key (`ifc-viewer:viewpoints:<building>`) and the exact string `storeViews` wrote there for two viewpoints saved one after the other |
 | `hidden.json` | Not a user file: the elements the scenario hid, named by model and GlobalId, with the id that build gave each (`savedId`) — what the test checks the restored ids against |
 | `*.schedule.json` | `JSON.stringify(def, null, 2)`, as the Export menu's "Schedule file" writes it: the gallery's door template (metric) and its wall template (imperial), renamed and with itemize off |
+| `calculated.schedule.json` | The same, for a door schedule `buildSchedule` (the assistant's `make_schedule`) made with one calculated column, its call carrying a `note`, plus one calculated column added through the build's own editor actions (`addCalculated`, `updateCalculated`, `addColumns`) |
 
 ## The scenario
 

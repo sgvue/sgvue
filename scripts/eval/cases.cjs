@@ -2995,6 +2995,125 @@ const VEE_CASES = [
       calls: [{ name: 'make_schedule', input: { base: 'open', columns: [{ field: 'FireRating' }] } }],
       reply: 'Added a `FireRating` column to "Door check"; it still lists **{doors}** doors.'
     }
+  },
+
+  /*
+   * 2026-11-24 — a calculated column Vee makes is marked as Vee's and carries its one-sentence
+   * plain-words note. Graded on what the Schedules window then holds (`schedule.calculated`, read
+   * off the stand-in's `calculated` list): a calculated entry whose formula matches, marked
+   * `by: 'vee'`, with a note that is not blank. The formula is a pattern, not a string: the model
+   * may name the column, bracket a heading or space the operators as it likes.
+   */
+  {
+    id: 'calc-vee-over-2m',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'calculated', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    prompt: 'Make a door schedule with each door’s name and height, and a column that says Yes if the height is over 2 m.',
+    expect: {
+      facts: [{ num: 'doors' }],
+      tools: { require: ['make_schedule'], maxCalls: 4 },
+      view: {
+        schedule: {
+          category: ['IfcDoor'],
+          columnsInclude: ['Name', 'Height'],
+          rowCount: 'doors',
+          calculated: [{ formula: '\\[?\\bHeight\\b\\]?\\s*>\\s*(?:2|2000)(?:\\.0*)?(?![\\d.])', by: 'vee', note: true }]
+        }
+      }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'make_schedule',
+          input: {
+            category: ['IfcDoor'],
+            columns: [{ field: 'Name' }, { field: 'Height' }],
+            calculated: [
+              {
+                name: 'Over 2 m',
+                formula: 'if(Height > 2, "Yes", "No")',
+                result: 'text',
+                note: 'Yes when the door is taller than 2 m, otherwise No.'
+              }
+            ]
+          }
+        }
+      ],
+      reply: 'The door schedule is open in the Schedules window: **{doors}** doors, with an `Over 2 m` column that reads Yes for a door taller than 2 m.'
+    }
+  },
+  {
+    id: 'calc-vee-volume',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'calculated', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    prompt: 'Make a door schedule with name, area and height, and add a column with area times height as a volume.',
+    expect: {
+      facts: [{ num: 'doors' }],
+      tools: { require: ['make_schedule'], maxCalls: 4 },
+      view: {
+        schedule: {
+          category: ['IfcDoor'],
+          columnsInclude: ['Name', 'Area', 'Height'],
+          rowCount: 'doors',
+          calculated: [
+            { formula: '\\bArea\\b\\]?(?:\\s*[*/]\\s*\\d+(?:\\.\\d+)?)?\\s*\\)*\\s*\\*\\s*\\(*\\s*\\[?Height\\b|\\bHeight\\b\\]?(?:\\s*[*/]\\s*\\d+(?:\\.\\d+)?)?\\s*\\)*\\s*\\*\\s*\\(*\\s*\\[?Area\\b', by: 'vee', note: true }
+          ]
+        }
+      }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'make_schedule',
+          input: {
+            category: ['IfcDoor'],
+            columns: [{ field: 'Name' }, { field: 'Area' }, { field: 'Height' }],
+            calculated: [{ name: 'Volume', formula: 'Area * Height', note: 'The door’s area multiplied by its height.' }]
+          }
+        }
+      ],
+      reply: 'The door schedule is open in the Schedules window: **{doors}** doors, with a `Volume` column of area times height.'
+    }
+  },
+  {
+    id: 'calc-vee-type-fd',
+    group: 'operate',
+    tags: ['operate', 'schedules', 'calculated', 'vee'],
+    fixture: 'mock',
+    harness: { schedules: true },
+    truth: { doors: { sql: "SELECT COUNT(*) FROM element WHERE type = 'IfcDoor'", shape: 'scalar' } },
+    prompt: 'Make a door schedule with name and type, and mark the rows whose type contains FD.',
+    expect: {
+      facts: [{ num: 'doors' }],
+      tools: { require: ['make_schedule'], maxCalls: 4 },
+      view: {
+        schedule: {
+          category: ['IfcDoor'],
+          columnsInclude: ['Name'],
+          rowCount: 'doors',
+          calculated: [{ formula: '\\bcontains\\s*\\(\\s*(?:\\[?\\bType\\b\\]?|\\[Object Type\\])\\s*,\\s*"FD"\\s*\\)', by: 'vee', note: true }]
+        }
+      }
+    },
+    oracle: {
+      calls: [
+        {
+          name: 'make_schedule',
+          input: {
+            category: ['IfcDoor'],
+            columns: [{ field: 'Name' }, { field: 'Type' }],
+            calculated: [{ name: 'FD', formula: 'contains(Type, "FD")', result: 'yes_no', note: 'Yes for a door whose type has FD in it.' }]
+          }
+        }
+      ],
+      reply: 'The door schedule is open in the Schedules window: **{doors}** doors, with an `FD` column that reads Yes where the type contains FD.'
+    }
   }
 ]
 
