@@ -26,11 +26,11 @@ function libraryBody(state: AppState, store: ModelStore): string {
           value="${esc(state.libraryQuery)}" />
       </label>
       <span class="spacer"></span>
-      <button class="icon-btn hv-step" data-act="import-schedule" title="Import a .schedule.json file into Mine"
+      <button class="icon-btn hv-step" data-act="import-schedule" data-tip="Import a .schedule.json file into Mine"
         aria-label="Import a .schedule.json file">${ICON.importFile}</button>
-      <button class="btn lib-save-btn" data-act="library-save-new" title="Save the schedule on screen as a template"
+      <button class="btn lib-save-btn" data-act="library-save-new" data-tip="Save the schedule on screen as a template"
         aria-label="Save current schedule">${ICON.save}<span class="lbl">Save current</span></button>
-      <button class="icon-btn hv-step-ink" data-act="close-overlay" title="Close (Esc)" aria-label="Close">${ICON.close}</button>
+      <button class="icon-btn hv-step-ink" data-act="close-overlay" data-tip="Close (Esc)" aria-label="Close">${ICON.close}</button>
     </div>
     <div class="lib">
       <div class="lib-list">

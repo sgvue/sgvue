@@ -227,7 +227,9 @@ export function emptySchedule(name = 'New Schedule', entity: string[] = []): Sch
     filterLogic: 'and',
     sort: [],
     itemize: true,
-    grandTotal: false,
+    // A new schedule totals at the bottom (2026-11-25). A loaded file says for itself:
+    // `parseScheduleDef` reads `grandTotal === true`, so one without the key stays off.
+    grandTotal: true,
     appearance: { showTitle: true, gridLines: true, zebra: true, fontSize: 13, headerBold: true },
   };
 }

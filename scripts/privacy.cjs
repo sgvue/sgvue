@@ -121,6 +121,9 @@ const ALLOWED_NUMBERS = {
   '2249.99': DOOR_COST,
   '2583.32': DOOR_COST,
   '2666.65': "a total / average over the doors' synthetic costs, in the kitchen-sink golden master's grand-total row (tests/unit/schedule/golden/hand-kitchen-sink.json)",
+  // 2026-11-25: a new template sums its area and volume columns and has a grand total.
+  '2596.62': "the grand total of the synthetic roofs' areas in ft², in the roof template's imperial golden master (tests/unit/schedule/golden/preset-roof-schedule-imperial.json)",
+  '5311.93': "the grand total of the synthetic spaces' volumes in ft³, in the room template's imperial golden master (tests/unit/schedule/golden/preset-room-schedule-imperial.json)",
   '2916.65': DOOR_COST,
   '3249.98': DOOR_COST,
   '3583.31': DOOR_COST,

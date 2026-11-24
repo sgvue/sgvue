@@ -44,7 +44,8 @@
      "display": "m³",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    }
   ],
   "filters": [],
@@ -61,7 +62,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -113,7 +114,8 @@
      "display": "m³",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    }
   ],
   "headings": [
@@ -251,6 +253,23 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 3,
+    "cells": [
+     null,
+     null,
+     null,
+     "1.93"
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     1.93
+    ]
    }
   ],
   "totalDataRows": 3,
@@ -278,7 +297,8 @@
   "1,,,",
   "Level 10 (1),,,",
   "450 x 450,Level 10,3200,0.60",
-  "1,,,"
+  "1,,,",
+  "Grand total,,,1.93"
  ],
  "xlsx": [
   {
@@ -1005,6 +1025,82 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 11,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": 1.93,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",

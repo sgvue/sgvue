@@ -409,7 +409,8 @@ describe('reading a schedule runs the engine, bounded', () => {
       filters: [],
       sortBy: [{ field: 'Name', descending: true }],
       groupBy: ['Level'],
-      grandTotals: false
+      // A new schedule has a grand total since 2026-11-25 (the ask did not say).
+      grandTotals: true
     })
     expect(simplify(def.def)).toEqual(out.schedule)
   })

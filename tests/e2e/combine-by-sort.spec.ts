@@ -84,16 +84,17 @@ test('itemise off, by sort value: one row per Level, <varies> where the doors di
 
     // 1 — the Rows chip: itemise off shows the Combine control, "Identical rows" chosen.
     await rowsChip(sched).click()
-    await expect(pop(sched).locator('[data-act="combine"]')).toHaveCount(0)
-    await pop(sched).locator('label.switch-row', { has: sched.locator('[data-act="itemize"]') }).click()
-    await expect(pop(sched).locator('[data-act="combine"][data-v="identical"]')).toHaveAttribute('aria-pressed', 'true')
+    // One choice of three since 2026-11-25: Every element | Merge identical | One row per sort value.
+    await expect(pop(sched).locator('[data-act="rows-mode"][data-v="every"]')).toHaveAttribute('aria-pressed', 'true')
+    await pop(sched).locator('[data-act="rows-mode"][data-v="merge"]').click()
+    await expect(pop(sched).locator('[data-act="rows-mode"][data-v="merge"]')).toHaveAttribute('aria-pressed', 'true')
     await expect(rowsChip(sched)).toHaveAttribute('aria-label', 'Rows: identical rows merged')
 
     // 2 — By sort value: one row per Level, the chip and the hint say so.
-    await pop(sched).locator('[data-act="combine"][data-v="sort"]').click()
-    await expect(pop(sched).locator('[data-act="combine"][data-v="sort"]')).toHaveAttribute('aria-pressed', 'true')
+    await pop(sched).locator('[data-act="rows-mode"][data-v="sort"]').click()
+    await expect(pop(sched).locator('[data-act="rows-mode"][data-v="sort"]')).toHaveAttribute('aria-pressed', 'true')
     await expect(rowsChip(sched)).toHaveAttribute('aria-label', 'Rows: one row per Level')
-    await expect(pop(sched).locator('.hint').first()).toContainText('Off — one row per Level.')
+    await expect(pop(sched).locator('.rows-hint')).toContainText('One row per Level.')
     const combined = await sched.locator('tr.data').count()
     expect(combined).toBeGreaterThan(0)
     expect(combined).toBeLessThan(itemised)
@@ -125,7 +126,7 @@ test('itemise off, by sort value: one row per Level, <varies> where the doors di
         await sched.waitForTimeout(250)
         await writeFile(join(shots, `combine-table-${theme}.png`), await sched.locator('table.schedule').screenshot())
         await rowsChip(sched).click()
-        await expect(pop(sched).locator('[data-act="combine"]').first()).toBeVisible()
+        await expect(pop(sched).locator('[data-act="rows-mode"]').first()).toBeVisible()
         await sched.waitForTimeout(250)
         await writeFile(join(shots, `combine-rows-${theme}.png`), await sched.screenshot())
         await sched.keyboard.press('Escape')

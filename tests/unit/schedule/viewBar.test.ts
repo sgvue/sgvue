@@ -23,7 +23,7 @@ import { buildCoverage } from '../../../src/renderer/schedule-ui/coverage';
 import { wireApp } from '../../../src/renderer/schedule-ui/events';
 import { flushPending, wirePending } from '../../../src/renderer/schedule-ui/pending';
 import { closePopover, wirePopover } from '../../../src/renderer/schedule-ui/popover';
-import { openChip, renderViewBar } from '../../../src/renderer/schedule-ui/viewBar';
+import { openChip, renderViewBar, toggleChipMore } from '../../../src/renderer/schedule-ui/viewBar';
 import { renderViewPopover } from '../../../src/renderer/schedule-ui/viewPopovers';
 import { buildStore } from './support/fixture';
 import { FakeEl, installFakeDom } from './support/fakeDom';
@@ -118,12 +118,14 @@ const CASES: [string, [Record<string, string>, Fire][], [Record<string, string>,
   ['sort: add on a field', steps([{ act: 'vb-add', v: 'sort', id: 'core|storey' }, click]),
     steps([{ act: 'sort-add' }, click], [{ act: 'sort-field', i: '2' }, change('core|storey')]),
     act.setSortField(act.addSortLevel(base), 2, { kind: 'core', key: 'storey' })],
-  ['rows: itemise', steps([{ act: 'itemize' }, change('', false)]), steps([{ act: 'itemize' }, change('', false)]),
-    act.setItemize(base, false)],
+  // 2026-11-25, step 2: itemise is one of the Rows choice's three — Merge identical is itemise off.
+  ['rows: itemise', steps([{ act: 'rows-mode', v: 'merge' }, click]), steps([{ act: 'itemize' }, change('', false)]),
+    act.setCombine(act.setItemize(base, false), 'identical')],
   // 2026-11-25: the grand total, grid lines and stripes are the view bar's one-click switches
   // (Σ, grid, stripes), so the chip steps are a click. The label box stays in Rows.
+  // A new schedule has its grand total on since 2026-11-25, so the one click turns it off.
   ['rows: grand total', steps([{ act: 'grand-total' }, click]), steps([{ act: 'grand-total' }, change('', true)]),
-    act.setGrandTotal(base, true)],
+    act.setGrandTotal(base, false)],
   ['rows: grand total title', steps([{ act: 'grand-title' }, typed('All doors')]), steps([{ act: 'grand-title' }, typed('All doors')]),
     act.setGrandTotalTitle(base, 'All doors')],
   ...(['grid:gridLines', 'outline:outline', 'zebra:zebra', 'blankfirst:blankRowBeforeData',
@@ -164,9 +166,11 @@ describe('the chip popovers and the bar carry every control the Filter, Sort and
   // buttons and the level drag handle — each must still be drawn in a chip popover or, since
   // the one-line bar (2026-11-25), on the bar itself: the all / any switch, the grand total, grid
   // lines and stripes. The grand total's label box stays in the Rows popover while it is on.
+  // Step 2 (2026-11-25): itemise is the Rows choice's `rows-mode`; what a sort level's and the
+  // Style popover's More… hold is drawn with More… open.
   const TAB_ACTS = {
     filter: ['filter-logic', 'filter-field', 'filter-op', 'filter-value', 'filter-lo', 'filter-hi', 'filter-values', 'filter-remove', 'show-removed'],
-    sort: ['sort-field', 'sort-dir', 'sort-header', 'sort-footer', 'sort-footer-style', 'sort-blank', 'sort-remove', 'itemize', 'grand-total', 'grand-title'],
+    sort: ['sort-field', 'sort-dir', 'sort-header', 'sort-footer', 'sort-footer-style', 'sort-blank', 'sort-remove', 'rows-mode', 'grand-total', 'grand-title'],
     style: ['app-grid', 'app-outline', 'app-zebra', 'app-blankfirst', 'app-showtitle', 'app-headerbold', 'app-title', 'app-fontsize', 'app-font'],
   };
   const cov = () => buildCoverage(store, state.def.entity);
@@ -174,8 +178,10 @@ describe('the chip popovers and the bar carry every control the Filter, Sort and
     const btn = new FakeEl('button', { act: 'vb-open', v: kind, ...(i === undefined ? {} : { i: String(i) }) }, root);
     click(btn);
     const html = renderViewPopover(state, store, cov()) + renderViewBar(state, store);
+    toggleChipMore();
+    const more = renderViewPopover(state, store, cov());
     closePopover();
-    return actsIn(html);
+    return actsIn(html + more);
   };
 
   it('Filter', () => {

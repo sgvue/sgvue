@@ -19,6 +19,8 @@
   .toast,
   .notice,
   .popover,
+  .pop-tip,
+  table.schedule tr.empty-row button,
   table.schedule th.add-col { display: none !important; }
 
   .app, .layout { display: block; height: auto; overflow: visible; min-width: 0; }

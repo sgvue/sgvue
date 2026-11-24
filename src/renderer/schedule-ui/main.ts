@@ -105,6 +105,7 @@ import { render, renderSoon, setRenderer, state, update, updateDef, type RenderS
 import { renderSchedule } from './tableView';
 import { afterPaintViewBar, openChip, refoldViewBar, renderViewBar } from './viewBar';
 import { renderViewPopover } from './viewPopovers';
+import { wireTips } from './tips';
 
 const app = byId('app');
 const header = byId('header');
@@ -724,6 +725,8 @@ wireColumnResize(outputPane, {
 // Outside click, Escape, scroll and resize for the one popover. The window's own dialog and
 // right-click menu sit above it and keep Escape while they are open.
 wirePopover(outputPane, () => dialogOpen() || menuOpen());
+// The fast descriptions inside the popover and the overlays (tips.ts).
+wireTips(app);
 
 // A typed edit lands before any click or key action: the window's capture phase runs first.
 wirePending(app, window);

@@ -69,7 +69,7 @@ export function conditionalRules(
     const presets = COND_PRESETS.map(([pb, pf]) => `<button class="cond-preset${
       pb === bg && pf === fg ? ' on' : ''}" data-act="cond-preset" data-i="${n}"${at}
       data-bg="${esc(pb)}" data-fg="${esc(pf)}" style="background:${esc(pb)};color:${esc(pf)}"
-      title="Use this pair" aria-label="Colour pair">Aa</button>`).join('');
+      data-tip="Use this pair" aria-label="Colour pair">Aa</button>`).join('');
 
     // A presence rule asks about the cell, not about a value, so there is no value to type
     // — and the operator takes the room the box would have had.
@@ -92,17 +92,17 @@ export function conditionalRules(
         ${presence ? '' : `<input class="grow-1" type="text" data-act="cond-value" data-i="${n}"${at} value="${esc(r.value ?? '')}"
           placeholder="value" aria-label="Value" />`}
         <button class="icon-btn sm hv-warn-both" data-act="cond-remove" data-i="${n}"${at}
-          title="Remove rule" aria-label="Remove rule">${ICON.remove}</button>
+          data-tip="Remove rule" aria-label="Remove rule">${ICON.remove}</button>
       </div>
       <div class="row block snug">
         <span class="cond-presets">${presets}</span>
       </div>
       <div class="row block snug">
-        <label class="cond-swatch" title="Fill colour">${ICON.fill}
+        <label class="cond-swatch" data-tip="Fill colour">${ICON.fill}
           <input type="color" data-act="cond-bg" data-i="${n}"${at} value="${esc(bg)}" aria-label="Fill colour" /></label>
-        <label class="cond-swatch" title="Text colour">${ICON.textColour}
+        <label class="cond-swatch" data-tip="Text colour">${ICON.textColour}
           <input type="color" data-act="cond-fg" data-i="${n}"${at} value="${esc(fg)}" aria-label="Text colour" /></label>
-        <label class="icon-btn sm cond-bold hv-step" title="Bold"><input type="checkbox" data-act="cond-bold" data-i="${n}"${at}
+        <label class="icon-btn sm cond-bold hv-step" data-tip="Bold"><input type="checkbox" data-act="cond-bold" data-i="${n}"${at}
           aria-label="Bold"${r.bold ? ' checked' : ''} />${ICON.bold}</label>
       </div>
       ${effect}

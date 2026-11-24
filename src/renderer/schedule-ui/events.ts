@@ -56,7 +56,7 @@ import {
   clearPicks, hoverPeek, peekKey, pickedIds, pickerKey, pickerMode, refreshPicker, resetPicker, setQuery, setView,
   toggleEmpty, toggleFold, toggleTick,
 } from './fieldPicker';
-import { openChip, openChipPopover, toggleChip } from './viewBar';
+import { openChip, openChipPopover, toggleChip, toggleChipMore } from './viewBar';
 import { listSaved } from './schedules';
 
 const num = (el: HTMLElement) => Number((el as HTMLInputElement).value);
@@ -645,10 +645,13 @@ function wireSort(root: HTMLElement) {
     updateDef((def) => act.setGroupOptions(def, idx(el), { footer: checked(el) ? 'titleCountTotals' : 'none' })));
   onChange(root, '[data-act="sort-footer-style"]', (el) =>
     updateDef((def) => act.setGroupOptions(def, idx(el), { footer: text(el) as SortLevel['footer'] })));
-  onChange(root, '[data-act="itemize"]', (el) =>
-    updateDef((def) => act.setItemize(def, checked(el))));
-  onClick(root, '[data-act="combine"]', (el) =>
-    updateDef((def) => act.setCombine(def, el.dataset.v === 'sort' ? 'sort' : 'identical')));
+  // The Rows popover's one choice of three (2026-11-25): itemise and how it combines, in one
+  // update, so one undo step. Every element keeps the combine key, which only itemise off reads.
+  onClick(root, '[data-act="rows-mode"]', (el) => updateDef((def) => {
+    const v = el.dataset.v;
+    if (v === 'every') return act.setItemize(def, true);
+    return act.setCombine(act.setItemize(def, false), v === 'sort' ? 'sort' : 'identical');
+  }));
   // The view bar's Σ (2026-11-25): one click switches. Its label box is the Rows popover's.
   onClick(root, '[data-act="grand-total"]', () => updateDef((def) => act.setGrandTotal(def, !def.grandTotal)));
   liveText(root, '[data-act="grand-title"]', (def, v) => act.setGrandTotalTitle(def, v));
@@ -770,6 +773,10 @@ function wireViewBar(root: HTMLElement) {
   // popover: addFilterRule + setFilterField, or addSortLevel + setSortField. At the cap both
   // say so and add nothing.
   onClick(root, '[data-act="vb-add"]', (el) => addFrom(el.dataset.v ?? '', el.dataset.id ?? ''));
+  // A sort level's or the Style popover's More… (2026-11-25): opening it changes no schedule.
+  onClick(root, '[data-act="vb-more"]', () => { toggleChipMore(); paintPopover(); });
+  // An empty table's "Change that filter": the rule's editor, on its chip or on +N.
+  onClick(root, '[data-act="open-filter"]', (el) => { openChipPopover('filter', idx(el)); paintPopover(); });
   wirePicker(root);
 }
 

@@ -26,7 +26,7 @@ export function formulaHelp(): string {
           <div class="grow-1">
             <h3>Formula syntax</h3>
           </div>
-          <button class="icon-btn hv-step-ink" data-act="close-overlay" title="Close" aria-label="Close">${ICON.close}</button>
+          <button class="icon-btn hv-step-ink" data-act="close-overlay" data-tip="Close" aria-label="Close">${ICON.close}</button>
         </div>
         <div class="chips filter-row">${toc}</div>
       </div>

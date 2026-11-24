@@ -304,10 +304,13 @@ test('phase 2: template → filter → group (itemise off) → a grouped row sel
     await inPop(sched, 'sort-remove', '[data-i="0"]').click()
     await expect(sched.locator('tr.group')).toHaveCount(0)
     await addOn(sched, 'sort', 'core|storey', 'level')
+    // A sort level's grouping is under its More… since 2026-11-25.
+    await inPop(sched, 'vb-more').click()
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await expect(sched.locator('tr.group')).toHaveCount(2)
     await chip(sched, 'rows').click()
-    await inPop(sched, 'itemize').uncheck()
+    // Itemise off is the Rows choice's Merge identical since 2026-11-25.
+    await inPop(sched, 'rows-mode', '[data-v="merge"]').click()
     await expect(sched.locator('table.schedule thead th', { hasText: 'Count' })).toHaveCount(1)
     await expect(sched.locator('tr.data')).toHaveCount(2)
     // Header rows select nothing: they carry no data-row.
@@ -500,12 +503,12 @@ test('phase 2 screenshots (SGVUE_SHOTS)', async () => {
     await useTemplate(sched, 'b:door-schedule')
     await addOn(sched, 'filter', 'core|storey', 'level')
     await chip(sched, 'sort', '[data-i="0"]').click()
+    await inPop(sched, 'vb-more').click()
     await inPop(sched, 'sort-header', '[data-i="0"]').check()
     await inPop(sched, 'sort-footer', '[data-i="0"]').check()
     await chip(sched, 'rows').click()
-    await inPop(sched, 'itemize').uncheck()
-    // The grand total is the view bar's Σ since 2026-11-25.
-    await act(sched, 'grand-total').click()
+    await inPop(sched, 'rows-mode', '[data-v="merge"]').click()
+    // The grand total is the view bar's Σ, on for a new schedule (2026-11-25).
     await expect(act(sched, 'grand-total')).toHaveAttribute('aria-pressed', 'true')
     await sched.locator('table.schedule thead th[data-defcol="0"]').click()
     await inPop(sched, 'cm-view', '[data-v="colour"]').click()
@@ -1186,6 +1189,7 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     await sched.locator('.schedule-name').fill('Walls round trip')
     await sched.locator('.schedule-name').press('Tab')
     await addOn(sched, 'sort', 'core|storey', 'level')
+    await inPop(sched, 'vb-more').click()
     // The switches are labels over a 1 px input: clicked where a hand clicks them. The label
     // is looked for in the popover; the input inside it is a plain `[data-act]` locator, because
     // Playwright reads a `has` locator relative to each label — a `#popover …` one would look
@@ -1194,8 +1198,8 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     await toggleOf('sort-header', '[data-i="0"]').click()
     await expect(inPop(sched, 'sort-header', '[data-i="0"]')).toBeChecked()
     await chip(sched, 'rows').click()
-    await toggleOf('itemize').click()
-    await expect(inPop(sched, 'itemize')).not.toBeChecked()
+    await inPop(sched, 'rows-mode', '[data-v="merge"]').click()
+    await expect(inPop(sched, 'rows-mode', '[data-v="merge"]')).toHaveAttribute('aria-pressed', 'true')
     await expect(sched.locator('tr.data')).toHaveCount(2)
     await answerSave(app, join(out, 'setup.json'))
     await exportAs(sched, 'Schedule file (.schedule.json)')

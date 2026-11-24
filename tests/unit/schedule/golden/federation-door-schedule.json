@@ -80,7 +80,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -708,6 +708,29 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 17,
+    "cells": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
    }
   ],
   "totalDataRows": 17,
@@ -751,7 +774,8 @@
   "ARC,200481,D1 Single 900x2100,L4,900,2100,1 HR",
   "ARC,200482,D1 Single 900x2100,L4,900,2100,1 HR",
   "ARC,200484,D1 Single 900x2100,L4,900,2100,1 HR",
-  "4,,,,,,"
+  "4,,,,,,",
+  "Grand total,,,,,,"
  ],
  "xlsx": [
   {
@@ -801,7 +825,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 10
+     "width": 13
     },
     {
      "i": 1,
@@ -3017,6 +3041,129 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 27,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 5,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 6,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 7,
+       "v": "",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",

@@ -18,9 +18,9 @@ import { renderPicker } from './fieldPicker';
 import { ICON } from './icons';
 import { appearanceBody } from './panels/appearanceSection';
 import { ruleBody, ruleEffects } from './panels/filterSection';
-import { fieldSelect, toggle } from './panels/shared';
+import { fieldSelect, moreFold, toggle } from './panels/shared';
 import { FOOTER_STYLES, rowsBody } from './panels/sortSection';
-import { fieldLabel, openChip, shortWords, shownChips, shownSorts } from './viewBar';
+import { chipMore, fieldLabel, openChip, shortWords, shownChips, shownSorts } from './viewBar';
 
 function filterPop(state: AppState, store: ModelStore, i: number): string {
   const def = state.def;
@@ -30,7 +30,7 @@ function filterPop(state: AppState, store: ModelStore, i: number): string {
     ${ruleBody(state, store, i, e)}
     <hr class="pop-rule" />
     <div class="icon-row end"><button class="icon-btn sm hv-warn-both" data-act="filter-remove" data-i="${i}"
-      title="Remove filter" aria-label="Remove filter">${ICON.remove}</button></div>`;
+      data-tip="Remove this filter" aria-label="Remove filter">${ICON.remove}</button></div>`;
 }
 
 /** The rules folded into `+N`: each opens its own editor (anchored on `+N`) or is removed. */
@@ -43,8 +43,8 @@ function foldPop(state: AppState, store: ModelStore): string {
     const e = effects[i];
     const text = shortWords(store, def, r);
     return `<div class="rl"><button class="mi hv-step${e && e.keeps === 0 && e.removes > 0 ? ' alert' : ''}" data-act="vb-open"
-      data-v="filter" data-i="${i}" title="Change this filter">${esc(text)}<span class="tail">−${(e?.removes ?? 0).toLocaleString()}</span></button><button
-      class="icon-btn sm hv-warn-both" data-act="filter-remove" data-i="${i}" title="Remove this filter"
+      data-v="filter" data-i="${i}" data-tip="Change this filter">${esc(text)}<span class="tail">−${(e?.removes ?? 0).toLocaleString()}</span></button><button
+      class="icon-btn sm hv-warn-both" data-act="filter-remove" data-i="${i}" data-tip="Remove this filter"
       aria-label="Remove filter ${esc(text)}">${ICON.remove}</button></div>`;
   });
   return `<div class="eyebrow block-label">More filters</div><div class="rule-list">${rows.join('')}</div>`;
@@ -61,42 +61,42 @@ function sfoldPop(state: AppState): string {
     const asc = l.dir !== 'desc';
     const grouped = !!l.header || (l.footer ?? 'none') !== 'none';
     return `<div class="rl"><button class="mi hv-step" data-act="vb-open" data-v="sort" data-i="${i}"
-      title="Change this sort level">${name}</button><button class="icon-btn sm hv-step" data-act="sort-dir" data-i="${i}"
-      title="${asc ? 'A to Z. Click for Z to A' : 'Z to A. Click for A to Z'}" aria-label="${name}: ${asc ? 'A to Z' : 'Z to A'}. Click to reverse">${
+      data-tip="Change this sort level">${name}</button><button class="icon-btn sm hv-step" data-act="sort-dir" data-i="${i}"
+      data-tip="${asc ? 'A to Z. Click for Z to A' : 'Z to A. Click for A to Z'}" aria-label="${name}: ${asc ? 'A to Z' : 'Z to A'}. Click to reverse">${
   asc ? ICON.sortAsc : ICON.sortDesc}</button><button class="icon-btn sm hv-step${grouped ? ' on' : ''}" data-act="sort-group" data-i="${i}"
-      aria-pressed="${grouped}" title="${grouped ? 'Grouped. Click to stop grouping' : 'Group by this'}" aria-label="Group by ${name}">${ICON.group}</button></div>`;
+      aria-pressed="${grouped}" data-tip="${grouped ? 'Grouped. Click to stop grouping' : 'Group by this'}" aria-label="Group by ${name}">${ICON.group}</button></div>`;
   });
   return `<div class="eyebrow block-label">More sort levels</div><div class="rule-list">${rows.join('')}</div>`;
 }
 
+/** A sort level (2026-11-25, the prototype's): its field, move, remove; More… holds how it
+ *  groups. Its direction is the chip's arrow, one click, and the sort `+N` list's. */
 function sortPop(state: AppState, i: number): string {
   const def = state.def;
   const l = def.sort[i];
   if (!l) return '';
   const at = ` data-i="${i}"`;
   const footerOn = !!l.footer && l.footer !== 'none';
-  const dir = (v: 'asc' | 'desc', label: string) => `<button class="seg-btn${l.dir === v ? ' on' : ''}"
-    data-act="sort-dir" data-v="${v}"${at} aria-pressed="${l.dir === v}">${label}</button>`;
+  const open = chipMore();
   return `<div class="pop-row"><span class="lvl-n">${i + 1}</span><div class="grow-1">${fieldSelect(state, l.field, 'sort-field', i)}</div></div>
-    <div class="pop-row"><span class="pop-lbl">Order</span><div class="seg grow-1" role="group" aria-label="Direction">
-      ${dir('asc', 'A→Z · 1→9')}${dir('desc', 'Z→A · 9→1')}</div></div>
-    <div class="switch-list">
+    <div class="icon-row">
+      <button class="icon-btn sm hv-step" data-act="sort-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}
+        data-tip="Move earlier: sort by this first" aria-label="Move level earlier">${ICON.arrowUp}</button>
+      <button class="icon-btn sm hv-step" data-act="sort-move" data-v="1"${at}${i === def.sort.length - 1 ? ' disabled' : ''}
+        data-tip="Move later" aria-label="Move level later">${ICON.arrowDown}</button>
+      <span class="spacer"></span>
+      <button class="icon-btn sm hv-warn-both" data-act="sort-remove"${at}
+        data-tip="Remove this sort level" aria-label="Remove level">${ICON.remove}</button>
+    </div>
+    <hr class="pop-rule" />
+    ${moreFold(open)}
+    ${open ? `<div class="pop-more switch-list">
       ${toggle('sort-header', 'Header row', !!l.header, at, 'row')}
       ${toggle('sort-footer', 'Footer', footerOn, at, 'row')}
       ${footerOn ? `<select class="full pop-sub" data-act="sort-footer-style"${at} aria-label="What the footer shows">
         ${FOOTER_STYLES.map(([v, t]) => option(String(v), t, (l.footer ?? 'none') === v)).join('')}</select>` : ''}
       ${toggle('sort-blank', 'Blank line after each group', !!l.blankLine, at, 'row')}
-    </div>
-    <hr class="pop-rule" />
-    <div class="icon-row">
-      <button class="icon-btn sm hv-step" data-act="sort-move" data-v="-1"${at}${i === 0 ? ' disabled' : ''}
-        title="Move earlier" aria-label="Move level earlier">${ICON.arrowUp}</button>
-      <button class="icon-btn sm hv-step" data-act="sort-move" data-v="1"${at}${i === def.sort.length - 1 ? ' disabled' : ''}
-        title="Move later" aria-label="Move level later">${ICON.arrowDown}</button>
-      <span class="spacer"></span>
-      <button class="icon-btn sm hv-warn-both" data-act="sort-remove"${at}
-        title="Remove level" aria-label="Remove level">${ICON.remove}</button>
-    </div>`;
+    </div>` : ''}`;
 }
 
 export function renderViewPopover(state: AppState, store: ModelStore, cov: Coverage): string {
@@ -112,6 +112,6 @@ export function renderViewPopover(state: AppState, store: ModelStore, cov: Cover
     case 'add-filter':
     case 'add-sort': return renderPicker(store, cov);
     case 'rows': return rowsBody(state);
-    case 'style': return appearanceBody(state, 'pop-');
+    case 'style': return appearanceBody(state, 'pop-', chipMore());
   }
 }

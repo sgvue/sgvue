@@ -97,7 +97,7 @@ function calcRow(state: AppState, c: Calculated, problems: Map<string, string>, 
            ${CALC_KINDS.map(([v, label]) => option(v, label, declared === v)).join('')}
          </select>
          ${disagrees ? `<button class="chip" data-act="calc-kind-accept" data-id="${esc(c.id)}"
-             title="Set it to what the formula works out to">looks like a ${esc(dim.kind === 'none' ? 'plain number' : dim.kind!)} — use that</button>` : ''}
+             data-tip="Set it to what the formula works out to">looks like a ${esc(dim.kind === 'none' ? 'plain number' : dim.kind!)} — use that</button>` : ''}
        </div>`
     : `<select data-act="calc-of" data-id="${esc(c.id)}" class="full" aria-label="Percentage of">
          ${selectableFields(state).map((f) => option(f.id, f.label, !!c.ofField && fieldKey(c.ofField) === f.id)).join('')}
@@ -109,7 +109,7 @@ function calcRow(state: AppState, c: Calculated, problems: Map<string, string>, 
       <input type="text" data-act="calc-name" data-id="${esc(c.id)}" value="${esc(refused ? refused.text : c.name)}"
         placeholder="Name" class="grow-1" aria-label="Calculated value name" />
       <button class="icon-btn sm hv-warn-both" data-act="calc-remove" data-id="${esc(c.id)}"
-        title="Remove" aria-label="Remove ${esc(c.name || 'calculated value')}">${ICON.remove}</button>
+        data-tip="Remove" aria-label="Remove ${esc(c.name || 'calculated value')}">${ICON.remove}</button>
     </div>
     ${refused ? `<div class="sub tip-error">${esc(refused.problem)}</div>` : ''}
     <div class="calc-body">${body}</div>

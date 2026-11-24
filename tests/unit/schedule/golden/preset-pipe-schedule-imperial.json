@@ -46,7 +46,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -169,6 +169,21 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 2,
+    "cells": [
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null
+    ]
    }
   ],
   "totalDataRows": 2,
@@ -189,7 +204,8 @@
   "1,,",
   "Roof (1),,",
   "DN50,Roof,16.40",
-  "1,,"
+  "1,,",
+  "Grand total,,"
  ],
  "xlsx": [
   {
@@ -579,6 +595,62 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 8,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",

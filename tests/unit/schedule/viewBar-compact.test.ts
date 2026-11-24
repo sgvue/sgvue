@@ -18,7 +18,7 @@ import { buildCoverage } from '../../../src/renderer/schedule-ui/coverage';
 import { wireApp } from '../../../src/renderer/schedule-ui/events';
 import { flushPending, wirePending } from '../../../src/renderer/schedule-ui/pending';
 import { anchorPopover, closePopover, popoverId, wirePopover } from '../../../src/renderer/schedule-ui/popover';
-import { fitBar, openChip, renderViewBar, shortWords } from '../../../src/renderer/schedule-ui/viewBar';
+import { fitBar, openChip, renderViewBar, shortWords, toggleChipMore } from '../../../src/renderer/schedule-ui/viewBar';
 import { ICON } from '../../../src/renderer/schedule-ui/icons';
 import { renderViewPopover } from '../../../src/renderer/schedule-ui/viewPopovers';
 import { buildStore } from './support/fixture';
@@ -329,8 +329,9 @@ describe('each one-click control runs its existing action and nothing else (Done
     state.def = structuredClone(base);
     expect(fire({ act: 'sort-group', i: '1' })).toEqual(act.setGroupOptions(base, 1, { header: false, footer: 'none', blankLine: false }));
   });
+  // A new schedule has its grand total on since 2026-11-25 (step 2), so the first click is off.
   it('Σ switches the grand total (setGrandTotal)', () => {
-    expect(fire({ act: 'grand-total' })).toEqual(act.setGrandTotal(base, true));
+    expect(fire({ act: 'grand-total' })).toEqual(act.setGrandTotal(base, false));
     expect(fire({ act: 'grand-total' })).toEqual(base);
   });
   it('grid lines and stripes switch (setAppearance)', () => {
@@ -409,9 +410,14 @@ describe('the duplicates left the popovers (brief item 10)', () => {
     state.def = { ...base, grandTotal: false, grandTotalTitle: 'All doors' };
     expect(body('rows')).not.toMatch(/grand-title|grand-total/);
   });
+  // Step 2 (2026-11-25): Outline is under Style's More…, so the check opens it.
   it('Style has no Grid lines and no Stripe rows', () => {
-    expect(body('style')).not.toMatch(/app-grid|app-zebra|Grid lines|Stripe rows/);
-    expect(body('style')).toMatch(/app-outline/);
+    click(new FakeEl('button', { act: 'vb-open', v: 'style' }, head));
+    toggleChipMore();
+    const html = renderViewPopover(state, store, buildCoverage(store, state.def.entity));
+    closePopover();
+    expect(html).not.toMatch(/app-grid|app-zebra|Grid lines|Stripe rows/);
+    expect(html).toMatch(/app-outline/);
   });
 });
 

@@ -107,6 +107,11 @@ function check(store: ModelStore, def: ScheduleDef, tally: Tally, what: string, 
     expect(body[0]?.cls, fail('the leading blank row')).toBe('blank');
     body = body.slice(1);
   }
+  // 2026-11-25: filters that leave no element add one note row under the headings, naming the
+  // cause; it is not one of the engine's rows.
+  const noted = !!def.filters.length && !res.matchedElements;
+  expect(body[0]?.cls === 'empty-row', fail('the empty-result note row')).toBe(noted);
+  if (noted) body = body.slice(1);
   expect(body.length, fail('row count')).toBe(res.rows.length);
   const elements: number[] = [];
   res.rows.forEach((r, i) => {

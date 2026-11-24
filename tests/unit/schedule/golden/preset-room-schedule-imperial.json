@@ -30,7 +30,8 @@
      "display": "ft²",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    },
    {
     "field": {
@@ -57,7 +58,8 @@
      "display": "ft³",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    }
   ],
   "filters": [],
@@ -74,7 +76,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -112,7 +114,8 @@
      "display": "ft²",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    },
    {
     "field": {
@@ -139,7 +142,8 @@
      "display": "ft³",
      "decimals": 2,
      "thousands": true
-    }
+    },
+    "total": "sum"
    }
   ],
   "headings": [
@@ -358,6 +362,25 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 5,
+    "cells": [
+     null,
+     null,
+     "622.93",
+     null,
+     "5,311.93"
+    ],
+    "nums": [
+     null,
+     null,
+     622.93,
+     null,
+     5311.93
+    ]
    }
   ],
   "totalDataRows": 5,
@@ -393,7 +416,8 @@
   "1,,,,",
   "Roof (1),,,,",
   "Space 3,Roof,,117.1,1062.39",
-  "1,,,,"
+  "1,,,,",
+  "Grand total,,622.93,,5311.93"
  ],
  "xlsx": [
   {
@@ -1645,6 +1669,102 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      }
+     ]
+    },
+    {
+     "r": 15,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": 622.93,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       },
+       "al": {
+        "horizontal": "right"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 5,
+       "v": 5311.93,
+       "f": "#,##0.00",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",

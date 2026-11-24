@@ -379,9 +379,42 @@ Anything not on this list is a defect.
   0.14 s, also on keyboard focus) and an `aria-label`, never a native `title`; tooltips hang
   inside the window from the control's left edge, on the right from its right edge, and an open
   control shows its popover, not its tooltip. New glyphs in the icon set's idiom: group, Σ,
-  columns, the three rows modes, stripes, brush; the funnel, plus and grid are the main window's own. The column
-  menu, the sort, Rows and Style popovers otherwise, the save format and the engine are
-  unchanged. **Nothing is added to the main window.** Not yet seen in a window.)*
+  columns, the three rows modes, stripes, brush; the funnel, plus and grid are the main window's own.
+  **Step 2, the same day — the popovers get fewer, combined controls**, as the same prototype
+  shows them: **Rows** is one choice of three, `Every element` | `Merge identical` | `One row per
+  sort value` (one row per value of all the sort levels, the engine's meaning), one undo step,
+  with one line under it for the mode chosen (`<varies>` and the Count column named where they
+  apply; "No sort level, so everything is one row" when that is so) — the Itemise switch and the
+  Combine row are gone; the grand-total label box stays, while the total is on. **A sort level's
+  popover** is its field, move earlier / later and remove, and a `More…` (shut when the popover
+  opens) holding Header row, Footer, what the footer shows and Blank line after each group; its
+  Order pair is gone (the chip's arrow and the sort `+N` list reverse it in one click). **Style**
+  shows Title with its Show title switch and Text size; `More…` holds Outline, Bold header, Blank
+  row before data and Body font with its note. **The column menu**: Align is three icon buttons,
+  the current one lit; Group by this, Filter by this…, Colour rules and the hide / remove icons
+  are one icon row (group lit when grouped, colour rules with its count as a small number); the
+  rest of the menu is unchanged. **Fast descriptions inside popovers and the modal cards:** every
+  icon-only button there names itself in one fixed tooltip element (`#pop-tip`) with the design
+  tooltip's look and timing, outside every scroll container, instead of a native `title`; the
+  `::after` tooltip is switched off there. **One tooltip rule for the window:** no control carries
+  a native `title` but a column heading, whose paragraph of mouse-and-keyboard help stays the slow
+  `title` it was — the header's width buttons, the rail's buttons, the table's badges and Count heading, the
+  field picker's and the `+N` lists' text buttons and the rest now show the fast tooltip (the
+  design's `::after` in the header and on the bar, the fixed one in the popover, the modal cards,
+  the rail and the table); the schedule-name box lost its "Rename this schedule" title (a box
+  cannot draw an `::after`, and its look says it); a `title` stays only on content that is not a
+  control and is cut short or abbreviated (a property set's short tag, a template's classes and
+  filter in the library list, the open schedule's name in the rail) and on the Vee dot's
+  three-line hover of 2026-11-24. **An empty table names its cause:** when filters leave
+  no row, the table keeps its headings and one full-width row under them — not a data row; it
+  selects nothing, is in no export and prints without its button — reads `No rows. “Width ≥ 5000 mm” removes every one.` with `Change that
+  filter`, which opens that rule's editor (on its chip, or on `+N` when folded), or, when the rules
+  empty it only together, `No rows match these filters.` with `Change the first filter`. **New
+  defaults, for new things only:** a new schedule — blank, a category's default, a template, Vee's
+  `make_schedule` when the ask does not say — has its grand total on, and a new column holding an
+  area, a volume, a mass or a count starts with Total = Sum, unless its creator stated a total; a
+  saved file opens exactly as it was saved (no grand total unless it says so). The save format and
+  the engine are unchanged. **Nothing is added to the main window.** Not yet seen in a window.)*
 - **2026-09-25 — on Windows the app draws on NVIDIA when there is one; Preferences can turn it
   off, and the About box names the adapter.** Asked for by the owner in these words: *"auto set
   the highest graphic card if available? Nvidia as first choice."* Preferences (the allowed

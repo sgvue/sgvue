@@ -50,7 +50,8 @@ describe('csvCell quoting', () => {
 describe('CSV export', () => {
   it('includes the header and every data row', () => {
     const store = build([{ name: 'A', w: 0.9 }, { name: 'B', w: 1.2 }]);
-    const def: ScheduleDef = { ...emptySchedule('S', ['IfcDoor']), columns: [colName, colWidth] };
+    // No grand total: a new schedule has one since 2026-11-25; this pins the data rows alone.
+    const def: ScheduleDef = { ...emptySchedule('S', ['IfcDoor']), grandTotal: false, columns: [colName, colWidth] };
     const csv = toCsv(toRows(fullResult(store, def)));
     expect(csv.split('\r\n')).toEqual(['Name,Width', 'A,900', 'B,1200']);
   });
@@ -208,7 +209,8 @@ describe('workbook round-trip', () => {
   // nothing about whether the sheets are right.
   it('writes one sheet per schedule, with the right names and rows', async () => {
     const store = build([{ name: 'A', w: 0.9 }, { name: 'B', w: 1.2 }]);
-    const doors: ScheduleDef = { ...emptySchedule('Doors', ['IfcDoor']), columns: [colName, colWidth] };
+    // No grand total (a new schedule's default since 2026-11-25): the sheet's rows are pinned below.
+    const doors: ScheduleDef = { ...emptySchedule('Doors', ['IfcDoor']), grandTotal: false, columns: [colName, colWidth] };
     const blob = await xlsxBlob([
       { name: 'Doors', res: fullResult(store, doors) },
       { name: 'Doors', res: fullResult(store, doors) },       // same name on purpose

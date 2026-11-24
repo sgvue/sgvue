@@ -23,7 +23,7 @@ export function renderRail(state: AppState, store: ModelStore): string {
   // sits inside it, and this is where its way back lives — the pane never fully disappears.
   if (!state.railOpen) {
     return `<button class="strip-open hv-step-ink" data-act="rail-toggle" aria-expanded="false"
-      title="Show the categories panel" aria-label="Show the categories panel">${ICON.chevronRight}</button>`;
+      data-tip="Show the categories panel" aria-label="Show the categories panel">${ICON.chevronRight}</button>`;
   }
   const q = state.railQuery.trim().toLowerCase();
   const az = state.railSort === 'name';
@@ -38,7 +38,7 @@ export function renderRail(state: AppState, store: ModelStore): string {
     // the class in step in place; this is the same mark on a repaint).
     const here = state.selEntities.includes(e.entity);
     return `<button class="rail-item hv-step${on ? ' on' : ''}${here ? ' sel-here' : ''}" data-act="category" data-entity="${esc(e.entity)}"
-      aria-pressed="${on}" title="Schedule the ${e.count.toLocaleString()} ${esc(e.entity)} elements"
+      aria-pressed="${on}" data-tip="Schedule the ${e.count.toLocaleString()} ${esc(e.entity)} elements"
       aria-label="${esc(e.entity)}, ${e.count.toLocaleString()} elements">
       <span class="dot ${disciplineForEntity(e.entity).toLowerCase()}"></span>
       <span class="grow">${esc(e.entity)}</span>
@@ -72,7 +72,7 @@ export function renderRail(state: AppState, store: ModelStore): string {
     <div class="rail-body">${categories}</div>
     <div class="rail-sched">
       <div class="rail-label"><span>Templates</span></div>
-      <button class="rail-lib hv-step" data-act="open-library" title="Browse, use and manage templates (T)"
+      <button class="rail-lib hv-step" data-act="open-library" data-tip="Browse, use and manage templates (T)"
         >${ICON.templates}<span class="grow">Templates library</span><kbd>T</kbd></button>
       ${current}
     </div>`;

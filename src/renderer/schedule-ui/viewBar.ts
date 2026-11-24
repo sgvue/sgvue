@@ -56,6 +56,10 @@ export function openChip(): { kind: ChipKind; i?: number } | null {
 }
 
 let scrollPending = false;
+/** A chip popover's More… (a sort level's, Style's): open or shut, transient like the popover. */
+let more = false;
+export const chipMore = () => more;
+export const toggleChipMore = () => { more = !more; };
 
 onPopoverClose(() => {
   // Headless (the assistant's requests in the unit tests) there is no heading to unmark.
@@ -66,6 +70,7 @@ onPopoverClose(() => {
 /** A chip's click: open its popover, or close it if it is the one open. `id` picks one of
  *  two openers of the same popover (the field picker: its chip, or the "+ Column" heading). */
 export function toggleChip(kind: string, i?: number, id?: string) {
+  if (popoverId() !== chipId(kind, i)) more = false;
   togglePopover(chipId(kind, i), anchorOf(kind, i, id));
   scrollPending = true;
 }
@@ -73,6 +78,8 @@ export function toggleChip(kind: string, i?: number, id?: string) {
 /** Open a chip's popover from elsewhere (the column menu's Filter by this, a new rule, a
  *  level that moved). `focus` false when it only follows something already being edited. */
 export function openChipPopover(kind: string, i?: number, focus = true, id?: string) {
+  // A fresh one opens shut; one that only follows a moved level keeps its More… as it was.
+  if (focus) more = false;
   openPopover(chipId(kind, i), anchorOf(kind, i, id), '', focus);
   scrollPending = true;
 }

@@ -91,6 +91,11 @@ export const ICON = {
   rowsMerge: svg('<path d="M3.5 6h6c3 0 4 6 7 6h4M3.5 18h6c3 0 4-6 7-6M3.5 12h13"/><path d="M18 9.5l2.5 2.5-2.5 2.5"/>'),
   rowsGroup: svg('<rect x="3.5" y="4" width="17" height="7" rx="1.5"/><rect x="3.5" y="13" width="17" height="7" rx="1.5"/><path d="M7 7.5h6M7 16.5h6"/>'),
   stripes: svg(`<rect x="3.5" y="4" width="17" height="16" rx="1.5"/>${solid('M3.5 8h17v4h-17z')}${solid('M3.5 16h17v4h-17z')}`),
+  // The column menu's icon rows (2026-11-25): alignment, and filter by this (a funnel with +).
+  alignLeft: svg('<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>'),
+  alignCentre: svg('<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>'),
+  alignRight: svg('<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>'),
+  filterThis: svg('<path d="M3 5h13l-5 6v5l-3 1.5V11z"/><path d="M18.5 13v7M15 16.5h7"/>'),
   brush: svg('<path d="M19.5 3.5l1 1-8.2 9.8-2.6-2.6z"/><path d="M9.6 11.8c-2.3-.2-4.1 1.3-4.1 3.7 0 1.6-.7 2.8-2 3.5 2.4 1.5 7.7 1.3 8.6-2.6.3-1.3 0-2.4-.4-2.9"/>'),
 } as const;
 

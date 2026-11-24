@@ -54,7 +54,7 @@ function firstRows(t: Tpl, rows: RenderRow[], cols: Column[], headings: string[]
     const unit = c.format?.display ? `<span class="u">${esc(c.format.display)}</span>` : '';
     const cls = [right ? 'r' : '', miss ? 'miss' : ''].filter(Boolean).join(' ');
     return `<th${cls ? ` class="${cls}"` : ''}${
-      miss ? ' title="Not found in this model — the column will be empty"' : ''}>${esc(headings[i])}${unit}</th>`;
+      miss ? ' data-tip="Not found in this model — the column will be empty"' : ''}>${esc(headings[i])}${unit}</th>`;
   }).join('') + (count ? '<th class="r">Count</th>' : '');
   const body = rows.map((r) => {
     if (r.kind === 'group') return `<tr class="group"><td colspan="${width}">${esc(r.label)} (${r.count})</td></tr>`;
@@ -149,7 +149,7 @@ function bar(state: AppState, t: Tpl): string {
   // interpolated name.
   const ib = (act: string, icon: string, label: string, opts: { off?: boolean; hover?: string; kb?: string } = {}) =>
     `<button class="icon-btn ${opts.hover ?? 'hv-step'}" ${act}${
-      opts.off ? ` aria-disabled="true" title="${READ_ONLY}"` : ` title="${label}${opts.kb ? ` (${opts.kb})` : ''}"`} aria-label="${label}">${icon}</button>`;
+      opts.off ? ` aria-disabled="true" data-tip="${READ_ONLY}"` : ` data-tip="${label}${opts.kb ? ` (${opts.kb})` : ''}"`} aria-label="${label}">${icon}</button>`;
   const inUse = currentKey(state) === t.key;
   const use = inUse && !state.dirty ? '<button class="btn primary use" disabled>In use</button>'
     : inUse ? '<button class="btn primary use" data-act="library-use">Revert to saved</button>'
@@ -160,7 +160,7 @@ function bar(state: AppState, t: Tpl): string {
     ${ib('data-act="library-export"', ICON.exportFile, 'Export as .schedule.json')}
     <span class="vsep"></span>
     ${ib('data-act="library-delete"', ICON.trash, 'Delete', { off: ro, hover: ro ? '' : 'hv-warn-both', kb: 'Del in the list' })}
-    ${ro ? `<span class="ro" title="${READ_ONLY}">Read-only</span>` : ''}
+    ${ro ? `<span class="ro" data-tip="${READ_ONLY}">Read-only</span>` : ''}
     ${use}
   </div>`;
 }

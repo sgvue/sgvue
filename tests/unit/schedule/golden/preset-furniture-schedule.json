@@ -46,7 +46,7 @@
    }
   ],
   "itemize": true,
-  "grandTotal": false,
+  "grandTotal": true,
   "appearance": {
    "showTitle": true,
    "gridLines": true,
@@ -263,6 +263,23 @@
      null,
      null
     ]
+   },
+   {
+    "kind": "grand",
+    "label": "Grand total",
+    "count": 4,
+    "cells": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "nums": [
+     null,
+     null,
+     null,
+     null
+    ]
    }
   ],
   "totalDataRows": 4,
@@ -283,7 +300,8 @@
   "1,,,",
   "Roof (1),,,",
   "Furniture 2,1800,Roof,Room 101",
-  "1,,,"
+  "1,,,",
+  "Grand total,,,"
  ],
  "xlsx": [
   {
@@ -1014,6 +1032,75 @@
        "v": "",
        "font": {
         "italic": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      }
+     ]
+    },
+    {
+     "r": 14,
+     "cells": [
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 1,
+       "v": "Grand total",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 2,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 3,
+       "v": "",
+       "font": {
+        "bold": true
+       },
+       "fill": {
+        "type": "pattern",
+        "pattern": "none"
+       }
+      },
+      {
+       "bd": {
+        "top": {
+         "style": "double"
+        }
+       },
+       "c": 4,
+       "v": "",
+       "font": {
+        "bold": true
        },
        "fill": {
         "type": "pattern",
