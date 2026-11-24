@@ -915,6 +915,7 @@ function gradeSchedules(v, store, truth) {
       }
       if (v.schedule.title !== undefined && open.title !== v.schedule.title) wrong.push(`titled "${open.title}", expected "${v.schedule.title}"`)
       out.push(check('schedule', !wrong.length, `the open schedule: ${wrong.join('; ')}`))
+      out.push(...gradeCalculated(v.schedule.calculated, sch.calculated))
     }
   }
   if (v.scheduleHistory) {
@@ -942,6 +943,38 @@ function gradeSchedules(v, store, truth) {
     )
   }
   return out
+}
+
+/*
+ * 2026-11-24 — the open schedule's calculated columns, as the stand-in lists them
+ * (`calculated`: each entry's `formula`, `by` and `note`). Each wanted entry is met by some
+ * listed one whose formula matches `formula` (a pattern, ignoring case), whose `by` equals `by`
+ * when the case names one, and — with `note: true` — whose note is not blank. A stand-in that
+ * lists no calculated columns fails, never passes.
+ */
+function gradeCalculated(wanted, got) {
+  if (!Array.isArray(wanted)) return []
+  if (!Array.isArray(got)) {
+    return [check('schedule-calculated', false, 'the Schedules window reports no calculated columns')]
+  }
+  return wanted.map((want, i) => {
+    const re = want.formula === undefined ? null : new RegExp(want.formula, 'i')
+    const hit = got.some(
+      (c) =>
+        c &&
+        (!re || (typeof c.formula === 'string' && re.test(c.formula))) &&
+        (want.by === undefined || c.by === want.by) &&
+        (!want.note || (typeof c.note === 'string' && c.note.trim().length > 0))
+    )
+    const asked = [
+      want.formula !== undefined ? `a formula like /${want.formula}/` : null,
+      want.by !== undefined ? `by ${want.by}` : null,
+      want.note ? 'a note' : null
+    ]
+      .filter(Boolean)
+      .join(', ')
+    return check(`schedule-calculated${i}`, hit, `no calculated column with ${asked} (calculated: ${JSON.stringify(got)})`)
+  })
 }
 
 /*

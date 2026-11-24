@@ -6,6 +6,7 @@ import { isBodyFont } from './fonts';
 // The decimal range lives in the file that owns decimals; this parser clamps to the same
 // numbers the column menu's box does, for the reason spelled out at clampDecimals.
 import { DECIMALS_MAX, DECIMALS_MIN } from './format';
+import { CALC_NOTE_CHARS } from '../../shared/tool-schemas';
 
 /** Core (non-property) fields. Mirrors ElemCore. */
 export type CoreKey =
@@ -126,6 +127,18 @@ export interface Calculated {
   formula?: string;
   /** Percentage: each row's share of this field's total over the matching rows. */
   ofField?: FieldRef;
+  /**
+   * 2026-11-24 — `'vee'` when the assistant made this entry, or last changed its formula or
+   * its percentage; absent when the user did. Optional and additive, like `result`: a file
+   * saved before opens unchanged. The user editing the formula takes it away.
+   */
+  by?: 'vee';
+  /**
+   * 2026-11-24 — Vee's one plain sentence saying what the column works out, written with the
+   * formula, at most `CALC_NOTE_CHARS`. Shown beside the formula, never instead of it; it goes
+   * when the user edits the formula.
+   */
+  note?: string;
 }
 
 /**
@@ -388,6 +401,9 @@ function cleanCalculated(v: unknown): Calculated | null {
     yesNo: c.yesNo === true ? true : undefined,
     formula: text(c.formula, 1000),
     ofField,
+    by: c.by === 'vee' ? ('vee' as const) : undefined,
+    // Trimmed, and absent when nothing is left: a blank note would be an empty title line.
+    note: typeof c.note === 'string' ? c.note.trim().slice(0, CALC_NOTE_CHARS).trimEnd() || undefined : undefined,
   });
 }
 

@@ -2,7 +2,7 @@
 
 import type { UnitKind } from '../../ifc/types';
 import { alignForCalc } from '../columns';
-import type { Calculated, ScheduleDef } from '../def';
+import { fieldKey, type Calculated, type ScheduleDef } from '../def';
 import { edit, newId } from './edit';
 
 export const addCalculated = (def: ScheduleDef, kind: 'formula' | 'percentage') => edit(def, (d) => {
@@ -19,12 +19,22 @@ export const removeCalculated = (def: ScheduleDef, id: string) => edit(def, (d) 
   d.columns = d.columns.filter((c) => !(c.field.kind === 'formula' && c.field.id === id));
 });
 
-/** Name, formula text, or a percentage's field. */
+/**
+ * Name, formula text, or a percentage's field. A new formula text or field makes the value the
+ * user's own (2026-11-24): Vee's mark and note go with what they described. A rename keeps them.
+ */
 export const updateCalculated = (
   def: ScheduleDef, id: string, patch: Partial<Pick<Calculated, 'name' | 'formula' | 'ofField'>>,
 ) => edit(def, (d) => {
   const c = d.calculated?.find((x) => x.id === id);
-  if (c) Object.assign(c, patch);
+  if (!c) return;
+  const rewritten = (patch.formula !== undefined && patch.formula !== c.formula)
+    || (patch.ofField !== undefined && (!c.ofField || fieldKey(patch.ofField) !== fieldKey(c.ofField)));
+  Object.assign(c, patch);
+  if (rewritten) {
+    delete c.by;
+    delete c.note;
+  }
 });
 
 /**

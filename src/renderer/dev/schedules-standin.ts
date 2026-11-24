@@ -30,7 +30,7 @@
 import { readSchedule, scheduleBrief } from '../../schedule/assistant'
 import type { ScheduleBrief } from '../../shared/ai-schema'
 import type { ExportFormat, ManageOp } from '../../schedule/messages'
-import type { ScheduleDef } from '../../schedule/schedule/def'
+import type { Calculated, ScheduleDef } from '../../schedule/schedule/def'
 import { presetCount, presetsFor, scheduleFromPreset } from '../../schedule/schedule/presets'
 import { connect, openSchedule, receive, scheduleStore } from '../model/schedule-link'
 import { useShell } from '../state/shell'
@@ -39,6 +39,11 @@ import { useShell } from '../state/shell'
 export interface StandInState {
   /** The schedule it shows, as the per-turn view state's `schedule` line puts it, or null. */
   open: ScheduleBrief | null
+  /**
+   * The open schedule's calculated entries, for the eval's `gradeCalculated` (2026-11-24): who
+   * made each and its note. Dev-only — the per-turn view state's `ScheduleBrief` has none of it.
+   */
+  calculated: { name: string; kind: Calculated['kind']; formula?: string; by?: 'vee'; note?: string }[]
   /** Steps on its undo history each way. */
   undo: number
   redo: number
@@ -221,6 +226,13 @@ export function attachScheduleStandIn(): () => StandInState {
     const open = openSchedule()
     return {
       open: open ? scheduleBrief(open.def, open.rowCount) : null,
+      calculated: (open?.def.calculated ?? []).map((c) => ({
+        name: c.name,
+        kind: c.kind,
+        ...(c.formula !== undefined ? { formula: c.formula } : {}),
+        ...(c.by ? { by: c.by } : {}),
+        ...(c.note !== undefined ? { note: c.note } : {})
+      })),
       undo: undo.length,
       redo: redo.length,
       saved: saved.map((s) => s.name),

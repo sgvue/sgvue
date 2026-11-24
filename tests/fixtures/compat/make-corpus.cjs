@@ -38,8 +38,11 @@ const VERSIONS = {
   'v1.2.0': { section: 'two', frame: 'none', units: false, idStride: false, sessions: true, schedules: true },
   // Public tag v1.3.0. `idStride`, `units`; the frame key is P, placed by an `IfcMapConversion`.
   'v1.3.0': { section: 'two', frame: 'map', units: 'ft', idStride: true, sessions: true, schedules: false },
+  // Public tag v1.6.1 — only `calculated.schedule.json`: a calculated column as the last
+  // release wrote it, before a calculated value carried `by` and `note` (2026-11-24).
+  'v1.6.1': { sessions: false, schedules: false, calculated: true },
   // Today's tree, as committed when the corpus was made: the frame key is always `identity`.
-  current: { section: 'two', frame: 'identity', units: 'm', idStride: true, sessions: true, schedules: true }
+  current: { section: 'two', frame: 'identity', units: 'm', idStride: true, sessions: true, schedules: true, calculated: true }
 }
 
 function entry(root, v) {
@@ -58,9 +61,20 @@ function entry(root, v) {
   if (v.schedules) {
     lines.push(`import { PRESETS, scheduleFromPreset } from ${at('src/schedule/schedule/presets')}`)
   }
+  if (v.calculated) {
+    lines.push(
+      `import { federate as federateCalc } from ${at('src/shared/federate')}`,
+      `import { mockModelIndex as mockCalc } from ${at('src/renderer/dev/mock-adapter')}`,
+      `import { snapshotOf } from ${at('src/schedule/adapter')}`,
+      `import { StoreBuilder } from ${at('src/schedule/ifc/store')}`,
+      `import { buildSchedule } from ${at('src/schedule/assistant')}`,
+      `import * as act from ${at('src/schedule/schedule/actions')}`
+    )
+  }
   lines.push(`const v = ${JSON.stringify(v)}`, `const out: Record<string, string> = {}`)
   if (v.sessions) lines.push(SESSION_BODY)
   if (v.schedules) lines.push(SCHEDULE_BODY)
+  if (v.calculated) lines.push(CALCULATED_BODY)
   lines.push(`process.stdout.write(JSON.stringify(out))`)
   return lines.join('\n')
 }
@@ -146,6 +160,32 @@ walls.itemize = false
 // exporting.ts: JSON.stringify(def, null, 2), as the Blob's text.
 out['doors.schedule.json'] = JSON.stringify(doors, null, 2)
 out['walls.schedule.json'] = JSON.stringify(walls, null, 2)
+`
+
+/**
+ * A door schedule with two calculated columns, written as Export does: one the build's own
+ * `make_schedule` executor (`buildSchedule`) made — the call carries a `note`, which a build
+ * before 2026-11-24 ignores — and one the user added in the calculated-value editor, through
+ * the build's own actions. Over the design's mock ARC model.
+ */
+const CALCULATED_BODY = String.raw`
+const fedC = federateCalc([mockCalc('ARC')])
+const snap = snapshotOf(fedC)
+const sb = new StoreBuilder()
+sb.add(snap.cores, snap.cells)
+const world = { store: sb.finish(snap.meta), propKeys: fedC.propKeys }
+const made: any = buildSchedule({
+  category: ['IfcDoor'],
+  columns: [{ field: 'Name' }, { field: 'Level' }, { field: 'Width' }],
+  calculated: [{ name: 'Double', formula: 'Width * 2', note: 'Twice the door’s width.' }]
+} as any, world as any, null)
+if (made.error) throw new Error(made.error)
+let def: any = act.addCalculated(made.def, 'formula')
+const id = def.calculated[def.calculated.length - 1].id
+def = act.updateCalculated(def, id, { name: 'Mine' })
+def = act.updateCalculated(def, id, { formula: 'Width * 3' })
+def = act.addColumns(def, [{ field: { kind: 'formula', id } }])
+out['calculated.schedule.json'] = JSON.stringify(def, null, 2)
 `
 
 function main() {

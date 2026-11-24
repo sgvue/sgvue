@@ -4,6 +4,24 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-24 — a calculated column Vee made carries a dot and Vee's plain-words note
+
+**Did.** In the Schedules window, a calculated column Vee made has a small accent dot after its heading; its hover
+title and the column menu read "Calculated by Vee", Vee's one-sentence note and the formula (owner-approved
+prototype `prototype/vee-column-icon/`, the dot). A user's own calculated column shows its formula in the menu too.
+`Calculated` gains two optional keys, `by: 'vee'` and `note` (at most `CALC_NOTE_CHARS`, 160); `make_schedule`'s
+calculated items take a `note`, the executor sets `by`, `get_schedule` reads the note back, and one prompt sentence
+asks for a note on every calculated column. The user editing the formula or a percentage's field drops both; undo
+brings them back. The keys travel through `.schedule.json`, the Templates library, the port and `.sgvue`; the
+corpus gains `v1.6.1/` and `current/` `calculated.schedule.json`, each from its own build. Three eval cases (92 in
+all): offline oracle 100 %, null 0 %. Checks were written first by a separate builder; deep review, two rounds,
+nothing blocking — it found a user's formula with a trailing space marked as Vee's when Vee re-sent it, a blank
+note leaving an empty title line, and eval patterns that took wrong answers; each fixed with its check. Typecheck,
+lint, build, privacy clean; `npm test` 5 028 passed, 4 skipped. **In a window:**
+`tests/e2e/vee-column-dot.spec.ts` 1 passed on macOS (its first run stopped at the vertical-heading step: the
+Heading control sits under the menu's "More…" fold, and the spec now opens it); the head and the open menu were
+captured in both themes and match the prototype. Not seen on Windows; the live eval was not run.
+
 ## 2026-11-23 — the Spatial-structure card compares the models
 
 **Did.** The IfcProject card is the owner-approved comparison table (prototype `prototype/project-card/`, rows
@@ -135,36 +153,13 @@ The published files are built by `release.yml` from the tag, not these. Installe
 
 The owner: *"create a new simple yet cool techy loading animation when model view is federating the new upload model."* **Before:** a model added to an open viewer showed progress only in the sidebar's upload row; the 3D view showed nothing, then the plain centre badge "Rebuilding federation…" for the last second. **Prototype first** (`prototypes/federating-animation/`, git-ignored): three variants and a "Today" comparison at the real window size; the owner picked *"B"* — Edge trace. **Built:** a 2 px five-segment line along the 3D view's top edge, one segment per real stage, and a caption in the bottom row's centre (`name · stage · n/5`, then a tick and `+N elements`, or `could not open — see Models`). Both read only the store's upload rows (`shared/fed-trace.ts`, pure; `model/fed-trace-store.ts`); `upload-pipeline.ts` is untouched. They replace "Rebuilding federation…" for these loads only and are gone 900 / 1 600 + 220 ms after the end; no frame loop, nothing reaches the viewer; the first load from the home page is unchanged. Normal lane: checks first (`tests/unit/fed-trace.test.ts`), builder, reviewer. **Seen in a window** on the owner's yes (`tests/e2e/fed-trace.spec.ts`, guarded, 34 s): six models added to an open view — both themes, a 520 px stage, the hint + reset pill + property card together, a file that cannot be opened, reduced motion — every stage in order, no overlap with any other piece, never with the centre badge, both pieces removed each time.
 
-## 2026-11-11 — the repo audit's fixes: decisions 6 to 10, and the sure list
-
-A read-only audit of the whole repository listed 80 sure fixes and 55 decisions for the owner; the owner approved decisions 6 to 10 (*"fix all the audit decisions 6 to 10"*) and then the sure list. All of it is on the branch `claude/repo-audit-48da55`, each change written against a check that failed first, reviewed, and committed apart; nothing is pushed or merged.
-
-**Decisions 6 to 10.** Ask Vee: showing only some storeys is under the 5 % scope guard like every other way of hiding; a clash list cut short is still in order; a placed spot is quoted in the unit on screen; `copy csv` writes volumes; two messages reworded. Six small visible things: Preferences' Model box saves once, the Spatial-structure card names the file's own coordinate system, Schedules says when a limit or storage refused. Schedules redraws its table only for what can change it. The schedule engine reads `.5` and `1e3`, yes/no filters, a class named twice and an unknown operator correctly. Code only its tests used is removed.
-
-**The sure list.** The assistant's model database stays read-only after it is built (sql.js's export had switched one of three safeguards off); a schedule file cannot name `constructor` as a field; dead code removed, the audit's 41 rows of stale comments and 17 rows of document facts corrected (one comment row skipped: its file is another session's); `.claude/launch.json` ignored.
-
-**Corrections to the audit itself.** Two "dead" items are live (`moveItem`'s re-export, `data-act="col-handle"`), the georef "leftovers" are called by live code, and the first check for an empty yes/no filter was wrong — the window stores nothing until the user picks, so an unfilled filter reads as it always has.
-
-**Owed.** Nothing here was seen in a window: the e2e specs and the live eval were not run. Open for the owner, in `docs/DECISIONS.md`'s rows of this date: the yes/no dropdown that shows "true" while the chip reads "equals No", and three more places where a crafted schedule file can name built-in JavaScript words.
-
-## 2026-11-11 — a project opened while another still loads (follow-up to "a project settles", below)
-
-**Did.** A second `.sgvue` opened while the first one's models still loaded read as loaded at once — its own fresh start cleared the first one's rows, and the "every file failed" fallback took that for its own load ending; until its restore ran it could show as changed, Save Project answered that no model was open, and Locate… acted on a project not yet restored. Three guards: the project's own fresh start no longer reads as its files failing (`project.ts`); a replaced batch's failed join undoes nothing and resolves `false` (`federation-store.ts`); a replaced load's failure no longer calls `bootFailed` (`upload-pipeline.ts`). Only the first is reachable by a user today; the other two are hardening — the shipped scene takes a model in one go, so a replaced join cannot fail late — and are pinned by holding the stand-in scene's `addModel`. Fix mode, Risky lane: failing checks first by a separate run (three sequences and a guard that a project whose every file fails still settles on the landing page), builder, each guard watched failing alone, `reviewer-deep` PASS in one round with sweeps of other timings. Checks: typecheck, lint, vitest 4 612 passed / 4 skipped, privacy 0 findings. **Not seen in a window.** **Noticed, not changed** (row in `docs/DECISIONS.md`): a replaced join that *succeeds* late would remove the newer load's model of the same key from the scene (same hardening-only reach); `openDemo` / `openLibrary` still call `bootFailed` unguarded.
-
-## 2026-11-11 — Ask Vee's box tools and SQL read a turned building square with it (option A)
-
-Asked whether Vee's box answers should be square with the building as the selection dimension and the card now are, the owner: *"Yes, option A"*. **Measured first** on the synthetic reference model and the demo building turned −43.4103°: a 6.0 × 0.1 m wall's world box is 4.4 × 4.2 m; clash candidates ARC × STR 251 where the unturned building gives 80, ARC × MEP 30 where it gives 0; `find_nearby` lists about 20 % too long; side-by-side gaps under-read by a median 0.7–1.7 m. **Built:** `model/plan-boxes.ts` hands `clash_check`, `find_nearby`, `measure_between` and `get_element` the box `Viewer.elementPlanBox` gives the card; SQL gains `plan_box` and `plan_frame`; `IfcElement.bbox`, the `bbox` table, the project file and markup placing are unchanged, and with the plan rotation at 0 every result is byte for byte what it was (golden files). Risky lane: checks first by a separate run, builder, `reviewer-deep` PASS. Headless: typecheck, lint, the whole unit suite, `eval:offline`, privacy. **Owed:** a live re-run of `ana-clash`, `ana-proximity`, `ana-tallest`, `op-place-spot`, `op-place-measure` (wording changed, truths did not; paid and windowed, the owner's yes); the plan-box gather timed on a model of several million triangles in the guarded benchmark. Exact surface-to-surface clash tests are a separate piece, with the parked clash review.
-
-## 2026-11-11 — a project settles when its own batch fails to join (follow-up to the entry below)
-
-**Did.** A `.sgvue` whose own models failed to open while others were brought in with Locate… read "loading" for good: the Locate… rows stayed beside loaded models, nothing the project stored for them was restored, Save Project refused. The project settled only when its batch joined, and the one fallback (no row in flight, not booted) never fires once a located model is loading. `AfterJoin` gains an optional `failed`, called from `join`'s catch for the load still current; `project.ts` answers with `settle()`, so the located models' batch does the full restore. Fix mode, Risky lane: failing checks first (three sequences, 27 failing assertions, and a guard that nothing changes with nothing located), builder, `reviewer-deep` PASS in one round (two extras no check needed were taken out). One assertion of the new checks was corrected before the fix was accepted: it expected a save to keep the file's model order, which no save does (`carryForward` writes loaded models first). **Not seen in a window.** **Noticed, not changed** (row in `docs/DECISIONS.md`): a project opened over another's load still in flight settles at once; a located model that does not end up loaded stays "being located", so the same file cannot be located again until the project is reopened; a save lists a missing model last.
-
-## 2026-11-11 — the offset is handed back only when nobody stands with it (follow-up to the entry below)
-
-**Did.** Closed the path the earlier fix's review left open. `FederationController` now keeps the models on their way to joining (`onTheWay`) and hands the scene offset back only when nothing is loaded and that set is empty; before, emptying the federation (`resetBoot`) handed it back at once, so a model already loading kept the old origin and the next chose its own. Review round 1 then reproduced a second old route — a project boot refused for "no geometry" while a located model waited — closed by unloading that boot through `removeModel` instead of `resetUnshown` (`upload-pipeline.ts`). Fix mode, Risky lane: failing checks first (three pipeline cases: 29.6 m, 29.6 m and 26.5 km off before), builder, `reviewer-deep` twice. **Left, with reasons in `docs/DECISIONS.md`:** a first model with no meshes still reports `[0, 0, 0]` (not small, not safe: needs a re-base of what is on screen). **Noticed, not changed:** the display unit is still handed back early in the same races; after a project's own model fails to boot, located models load but the project still reads as loading and the missing rows stay. Nothing visible changed for an ordinary load; `.sgvue` format unchanged; nothing auto-aligns.
-
 ## Earlier work
 
+- **2026-11-11** — the repo audit's fixes: decisions 6 to 10, and the sure list
+- **2026-11-11** — a project opened while another still loads (follow-up to "a project settles", below)
+- **2026-11-11** — Ask Vee's box tools and SQL read a turned building square with it (option A). **Owed:** the plan-box gather timed on a model of several million triangles in the guarded benchmark
+- **2026-11-11** — a project settles when its own batch fails to join (follow-up to the entry below)
+- **2026-11-11** — the offset is handed back only when nobody stands with it (follow-up to the entry below)
 - **2026-11-11** — two position bugs from the owner's 1.5.0 test: a reopened project, and the selection DIM
 - **2026-11-11** — ObjectType is the element's own; the type's Name kept apart
 - **2026-11-09** — SGVue 1.5.0 published

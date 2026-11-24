@@ -36,6 +36,7 @@ import { z } from 'zod'
 import { HL } from '../../../shared/colors'
 import {
   ASK_LEAD_MAX,
+  CALC_NOTE_CHARS,
   FILTER_SET_NAME_MAX,
   IFCSG_NAME_MAX,
   INTERFACE_CARDS,
@@ -185,7 +186,8 @@ const ScheduleInput = z.object({
         name: z.string().min(1).max(120),
         formula: z.string().max(SCHEDULE_FORMULA_CHARS, `at most ${SCHEDULE_FORMULA_CHARS} characters`).optional(),
         percentageOf: SchedField.optional(),
-        result: en(SCHEDULE_RESULTS).optional()
+        result: en(SCHEDULE_RESULTS).optional(),
+        note: z.string().max(CALC_NOTE_CHARS, `at most ${CALC_NOTE_CHARS} characters`).optional()
       })
     )
     .max(SCHEDULE_CALC_CAP, `at most ${SCHEDULE_CALC_CAP} calculated columns in one call`)

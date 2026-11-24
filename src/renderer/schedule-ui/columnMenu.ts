@@ -17,7 +17,7 @@ import { candidateRows } from '../../schedule/schedule/engine';
 import { formatCell } from '../../schedule/schedule/format';
 import { resolveField } from '../../schedule/schedule/resolve';
 import { fieldKey } from '../../schedule/schedule/actions';
-import { BOOL_STYLES, headingOf, type Column } from '../../schedule/schedule/def';
+import { BOOL_STYLES, headingOf, type Column, type ScheduleDef } from '../../schedule/schedule/def';
 import { ANY_PSET } from '../../schedule/schedule/resolve';
 import type { ScheduleResult } from '../../schedule/schedule/engine';
 import { DECIMALS_MAX, DECIMALS_MIN, defaultDecimals, defaultUnit, unitOptions } from '../../schedule/schedule/format';
@@ -31,7 +31,7 @@ import { conditionalRules } from './panels/conditionalRules';
 import { remapBlock } from './remap';
 import { kindOf, toggle, typeOf } from './panels/shared';
 import { openPopover, popoverId, togglePopover } from './popover';
-import { alignOf, cellStyle } from './tableView';
+import { alignOf, cellStyle, veeCalc } from './tableView';
 
 const PREFIX = 'col:';
 let view: 'main' | 'colour' = 'main';
@@ -159,7 +159,7 @@ export function renderColumnMenu(
   const psetOf = col.field.kind === 'prop' ? (col.field.pset === ANY_PSET ? 'any pset' : col.field.pset) : 'core';
   const problem = col.field.kind === 'formula' ? calcProblems(state, store).get(col.field.id) : undefined;
   const cover = col.field.kind === 'formula'
-    ? `<div class="pop-note${problem ? ' bad' : ''}"><span class="grow-1">${problem ? esc(problem) : 'Calculated column'}</span>
+    ? `<div class="pop-note${problem ? ' bad' : ''}"><span class="grow-1">${problem ? esc(problem) : calcNote(def, col.field.id)}</span>
         <button class="btn" data-act="open-calc">Edit formula</button></div>`
     : `<div class="pop-cover${n === 0 ? ' none' : n < cov.total ? ' mid' : ''}">${coverBar(fraction(cov, col.field))}
         <b>${n.toLocaleString()} of ${cov.total.toLocaleString()}</b> carry it<span class="pset">${esc(psetOf)}</span></div>
@@ -217,4 +217,17 @@ export function renderColumnMenu(
       <button class="icon-btn sm hv-warn-both" data-act="col-remove" data-i="${i}" title="Remove column"
         aria-label="Remove column">${ICON.remove}</button>
     </div>`;
+}
+
+/**
+ * A calculated column's note in its menu (2026-11-24): who made it — Vee, with Vee's plain-words
+ * note — and then the formula itself, on a line of its own (a percentage has none).
+ */
+function calcNote(def: ScheduleDef, id: string): string {
+  const c = def.calculated?.find((x) => x.id === id);
+  const vee = veeCalc(def, id);
+  const formula = c?.kind === 'formula' && c.formula ? `<span class="f">${esc(c.formula)}</span>` : '';
+  return vee
+    ? `Calculated by Vee${vee.note ? `<br>${esc(vee.note)}` : ''}${formula}`
+    : `Calculated column${formula}`;
 }

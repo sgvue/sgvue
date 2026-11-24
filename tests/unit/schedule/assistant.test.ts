@@ -767,7 +767,7 @@ describe('phase 4 — a unit and decimals only where the Format tab offers them'
 describe('phase 4 — calculated columns, in the engine’s own formula grammar', () => {
   it('a formula over the columns’ headings becomes a column at the right, and reads back by name', () => {
     const b = built({ ...DOORS, calculated: [{ name: 'Double', formula: 'Width * 2' }] })
-    expect(b.def.calculated).toEqual([{ id: 'calc1', name: 'Double', kind: 'formula', formula: 'Width * 2', result: 'number' }])
+    expect(b.def.calculated).toEqual([{ id: 'calc1', name: 'Double', kind: 'formula', formula: 'Width * 2', result: 'number', by: 'vee' }])
     expect(b.def.columns.at(-1)).toEqual({ field: { kind: 'formula', id: 'calc1' }, align: 'right' })
     const read = readOf(b.def)
     expect(read.headings).toEqual(['Name', 'Level', 'Width', 'Double'])
@@ -806,7 +806,7 @@ describe('phase 4 — calculated columns, in the engine’s own formula grammar'
   it('percentageOf is each row’s share of a field’s total', () => {
     const b = built({ ...DOORS, calculated: [{ name: 'Share', percentageOf: 'Width' }] })
     expect(b.def.calculated).toEqual([
-      { id: 'calc1', name: 'Share', kind: 'percentage', ofField: { kind: 'prop', pset: '*', prop: 'Width' } }
+      { id: 'calc1', name: 'Share', kind: 'percentage', ofField: { kind: 'prop', pset: '*', prop: 'Width' }, by: 'vee' }
     ])
     const total = doors.reduce((a, d) => a + Number(d.qto.Qto_DoorBaseQuantities.Width), 0)
     const rows = readOf(b.def).rows
@@ -826,7 +826,7 @@ describe('phase 4 — calculated columns, in the engine’s own formula grammar'
   it('is redefined by name on the open schedule, where it stands — and can be taken away as a column', () => {
     const base = built({ ...DOORS, calculated: [{ name: 'Double', formula: 'Width * 2' }] }).def
     const again = built({ base: 'open', calculated: [{ name: 'double', formula: 'Width * 3' }] }, base)
-    expect(again.def.calculated).toEqual([{ id: 'calc1', name: 'Double', kind: 'formula', formula: 'Width * 3', result: 'number' }])
+    expect(again.def.calculated).toEqual([{ id: 'calc1', name: 'Double', kind: 'formula', formula: 'Width * 3', result: 'number', by: 'vee' }])
     expect(headingsOf(again.def)).toEqual(['Name', 'Level', 'Width', 'Double'])
     expect(readOf(again.def).rows[0][3]).toBe('7,200.00')
     // A second one is a second value, with an id of its own.
@@ -838,7 +838,7 @@ describe('phase 4 — calculated columns, in the engine’s own formula grammar'
     // Turned into a share, it stops being a formula.
     const share = built({ base: 'open', calculated: [{ name: 'Double', percentageOf: 'Width' }] }, base)
     expect(share.def.calculated).toEqual([
-      { id: 'calc1', name: 'Double', kind: 'percentage', ofField: { kind: 'prop', pset: '*', prop: 'Width' } }
+      { id: 'calc1', name: 'Double', kind: 'percentage', ofField: { kind: 'prop', pset: '*', prop: 'Width' }, by: 'vee' }
     ])
     // removeColumns takes the column away; the value's definition is kept, as the editor keeps it.
     const gone = built({ base: 'open', removeColumns: ['Double'] }, base)
