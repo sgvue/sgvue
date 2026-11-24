@@ -129,6 +129,7 @@ const SAMPLES: Record<string, unknown[]> = {
   setSortDir: [0, 'desc'],
   setGroupOptions: [2, { header: true, footer: 'count', blankLine: true }],
   setItemize: [true],
+  setCombine: ['sort'],
   setGrandTotal: [false],
   setGrandTotalTitle: ['Everything'],
   setAppearance: [{

@@ -41,10 +41,13 @@ function fires(col: Column, r: CondRule, text: string): boolean {
  * skipped on blank text: `= ''` and `contains ''` are both true of the empty string, and a
  * rule authored with its value box left empty would otherwise paint the whole column the
  * moment it was added.
+ *
+ * `mixed` is the engine's flag for a combined-by-sort `<varies>` cell: it is claimed by nothing.
  */
-export function firingRule(col: Column, text: string): number {
+export function firingRule(col: Column, text: string, mixed = false): number {
   const rules = col.conditional;
-  if (!rules?.length) return -1;
+  // A combined row's `<varies>` cell (`mixed`) holds no one value, so no rule may claim it.
+  if (!rules?.length || mixed) return -1;
   for (let k = 0; k < rules.length; k++) {
     const r = rules[k];
     if (text === '') {

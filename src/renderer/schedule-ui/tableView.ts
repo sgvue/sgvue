@@ -55,8 +55,9 @@ export function alignOf(col: Column): 'left' | 'center' | 'right' {
 /** One place that turns an alignment into a class, so headers and cells cannot disagree. */
 const ALIGN_CLASS: Record<'left' | 'center' | 'right', string> = { left: '', center: 'ctr', right: 'num' };
 
-function alignClass(col: Column): string {
-  const cls = ALIGN_CLASS[alignOf(col)];
+function alignClass(col: Column, varies = false): string {
+  // `varies`: a combined-by-sort cell whose members differ (2026-11-24), drawn muted.
+  const cls = [ALIGN_CLASS[alignOf(col)], varies ? 'varies' : ''].filter(Boolean).join(' ');
   return cls ? ` class="${cls}"` : '';
 }
 
@@ -68,8 +69,8 @@ function alignClass(col: Column): string {
  * colours. A claiming rule with every colour cleared paints nothing and still claims — it
  * is the first match that wins, not the first match that happens to be visible.
  */
-export function cellStyle(col: Column, text: string): string {
-  const k = firingRule(col, text);
+export function cellStyle(col: Column, text: string, mixed = false): string {
+  const k = firingRule(col, text, mixed);
   if (k < 0) return '';
   const r = col.conditional![k];
   const bits = [
@@ -113,8 +114,11 @@ function renderRow(
     case 'data': {
       const cells = cols.map((c, i) => {
         const text = row.cells[i];
-        const mark = sw && sw.col === i && text ? swatch(sw.map.get(colourKey(text))) : '';
-        return `<td${alignClass(c)}${cellStyle(c, text)}>${mark}${esc(text)}</td>`;
+        const mixed = row.mixed?.[i] ?? false;
+        // A <varies> or total cell holds no one element's value, so it carries no swatch.
+        const own = !mixed && !row.totalled?.[i];
+        const mark = sw && sw.col === i && text && own ? swatch(sw.map.get(colourKey(text))) : '';
+        return `<td${alignClass(c, mixed)}${cellStyle(c, text, mixed)}>${mark}${esc(text)}</td>`;
       });
       const on = selected.size > 0 && row.rows.some((r) => selected.has(r));
       return `<tr class="data hv-step${on ? ' on' : ''}" data-row="${index}">`

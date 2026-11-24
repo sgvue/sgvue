@@ -164,6 +164,8 @@ export interface AskSchedule {
   groupBy?: string[]
   /** The Rows popover's "Itemise every instance"; off, identical rows collapse into one with a count. */
   itemize?: boolean
+  /** How itemise off combines: 'sort' is one row per sort value (Revit's way); 'identical' the default. */
+  combine?: 'identical' | 'sort'
   grandTotals?: boolean
 }
 
@@ -686,7 +688,13 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
     def.sort = [...groups, ...plain]
   }
 
+  if (ask.combine === 'sort' && ask.itemize === true) {
+    return { error: 'make_schedule: combine "sort" needs itemize false — leave itemize out (combine switches it off) or send itemize: false.' }
+  }
   if (ask.itemize !== undefined) def.itemize = ask.itemize
+  // Combining by sort value is a way of itemise off, so asking for it switches itemise off.
+  if (ask.combine === 'sort') { def.combine = 'sort'; def.itemize = false }
+  else if (ask.combine === 'identical') delete def.combine
   if (ask.grandTotals !== undefined) def.grandTotal = ask.grandTotals
   const title = ask.title?.trim().slice(0, 200)
   if (title) {
@@ -776,6 +784,7 @@ export function simplify(def: ScheduleDef): Record<string, unknown> {
     groupBy: def.sort.filter(isGroup).map((l) => fieldName(l.field, def)),
     grandTotals: def.grandTotal,
     ...(def.itemize ? {} : { itemize: false }),
+    ...(!def.itemize && def.combine === 'sort' ? { combine: 'sort' } : {}),
     ...(calculated.length
       ? {
           calculated: calculated.slice(0, SCHEDULE_CALC_CAP).map((c) => ({
@@ -861,6 +870,18 @@ export interface ScheduleRead {
   groups: { label: string; ids: number[] }[]
 }
 
+/** What a row combined by sort value stands for, said in `readSchedule`'s message. */
+function combinedNote(def: ScheduleDef): string {
+  // Bounded like every text this result takes from the file: a field name can be any length.
+  const labels = def.sort.slice(0, MAX_SORT_LEVELS).map((l) => clip(fieldName(l.field, def), 60))
+  return (
+    (labels.length
+      ? ` Each row stands for the elements sharing one ${labels.join(' + ')} value, Count saying how many;`
+      : ' With no sort level every element is one row, Count saying how many;') +
+    ' a column with a total shows it over those elements, and <varies> means they differ in that column.'
+  )
+}
+
 /**
  * Run `def` over `store` and report it as the Schedules window shows it. The engine runs
  * uncapped (the screen stops drawing at 5 000 rows; totals never did), and the page of rows,
@@ -917,8 +938,11 @@ export function readSchedule(
         ids.push(id)
         if (top.length) top[top.length - 1].ids.push(id)
       }
+      // A row combined by sort value counts its own members (`filled`): a <varies> or a
+      // total cell is not blank, yet some of the elements behind it may be.
       r.cells.forEach((c, i) => {
-        if (c !== '') filled[i] += r.count
+        if (r.filled) filled[i] += r.filled[i]
+        else if (c !== '') filled[i] += r.count
       })
       if (res.countColumn) filled[headings.length - 1] += r.count
       if (dataIndex >= offset && rows.length < limit && !cut) {
@@ -956,12 +980,14 @@ export function readSchedule(
   })
   const truncated = offset + rows.length < res.totalDataRows || groups.length < groupCount
   const title = clip(titleOf(def), 200)
+  const bySort = !def.itemize && def.combine === 'sort'
   const shownRows = rows.length ? `rows ${offset + 1}–${offset + rows.length} are listed as the table shows them` : 'no rows are listed'
   const message =
     `${title}: ${res.totalDataRows} row${res.totalDataRows === 1 ? '' : 's'} listing ${res.matchedElements} of the ` +
     `${candidates.length} ${def.entity.join(' / ') || 'uncategorised'} elements; ${shownRows}` +
     (truncated ? ' — more are left out, page with offset.' : '.') +
     (grand ? ' The grand totals are in grandTotal.' : '') +
+    (bySort ? combinedNote(def) : '') +
     (units.some(Boolean)
       ? ' Cells and totals read in each column’s unit; a filter number is in its filterUnit (SI), so 900 mm is 0.9.'
       : '')

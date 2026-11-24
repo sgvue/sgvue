@@ -72,6 +72,16 @@ export function fieldLabel(def: ScheduleDef, field: FieldRef): string {
   return col ? headingOf(col, def) : defaultHeading(field, def);
 }
 
+/** The sort levels as the schedule names them — what a row stands for when combined by sort. */
+export const sortLabels = (def: ScheduleDef): string[] => def.sort.map((l) => fieldLabel(def, l.field));
+
+/** The Rows chip's text with itemise off: by sort value, what one row stands for. */
+function combinedLabel(def: ScheduleDef): string {
+  if (def.combine !== 'sort') return 'Combined rows';
+  const labels = sortLabels(def);
+  return labels.length ? `One row per ${labels.join(' + ')}` : 'One row';
+}
+
 /** The condition and value of a rule, worded for a chip: `is at most · 1,200 mm`. */
 function ruleWords(store: ModelStore, def: ScheduleDef, r: FilterRule): [string, string] {
   const kind = kindOf(store, def, r.field);
@@ -150,7 +160,7 @@ export function renderViewBar(state: AppState, store: ModelStore): string {
   parts.push(`<button class="vset hv-step" data-act="vb-open" data-v="picker" data-id="chip" aria-haspopup="dialog" title="Add, remove or reorder columns — or press /"><b>${
     shown.length}</b> of ${fields} fields${hidden ? ` · ${hidden} hidden` : ''}${empty ? ` · <span class="warnc">${empty} empty</span>` : ''}</button>`);
   parts.push(`<button class="vset hv-step" data-act="vb-open" data-v="rows" aria-haspopup="dialog">${
-    def.itemize ? 'Every instance' : '<b>Combined rows</b>'}${def.grandTotal ? ' · grand total' : ''}</button>`);
+    def.itemize ? 'Every instance' : `<b>${esc(combinedLabel(def))}</b>`}${def.grandTotal ? ' · grand total' : ''}</button>`);
   parts.push(`<button class="vset hv-step" data-act="vb-open" data-v="style" aria-haspopup="dialog">Style</button>`);
 
   return `<div class="viewbar" role="toolbar" aria-label="What this schedule shows">${parts.join('')}</div>`;

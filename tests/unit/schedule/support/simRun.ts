@@ -84,7 +84,7 @@ function expectedCounts(name: ActionName, args: unknown[], d: ScheduleDef) {
     // union names every member), so a new action has to be placed here by hand.
     case 'moveColumn': case 'moveSortLevel': case 'remapColumn': case 'setAlign':
     case 'setAppearance': case 'setCalculatedResult': case 'setCalculatedUnitKind':
-    case 'setColumnFormat': case 'setFilterField': case 'setFilterMode': case 'setFilterOp':
+    case 'setColumnFormat': case 'setCombine': case 'setFilterField': case 'setFilterMode': case 'setFilterOp':
     case 'setFilterRange': case 'setFilterValue': case 'setFilterValues': case 'setGrandTotal':
     case 'setGrandTotalTitle': case 'setGroupOptions': case 'setHeading':
     case 'setHeadingOrientation': case 'setHidden': case 'setItemize': case 'setName':

@@ -201,6 +201,12 @@ export interface ScheduleDef {
   sort: SortLevel[];
   /** false collapses rows identical in every visible column, exposing a Count. */
   itemize: boolean;
+  /**
+   * How itemize false combines (2026-11-24): absent merges rows identical in every visible
+   * column; 'sort' makes one row per distinct value of the sort levels, as Revit does, a
+   * column whose members differ reading `<varies>`. Read only when itemize is false.
+   */
+  combine?: 'sort';
   grandTotal: boolean;
   grandTotalTitle?: string;
   appearance?: Appearance;
@@ -471,6 +477,7 @@ export function parseScheduleDef(input: unknown): ScheduleDef {
     sort: Array.isArray(o.sort)
       ? (o.sort as SortLevel[]).filter((s) => s?.field).slice(0, MAX_SORT_LEVELS) : [],
     itemize: o.itemize !== false,
+    ...(o.combine === 'sort' ? { combine: 'sort' as const } : {}),
     grandTotal: o.grandTotal === true,
     grandTotalTitle: text(o.grandTotalTitle, 200),
     appearance: cleanAppearance(o.appearance),

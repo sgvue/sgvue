@@ -35,6 +35,10 @@ export const setGroupOptions = (
 export const setItemize = (def: ScheduleDef, itemize: boolean) =>
   edit(def, (d) => { d.itemize = itemize; });
 
+/** How itemise off combines rows: 'identical' (the default) takes the key away. */
+export const setCombine = (def: ScheduleDef, combine: 'identical' | 'sort') =>
+  edit(def, (d) => { if (combine === 'sort') d.combine = 'sort'; else delete d.combine; });
+
 export const setGrandTotal = (def: ScheduleDef, on: boolean) =>
   edit(def, (d) => { d.grandTotal = on; });
 

@@ -21,6 +21,7 @@ import { esc } from './dom';
 import { ICON } from './icons';
 import { selectionNote } from './selection';
 import type { AppState } from './state';
+import { sortLabels } from './viewBar';
 
 /** ⌘ on a Mac, Ctrl elsewhere — only for what the tooltips say. */
 const MOD = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+';
@@ -91,9 +92,13 @@ export function renderStatus(state: AppState, res: ScheduleResult, cov: Coverage
   // built from exactly this entity list.
   const total = cov.total;
 
+  const from = `Collapsed from ${matched.toLocaleString()} instance${matched === 1 ? '' : 's'}`;
+  const labels = sortLabels(state.def);
   const collapse = state.def.itemize
     ? 'Every instance itemised'
-    : `Collapsed from ${matched.toLocaleString()} instance${matched === 1 ? '' : 's'} by ${res.columns.length} column${res.columns.length === 1 ? '' : 's'}`;
+    : state.def.combine !== 'sort'
+      ? `${from} by ${res.columns.length} column${res.columns.length === 1 ? '' : 's'}`
+      : labels.length ? `${from} by ${labels.join(' + ')}` : `${from} into one row`;
 
   return `<span class="sel-note">${selNoteHtml(state, res)}</span>
     <span>${rows.toLocaleString()} row${rows === 1 ? '' : 's'}</span>

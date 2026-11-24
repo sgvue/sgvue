@@ -637,6 +637,8 @@ tr.blank td { height: 1.7em; padding: 0; }
 table.schedule td.num, table.schedule th.num { text-align: right; }
 table.schedule td.num { font-variant-numeric: tabular-nums; }
 table.schedule td.ctr, table.schedule th.ctr { text-align: center; }
+/* A combined-by-sort cell whose members differ (2026-11-24, docs/DEVIATIONS.md). */
+table.schedule td.varies { color: var(--muted); }
 th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; }
 
 /* The resize grip: the last few pixels of a heading, owned by colResize.ts. */

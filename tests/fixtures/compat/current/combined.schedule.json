@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "name": "Door Schedule",
+  "entity": [
+    "IfcDoor"
+  ],
+  "columns": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "name"
+      },
+      "align": "left"
+    },
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      },
+      "align": "left"
+    },
+    {
+      "field": {
+        "kind": "prop",
+        "pset": "*",
+        "prop": "Width"
+      },
+      "align": "right",
+      "format": {
+        "display": "",
+        "decimals": 2,
+        "thousands": true
+      }
+    }
+  ],
+  "filters": [],
+  "filterLogic": "and",
+  "sort": [
+    {
+      "field": {
+        "kind": "core",
+        "key": "storey"
+      },
+      "dir": "asc"
+    }
+  ],
+  "itemize": false,
+  "grandTotal": false,
+  "appearance": {
+    "showTitle": true,
+    "gridLines": true,
+    "outline": true,
+    "blankRowBeforeData": false,
+    "zebra": true,
+    "fontSize": 13,
+    "headerBold": true,
+    "bodyFont": "plex"
+  },
+  "combine": "sort"
+}

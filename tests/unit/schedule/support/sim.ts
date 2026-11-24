@@ -161,6 +161,7 @@ export const GENS: Record<ActionName, Gen> = {
       () => ({ footer: pick(r, FOOTERS) })])()]
     : null),
   setItemize: (_d, r) => [bool(r)],
+  setCombine: (_d, r) => [pick(r, ['identical', 'sort'])],
   setGrandTotal: (_d, r) => [bool(r)],
   setGrandTotalTitle: (_d, r) => [pick(r, TEXTS)],
   setAppearance: (_d, r) => [pick(r, [
