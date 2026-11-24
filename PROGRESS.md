@@ -17,8 +17,10 @@ corpus gains `v1.6.1/` and `current/` `calculated.schedule.json`, each from its 
 all): offline oracle 100 %, null 0 %. Checks were written first by a separate builder; deep review, two rounds,
 nothing blocking — it found a user's formula with a trailing space marked as Vee's when Vee re-sent it, a blank
 note leaving an empty title line, and eval patterns that took wrong answers; each fixed with its check. Typecheck,
-lint, build, privacy clean; `npm test` 5 028 passed, 4 skipped. **Not seen in a window:**
-`tests/e2e/vee-column-dot.spec.ts` is written and has not been run; the live eval was not run.
+lint, build, privacy clean; `npm test` 5 028 passed, 4 skipped. **In a window:**
+`tests/e2e/vee-column-dot.spec.ts` 1 passed on macOS (its first run stopped at the vertical-heading step: the
+Heading control sits under the menu's "More…" fold, and the spec now opens it); the head and the open menu were
+captured in both themes and match the prototype. Not seen on Windows; the live eval was not run.
 
 ## 2026-11-23 — the Spatial-structure card compares the models
 

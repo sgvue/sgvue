@@ -196,6 +196,8 @@ test('a Vee-made calculated column: the dot, its title, its menu, print, vertica
 
     // 8 — a vertical heading (the menu's own Heading control): the dot is clear of the text
     // along the direction the text runs.
+    // The Heading control sits under the menu's "More…" fold.
+    await pop(sched).locator('[data-act="cm-more"]').click()
     await pop(sched).locator('[data-act="cm-orient"][data-v="vertical"]').click()
     await expect(heading(sched, VEE)).toHaveClass(/\bvertical\b/)
     await sched.keyboard.press('Escape')
