@@ -283,7 +283,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 3",
     "count": 3,
     "cells": [
      null,
@@ -327,7 +327,7 @@
   "Roof (1),,,,",
   "600x600,FLOORING,Roof,21.23,157",
   "1,,,,",
-  "Grand total,,,41.23,"
+  "Grand total: 3,,,41.23,"
  ],
  "xlsx": [
   {
@@ -377,7 +377,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 14
+     "width": 16
     },
     {
      "i": 1,
@@ -1196,7 +1196,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 3",
        "font": {
         "bold": true
        },

@@ -481,6 +481,10 @@ button.pop-back { color: var(--accent-ink); padding: 4px 6px; margin-bottom: 6px
 
 /* 2026-11-25, step 2 of the one-line bar. The Rows choice's one line; the column menu's icon row
    (group, filter, colour rules with its count, hide, remove). */
+/* The Rows choice is a stacked list: side by side its three labels wrap in the popover. */
+.rows-mode .seg { flex-direction: column; }
+.rows-mode .seg-btn { border-right: none; border-bottom: 1px solid var(--border); justify-content: flex-start; white-space: nowrap; }
+.rows-mode .seg-btn:last-child { border-bottom: none; }
 .rows-hint { margin: 8px 2px 0; }
 .icon-row.cm-actions { margin: 6px 0 2px; }
 .cm-colour { position: relative; }

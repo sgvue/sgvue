@@ -470,7 +470,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 9",
     "count": 9,
     "cells": [
      null,
@@ -524,7 +524,7 @@
   "1013,0915 x 2134mm,Roof,,,'=SUM(A1)",
   "1017,0915 x 2134mm,Roof,1759,3059,",
   "2,,,,,",
-  "Grand total,,,,,"
+  "Grand total: 9,,,,,"
  ],
  "xlsx": [
   {
@@ -2092,7 +2092,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 9",
        "font": {
         "bold": true
        },

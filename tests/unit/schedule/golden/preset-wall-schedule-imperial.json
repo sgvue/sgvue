@@ -679,7 +679,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 10",
     "count": 10,
     "cells": [
      null,
@@ -752,7 +752,7 @@
   "Generic 200mm,Roof,10.12,34.8,137.2,131.00,,60 min,",
   "Exterior 300mm,Roof,35.35,22.6,,,,,Yes",
   "3,,,,,,,,",
-  "Grand total,,,,,495.59,277.83,,"
+  "Grand total: 10,,,,,495.59,277.83,,"
  ],
  "xlsx": [
   {
@@ -802,7 +802,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 16
+     "width": 17
     },
     {
      "i": 1,
@@ -3702,7 +3702,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 10",
        "font": {
         "bold": true
        },

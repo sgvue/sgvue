@@ -176,7 +176,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 2",
     "count": 2,
     "cells": [
      null,
@@ -209,7 +209,7 @@
   "Level 2 (1),,",
   "Flat,Level 2,120.00",
   "1,,",
-  "Grand total,,241.23"
+  "Grand total: 2,,241.23"
  ],
  "xlsx": [
   {
@@ -259,7 +259,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 13
+     "width": 16
     },
     {
      "i": 1,
@@ -620,7 +620,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 2",
        "font": {
         "bold": true
        },

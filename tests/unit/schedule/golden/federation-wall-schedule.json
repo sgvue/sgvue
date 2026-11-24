@@ -2928,7 +2928,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 80",
     "count": 80,
     "cells": [
      null,
@@ -3071,7 +3071,7 @@
   "ARC,Parapet 200 RC,Roof,18200.00,200,1000,,,'-,Yes",
   "ARC,Parapet 200 RC,Roof,18200.00,200,1000,,,'-,Yes",
   "4,,,,,,,,,",
-  "Grand total,,,,,,870.32,,,"
+  "Grand total: 80,,,,,,870.32,,,"
  ],
  "xlsx": [
   {
@@ -3121,7 +3121,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 13
+     "width": 17
     },
     {
      "i": 1,
@@ -16678,7 +16678,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 80",
        "font": {
         "bold": true
        },

@@ -711,7 +711,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 17",
     "count": 17,
     "cells": [
      null,
@@ -775,7 +775,7 @@
   "ARC,200482,D1 Single 900x2100,L4,900,2100,1 HR",
   "ARC,200484,D1 Single 900x2100,L4,900,2100,1 HR",
   "4,,,,,,",
-  "Grand total,,,,,,"
+  "Grand total: 17,,,,,,"
  ],
  "xlsx": [
   {
@@ -825,7 +825,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 13
+     "width": 17
     },
     {
      "i": 1,
@@ -3059,7 +3059,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 17",
        "font": {
         "bold": true
        },

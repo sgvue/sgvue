@@ -296,7 +296,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 3",
     "count": 3,
     "cells": [
      null,
@@ -340,7 +340,7 @@
   "Roof (1),,,,",
   "T2,Tembusu,4.06,26.70,Remove",
   "1,,,,",
-  "Grand total,,,,"
+  "Grand total: 3,,,,"
  ],
  "xlsx": [
   {
@@ -390,7 +390,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 13
+     "width": 16
     },
     {
      "i": 1,
@@ -1208,7 +1208,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 3",
        "font": {
         "bold": true
        },

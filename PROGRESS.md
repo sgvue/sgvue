@@ -20,17 +20,21 @@ window carries a native `title` any more, but a column heading: its paragraph of
 `title` it was (at the fast tooltip's 0.14 s it would cover the table whenever the pointer crossed the header row). **New defaults, for new things only:** a
 new schedule (blank, a category's default, a template, Vee's when the ask does not say) has a grand total, and a new
 column of areas, volumes, masses or counts starts with Total = Sum (`withDefaultTotal`, every route that makes a
-column); a loaded file opens as it was saved. **How it was checked:** each step's checks first and seen failing —
+column); a loaded file opens as it was saved. After the window test, the grand-total row reads "Grand total: N" (a
+default-on row must say something even when no column totals), saved schedules with a grand total included. **How it was checked:** each step's checks first and seen failing —
 `viewBar-compact`, `viewBar-refold` (the window's composition root with a laid-out bar: fold, resize, focus, open
 popovers), `popovers-step2`, `defaults`; the whole unit suite, the compatibility corpus untouched, the offline eval
 (oracle 100 %, null 0 %), typecheck, lint and privacy clean. 34 golden files re-pointed for the new defaults (a
 grand-total row, Sum on quantity columns), each diff only that. Headless Chromium renders of the real bar code at
 three widths, with and without the rail, are in `prototype/schedule-bar/` (untracked).
 
-**Not checked — needs a window run.** Nothing of either step has been seen in the Electron window: the tooltips'
-speed and placement, the fold at real widths, the popovers' look, the empty-table note. The e2e specs whose
-selectors changed (`tests/e2e/schedules.spec.ts`, `tests/e2e/combine-by-sort.spec.ts`) were not run. No live Ask
-Vee eval was run (it spends paid credits).
+**In a window** (macOS, the built app, `scripts/safe-e2e.cjs`): `tests/e2e/schedules.spec.ts`,
+`combine-by-sort.spec.ts`, `chained-formulas.spec.ts` and `vee-column-dot.spec.ts`, 13 passed and 3 skipped (the
+SGVUE_SHOTS and SGVUE_IFC runs), peak 557 MB, nothing survived. The first run failed two export tests and showed the
+flaw the grand-total label now answers: a default-on row that said only "Grand total". The SGVUE_SHOTS run was looked
+at in both themes; the Rows choice wrapped its three labels side by side and is stacked since. **Not checked:** the
+tooltips' speed and their placement at the window's edges by eye, the fold with a real model's long headings at
+780 px, a print with the empty-table note, Windows. No live Ask Vee eval was run (it spends paid credits).
 
 ## 2026-11-25 — a formula may use another calculated column; calculated names are unique
 

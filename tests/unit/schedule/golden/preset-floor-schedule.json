@@ -389,7 +389,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 4",
     "count": 4,
     "cells": [
      null,
@@ -446,7 +446,7 @@
   "Roof (1),,,,,",
   "Generic 150mm,Roof,287,41.23,6.04,26.14",
   "1,,,,,",
-  "Grand total,,,124.94,24.25,"
+  "Grand total: 4,,,124.94,24.25,"
  ],
  "xlsx": [
   {
@@ -496,7 +496,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 15
+     "width": 16
     },
     {
      "i": 1,
@@ -1896,7 +1896,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 4",
        "font": {
         "bold": true
        },

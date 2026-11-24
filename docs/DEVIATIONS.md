@@ -413,8 +413,12 @@ Anything not on this list is a defect.
   defaults, for new things only:** a new schedule — blank, a category's default, a template, Vee's
   `make_schedule` when the ask does not say — has its grand total on, and a new column holding an
   area, a volume, a mass or a count starts with Total = Sum, unless its creator stated a total; a
-  saved file opens exactly as it was saved (no grand total unless it says so). The save format and
-  the engine are unchanged. **Nothing is added to the main window.** Not yet seen in a window.)*
+  saved file opens exactly as it was saved (no grand total unless it says so). The grand-total
+  row's label carries its element count, as a group footer's does — `Grand total: 40`, or
+  `Doors in total: 40` with a label of the user's own — because a row that is on by default must
+  say something even when no column totals; a schedule saved with a grand total shows the count
+  in it too from now on. The save format is unchanged, and
+  the engine changed in that one label only. **Nothing is added to the main window.** Seen in a window on macOS (2026-11-25, `tests/e2e/schedules.spec.ts` and `combine-by-sort.spec.ts`); not on Windows.)*
 - **2026-09-25 — on Windows the app draws on NVIDIA when there is one; Preferences can turn it
   off, and the About box names the adapter.** Asked for by the owner in these words: *"auto set
   the highest graphic card if available? Nvidia as first choice."* Preferences (the allowed

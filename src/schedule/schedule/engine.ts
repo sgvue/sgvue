@@ -452,7 +452,10 @@ export function runSchedule(
       ? aggregate(store, all, c, c.total, computedOf, fmts[ci]) : null));
     out.push({
       kind: 'grand',
-      label: def.grandTotalTitle?.trim() || 'Grand total',
+      // The count in the label, as a footer carries it ("L1: 3") — Revit's "Grand total: 40".
+      // A grand total is on by default since 2026-11-25, and a row of no totals must still say
+      // something (2026-11-25, from the window test).
+      label: `${def.grandTotalTitle?.trim() || 'Grand total'}: ${all.length}`,
       count: all.length,
       cells: totals.map((t) => t?.text ?? null),
       nums: totals.map((t) => t?.num ?? null),

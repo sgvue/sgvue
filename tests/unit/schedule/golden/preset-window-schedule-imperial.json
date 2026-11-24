@@ -384,7 +384,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 5",
     "count": 5,
     "cells": [
      null,
@@ -434,7 +434,7 @@
   "1019,1200 x 1500mm,Roof,47.2,59.1,Yes",
   "1023,1200 x 1500mm,Roof,68.8,80.6,Yes",
   "2,,,,,",
-  "Grand total,,,,,"
+  "Grand total: 5,,,,,"
  ],
  "xlsx": [
   {
@@ -1862,7 +1862,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 5",
        "font": {
         "bold": true
        },

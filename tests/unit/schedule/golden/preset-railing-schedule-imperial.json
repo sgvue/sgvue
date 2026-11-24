@@ -172,7 +172,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 2",
     "count": 2,
     "cells": [
      null,
@@ -205,7 +205,7 @@
   "Roof (1),,",
   "900mm,Roof,13.12",
   "1,,",
-  "Grand total,,"
+  "Grand total: 2,,"
  ],
  "xlsx": [
   {
@@ -255,7 +255,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 14
+     "width": 16
     },
     {
      "i": 1,
@@ -616,7 +616,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 2",
        "font": {
         "bold": true
        },

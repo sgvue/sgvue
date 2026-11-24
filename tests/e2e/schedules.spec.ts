@@ -983,8 +983,9 @@ async function exportAs(win: Page, label: string): Promise<void> {
 }
 
 /**
- * The table on screen as text: the headings, then every data row — badges and swatches left
- * out, and the `+ Column` heading too: it is the field picker's button, not a column (no
+ * The table on screen as text: the headings, then every data row and the grand-total row (on by
+ * default since 2026-11-25, so the export's last line has a row on screen to equal) — badges and
+ * swatches left out, and the `+ Column` heading too: it is the field picker's button, not a column (no
  * `data-defcol`, no cells, hidden in print by `print.css`), and the exporter never sees it.
  */
 const tableText = (win: Page): Promise<string[][]> =>
@@ -996,7 +997,8 @@ const tableText = (win: Page): Promise<string[][]> =>
     }
     return [
       [...document.querySelectorAll('table.schedule thead th:not(.add-col)')].map(text),
-      ...[...document.querySelectorAll('table.schedule tbody tr.data')].map((tr) => [...tr.querySelectorAll('td')].map(text))
+      ...[...document.querySelectorAll('table.schedule tbody tr.data, table.schedule tbody tr.grand')].map((tr) =>
+        [...tr.querySelectorAll('td')].map(text))
     ]
   })
 
@@ -1093,6 +1095,8 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const csv = await readFile(csvPath, 'utf8')
     expect(csv.charCodeAt(0)).toBe(0xfeff)
     const screen = await tableText(sched)
+    // The grand-total row is on screen and in the file, the same: "Grand total: 4".
+    expect(screen.at(-1)![0]).toBe('Grand total: 4')
     expect(parseCsv(csv.slice(1))).toEqual(screen.map((row) => row.map(plain)))
 
     // 4 — Excel: the same table, one sheet named after the schedule; text is text, and a
@@ -1182,7 +1186,9 @@ test('phase 4: export CSV, Excel, a workbook and a schedule file through the nat
     const book = new Workbook()
     await book.xlsx.readFile(bookPath)
     expect(book.worksheets.map((w) => w.name)).toEqual(['Wall Schedule'])
-    expect(book.worksheets[0].rowCount).toBe(5)
+    // The heading, 4 walls and — new since 2026-11-25, a new schedule's default — the grand total.
+    expect(book.worksheets[0].rowCount).toBe(6)
+    expect(book.worksheets[0].getRow(6).getCell(1).value).toBe('Grand total: 4')
 
     // 8 — the schedule file: a distinctive setup (renamed, grouped by level, itemise off)
     // exported from the menu; the Save dialog's name is forced to .schedule.json.
@@ -1604,7 +1610,9 @@ test('the assistant exports the open schedule through its Save dialog, and colou
     const wb = new Workbook()
     await wb.xlsx.readFile(xlsxPath)
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Walls from chat'])
-    expect(wb.worksheets[0].rowCount).toBe(5)
+    // The heading, 4 walls and — new since 2026-11-25, a new schedule's default — the grand total.
+    expect(wb.worksheets[0].rowCount).toBe(6)
+    expect(wb.worksheets[0].getRow(6).getCell(1).value).toBe('Grand total: 4')
 
     // 4 — Cancel: the dialog opens, nothing is written, and the menu's own toast says so.
     await answerSave(app, '')

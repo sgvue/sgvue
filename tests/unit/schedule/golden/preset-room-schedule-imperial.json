@@ -365,7 +365,7 @@
    },
    {
     "kind": "grand",
-    "label": "Grand total",
+    "label": "Grand total: 5",
     "count": 5,
     "cells": [
      null,
@@ -417,7 +417,7 @@
   "Roof (1),,,,",
   "Space 3,Roof,,117.1,1062.39",
   "1,,,,",
-  "Grand total,,622.93,,5311.93"
+  "Grand total: 5,,622.93,,5311.93"
  ],
  "xlsx": [
   {
@@ -467,7 +467,7 @@
    "cols": [
     {
      "i": 0,
-     "width": 14
+     "width": 16
     },
     {
      "i": 1,
@@ -1690,7 +1690,7 @@
         }
        },
        "c": 1,
-       "v": "Grand total",
+       "v": "Grand total: 5",
        "font": {
         "bold": true
        },

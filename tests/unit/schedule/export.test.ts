@@ -79,7 +79,8 @@ describe('CSV export', () => {
     // every exported row has the same width as the header
     const width = rows[0].cells.length;
     expect(rows.every((r) => r.cells.length === width)).toBe(true);
-    expect(rows.at(-1)!.cells).toEqual(['Grand total', '3000']);
+    // The grand row's label carries its element count since 2026-11-25.
+    expect(rows.at(-1)!.cells).toEqual(['Grand total: 2', '3000']);
   });
 
   it('exports every row even when the render was capped', () => {

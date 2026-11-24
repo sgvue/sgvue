@@ -310,7 +310,8 @@ describe('a blank first-column total gives its cell to the totals row\'s label, 
     const t = readTable(renderSchedule(stateOf(store, def), res, buildCoverage(store, def.entity)));
     const screen = t.body.filter((r) => r.cls.startsWith('footer') || r.cls === 'grand').map((r) => r.cells[0].text);
     const file = toRows(res).filter((r) => r.kind === 'footer' || r.kind === 'grand').map((r) => r.cells[0]);
-    expect(file).toEqual(['Level 1: 2', '3,500', '31,500', 'Roof: 2', 'Grand total']);
+    // The grand row's label carries its count since 2026-11-25: the fixture's 7 walls.
+    expect(file).toEqual(['Level 1: 2', '3,500', '31,500', 'Roof: 2', 'Grand total: 7']);
     expect(screen).toEqual(file);
     check(store, def, newTally(), 'blank first total');
   });

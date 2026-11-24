@@ -38,8 +38,9 @@ function rowsHint(def: AppState['def'], mode: RowsMode): string {
 export function rowsBody(state: AppState): string {
   const def = state.def;
   const mode = rowsModeOf(def);
-  return `${seg('rows-mode', [['every', 'Every element'], ['merge', 'Merge identical'], ['sort', 'One row per sort value']],
-    mode, '', 'How rows show')}
+  // Stacked (`.rows-mode`): three labels of this length wrap inside a 320 px popover side by side.
+  return `<div class="rows-mode">${seg('rows-mode', [['every', 'Every element'], ['merge', 'Merge identical'], ['sort', 'One row per sort value']],
+    mode, '', 'How rows show')}</div>
     <p class="hint rows-hint">${esc(rowsHint(def, mode))}</p>
     ${def.grandTotal ? `<input class="full block snug" type="text" data-act="grand-title"
       value="${esc(def.grandTotalTitle ?? '')}" placeholder="Grand total" aria-label="Grand total label" />` : ''}`;
