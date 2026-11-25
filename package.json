@@ -1,6 +1,6 @@
 {
   "name": "sgvue",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "SGVue — read-only IFC model viewer for BIM coordination review",
   "main": "./out/main/index.js",
   "author": {

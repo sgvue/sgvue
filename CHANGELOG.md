@@ -8,6 +8,36 @@ https://github.com/sgvue/releases/releases; from 1.2.0 the full notes of each ve
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-25
+
+### Added
+
+- **Ask Vee sets up a whole schedule.** Vee can set everything the Schedules window can: the
+  style, each group's heading and footer, the grand-total label, colour rules on a column's
+  cells, and a column's width and number format. A calculated column Vee made carries a dot on
+  its heading, and its menu shows Vee's note and the formula. Vee changes only what the window
+  shows, never the model or a file.
+- **IFC+SG schedules from the CoP property lists.** For an IFC+SG model, Vee builds a schedule
+  from the CoP 4th Edition property lists the elements carry, grouped by sub-type, and names the
+  missing ones. It never gives a compliance verdict.
+- **Revit-style rows.** *One row per sort value* makes one row per value of the sort levels: a
+  total where the column has one, the shared value, or `<varies>`.
+- **Formulas that use other formulas.** A calculated value can name another calculated value;
+  a loop is refused; names are unique; a rename rewrites the formulas that use it.
+- **The Spatial-structure card compares the models:** a column per model, every IfcProject,
+  IfcSite and IfcBuilding attribute and property set, differing rows marked, and a
+  "differences only" switch.
+
+### Changed
+
+- **The Schedules view bar is one line:** the kept count, All / Any, short filter and sort
+  chips that fold into `+N`, **+ Filter** and **+ Sort / group**, and one-click grand total,
+  grid lines and stripes. Every control's description shows at once.
+- **Fewer controls in the popovers:** Rows is one choice of three; sort levels and Style put
+  the rest under More…; the column menu's actions are icon rows.
+- **New schedules have a grand total**, and new area, volume, mass and count columns start with
+  Sum. Saved schedules open as they were. The grand-total row reads "Grand total: N".
+
 ## [1.6.1] - 2026-11-16
 
 ### Fixed
@@ -473,6 +503,7 @@ assistant, and the accessibility, performance and packaging pass. It was not pub
 releases page.
 
 [Unreleased]: https://github.com/sgvue/sgvue/commits/main
+[1.7.0]: https://github.com/sgvue/releases/releases/tag/v1.7.0
 [1.6.1]: https://github.com/sgvue/releases/releases/tag/v1.6.1
 [1.6.0]: https://github.com/sgvue/releases/releases/tag/v1.6.0
 [1.5.0]: https://github.com/sgvue/releases/releases/tag/v1.5.0
