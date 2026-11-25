@@ -190,10 +190,10 @@ function sortChip(def: ScheduleDef, l: SortLevel, i: number): string {
     : `Group by ${name}: a heading and a footer for each one`, `Group by ${name}`)}>${ICON.group}</button></span>`;
 }
 
-/** The `+` that adds a filter or a sort level; at the cap it is disabled and says so. */
+/** "+ Filter" / "+ Sort / group", which add a filter or a sort level; at the cap it is disabled and says so. */
 function plus(kind: 'add-filter' | 'add-sort', full: boolean, tip: string, cap: string): string {
   return `<button class="vplus hv-accent-step" data-act="vb-open" data-v="${kind}" aria-haspopup="dialog"${full ? ' disabled' : ''}
-    ${words(full ? cap : tip)}>${ICON.plus}</button>`;
+    ${words(full ? cap : tip)}>${kind === 'add-filter' ? '+ Filter' : '+ Sort / group'}</button>`;
 }
 
 export function renderViewBar(state: AppState, store: ModelStore): string {
