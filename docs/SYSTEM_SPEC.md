@@ -9,7 +9,7 @@ Every section carries a **Status** line. Phase 0 is the scaffold, so most sectio
 the agreed design and say plainly which parts are not built yet. The document is updated at
 the end of every phase.
 
-- Version: 1.6.1 · all ten phases built (`docs/releases/1.6.1.md` is what changed since 1.6.0)
+- Version: 1.7.0 · all ten phases built (`docs/releases/1.7.0.md` is what changed since 1.6.1)
 - Last updated: 2026-11-12
 - Specification of record for everything visible: `design-reference/design/SGVue.dc.html`
   and `design-reference/design/viewer-core.js`
@@ -211,6 +211,14 @@ design target goes to 200 MB files: a legitimate model would have tripped it.
 > build-provenance attestation verified with `gh attestation verify` — `SGVue-1.6.1-setup.exe`
 > 124 908 967 bytes, `SGVue-1.6.1-arm64.dmg` 135 689 847 and `SGVue-1.6.1-x64.dmg` 142 283 956 — and
 > published together on `sgvue/releases`. None of the three was run before publishing.
+> **2026-11-25, version 1.7.0:** the Schedules work since 1.6.1 and Vee setting up a whole schedule;
+> requirements as 1.6.0. Built by `release.yml` from the tag `v1.7.0` (commit `fa71e73`), each file's
+> SHA-256 and build-provenance attestation verified with `gh attestation verify` —
+> `SGVue-1.7.0-setup.exe` 124 937 268 bytes, `SGVue-1.7.0-arm64.dmg` 135 722 404 and
+> `SGVue-1.7.0-x64.dmg` 142 325 143 — and published together on `sgvue/releases`. The Windows
+> installer was run silently over an installed 1.6.1: the install reads 1.7.0, is 396 MB, and
+> `settings.json` (with the encrypted API key) is byte-identical before and after. The Mac disk images
+> were not run.
 
 ---
 

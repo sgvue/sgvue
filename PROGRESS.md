@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-25 — SGVue 1.7.0 published; the installer keeps the user's API key
+
+**Did.** Version 1.7.0 — `package.json`, `docs/releases/1.7.0.md`, `CHANGELOG.md`, `docs/SYSTEM_SPEC.md` §1 — for
+everything since 1.6.1 (the owner: *"Compile into installers. Update the releases and website"*). Checked on
+Windows 11 before tagging: typecheck, lint, privacy clean; `npm test` 5 434 passed, 4 skipped; `npm run test:e2e`
+in parts (the guard's 600 s cuts one run): 43 + 32 (`smoke.spec.ts`, rebuilt as 1.7.0) + 12 (the three `vee-*`
+files) passed — four smoke failures in the first part were its build being 1.6.1 while `package.json` said 1.7.0.
+`release.yml` built the three installers from `v1.7.0` (`fa71e73`); each attestation verifies. The packaged app has
+no API key in it (`app.asar` searched for key patterns; `ANTHROPIC_API_KEY` only as a hint's text), and no key is in
+the repository or its history (test values only). The CI-built `SGVue-1.7.0-setup.exe` ran silently over the
+owner's installed 1.6.1: 1.7.0 installed, `settings.json` with `apiKeyEnc` byte-identical before and after, and
+after a guarded launch; `npm run test:packaged` 2 passed. Published on `sgvue/releases` with SHA-256; the update
+endpoint answers `v1.7.0`. Sizes are in MiB as before (119 / 129 / 136 MB, 396 MB installed). The site's What is
+new is 1.7.0's plus 1.6.1's camera fix (`sgvue.github.io` `935a175`). **Not done:** the Mac disk images were not run.
+
 ## 2026-11-25 — "+ Filter" and "+ Sort / group" are back; Vee sets up everything the Schedules window can
 
 **Did.** Owner: *"put back the sort and filter wording"* — the bar's two add buttons read `+ Filter` and
@@ -159,82 +174,11 @@ off CI, where Windows without Developer Mode refuses (`EPERM`), the three checks
 a notice goes to stderr; on CI a refusal fails the run. No check changed. Here: `npm test` 4 906 passed,
 7 skipped, 0 failed — `file-protocol.test.ts`'s other 20, which its `beforeAll` had stopped, run again.
 
-## 2026-11-16 — SGVue 1.6.1 published: the camera fix, checked in a window
-
-**Did — the release.** GitHub's checks passed on `cf3acf0` on all three systems; the tag `v1.6.1` was pushed and
-`release.yml` built the three installers. Each file's build-provenance attestation verifies (`refs/tags/v1.6.1`):
-`SGVue-1.6.1-setup.exe` 124 908 967 bytes, `SGVue-1.6.1-arm64.dmg` 135 689 847, `SGVue-1.6.1-x64.dmg` 142 283 956.
-All three were published on `sgvue/releases` with their SHA-256 (the owner: *"Yes, run and ship"*). The update
-check's endpoint answers `v1.6.1`, and `?v=1.6.0` on the site reads "Update available: SGVue 1.6.1". None of
-the three installers was run before publishing — the owner's Windows install and Mac launch are owed.
-
-**Did.** Version 1.6.1 — `package.json`, `docs/releases/1.6.1.md`, `CHANGELOG.md`, `docs/SYSTEM_SPEC.md` §1 — for
-one change since 1.6.0: `b303532`, perspective pan and zoom re-anchor the orbit point on what is under the cursor
-(`docs/DEVIATIONS.md`, 2026-11-15). Checked on Windows 11 at 125 % display scaling: typecheck and build pass;
-`npm test` 4 885 passed, 26 skipped, 1 failed, and `file-protocol.test.ts` fails before its tests start — both
-`symlink` EPERM (Developer Mode is off), not code; GitHub's checks are green on `584038d`. `npm run test:e2e`
-cannot finish in the guard's 600 s here, so it ran in parts: every file but `smoke.spec.ts` 40 passed, 6 skipped;
-`smoke.spec.ts` 25 passed, 7 failed. All seven are layout checks with exact pixel values, off by rounding at
-125 % (`1px` border read `0.8px`, toolbar 41.6 px for 42, the Ask Vee window 332 × 421 for 330 × 420, …). With
-the three camera files put back to v1.6.0 and built without the typecheck, the six viewer-window failures fail
-with the same numbers to the digit, so none comes from the fix.
-
-**Not done.** No installer was run. The 125 %-scaling failures are not fixed (the checks assume 100 %; CI runs at 100 %). The Windows
-symlink tests need Developer Mode or a skip on EPERM.
-
-## 2026-11-12 — SGVue 1.6.0 published; `CLAUDE.md` slimmed and the system spec brought up to date
-
-**Did — the release.** GitHub's checks passed on `cdd8256` on all three systems; the tag `v1.6.0` was pushed and
-`release.yml` built the three installers. Each file's SHA-256 matches its build-provenance attestation
-(`gh attestation verify`, built by `release.yml` at `refs/tags/v1.6.0`): `SGVue-1.6.0-setup.exe` 124 908 404 bytes,
-`SGVue-1.6.0-arm64.dmg` 135 689 704, `SGVue-1.6.0-x64.dmg` 142 283 558 — the sizes the notes give. The
-Apple-silicon app inside the published image reads 1.6.0, is ad-hoc signed, holds the five licence files, passes
-the `app.asar` contents test, and passes `npm run test:packaged` (4 passed, 1 skipped, peak 1 043 MB). All three
-were published together on `sgvue/releases` with their SHA-256 (the owner: *"publish the latest version under
-v1.6.0"*). It is the latest release: the update check's endpoint answers `v1.6.0`, `?v=1.6.0` on the site reads
-"You're up to date — SGVue 1.6.0" and `?v=1.5.0` reads "Update available: SGVue 1.6.0 (you have 1.5.0)".
-`docs/SYSTEM_SPEC.md` §3 records the release.
-
-**Did — the documents (the audit's decisions 3 and 4).** `CLAUDE.md` is 359 lines, was 1 795: the
-allowed-deviations list moved byte for byte to `docs/DEVIATIONS.md` and the decisions index to
-`docs/DECISIONS-INDEX.md`, and `CLAUDE.md` keeps the goal, the fidelity rules, the commands, the rules and the
-traps unchanged, one pointer line per deviation and 37 standing constraints. This file keeps its newest entries
-in full and one line for each older one. `docs/SYSTEM_SPEC.md` describes origin-to-origin placement, the note,
-the plan rotation and the one shared offset from the code, and gains §9.1, the `.sgvue` project file; the two
-plan files say what is built. A builder each, then one reviewer: both passed, no blocking item; its three small
-notes (the pull-request template's pointer, two present-tense lines of the spec) are fixed. On the merged
-result: lint 0, privacy 0, `npm test` 234 files, 4 898 passed, 3 skipped.
-
-**Not done.** The Windows installer and the Intel Mac image were not run here (hash and attestation only) —
-the owner's Windows check is still owed. The five live Ask Vee eval cases were not run (paid credits not
-approved). Not opened: the owner's real federation. Left: a schedule filter's or sort level's `field` is not
-passed through `cleanField` (`src/schedule/schedule/def.ts`; needs its own task and check); `mergeLocated` can
-leave two ids bound to one key after the save-swap fix; source comments that still say a deviation is "in
-`CLAUDE.md`"; three stale lines of the spec outside the rewritten parts; the finished worktrees and branches
-and the old installers in `dist/` are not cleaned up. Running in sessions of their own: the product site's
-update for 1.6.0, and a marketing video.
-
-## 2026-11-12 — SGVue 1.6.0 prepared: everything since 1.5.0, checked in a window
-
-The owner, away from the computer: *"make sure all sessions completed their works. Run quick security check. Then u run the final tests before building installers … After you completed everything, just merge and push. publish the latest version under v1.6.0. Ensure its a stable functional version."*
-
-**Merged into `main`:** every open branch (the position, ObjectType and identity-tile fixes; the box tools; the offset hand-back; a project that settles; a replaced load; Locate… again; the save-swap fix; the audit's decisions 6 to 10 and its sure list; the federating indicator) and GitHub's dependency update (sql.js 1.15.2, zustand 5.1.0, four dev tools). The update fired the sql.js canary — a bare export now keeps `query_only` — and the two library tests pin the new behaviour (`docs/DECISIONS.md`).
-
-**Quick security pass** (`reviewer-deep`, the diff since `v1.5.0`): PASS, no new IPC, preload key, disk write or HTML sink. Two older notes were fixed, checks first — a formula's function name and a display unit are own keys only. One older note is left: a filter's or sort level's `field` is not cleaned.
-
-**Checked.** Headless: typecheck 0, lint 0, `npm test` 234 files / 4 898 passed / 3 skipped, privacy 0 findings, offline eval pass, build 0. In a window, through the guards, on this Mac: the end-to-end suite 71 passed / 11 skipped (Windows-only, real-model and screenshot tests) / 1 failed only because `dist/` still held a 1.4.0 package, peak footprint 1 138 MB; on a development-tools build `project-positions.spec.ts` 2 of 2 — a three-model project reopens with every element where it was, and the selection dimension and the card read a turned wall's own size; the packaged app (`dist:mac`, ad-hoc signed, `identityName=-`) 4 passed / 1 skipped, both `app.asar`s pass the packaging test, both apps hold the two licence files. Three stale window-test expectations were corrected on the way (`docs/DECISIONS.md`). A first run was stopped by the guard at memory pressure 2 while another session ran its tests; run alone it never tripped.
-
-| File (built here, for the check) | Bytes | SHA-256 |
-|---|--:|---|
-| `SGVue-1.6.0-arm64.dmg` | 135 692 896 | `08641bff105cc98ef54ce51c9328e0be85de1943e6629edf7f9b0c3d454852cc` |
-| `SGVue-1.6.0-x64.dmg` | 142 287 015 | `d7050354d4491857f66f5a24e418b4cc108000a070bc91f8647757f162c055d0` |
-
-The published files are built by `release.yml` from the tag, not these. Installed, the Mac app is 336 MB (Apple silicon) and 343 MB (Intel).
-
-**Not checked.** The Windows installer was not run (no Windows machine). The five live Ask Vee eval cases owed for the box tools were not re-run: they spend paid credits the owner had not approved. The owner's own saved federation was not opened: its files are not in this repository. Audit decisions 3 and 4 (slim `CLAUDE.md`, update `docs/SYSTEM_SPEC.md`) are still owed.
-
 ## Earlier work
 
+- **2026-11-16** — SGVue 1.6.1 published: the camera fix, checked in a window
+- **2026-11-12** — SGVue 1.6.0 published; `CLAUDE.md` slimmed and the system spec brought up to date
+- **2026-11-12** — SGVue 1.6.0 prepared: everything since 1.5.0, checked in a window
 - **2026-11-12** — a save no longer swaps a missing project model for another file of the same name (`.sgvue` with a missing model, another file of its key opened and saved). Not seen in a window
 - **2026-11-12** — Locate… works again after a located model did not load: the "being located" mark is released when nothing holds the file any more. Not seen in a window
 - **2026-11-12** — a federating indicator for a model added to an open view (the owner's pick "B"): a five-segment line along the 3D view's top edge and a caption in the bottom row, seen in a window
