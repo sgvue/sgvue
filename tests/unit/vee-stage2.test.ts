@@ -706,7 +706,10 @@ describe('the heads-up a "Yes" earns (the owner: "App adds it")', () => {
     expect(SG_SET_MAX).toBe(50_000)
     // The port carries the lead-in alone.
     expect(Object.keys(snapshotOf(st()).msgs[t.index].ask!).sort()).toEqual(['chosen', 'lead', 'open', 'question', 'replies'])
-    expect(JSON.stringify(snapshotOf(st()).msgs[t.index])).not.toContain(String(l4[0]))
+    // No element id on the port, as a whole number: a bare substring check also matched the
+    // same digits inside the message's clock time (`at`), failing by chance.
+    const port = JSON.stringify(snapshotOf(st()).msgs[t.index])
+    for (const id of l4) expect(port).not.toMatch(new RegExp(`(?<![\\d.])${id}(?![\\d.])`))
   })
 
   it('adds objectTypeOnly to the answer that makes no tool call, with the right count — and forgets the set', async () => {
