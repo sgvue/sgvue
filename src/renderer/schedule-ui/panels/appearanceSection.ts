@@ -3,6 +3,7 @@
 // a More… as in the prototype.
 
 import { BODY_FONTS, normaliseFont } from '../../../schedule/schedule/fonts';
+import { TEXT_SIZE_SLIDER_MAX, TEXT_SIZE_SLIDER_MIN } from '../../../schedule/schedule/limits';
 import type { AppState } from '../state';
 import { esc, option } from '../dom';
 import { moreFold, toggle } from './shared';
@@ -45,7 +46,7 @@ export function appearanceBody(state: AppState, idp = '', more = false): string 
         <label class="lbl" for="${idp}app-size">Text size</label>
         <span class="mono size-read">${esc(a.fontSize ?? 13)} px</span>
       </div>
-      <input id="${idp}app-size" class="full" type="range" min="10" max="18" step="1"
+      <input id="${idp}app-size" class="full" type="range" min="${TEXT_SIZE_SLIDER_MIN}" max="${TEXT_SIZE_SLIDER_MAX}" step="1"
         data-act="app-fontsize" value="${esc(a.fontSize ?? 13)}" />
     </div>
 

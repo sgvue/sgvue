@@ -160,6 +160,14 @@ describe('the bar for 0, 1, 3 and 5 filters (Done 1)', () => {
     expect(bar(withFilters([{ field: W, op: '>=', value: 2 }]))).toMatch(/class="vcount zero"/);
   });
 
+  it('the two add buttons say what they add: "+ Filter" and "+ Sort / group"', () => {
+    const plus = [...bar(withFilters([])).matchAll(/<button class="vplus[\s\S]*?<\/button>/g)].map((m) => m[0]);
+    expect(plus).toHaveLength(2);
+    // The words are the button's whole content: nothing else between its tag and </button>.
+    expect(plus[0]).toMatch(/^<button [^>]*>\+ Filter<\/button>$/);
+    expect(plus[1]).toMatch(/^<button [^>]*>\+ Sort \/ group<\/button>$/);
+  });
+
   it('at the caps the + is disabled and says so', () => {
     let d = withFilters([]);
     while (d.filters.length < MAX_FILTERS) d = act.addFilterRule(d);

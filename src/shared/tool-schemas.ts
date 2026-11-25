@@ -134,6 +134,10 @@
  */
 import { HL } from './colors'
 import { LEVEL_DEFAULT_OFFSET_MM } from './sections'
+// Two leaf modules of the schedule engine (no imports of their own), so the catalogue names the
+// window's own fonts and ranges without pulling the engine into the main process (2026-11-25).
+import { BODY_FONTS } from '../schedule/schedule/fonts'
+import { COL_WIDTH_MAX, COL_WIDTH_MIN, TEXT_SIZE_SLIDER_MAX, TEXT_SIZE_SLIDER_MIN } from '../schedule/schedule/limits'
 
 /* ────────────────────────────── schema shapes ────────────────────────────── */
 
@@ -1257,6 +1261,32 @@ export const SCHEDULE_FORMULA_CHARS = 1000
 /** A calculated value's plain-words note, at most — cut to it on read; `make_schedule`'s input check refuses a longer one, like an over-long formula, and its executor's cut is defence in depth (2026-11-24). */
 export const CALC_NOTE_CHARS = 160
 
+/*
+ * 2026-11-25 — what the Schedules window sets and `make_schedule` could only keep: the Style
+ * popover, a group level's header and footer, a column's colour rules, width and number format.
+ * Spelled here, like the lists above, so the main process does not load the engine; the unit
+ * tests keep each identical to the engine side's.
+ */
+/** A yes / no column's spellings — `BOOL_STYLES` (`schedule/schedule/def.ts`), in its order. */
+export const SCHEDULE_BOOL_STYLE_ENUM = ['Yes/No', 'TRUE/FALSE', 'Y/N', '✓/✗'] as const
+/** A group level's footer, as `make_schedule` names it; title_count_totals is `titleCountTotals`. */
+export const SCHEDULE_FOOTER_ENUM = ['none', 'title', 'count', 'totals', 'title_count_totals'] as const
+/** The colour-rule operators: the filter's, less the two that take a list (`panels/conditionalRules.ts`). */
+export const SCHEDULE_COLOUR_OP_ENUM = SCHEDULE_OP_ENUM.filter((op) => op !== 'in' && op !== 'between')
+/** Colour rules on one column, at most. The window's "+ Add rule" has no cap of its own. */
+export const SCHEDULE_COLOUR_RULES_MAX = 10
+/** A colour-rule value, at most — what `parseScheduleDef` keeps on read. */
+export const SCHEDULE_COLOUR_VALUE_CHARS = 120
+/** A grand-total row's label, at most — what `parseScheduleDef` keeps on read. */
+export const SCHEDULE_GRAND_TOTAL_TITLE_CHARS = 200
+/** A colour as the window's colour picker gives one, and what a refusal of any other says. It reaches a CSS declaration. */
+export const SCHEDULE_HEX_COLOUR = /^#[0-9a-f]{6}$/i
+export const NOT_A_COLOUR = 'is not a colour — give one as #rrggbb, such as #f8d7da.'
+/** A column's prefix or suffix, at most — what `parseScheduleDef` keeps on read. */
+export const SCHEDULE_AFFIX_CHARS = 16
+/** The Style popover's fonts, by the key a schedule stores. */
+export const SCHEDULE_FONT_KEYS: readonly string[] = BODY_FONTS.map((f) => f.key)
+
 /** A column's field, wherever `make_schedule` takes one. The tool description lists them. */
 const SCHEDULE_FIELD: JsonSchema = {
   type: 'string',
@@ -1276,8 +1306,9 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
     // calculated-value editor set — filterLogic, itemize, a column's format and place, and
     // calculated columns — which until now it could only keep.
     description:
-      'Build a schedule — a table of elements with the columns, filters, sorting, grouping and totals asked for — and show it in the Schedules window, opening that window when it is closed; the user can undo it there. It returns the schedule as the window shows it: headings, the first rows as displayed text, each group’s count and subtotals and the grand totals, so answer from them. Use it when the user asks for a schedule or wants the table in the Schedules window — a door schedule with fire rating and width, room or space areas by level; to tabulate, count or total in the chat, use summarize_elements instead. base:"open" changes the schedule the user already has open instead: columns are added — or, for a field it already shows, given the heading, total and format you pass, and moved when after is given — removeColumns takes columns away by heading or field, and filters, sortBy and groupBy replace their lists when given; everything else the user set up (other columns and their formats, colour rules, widths) is kept. category is one or more IFC classes, unioned; a class no loaded model carries is left out of the union and the result says so, and only a category with no class left refuses. A field is one of the Schedules window’s own — Level, Name, Type, Family, IFC Class (or IfcEntity), Object Type, Predefined Type, Material, Model, GUID, Description, Tag (Revit ID), Level Elevation, Room / Space, Building, Site, Discipline — or any property name from the schema, matched the way rules match it; Pset.Name names one property set. A name that is not one refuses the whole call with the nearest names, and nothing is shown. Cells and totals are written in each column’s display unit — the unit on each schedule.columns entry of the result, e.g. mm — but filter numbers on lengths, areas and volumes are SI, the column’s filterUnit: metres, square metres, cubic metres, so 900 mm is 0.9; a number the file gives no unit compares as shown. ' +
+      'Build a schedule — a table of elements with the columns, filters, sorting, grouping and totals asked for — and show it in the Schedules window, opening that window when it is closed; the user can undo it there. It returns the schedule as the window shows it: headings, the first rows as displayed text, each group’s count and subtotals and the grand totals, so answer from them. Use it when the user asks for a schedule or wants the table in the Schedules window — a door schedule with fire rating and width, room or space areas by level; to tabulate, count or total in the chat, use summarize_elements instead. base:"open" changes the schedule the user already has open instead: columns are added — or, for a field it already shows, given the heading, total and format you pass, and moved when after is given — removeColumns takes columns away by heading or field, and filters, sortBy and groupBy replace their lists when given; everything else the user set up (other columns and their formats, colour rules, widths, the style) is kept unless you set it. category is one or more IFC classes, unioned; a class no loaded model carries is left out of the union and the result says so, and only a category with no class left refuses. A field is one of the Schedules window’s own — Level, Name, Type, Family, IFC Class (or IfcEntity), Object Type, Predefined Type, Material, Model, GUID, Description, Tag (Revit ID), Level Elevation, Room / Space, Building, Site, Discipline — or any property name from the schema, matched the way rules match it; Pset.Name names one property set. A name that is not one refuses the whole call with the nearest names, and nothing is shown. Cells and totals are written in each column’s display unit — the unit on each schedule.columns entry of the result, e.g. mm — but filter numbers on lengths, areas and volumes are SI, the column’s filterUnit: metres, square metres, cubic metres, so 900 mm is 0.9; a number the file gives no unit compares as shown. ' +
       'filterLogic:"or" lists what passes any filter rather than every one, and itemize:false collapses rows that read alike into one with a Count. calculated adds columns worked out per row from the other columns, named by their headings — Area * 1.15, [Clear Width] * 2, if(Area > 10, "Large", "Small"), contains(Type, "FD") — with + - * /, comparisons, && and ||, and round, floor, ceil, abs, sqrt, min, max, if, contains, starts, ends, number and len; a formula reads measures in SI as a filter does, so Width > 0.9 is wider than 900 mm; or percentageOf, each row’s share of a field’s total. A formula that does not parse, or names a heading the schedule has no column for, refuses the call with the reason. A formula may also name another calculated column of the same schedule by its name, such as Volume * 1.1, but not a percentage one; a loop refuses the call, and so does a calculated column named like another column of the schedule. ' +
+      'style sets the window’s Style controls, only the keys given; groupFormat sets a sort or group level’s heading row, footer and blank line, by its field, after sortBy and groupBy; a column also takes colourRules, a width, a vertical heading and its number format. A value the window does not offer refuses the call with what it does. ' +
       `At most 40 columns, 8 filters, and 4 sort and group fields together, and ${SCHEDULE_CALCULATED_MAX} calculated columns. It changes only what the Schedules window shows — never the model.`,
     input_schema: obj({
       base: {
@@ -1303,9 +1334,9 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
             heading: { type: 'string', description: 'Column heading. Default: the field’s name.' },
             total: {
               type: 'string',
-              enum: ['sum', 'count', 'min', 'max', 'avg', 'none'],
+              enum: ['sum', 'count', 'count_distinct', 'min', 'max', 'avg', 'none'],
               description:
-                'Total this column in each group footer and the grand total; none takes a total away. A new column of areas, volumes, masses or counts is summed unless you say otherwise'
+                'Total this column in each group footer and the grand total; count_distinct counts the different values; none takes a total away. A new column of areas, volumes, masses or counts is summed unless you say otherwise'
             },
             // 2026-10-02 — the column menu's switches for this column, and its place.
             hidden: {
@@ -1323,6 +1354,33 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
               type: 'string',
               description:
                 'The heading or field of the column this one goes directly after; "" puts it first'
+            },
+            // 2026-11-25 — the column menu's More fold, and the column's colour rules.
+            width: { type: 'number', description: `Width in px, ${COL_WIDTH_MIN}–${COL_WIDTH_MAX}.` },
+            verticalHeading: { type: 'boolean', description: 'true turns the heading on its side' },
+            thousands: { type: 'boolean', description: 'Thousands separator. A numeric column only.' },
+            prefix: { type: 'string', description: `Text before each value, at most ${SCHEDULE_AFFIX_CHARS} characters; "" clears it.` },
+            suffix: { type: 'string', description: `Text after each value, at most ${SCHEDULE_AFFIX_CHARS} characters; "" clears it.` },
+            hideZero: { type: 'boolean', description: 'true shows a zero as a blank cell. A numeric column only.' },
+            showUnit: { type: 'boolean', description: 'true writes the unit symbol in each cell. A numeric column only.' },
+            yesNoStyle: { type: 'string', enum: SCHEDULE_BOOL_STYLE_ENUM, description: 'How a yes / no column reads.' },
+            colourRules: {
+              type: 'array',
+              description: `Cell colours by value, at most ${SCHEDULE_COLOUR_RULES_MAX}: given replaces the column’s rules, [] clears them. The ops a column offers depend on what it holds, as in the window.`,
+              items: obj(
+                {
+                  op: { type: 'string', enum: SCHEDULE_COLOUR_OP_ENUM },
+                  value: {
+                    type: 'string',
+                    description:
+                      'Compared with the cell as shown, in the column’s display unit (so 900 mm is 900) — not SI as a filter is; hasValue and noValue take none'
+                  },
+                  background: { type: 'string', description: 'Cell colour, #rrggbb' },
+                  text: { type: 'string', description: 'Text colour, #rrggbb' },
+                  bold: { type: 'boolean' }
+                },
+                ['op']
+              )
             }
           },
           ['field']
@@ -1409,7 +1467,34 @@ const SCHEDULE_TOOLS: readonly ToolSpec[] = [
       grandTotals: {
         type: 'boolean',
         description: 'A grand-total row under the table. A new schedule has one; false takes it away.'
-      }
+      },
+      grandTotalTitle: {
+        type: 'string',
+        description: `The grand-total row’s label, at most ${SCHEDULE_GRAND_TOTAL_TITLE_CHARS} characters; "" clears it.`
+      },
+      groupFormat: {
+        type: 'array',
+        description: 'Per sort or group level, by its field; only the keys given change. A field with no level refuses the call.',
+        items: obj(
+          {
+            field: SCHEDULE_FIELD,
+            header: { type: 'boolean', description: 'A heading row over each group' },
+            footer: { type: 'string', enum: SCHEDULE_FOOTER_ENUM, description: 'What each group’s footer row shows' },
+            blankLine: { type: 'boolean', description: 'A blank row after each group' }
+          },
+          ['field']
+        )
+      },
+      style: obj({
+        showTitle: { type: 'boolean' },
+        gridLines: { type: 'boolean' },
+        stripes: { type: 'boolean', description: 'Shade every other row' },
+        textSize: { type: 'number', description: `px, ${TEXT_SIZE_SLIDER_MIN}–${TEXT_SIZE_SLIDER_MAX}` },
+        font: { type: 'string', enum: SCHEDULE_FONT_KEYS },
+        outline: { type: 'boolean', description: 'A border round the table' },
+        boldHeader: { type: 'boolean' },
+        blankRowBeforeData: { type: 'boolean' }
+      })
     }),
     strict: true
   },

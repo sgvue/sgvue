@@ -359,12 +359,13 @@ Anything not on this list is a defect.
   there; its tooltip lists them in the short words, separated by " · ". Folded sort levels go into
   a neutral sort `+N` where their chips were, whose tooltip lists them ("Then sorted by Mark · …")
   and whose list gives each its name (opening its popover on the sort `+N`), a direction button
-  and a group button, both one click as on the chip. A round dashed `+` adds a
-  filter (disabled at eight, and says so). After a separator, a **sort chip** per level: the
+  and a group button, both one click as on the chip. A dashed `+ Filter` pill adds a
+  filter (disabled at eight, and says so; amended 2026-11-25, the owner: "put back the sort and
+  filter wording" — it was a bare round `+`). After a separator, a **sort chip** per level: the
   field's name (the same sort popover), an arrow segment that reverses the direction in one
   click, and a group segment, lit when grouped, that does exactly what the column menu's "Group
   by this" does (on: header row and a title, count and totals footer; off: neither, no blank
-  line); no level numbers ("Sorted first by …" / "Then sorted by …" in the tooltip); a `+` adds a
+  line); no level numbers ("Sorted first by …" / "Then sorted by …" in the tooltip); `+ Sort / group` adds a
   level (four at most, and says so). The "N formulas to fix" chip is unchanged. On the right, the
   window's icon buttons, `.on` when lit: columns with the shown-column count (the field picker;
   hidden and empty columns named in its tooltip, warn-coloured when a shown column is empty),

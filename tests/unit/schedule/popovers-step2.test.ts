@@ -238,9 +238,10 @@ describe('D. The column menu', () => {
 describe('E. Fast descriptions inside popovers and overlays', () => {
   // Every icon-only button the window draws inside a popover or an overlay, read straight from
   // the source: an opening <button> tag whose whole content is one icon.
-  const UI = resolve(__dirname, '../../../src/renderer/schedule-ui');
+  // Paths in `/` form on every system, so the names below match on Windows too.
+  const UI = resolve(__dirname, '../../../src/renderer/schedule-ui').replace(/\\/g, '/');
   const walk = (dir: string): string[] => readdirSync(dir).flatMap((n) => {
-    const f = join(dir, n);
+    const f = join(dir, n).replace(/\\/g, '/');
     return statSync(f).isDirectory() ? walk(f) : f.endsWith('.ts') ? [f] : [];
   });
   // The bar (step 1), the header and the rail keep their own tooltips; the table's headings
@@ -373,9 +374,10 @@ describe('one tooltip rule for the whole window: no title on a control (fix roun
   // Every `title="…"` the window's source writes, by file and the tag that carries it. A title may
   // stay only where it is not a control and carries content's full text (or, for the Vee dot, the
   // three-line hover the 2026-11-24 deviation records).
-  const UI = resolve(__dirname, '../../../src/renderer/schedule-ui');
+  // Paths in `/` form on every system, so the names below match on Windows too.
+  const UI = resolve(__dirname, '../../../src/renderer/schedule-ui').replace(/\\/g, '/');
   const walk = (dir: string): string[] => readdirSync(dir).flatMap((n) => {
-    const f = join(dir, n);
+    const f = join(dir, n).replace(/\\/g, '/');
     return statSync(f).isDirectory() ? walk(f) : f.endsWith('.ts') ? [f] : [];
   });
   const found = walk(UI).flatMap((f) => {

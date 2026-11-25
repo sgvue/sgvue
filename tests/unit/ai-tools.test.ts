@@ -517,11 +517,14 @@ describe('the Schedules window’s tools', () => {
       'combine',
       'filterLogic',
       'filters',
+      'grandTotalTitle',
       'grandTotals',
       'groupBy',
+      'groupFormat',
       'itemize',
       'removeColumns',
       'sortBy',
+      'style',
       'title'
     ])
     expect(make.input_schema.required).toBeUndefined()
@@ -1342,7 +1345,7 @@ describe('parity with the user — phase 4: the Schedules window, and placing ma
 
   it('make_schedule gains a column’s format and place, calculated columns, the filter logic and itemise', () => {
     const col = make.input_schema.properties.columns.items!
-    expect(Object.keys(col.properties!)).toEqual(['field', 'heading', 'total', 'hidden', 'decimals', 'unit', 'align', 'after'])
+    expect(Object.keys(col.properties!)).toEqual(['field', 'heading', 'total', 'hidden', 'decimals', 'unit', 'align', 'after', 'width', 'verticalHeading', 'thousands', 'prefix', 'suffix', 'hideZero', 'showUnit', 'yesNoStyle', 'colourRules'])
     expect(col.required).toEqual(['field'])
     const calc = make.input_schema.properties.calculated.items!
     expect(Object.keys(calc.properties!)).toEqual(['name', 'formula', 'percentageOf', 'result', 'note'])
