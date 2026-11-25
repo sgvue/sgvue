@@ -4,6 +4,21 @@
 > 2026-10-05) refer to the project's private history and do not resolve in this repository;
 > later ones do.
 
+## 2026-11-25 — "+ Filter" and "+ Sort / group" are back; Vee sets up everything the Schedules window can
+
+**Did.** Owner: *"put back the sort and filter wording"* — the bar's two add buttons read `+ Filter` and
+`+ Sort / group` again (dashed pills; the fold still measures real widths). Owner: *"Vee should be able to setup
+everything in schedule"* and *"as long as Vee dont get the chance to edit any database"* — `make_schedule` gains
+`style` (title, grid lines, stripes, text size 10–18 as the slider, font, outline, bold header, blank row),
+`groupFormat` (each level's header, footer and blank line), `grandTotalTitle`, per-column `colourRules` (`#rrggbb`
+only, ops as the window offers per column type, at most 10) and column extras (width 30–600, vertical heading,
+thousands, prefix, suffix, hide zero, show unit, yes/no style, count distinct); `get_schedule` reads them back in the
+same names. Still `kind:'view'`: no new tool, gate, channel or write. Limits live in `src/schedule/schedule/limits.ts`,
+read by the window's own controls too. **How it was checked:** checks written first by a separate run and seen
+failing (`assistant-settings`, `assistant-settings-review`, `viewBar-compact`); deep review, two rounds, PASS;
+typecheck, lint, `npm test` (2 pre-existing Windows failures in `popovers-step2`); `schedules.spec.ts` in the window,
+12 passed. **Open:** no live API turn has sent the larger strict schema yet.
+
 ## 2026-11-25 — the Schedules view bar is one line; the popovers get fewer controls and better defaults
 
 **Did.** Owner-approved from the prototype `prototype/schedule-bar/` (*"Yes, build it"*), in two steps.

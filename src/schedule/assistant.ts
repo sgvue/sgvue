@@ -29,18 +29,34 @@
  * (`kindOf`, `typeOf`, `unitOptions`, `calcProblems`: the engine's, which the controls call too), and
  * `simplify` reads every one of them back. And `scheduleElementIds` is the schedule's rows as a
  * set of elements, for the view tools' `schedule:true` target.
+ *
+ * 2026-11-25 — five more things the window sets: the Style popover (`style`), a sort or group
+ * level's heading row, footer and blank line (`groupFormat`), the grand-total row's label, a
+ * column's colour rules, and its width, heading direction, number format, yes / no spelling and
+ * distinct count. Each within the window control's own range or list, else the call is refused.
  */
 import type { ScheduleBrief } from '../shared/ai-schema'
 import { ATTR_KEYS } from '../shared/attr'
-import { CALC_NOTE_CHARS, SCHEDULE_FORMULA_CHARS } from '../shared/tool-schemas'
+import {
+  CALC_NOTE_CHARS,
+  NOT_A_COLOUR,
+  SCHEDULE_AFFIX_CHARS,
+  SCHEDULE_COLOUR_RULES_MAX,
+  SCHEDULE_COLOUR_VALUE_CHARS,
+  SCHEDULE_FOOTER_ENUM,
+  SCHEDULE_FORMULA_CHARS,
+  SCHEDULE_GRAND_TOTAL_TITLE_CHARS,
+  SCHEDULE_HEX_COLOUR
+} from '../shared/tool-schemas'
 import { ambiguousText, nearestKeys, normKey, resolveKey } from '../shared/prop-names'
 import { keysForEntity, type ModelStore } from './ifc/store'
 import type { PropStat, UnitKind } from './ifc/types'
 import { alignForCalc, columnForCore, columnForProp, kindOf, kindsByHeading, typeOf } from './schedule/columns'
-import { matchRule, OP_LABELS, ruleText } from './schedule/compare'
+import { matchRule, OP_LABELS, opsForType, ruleText } from './schedule/compare'
 import { bracketProblem, calcCalled, calcNameClash, clearOfCalcNames, HEADING_TAKEN } from './schedule/calcNames'
 import { calcProblems, planComputed } from './schedule/computed'
 import {
+  BOOL_STYLES,
   CORE_KEYS,
   CORE_LABELS,
   MAX_SORT_LEVELS,
@@ -50,8 +66,10 @@ import {
   newId,
   parseScheduleDef,
   resultOf,
+  type Appearance,
   type Calculated,
   type Column,
+  type CondRule,
   type CoreKey,
   type FieldRef,
   type FilterRule,
@@ -60,9 +78,11 @@ import {
   type SortLevel
 } from './schedule/def'
 import { candidateRows, disambiguate, runSchedule, visibleColumns } from './schedule/engine'
+import { BODY_FONTS, normaliseFont } from './schedule/fonts'
 import { defaultUnit, unitOptions } from './schedule/format'
 import { dimensionOf } from './schedule/formula'
 import { ANY_PSET, resolveField } from './schedule/resolve'
+import { COL_WIDTH_MAX, COL_WIDTH_MIN, TEXT_SIZE_SLIDER_MAX, TEXT_SIZE_SLIDER_MIN } from './schedule/limits'
 import { MAX_DEF_CALCULATED, MAX_DEF_COLUMNS } from './messages'
 
 /* ────────────────────────────── bounds ────────────────────────────── */
@@ -89,8 +109,8 @@ export const READ_BUDGET = 300_000
 /** Names offered for a field that is not one. */
 export const FIELD_NEAREST_CAP = 8
 
-/** The totals `make_schedule` offers; `none` takes a total away. */
-export const SCHEDULE_TOTALS = ['sum', 'count', 'min', 'max', 'avg', 'none'] as const
+/** The totals `make_schedule` offers; `none` takes a total away, `count_distinct` is `countDistinct`. */
+export const SCHEDULE_TOTALS = ['sum', 'count', 'count_distinct', 'min', 'max', 'avg', 'none'] as const
 /** The engine's own thirteen operators. */
 export const SCHEDULE_OPS = Object.keys(OP_LABELS) as Op[]
 
@@ -130,6 +150,47 @@ export interface AskColumn {
   align?: (typeof SCHEDULE_ALIGNS)[number]
   /** The heading or field of the column this one goes directly after; `""` puts it first. */
   after?: string
+  /** 2026-11-25 — the column menu's More fold: px, `COL_WIDTH_MIN`–`COL_WIDTH_MAX`. */
+  width?: number
+  verticalHeading?: boolean
+  /** A numeric column's switches: `thousands`, `hideZero` (suppressZero), `showUnit` (showSymbol). */
+  thousands?: boolean
+  hideZero?: boolean
+  showUnit?: boolean
+  /** Text either side of each value, at most `SCHEDULE_AFFIX_CHARS`; `""` clears. */
+  prefix?: string
+  suffix?: string
+  /** A yes / no column's spelling. */
+  yesNoStyle?: (typeof BOOL_STYLES)[number]
+  /** Given replaces the column's colour rules, `[]` clears them, absent keeps them. */
+  colourRules?: AskColourRule[]
+}
+/** One colour rule, as `make_schedule` names it: `background` is `bg`, `text` is `fg`. */
+export interface AskColourRule {
+  op: Op
+  value?: string | number
+  background?: string
+  text?: string
+  bold?: boolean
+}
+export type ScheduleFooterName = (typeof SCHEDULE_FOOTER_ENUM)[number]
+/** One sort or group level's heading row, footer and blank line, by its field. */
+export interface AskGroupFormat {
+  field: string
+  header?: boolean
+  footer?: ScheduleFooterName
+  blankLine?: boolean
+}
+/** The Style popover, under the names `make_schedule` takes. Only the keys given change. */
+export interface AskStyle {
+  showTitle?: boolean
+  gridLines?: boolean
+  stripes?: boolean
+  textSize?: number
+  font?: string
+  outline?: boolean
+  boldHeader?: boolean
+  blankRowBeforeData?: boolean
 }
 /** One calculated value: a formula over the other columns' headings, or a share of a total. */
 export interface AskCalculated {
@@ -168,6 +229,11 @@ export interface AskSchedule {
   /** How itemise off combines: 'sort' is one row per sort value (Revit's way); 'identical' the default. */
   combine?: 'identical' | 'sort'
   grandTotals?: boolean
+  /** The grand-total row's label; `""` clears it. */
+  grandTotalTitle?: string
+  /** Applied after `sortBy` / `groupBy`, to the level with that field. */
+  groupFormat?: AskGroupFormat[]
+  style?: AskStyle
 }
 
 /** What the field names are resolved against. */
@@ -523,6 +589,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
       else delete col.heading
     }
     if (spec.total === 'none') delete col.total
+    else if (spec.total === 'count_distinct') col.total = 'countDistinct'
     else if (spec.total !== undefined) col.total = spec.total
     if (spec.align !== undefined) col.align = spec.align
   }
@@ -543,6 +610,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
   const filterSpecs = (ask.filters ?? []).map((spec) => ({ spec, field: resolve(spec.field) }))
   const sortSpecs = (ask.sortBy ?? []).map((spec) => ({ spec, field: resolve(spec.field) }))
   const groupFields = (ask.groupBy ?? []).map((asked) => resolve(asked))
+  const formatSpecs = (ask.groupFormat ?? []).map((spec) => ({ spec, field: resolve(spec.field) }))
 
   if (errors.length) return { error: errors.join(' '), valid_values: { fields } }
   for (const { calc, of } of calcs) if (of) calc.ofField = of
@@ -686,6 +754,7 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
       } else col.format = { ...col.format, decimals: spec.decimals }
     }
   }
+  for (const { spec, col } of placed) dressExtras(store, def, col, spec, errors)
   if (errors.length) return { error: errors.join(' ') }
 
   if (ask.filters !== undefined) {
@@ -723,6 +792,33 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
     def.sort = [...groups, ...plain]
   }
 
+  // ── a level's heading row, footer and blank line, on the levels this call leaves ──
+  for (const { spec, field } of formatSpecs) {
+    const level = def.sort.find((l) => sameField(l.field, field!))
+    if (!level) {
+      const levels = def.sort.map((l) => fieldName(l.field, def))
+      errors.push(
+        `groupFormat: this schedule has no sort or group level for ${spec.field} — ` +
+          (levels.length ? `its levels are ${levels.join(', ')}` : 'it has none') +
+          '; sort or group by it first (sortBy or groupBy).'
+      )
+      continue
+    }
+    if (spec.header !== undefined) level.header = spec.header
+    if (spec.footer !== undefined) level.footer = spec.footer === 'title_count_totals' ? 'titleCountTotals' : spec.footer
+    if (spec.blankLine !== undefined) level.blankLine = spec.blankLine
+  }
+  if (ask.style) applyStyle(def, ask.style, errors)
+  if (errors.length) return { error: errors.join(' ') }
+  if (ask.grandTotalTitle !== undefined) {
+    const label = ask.grandTotalTitle.trim()
+    if (label.length > SCHEDULE_GRAND_TOTAL_TITLE_CHARS) {
+      return { error: `grandTotalTitle is at most ${SCHEDULE_GRAND_TOTAL_TITLE_CHARS} characters; that one has ${label.length}.` }
+    }
+    if (label) def.grandTotalTitle = label
+    else delete def.grandTotalTitle
+  }
+
   if (ask.combine === 'sort' && ask.itemize === true) {
     return { error: 'make_schedule: combine "sort" needs itemize false — leave itemize out (combine switches it off) or send itemize: false.' }
   }
@@ -744,6 +840,143 @@ export function buildSchedule(ask: AskSchedule, w: FieldWorld, base: ScheduleDef
     return { error: `That schedule could not be built: ${error instanceof Error ? error.message : String(error)}` }
   }
   return { def: checked, resolvedKeys, ...(dropped ? { dropped } : {}) }
+}
+
+/** What a refusal quotes back of a value the model sent: bounded, one line. */
+const quoted = (v: unknown): string => (typeof v === 'number' ? String(v) : JSON.stringify(clip(String(v), 40)))
+const FONT_KEYS: readonly string[] = BODY_FONTS.map((f) => f.key)
+
+/**
+ * The Style popover's controls, by `make_schedule`'s names (2026-11-25): only the keys given
+ * change. Text size is the popover slider's own range (`TEXT_SIZE_SLIDER_MIN`–`_MAX`), a font one
+ * of its list.
+ */
+function applyStyle(def: ScheduleDef, style: AskStyle, errors: string[]): void {
+  const a: Appearance = (def.appearance ??= {})
+  if (style.textSize !== undefined) {
+    const n = style.textSize
+    if (!Number.isFinite(n) || n < TEXT_SIZE_SLIDER_MIN || n > TEXT_SIZE_SLIDER_MAX) {
+      errors.push(`Text size ${quoted(n)} is outside ${TEXT_SIZE_SLIDER_MIN}–${TEXT_SIZE_SLIDER_MAX} px, the Style slider’s range.`)
+    } else a.fontSize = Math.round(n)
+  }
+  if (style.font !== undefined) {
+    if (!FONT_KEYS.includes(style.font)) {
+      errors.push(`Font ${quoted(style.font)} is not one the Style popover offers — the fonts are ${FONT_KEYS.join(', ')}.`)
+    } else a.bodyFont = style.font
+  }
+  if (style.showTitle !== undefined) a.showTitle = style.showTitle
+  if (style.gridLines !== undefined) a.gridLines = style.gridLines
+  if (style.stripes !== undefined) a.zebra = style.stripes
+  if (style.outline !== undefined) a.outline = style.outline
+  if (style.boldHeader !== undefined) a.headerBold = style.boldHeader
+  if (style.blankRowBeforeData !== undefined) a.blankRowBeforeData = style.blankRowBeforeData
+}
+
+/**
+ * A column's More fold and colour rules (2026-11-25), each by the column menu's own rule: a
+ * width in its Width box's range; thousands, blank-for-zero and the unit symbol where it offers
+ * them (a numeric column); a yes / no spelling on a yes / no column; colour rules with the
+ * operators its rule row offers for what the column holds (`opsForType` less the two list
+ * operators, plus one a rule of this column already uses, which the row keeps), colours
+ * `#rrggbb` only, at most `SCHEDULE_COLOUR_RULES_MAX`.
+ */
+function dressExtras(store: ModelStore, def: ScheduleDef, col: Column, spec: AskColumn, errors: string[]): void {
+  const heading = headingOf(col, def)
+  const type = typeOf(store, def, col.field)
+  const numeric = type === 'number' || kindOf(store, def, col.field) !== 'none'
+  if (spec.width !== undefined) {
+    const w = spec.width
+    if (!Number.isFinite(w) || w < COL_WIDTH_MIN || w > COL_WIDTH_MAX) {
+      errors.push(`${heading}: width ${quoted(w)} is outside ${COL_WIDTH_MIN}–${COL_WIDTH_MAX} px, the column menu’s range.`)
+    } else col.width = Math.round(w)
+  }
+  if (spec.verticalHeading === true) col.headingOrientation = 'vertical'
+  else if (spec.verticalHeading === false) delete col.headingOrientation
+  const switches: [keyof AskColumn, boolean | undefined][] = [
+    ['thousands', spec.thousands],
+    ['hideZero', spec.hideZero],
+    ['showUnit', spec.showUnit]
+  ]
+  const on = switches.filter(([, v]) => v === true).map(([k]) => k)
+  if (on.length && !numeric) {
+    errors.push(`${heading} is not a number, so ${on.join(', ')} do${on.length === 1 ? 'es' : ''} not apply to it.`)
+  } else {
+    if (spec.thousands !== undefined) col.format = { ...col.format, thousands: spec.thousands }
+    if (spec.hideZero !== undefined) {
+      col.format = { ...col.format, suppressZero: true }
+      if (!spec.hideZero) delete col.format.suppressZero
+    }
+    if (spec.showUnit !== undefined) {
+      col.format = { ...col.format, showSymbol: true }
+      if (!spec.showUnit) delete col.format.showSymbol
+    }
+  }
+  for (const key of ['prefix', 'suffix'] as const) {
+    const text = spec[key]
+    if (text === undefined) continue
+    if (text.length > SCHEDULE_AFFIX_CHARS) {
+      errors.push(`${heading}: a ${key} is at most ${SCHEDULE_AFFIX_CHARS} characters.`)
+    } else {
+      col.format = { ...col.format, [key]: text }
+      if (!text) delete col.format[key]
+    }
+  }
+  if (spec.yesNoStyle !== undefined) {
+    const style = BOOL_STYLES.find((b) => b === spec.yesNoStyle)
+    if (!style) {
+      errors.push(`${heading}: yesNoStyle ${quoted(spec.yesNoStyle)} is not one of the window’s yes / no styles — ${BOOL_STYLES.join(', ')}.`)
+    } else if (type !== 'bool') {
+      errors.push(`${heading} is not a yes / no column, so yesNoStyle does not apply to it.`)
+    } else col.format = { ...col.format, boolStyle: style }
+  }
+  if (spec.colourRules !== undefined) {
+    const asked = spec.colourRules
+    if (asked.length > SCHEDULE_COLOUR_RULES_MAX) {
+      errors.push(`${heading}: at most ${SCHEDULE_COLOUR_RULES_MAX} colour rules on one column; that asks for ${asked.length}.`)
+      return
+    }
+    const ops = new Set<Op>([
+      ...opsForType(type).filter((o) => o !== 'in' && o !== 'between'),
+      ...(col.conditional ?? []).map((r) => r.op)
+    ])
+    const rules: CondRule[] = []
+    asked.forEach((r, i) => {
+      const which = `${heading}: colour rule ${i + 1}`
+      const bad: string[] = []
+      if (!ops.has(r.op)) bad.push(`${which}'s op ${quoted(r.op)} is not offered for this column — its ops are ${[...ops].join(', ')}.`)
+      for (const [key, v] of [['background', r.background], ['text', r.text]] as const) {
+        if (v !== undefined && !SCHEDULE_HEX_COLOUR.test(v)) bad.push(`${which}'s ${key} colour ${quoted(v)} ${NOT_A_COLOUR}`)
+      }
+      if (typeof r.value === 'string' && r.value.length > SCHEDULE_COLOUR_VALUE_CHARS) {
+        bad.push(`${which}'s value is at most ${SCHEDULE_COLOUR_VALUE_CHARS} characters.`)
+      }
+      if (bad.length) {
+        errors.push(...bad)
+        return
+      }
+      const presence = r.op === 'hasValue' || r.op === 'noValue'
+      rules.push({
+        op: r.op,
+        ...(!presence && r.value !== undefined ? { value: r.value } : {}),
+        ...(r.background !== undefined ? { bg: r.background } : {}),
+        ...(r.text !== undefined ? { fg: r.text } : {}),
+        bold: r.bold === true
+      })
+    })
+    if (rules.length) col.conditional = rules
+    else delete col.conditional
+  }
+}
+
+/** A colour the file holds, as `#rrggbb` — the reader also keeps `#rgb` and `rgb(…)` — so get_schedule's read sends back as-is. */
+function hexOf(c: string | undefined): string | undefined {
+  if (!c) return undefined
+  const s = c.trim()
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(s)
+  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`
+  const rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i.exec(s)
+  if (rgb) return '#' + rgb.slice(1, 4).map((n) => Math.min(255, Number(n)).toString(16).padStart(2, '0')).join('')
+  return s
 }
 
 const NUMERIC_OPS: ReadonlySet<Op> = new Set<Op>(['>', '>=', '<', '<='])
@@ -789,22 +1022,65 @@ function toRule(spec: AskFilter, field: FieldRef, def: ScheduleDef): FilterRule 
  * (`alignOf`: right for a column with decimals or a total, left otherwise — so an ordinary text
  * or number column says nothing), `filterLogic` and `itemize` as before, and what each
  * calculated value's `result` is. A column's place is its place in the list.
+ *
+ * 2026-11-25: and `style`, `groupFormat`, `grandTotalTitle` and each column's width, heading
+ * direction, number format, yes / no style, colour rules and distinct count, the same way — each
+ * only where it is not what a schedule does anyway, so an ordinary schedule reads as before:
+ * a style key that is not the window's default; a level's heading row and footer where they are
+ * not what groupBy gives (a heading row, and a count — with totals when a column has one), its
+ * blank line when on; a column's thousands separator when off, or with the rest of a number
+ * format that is set (a prefix, a suffix, blank for zero, the unit symbol).
  */
 export function simplify(def: ScheduleDef): Record<string, unknown> {
   const calculated = def.calculated ?? []
+  const footerByDefault = def.columns.some((c) => c.total) ? 'titleCountTotals' : 'count'
+  const levels = def.sort
+    .map((l) => {
+      const group = isGroup(l)
+      return {
+        field: fieldName(l.field, def),
+        ...(group && l.header !== true ? { header: !!l.header } : {}),
+        ...(group && l.footer !== undefined && l.footer !== footerByDefault ? { footer: footerName(l.footer) } : {}),
+        ...(l.blankLine ? { blankLine: true } : {})
+      }
+    })
+    .filter((l) => Object.keys(l).length > 1)
+  const style = styleOf(def.appearance ?? {})
   return {
     title: clip(titleOf(def), 200),
     category: def.entity,
     columns: def.columns.map((c) => ({
       field: fieldName(c.field, def),
       heading: clip(headingOf(c, def)),
-      ...(c.total ? { total: c.total } : {}),
+      ...(c.total ? { total: c.total === 'countDistinct' ? 'count_distinct' : c.total } : {}),
       ...(c.hidden ? { hidden: true } : {}),
       ...(c.format?.decimals !== undefined ? { decimals: c.format.decimals } : {}),
       ...(c.align && c.align !== (c.total || c.format?.decimals !== undefined ? 'right' : 'left')
         ? { align: c.align }
         : {}),
-      ...(c.field.kind === 'formula' ? { calculated: true } : {})
+      ...(c.field.kind === 'formula' ? { calculated: true } : {}),
+      ...(c.width !== undefined ? { width: c.width } : {}),
+      ...(c.headingOrientation === 'vertical' ? { verticalHeading: true } : {}),
+      ...(c.format?.thousands === false ||
+      (c.format?.thousands !== undefined && (c.format.prefix || c.format.suffix || c.format.suppressZero || c.format.showSymbol))
+        ? { thousands: c.format.thousands }
+        : {}),
+      ...(c.format?.prefix ? { prefix: c.format.prefix } : {}),
+      ...(c.format?.suffix ? { suffix: c.format.suffix } : {}),
+      ...(c.format?.suppressZero ? { hideZero: true } : {}),
+      ...(c.format?.showSymbol ? { showUnit: true } : {}),
+      ...(c.format?.boolStyle ? { yesNoStyle: c.format.boolStyle } : {}),
+      ...(c.conditional?.length
+        ? {
+            colourRules: c.conditional.map((r) => ({
+              op: r.op,
+              ...(r.value !== undefined ? { value: typeof r.value === 'number' ? r.value : clip(r.value) } : {}),
+              ...(r.bg ? { background: hexOf(r.bg) } : {}),
+              ...(r.fg ? { text: hexOf(r.fg) } : {}),
+              ...(r.bold ? { bold: true } : {})
+            }))
+          }
+        : {})
     })),
     filters: def.filters.map((f) => ({
       field: fieldName(f.field, def),
@@ -817,7 +1093,10 @@ export function simplify(def: ScheduleDef): Record<string, unknown> {
       .filter((l) => !isGroup(l))
       .map((l) => ({ field: fieldName(l.field, def), ...(l.dir === 'desc' ? { descending: true } : {}) })),
     groupBy: def.sort.filter(isGroup).map((l) => fieldName(l.field, def)),
+    ...(levels.length ? { groupFormat: levels } : {}),
     grandTotals: def.grandTotal,
+    ...(def.grandTotalTitle ? { grandTotalTitle: clip(def.grandTotalTitle, 200) } : {}),
+    ...(Object.keys(style).length ? { style } : {}),
     ...(def.itemize ? {} : { itemize: false }),
     ...(!def.itemize && def.combine === 'sort' ? { combine: 'sort' } : {}),
     ...(calculated.length
@@ -832,6 +1111,35 @@ export function simplify(def: ScheduleDef): Record<string, unknown> {
           }))
         }
       : {})
+  }
+}
+
+/** The Style popover's keys that are not its defaults (`parseScheduleDef`'s), under `make_schedule`'s names. */
+function styleOf(a: Appearance): AskStyle {
+  const font = normaliseFont(a.bodyFont)
+  const size = a.fontSize ?? 13
+  return {
+    ...(a.showTitle === false ? { showTitle: false } : {}),
+    ...(a.gridLines === false ? { gridLines: false } : {}),
+    ...(a.zebra === false ? { stripes: false } : {}),
+    ...(size !== 13 ? { textSize: size } : {}),
+    ...(font !== 'plex' ? { font } : {}),
+    ...(a.outline === false ? { outline: false } : {}),
+    ...(a.headerBold === false ? { boldHeader: false } : {}),
+    ...(a.blankRowBeforeData ? { blankRowBeforeData: true } : {})
+  }
+}
+
+/** A level's footer as `make_schedule` names it. */
+function footerName(f: NonNullable<SortLevel['footer']>): ScheduleFooterName {
+  switch (f) {
+    case 'titleCountTotals':
+      return 'title_count_totals'
+    case 'none':
+    case 'title':
+    case 'count':
+    case 'totals':
+      return f
   }
 }
 

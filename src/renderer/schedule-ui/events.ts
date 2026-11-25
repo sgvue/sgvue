@@ -37,6 +37,7 @@ import {
   type Column, type CondRule, type FieldRef, type FilterRule, type ScheduleDef, type SortLevel, type TotalKind,
 } from '../../schedule/schedule/def';
 import { clampDecimals, defaultDecimals } from '../../schedule/schedule/format';
+import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../../schedule/schedule/limits';
 import { headingBoxProblem, nameBoxProblem } from '../../schedule/schedule/calcNames';
 import { dimensionOf } from '../../schedule/schedule/formula';
 import { printSchedule, stepHistory } from './actions';
@@ -753,7 +754,7 @@ function wireAppearance(root: HTMLElement) {
   onChange(root, '[data-act="app-font"]', (el) =>
     updateDef((def) => act.setAppearance(def, { bodyFont: text(el) })));
   onInput(root, '[data-act="app-fontsize"]', (el) =>
-    updateDef((def) => act.setAppearance(def, { fontSize: clamp(num(el), 8, 24) })));
+    updateDef((def) => act.setAppearance(def, { fontSize: clamp(num(el), FONT_SIZE_MIN, FONT_SIZE_MAX) })));
 }
 
 // ---------------------------------------------------------------- view bar

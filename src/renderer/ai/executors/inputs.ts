@@ -55,7 +55,17 @@ import {
   MAX_TOOL_IDS,
   RECENT_NAME_MAX,
   REQUEST_ACTIONS,
+  SCHEDULE_AFFIX_CHARS,
+  SCHEDULE_BOOL_STYLE_ENUM,
+  SCHEDULE_COLOUR_OP_ENUM,
+  SCHEDULE_COLOUR_RULES_MAX,
   SCHEDULE_EXPORT_FORMATS,
+  SCHEDULE_COLOUR_VALUE_CHARS,
+  SCHEDULE_FONT_KEYS,
+  SCHEDULE_FOOTER_ENUM,
+  SCHEDULE_GRAND_TOTAL_TITLE_CHARS,
+  SCHEDULE_HEX_COLOUR,
+  NOT_A_COLOUR,
   SCHEDULE_MANAGE_OPS,
   SCHEDULE_NAME_MAX,
   SPOT_SHOWS,
@@ -79,6 +89,7 @@ import {
 import { isSafeName } from '../../../schedule/messages'
 import { MAX_FILTERS, MAX_SORT_LEVELS, type Op } from '../../../schedule/schedule/def'
 import { DECIMALS_MAX, DECIMALS_MIN } from '../../../schedule/schedule/format'
+import { COL_WIDTH_MAX, COL_WIDTH_MIN, TEXT_SIZE_SLIDER_MAX, TEXT_SIZE_SLIDER_MIN } from '../../../schedule/schedule/limits'
 
 /**
  * 2026-11-09 (the v4 run: Sonnet 5.5 sent `base: "\"open\""`) — a value that arrives wrapped in a
@@ -147,6 +158,39 @@ const MarkupMetres = z
  */
 const SchedField = z.string().min(1).max(200)
 const SchedValue = z.union([z.string().max(500), z.number(), z.boolean()])
+/** A number in the window control's own range, said in words when it is not. */
+const SchedRange = (lo: number, hi: number) =>
+  z.number().min(lo, `between ${lo} and ${hi}`).max(hi, `between ${lo} and ${hi}`)
+/**
+ * 2026-11-25 — a colour rule. Its colours reach a CSS declaration: `#rrggbb` only, here and
+ * again in `buildSchedule` (and `parseScheduleDef` on read), refused in the same words.
+ */
+const SchedColour = z.string().regex(SCHEDULE_HEX_COLOUR, NOT_A_COLOUR)
+const SchedColourRule = z.object({
+  op: en(SCHEDULE_COLOUR_OP_ENUM as [Op, ...Op[]]),
+  value: z
+    .union([
+      z.string().max(SCHEDULE_COLOUR_VALUE_CHARS, `a colour rule's value is at most ${SCHEDULE_COLOUR_VALUE_CHARS} characters`),
+      z.number()
+    ])
+    .optional(),
+  background: SchedColour.optional(),
+  text: SchedColour.optional(),
+  bold: z.boolean().optional()
+})
+/** The Style popover: only the keys given change, and an unknown one is refused, not dropped. */
+const SchedStyle = z
+  .object({
+    showTitle: z.boolean().optional(),
+    gridLines: z.boolean().optional(),
+    stripes: z.boolean().optional(),
+    textSize: SchedRange(TEXT_SIZE_SLIDER_MIN, TEXT_SIZE_SLIDER_MAX).optional(),
+    font: en(SCHEDULE_FONT_KEYS as [string, ...string[]]).optional(),
+    outline: z.boolean().optional(),
+    boldHeader: z.boolean().optional(),
+    blankRowBeforeData: z.boolean().optional()
+  })
+  .strict()
 const ScheduleInput = z.object({
   base: en(['new', 'open']).optional(),
   // (Phase 4: a title becomes a saved setup's name when the schedule is saved, so it is held
@@ -173,7 +217,20 @@ const ScheduleInput = z.object({
           .optional(),
         unit: z.string().min(1).max(8).optional(),
         align: en(SCHEDULE_ALIGNS).optional(),
-        after: z.string().max(200).optional()
+        after: z.string().max(200).optional(),
+        // 2026-11-25 — the column menu's More fold, and the column's colour rules.
+        width: SchedRange(COL_WIDTH_MIN, COL_WIDTH_MAX).optional(),
+        verticalHeading: z.boolean().optional(),
+        thousands: z.boolean().optional(),
+        prefix: z.string().max(SCHEDULE_AFFIX_CHARS, `at most ${SCHEDULE_AFFIX_CHARS} characters`).optional(),
+        suffix: z.string().max(SCHEDULE_AFFIX_CHARS, `at most ${SCHEDULE_AFFIX_CHARS} characters`).optional(),
+        hideZero: z.boolean().optional(),
+        showUnit: z.boolean().optional(),
+        yesNoStyle: en(SCHEDULE_BOOL_STYLE_ENUM).optional(),
+        colourRules: z
+          .array(SchedColourRule)
+          .max(SCHEDULE_COLOUR_RULES_MAX, `at most ${SCHEDULE_COLOUR_RULES_MAX} colour rules on one column`)
+          .optional()
       })
     )
     .max(SCHEDULE_COLUMN_CAP, `at most ${SCHEDULE_COLUMN_CAP} columns in one call`)
@@ -214,7 +271,24 @@ const ScheduleInput = z.object({
     .max(MAX_SORT_LEVELS)
     .optional(),
   groupBy: z.array(SchedField).max(MAX_SORT_LEVELS).optional(),
-  grandTotals: z.boolean().optional()
+  grandTotals: z.boolean().optional(),
+  // 2026-11-25 — the grand-total row's label, a level's heading and footer, the Style popover.
+  grandTotalTitle: z
+    .string()
+    .max(SCHEDULE_GRAND_TOTAL_TITLE_CHARS, `grandTotalTitle is at most ${SCHEDULE_GRAND_TOTAL_TITLE_CHARS} characters`)
+    .optional(),
+  groupFormat: z
+    .array(
+      z.object({
+        field: SchedField,
+        header: z.boolean().optional(),
+        footer: en(SCHEDULE_FOOTER_ENUM).optional(),
+        blankLine: z.boolean().optional()
+      })
+    )
+    .max(MAX_SORT_LEVELS)
+    .optional(),
+  style: SchedStyle.optional()
 })
 
 export const TOOL_INPUTS = {

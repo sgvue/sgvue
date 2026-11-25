@@ -8,17 +8,18 @@
 // through the caller so this module never touches app state.
 
 import { clamp } from './dom';
+import { COL_WIDTH_MAX, COL_WIDTH_MIN } from '../../schedule/schedule/limits';
 
 /** Hot zone at the right edge of a heading. Narrow: the rest of the th still opens the column menu. */
 const EDGE = 6;
 /**
- * The one range a column width may be set to. This module owns it because the drag is the
- * gesture that produces widths; the column menu's Width box (its min/max attributes, and the
- * one commit in events.ts, which clamps through `clampWidth` below) imports from here so it
- * cannot disagree.
+ * The one range a column width may be set to. The drag is the gesture that produces widths;
+ * the column menu's Width box (its min/max attributes, and the one commit in events.ts, which
+ * clamps through `clampWidth` below) imports from here so it cannot disagree. The numbers live
+ * engine-side (`schedule/limits.ts`, 2026-11-25) so the assistant's `make_schedule` reads the
+ * same range; they are re-exported here for this window's own users.
  */
-export const COL_WIDTH_MIN = 30;
-export const COL_WIDTH_MAX = 600;
+export { COL_WIDTH_MAX, COL_WIDTH_MIN };
 
 /**
  * A number turned into a width this app will accept. The rounding is half of it: a width
